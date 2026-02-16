@@ -34,7 +34,11 @@ It's built with love for **Android gaming handhelds** (Retroid, Odin, AYN, Anber
 
 ## 📸 Screenshots
 
-*Screenshots coming soon!*
+<p align="center">
+  <img src="screenshots/console_list.png" width="250" alt="Console Overview" />
+  <img src="screenshots/rom_list.png" width="250" alt="ROM List" />
+  <img src="screenshots/download_queue.png" width="250" alt="Download Queue" />
+</p>
 
 ---
 
