@@ -1,0 +1,249 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'app_intents.dart';
+import 'global_input_wrapper.dart';
+import 'input_providers.dart';
+
+mixin ConsoleScreenMixin<T extends ConsumerStatefulWidget> on ConsumerState<T> {
+  late final FocusNode screenFocusNode;
+  late final FocusStateManager _focusStateManager;
+
+  @protected
+  FocusStateManager get focusStateManager => _focusStateManager;
+
+  String get routeId;
+
+  Map<Type, Action<Intent>> get screenActions => {};
+
+  Map<ShortcutActivator, Intent>? get additionalShortcuts => null;
+
+  @override
+  void initState() {
+    super.initState();
+    screenFocusNode = FocusNode(debugLabel: 'Screen_$routeId');
+    _focusStateManager = ref.read(focusStateManagerProvider.notifier);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreFocus();
+    });
+  }
+
+  void _restoreFocus() {
+    final savedState = ref.read(focusStateManagerProvider)[routeId];
+    if (savedState?.savedFocusNode?.canRequestFocus == true) {
+      savedState!.savedFocusNode!.requestFocus();
+    } else {
+      screenFocusNode.requestFocus();
+    }
+  }
+
+  void requestScreenFocus() {
+    if (screenFocusNode.canRequestFocus) {
+      screenFocusNode.requestFocus();
+    }
+  }
+
+  @override
+  void dispose() {
+    // Schedule focus state save to avoid modifying provider during build/dispose
+    Future.delayed(Duration.zero, () {
+      _focusStateManager.saveFocusState(
+        routeId,
+        savedFocusNode: FocusManager.instance.primaryFocus,
+      );
+    });
+
+    screenFocusNode.dispose();
+    super.dispose();
+  }
+
+  void saveFocusState({
+    int? selectedIndex,
+    String? focusedElementId,
+    Map<String, dynamic>? metadata,
+  }) {
+    _focusStateManager.saveFocusState(
+          routeId,
+          selectedIndex: selectedIndex,
+          focusedElementId: focusedElementId,
+          metadata: metadata ?? const {},
+        );
+  }
+
+  FocusStateEntry? getSavedFocusState() {
+    return _focusStateManager.state[routeId];
+  }
+
+  int? get savedSelectedIndex => getSavedFocusState()?.selectedIndex;
+
+  Widget buildWithActions(Widget child,
+      {KeyEventResult Function(FocusNode, KeyEvent)? onKeyEvent}) {
+    return ScreenActionsWrapper(
+      screenActions: screenActions,
+      additionalShortcuts: additionalShortcuts,
+      child: Focus(
+        focusNode: screenFocusNode,
+        onKeyEvent: onKeyEvent,
+        autofocus: true,
+        child: child,
+      ),
+    );
+  }
+}
+
+mixin ConsoleGridScreenMixin<T extends ConsumerStatefulWidget>
+    on ConsumerState<T> {
+  late final FocusNode screenFocusNode;
+  late final FocusStateManager _focusStateManager;
+
+  String get routeId;
+
+  int get currentSelectedIndex;
+  set currentSelectedIndex(int value);
+
+  void onNavigate(GridDirection direction);
+  void onConfirm();
+
+  Map<Type, Action<Intent>> get screenActions => {};
+
+  @override
+  void initState() {
+    super.initState();
+    screenFocusNode = FocusNode(debugLabel: 'GridScreen_$routeId');
+    _focusStateManager = ref.read(focusStateManagerProvider.notifier);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreFocus();
+    });
+  }
+
+  void _restoreFocus() {
+    final savedState = ref.read(focusStateManagerProvider)[routeId];
+    if (savedState?.selectedIndex != null) {
+      currentSelectedIndex = savedState!.selectedIndex!;
+    }
+
+    if (screenFocusNode.canRequestFocus) {
+      screenFocusNode.requestFocus();
+    }
+  }
+
+  void requestScreenFocus() {
+    if (screenFocusNode.canRequestFocus) {
+      screenFocusNode.requestFocus();
+    }
+  }
+
+  @override
+  void dispose() {
+    // Schedule focus state save to avoid modifying provider during build/dispose
+    Future.delayed(Duration.zero, () {
+      _focusStateManager.saveFocusState(
+        routeId,
+        selectedIndex: currentSelectedIndex,
+      );
+    });
+
+    screenFocusNode.dispose();
+    super.dispose();
+  }
+
+  Map<Type, Action<Intent>> get gridActions => {
+        NavigateIntent: _GridNavigateAction(this),
+        ConfirmIntent: CallbackAction<ConfirmIntent>(
+          onInvoke: (_) {
+            onConfirm();
+            return null;
+          },
+        ),
+        ...screenActions,
+      };
+
+  Widget buildWithGridActions(Widget child) {
+    return ScreenActionsWrapper(
+      screenActions: gridActions,
+      child: Focus(
+        focusNode: screenFocusNode,
+        autofocus: true,
+        child: child,
+      ),
+    );
+  }
+}
+
+class _GridNavigateAction extends Action<NavigateIntent> {
+  final ConsoleGridScreenMixin<dynamic> screen;
+
+  _GridNavigateAction(this.screen);
+
+  @override
+  Object? invoke(NavigateIntent intent) {
+    screen.onNavigate(intent.direction);
+    return null;
+  }
+}
+
+mixin ConsoleDetailScreenMixin<T extends ConsumerStatefulWidget>
+    on ConsumerState<T> {
+  late final FocusNode screenFocusNode;
+
+  String get routeId;
+
+  void onBack();
+  void onConfirm();
+  void onInfo();
+
+  Map<Type, Action<Intent>> get screenActions => {};
+
+  @override
+  void initState() {
+    super.initState();
+    screenFocusNode = FocusNode(debugLabel: 'DetailScreen_$routeId');
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (screenFocusNode.canRequestFocus) {
+        screenFocusNode.requestFocus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    screenFocusNode.dispose();
+    super.dispose();
+  }
+
+  Map<Type, Action<Intent>> get detailActions => {
+        BackIntent: CallbackAction<BackIntent>(
+          onInvoke: (_) {
+            onBack();
+            return null;
+          },
+        ),
+        ConfirmIntent: CallbackAction<ConfirmIntent>(
+          onInvoke: (_) {
+            onConfirm();
+            return null;
+          },
+        ),
+        InfoIntent: CallbackAction<InfoIntent>(
+          onInvoke: (_) {
+            onInfo();
+            return null;
+          },
+        ),
+        ...screenActions,
+      };
+
+  Widget buildWithDetailActions(Widget child) {
+    return ScreenActionsWrapper(
+      screenActions: detailActions,
+      child: Focus(
+        focusNode: screenFocusNode,
+        autofocus: true,
+        child: child,
+      ),
+    );
+  }
+}
