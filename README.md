@@ -3,6 +3,10 @@
 **Your retro game collection, one tap away.**
 A premium console-style game manager for Android — built for handhelds, controllers, and anyone who loves retro gaming.
 
+<p align="center">
+  <img src="screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
+</p>
+
 ![Version](https://img.shields.io/badge/version-0.9.0_Beta-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Android-brightgreen)
