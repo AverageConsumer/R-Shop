@@ -81,6 +81,7 @@ class ControlButton extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
+        canRequestFocus: false,
         onTap: onTap == null ? null : () {
           final now = DateTime.now().millisecondsSinceEpoch;
           if (now - _lastTapTime < _tapCooldownMs) return;

@@ -11,13 +11,10 @@ void main() {
 
     setUp(() {
       testSystem = const SystemModel(
+        id: 'gba',
         name: 'Game Boy Advance',
         manufacturer: 'Nintendo',
         releaseYear: 2001,
-        sourceSlug: 'No-Intro/Nintendo - Game Boy Advance',
-        esdeFolder: 'gba',
-        extensions: ['.zip', '.gba'],
-        gridRatio: 1.0,
         romExtensions: ['.gba'],
         accentColor: Color(0xFF4CAF50),
       );
@@ -79,13 +76,10 @@ void main() {
 
     test('ISO file extension is preserved', () {
       const ps2System = SystemModel(
+        id: 'ps2',
         name: 'PlayStation 2',
         manufacturer: 'Sony',
         releaseYear: 2000,
-        sourceSlug: 'Redump/Sony - PlayStation 2',
-        esdeFolder: 'ps2',
-        extensions: ['.iso', '.chd'],
-        gridRatio: 1.33,
         romExtensions: ['.iso', '.chd'],
         accentColor: Color(0xFF2196F3),
       );
@@ -127,13 +121,10 @@ void main() {
       );
 
       const system = SystemModel(
+        id: 'gba',
         name: 'Game Boy Advance',
         manufacturer: 'Nintendo',
         releaseYear: 2001,
-        sourceSlug: 'No-Intro/Nintendo - Game Boy Advance',
-        esdeFolder: 'gba',
-        extensions: ['.zip', '.gba'],
-        gridRatio: 1.0,
         romExtensions: ['.gba'],
         accentColor: Color(0xFF4CAF50),
       );

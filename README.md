@@ -7,7 +7,7 @@ A premium console-style game manager for Android — built for handhelds, contro
   <img src="screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
 </p>
 
-![Version](https://img.shields.io/badge/version-0.9.1_Beta-blue)
+![Version](https://img.shields.io/badge/version-0.9.2_Beta-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Android-brightgreen)
 ![Status](https://img.shields.io/badge/status-Public_Beta-orange)
@@ -26,10 +26,11 @@ It's built with love for **Android gaming handhelds** (Retroid, Odin, AYN, Anber
 
 ## ✨ Features
 
-- 🎮 **Built for Controllers** — Full D-pad/analog navigation, haptic feedback on every interaction, satisfying click sounds. Feels like a real console UI, not a phone app.
+- 🎮 **Built for Controllers** — Full D-pad/analog navigation with auto-scroll, haptic feedback on every interaction, satisfying click sounds. Feels like a real console UI, not a phone app.
 - 🌐 **Multi-Source Providers** — Each console can pull from Web directories, SMB shares, FTP servers, or a RomM instance. Mix and match per system.
 - 🔗 **RomM Integration** — Connect to your RomM server and let R-Shop automatically match platforms via IGDB.
 - 📥 **Smart Download Queue** — Queue up your entire library. Downloads run with live progress and auto-extraction (ZIP/7z).
+- ✅ **Installed Indicator** — Already downloaded? A glowing LED strip on each game card tells you at a glance.
 - 🖼️ **Automatic Box Art** — Every game gets its cover art fetched and cached automatically via [libretro-thumbnails](https://github.com/libretro-thumbnails).
 - ⚡ **Aggressive Caching** — Optimized for huge libraries (5000+ items). After the first load, the app feels instant even without internet.
 - 🔍 **Instant Search** — Find any game across all systems in milliseconds.

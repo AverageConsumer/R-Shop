@@ -238,6 +238,8 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
   // Stagger animation
   late AnimationController _staggerController;
 
+  final FocusNode _modalFocusNode = FocusNode(debugLabel: 'DownloadModal');
+
   @override
   void initState() {
     super.initState();
@@ -272,10 +274,17 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
     Future.delayed(const Duration(milliseconds: 150), () {
       if (mounted) _staggerController.forward();
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _modalFocusNode.requestFocus();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _modalFocusNode.dispose();
     _panelController.dispose();
     _staggerController.dispose();
     _debouncer.dispose();
@@ -288,6 +297,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
     _panelController.reverse().then((_) {
       if (!mounted) return;
       ref.read(downloadOverlayExpandedProvider.notifier).state = false;
+      restoreMainFocus(ref);
     });
   }
 
@@ -359,6 +369,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
       child: Stack(
         children: [
           Focus(
+        focusNode: _modalFocusNode,
         onKeyEvent: _handleKeyEvent,
         autofocus: true,
         child: GestureDetector(
@@ -407,31 +418,23 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
 
   Widget _buildControls(bool hasActive, bool hasFinished) {
     return ConsoleHud(
-      buttons: [
-        ControlButton(
-          label: 'A',
-          action: hasActive ? 'Cancel' : 'Clear',
-          onTap: () {
-            final targetIndex = _hoveredIndex ?? _focusedIndex;
-            if (targetIndex < widget.recentItems.length) {
-              _performAction(widget.recentItems[targetIndex]);
-            }
-          },
-        ),
-        ControlButton(
-          label: 'B',
-          action: 'Close',
-          onTap: _close,
-        ),
-        if (hasFinished)
-          ControlButton(
-            label: 'Y',
-            action: 'Clear Done',
-            onTap: () {
+      a: HudAction(
+        hasActive ? 'Cancel' : 'Clear',
+        onTap: () {
+          final targetIndex = _hoveredIndex ?? _focusedIndex;
+          if (targetIndex < widget.recentItems.length) {
+            _performAction(widget.recentItems[targetIndex]);
+          }
+        },
+      ),
+      b: HudAction('Close', onTap: _close),
+      y: hasFinished
+          ? HudAction('Clear Done', onTap: () {
               ref.read(downloadQueueManagerProvider).clearCompleted();
-            },
-          ),
-      ],
+            })
+          : null,
+      showDownloads: false,
+      embedded: true,
     );
   }
 

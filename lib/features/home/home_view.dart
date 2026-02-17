@@ -24,9 +24,9 @@ class HomeView extends ConsumerStatefulWidget {
   ConsumerState<HomeView> createState() => _HomeViewState();
 }
 
-class _HomeViewState extends ConsumerState<HomeView> {
+class _HomeViewState extends ConsumerState<HomeView>
+    with ConsoleScreenMixin {
   late PageController _pageController;
-  final FocusNode _focusNode = FocusNode();
   static const int _initialPage = 5000;
   int _currentIndex = 0;
   bool _isUserScrolling = false;
@@ -37,6 +37,31 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
   /// Filtered list of systems that have a config entry.
   List<SystemModel> _configuredSystems = SystemModel.supportedSystems;
+
+  @override
+  String get routeId => 'home';
+
+  @override
+  Map<Type, Action<Intent>> get screenActions => {
+        NavigateIntent: NavigateAction(ref, onNavigate: (intent) {
+          if (intent.direction == GridDirection.left) {
+            if (_navigateLeft()) {
+              ref.read(feedbackServiceProvider).tick();
+            }
+            return true;
+          } else if (intent.direction == GridDirection.right) {
+            if (_navigateRight()) {
+              ref.read(feedbackServiceProvider).tick();
+            }
+            return true;
+          }
+          return false;
+        }),
+        ConfirmIntent: ConfirmAction(ref, onConfirm: _navigateToCurrentSystem),
+        InfoIntent: InfoAction(ref, onInfo: _openSettings),
+        BackIntent: _HomeBackAction(this),
+        ToggleOverlayIntent: ToggleOverlayAction(ref),
+      };
 
   @override
   void initState() {
@@ -51,10 +76,10 @@ class _HomeViewState extends ConsumerState<HomeView> {
     _lastStablePage = _initialPage;
     _pageController.addListener(_onPageScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(mainFocusRequestProvider.notifier).state = _focusNode;
+      ref.read(mainFocusRequestProvider.notifier).state = screenFocusNode;
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
-          _focusNode.requestFocus();
+          screenFocusNode.requestFocus();
           ref.read(audioManagerProvider).startBgm();
         }
       });
@@ -66,7 +91,6 @@ class _HomeViewState extends ConsumerState<HomeView> {
     _debouncer.stopHold();
     _pageController.removeListener(_onPageScroll);
     _pageController.dispose();
-    _focusNode.dispose();
     super.dispose();
   }
 
@@ -124,22 +148,24 @@ class _HomeViewState extends ConsumerState<HomeView> {
     );
   }
 
-  void _navigateLeft() {
+  bool _navigateLeft() {
     final page = _pageController.page;
-    if (page != null && page != page.roundToDouble()) return;
+    if (page != null && page != page.roundToDouble()) return false;
     _pageController.previousPage(
       duration: const Duration(milliseconds: 350),
       curve: Curves.easeOutCubic,
     );
+    return true;
   }
 
-  void _navigateRight() {
+  bool _navigateRight() {
     final page = _pageController.page;
-    if (page != null && page != page.roundToDouble()) return;
+    if (page != null && page != page.roundToDouble()) return false;
     _pageController.nextPage(
       duration: const Duration(milliseconds: 350),
       curve: Curves.easeOutCubic,
     );
+    return true;
   }
 
   void _openSettings() async {
@@ -187,7 +213,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
     configAsync.whenData((config) {
       final configuredIds = config.systems.map((s) => s.id).toSet();
       final filtered = SystemModel.supportedSystems
-          .where((s) => configuredIds.contains(s.esdeFolder))
+          .where((s) => configuredIds.contains(s.id))
           .toList();
       if (filtered.isNotEmpty && filtered.length != _configuredSystems.length) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -228,81 +254,39 @@ class _HomeViewState extends ConsumerState<HomeView> {
     final currentSystem = _getSystem(_currentIndex);
     final accentColor = currentSystem.accentColor;
 
-    return Shortcuts(
-      shortcuts: AppShortcuts.defaultShortcuts,
-      child: Actions(
-        actions: _showExitDialog ? _getDialogActions() : _getNormalActions(),
-        child: Focus(
-          focusNode: _focusNode,
-          autofocus: true,
-          child: PopScope(
-            canPop: false,
-            onPopInvokedWithResult: (didPop, _) {
-              if (!didPop) {
-                if (_showExitDialog) {
-                  _hideExitDialog();
-                } else if (_debouncer.canPerformAction()) {
-                  _showExitDialogOverlay();
-                }
-              }
-            },
-            child: ScreenLayout(
-            backgroundColor: Colors.black,
-            accentColor: accentColor,
-            useSafeArea: false,
-            padding: EdgeInsets.zero,
-            body: Stack(
-              children: [
-                if (rs.isPortrait)
-                  _buildPortraitLayout(rs, currentSystem)
-                else
-                  _buildLandscapeLayout(rs, currentSystem),
-                if (_showExitDialog)
-                  ExitConfirmationOverlay(
-                    onConfirm: _exitApp,
-                    onCancel: _hideExitDialog,
-                  ),
-              ],
-            ),
-          ),
+    return buildWithActions(
+      PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) {
+            if (_showExitDialog) {
+              _hideExitDialog();
+            } else if (_debouncer.canPerformAction()) {
+              _showExitDialogOverlay();
+            }
+          }
+        },
+        child: ScreenLayout(
+          backgroundColor: Colors.black,
+          accentColor: accentColor,
+          useSafeArea: false,
+          padding: EdgeInsets.zero,
+          body: Stack(
+            children: [
+              if (rs.isPortrait)
+                _buildPortraitLayout(rs, currentSystem)
+              else
+                _buildLandscapeLayout(rs, currentSystem),
+              if (_showExitDialog)
+                ExitConfirmationOverlay(
+                  onConfirm: _exitApp,
+                  onCancel: _hideExitDialog,
+                ),
+            ],
           ),
         ),
       ),
     );
-  }
-
-  Map<Type, Action<Intent>> _getNormalActions() {
-    return {
-      NavigateIntent: NavigateAction(ref, onNavigate: (intent) {
-        if (intent.direction == GridDirection.left) {
-          _navigateLeft();
-          return true;
-        } else if (intent.direction == GridDirection.right) {
-          _navigateRight();
-          return true;
-        }
-        return false;
-      }),
-      ConfirmIntent: ConfirmAction(ref, onConfirm: () {
-        _navigateToCurrentSystem();
-      }),
-      InfoIntent: InfoAction(ref, onInfo: () {
-        _openSettings();
-      }),
-      BackIntent: CallbackAction<BackIntent>(onInvoke: (_) {
-         if (_debouncer.canPerformAction()) {
-           _showExitDialogOverlay();
-         }
-         return null;
-      }),
-      ToggleOverlayIntent: ToggleOverlayAction(ref),
-    };
-  }
-
-  Map<Type, Action<Intent>> _getDialogActions() {
-    return {
-       // Dialog handles its own shortcuts via CallbackShortcuts in ExitConfirmationOverlay
-    };
   }
 
   Widget _buildLandscapeLayout(Responsive rs, SystemModel currentSystem) {
@@ -487,29 +471,33 @@ class _HomeViewState extends ConsumerState<HomeView> {
   Widget _buildControls(Responsive rs) {
     // Check full queue (including history) to see if overlay has content
     final hasAnyDownloads = ref.watch(downloadQueueProvider).isNotEmpty;
-    final hasActiveDownloads = ref.watch(downloadCountProvider) > 0;
     final isOverlayExpanded = ref.watch(downloadOverlayExpandedProvider);
 
     // Only hide controls if the overlay is expanded AND there is content to show.
     // If the queue is empty, DownloadOverlay returns SizedBox.shrink(), so we should keep showing controls.
     if (isOverlayExpanded && hasAnyDownloads) return const SizedBox.shrink();
 
-    final buttons = <Widget>[
-      ControlButton(
-          label: 'A', action: 'Select', onTap: _navigateToCurrentSystem),
-      ControlButton(label: 'X', action: 'Settings', onTap: _openSettings),
-      ControlButton(
-          label: 'B', action: 'Exit', onTap: _showExitDialogOverlay),
-      if (hasActiveDownloads)
-        ControlButton(
-          label: '',
-          action: 'Downloads',
-          icon: Icons.play_arrow_rounded,
-          highlight: true,
-          onTap: () => toggleDownloadOverlay(ref),
-        ),
-    ];
+    return ConsoleHud(
+      a: HudAction('Select', onTap: _navigateToCurrentSystem),
+      x: HudAction('Settings', onTap: _openSettings),
+      b: HudAction('Exit', onTap: _showExitDialogOverlay),
+    );
+  }
+}
 
-    return ConsoleHud(buttons: buttons);
+class _HomeBackAction extends Action<BackIntent> {
+  final _HomeViewState screen;
+
+  _HomeBackAction(this.screen);
+
+  @override
+  bool isEnabled(BackIntent intent) =>
+      screen.ref.read(overlayPriorityProvider) == OverlayPriority.none;
+
+  @override
+  Object? invoke(BackIntent intent) {
+    if (!screen._debouncer.canPerformAction()) return null;
+    screen._showExitDialogOverlay();
+    return null;
   }
 }

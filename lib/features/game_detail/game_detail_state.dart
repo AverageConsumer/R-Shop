@@ -7,6 +7,7 @@ class GameDetailState {
   final int dialogSelection;
   final bool showTagInfo;
   final bool isAddingToQueue;
+  final bool showFullFilename;
 
   const GameDetailState({
     this.selectedIndex = 0,
@@ -17,6 +18,7 @@ class GameDetailState {
     this.dialogSelection = 0,
     this.showTagInfo = false,
     this.isAddingToQueue = false,
+    this.showFullFilename = false,
   });
 
   GameDetailState copyWith({
@@ -31,6 +33,7 @@ class GameDetailState {
     bool? showTagInfo,
     bool clearTagInfo = false,
     bool? isAddingToQueue,
+    bool? showFullFilename,
   }) {
     return GameDetailState(
       selectedIndex: selectedIndex ?? this.selectedIndex,
@@ -42,6 +45,7 @@ class GameDetailState {
       dialogSelection: dialogSelection ?? this.dialogSelection,
       showTagInfo: clearTagInfo ? false : (showTagInfo ?? this.showTagInfo),
       isAddingToQueue: isAddingToQueue ?? this.isAddingToQueue,
+      showFullFilename: showFullFilename ?? this.showFullFilename,
     );
   }
 

@@ -9,6 +9,7 @@ import '../../providers/game_providers.dart';
 import '../../services/config_storage_service.dart';
 import '../../widgets/console_hud.dart';
 import '../onboarding/onboarding_controller.dart';
+import '../onboarding/widgets/console_setup_hud.dart';
 import '../onboarding/widgets/console_setup_step.dart';
 import '../onboarding/widgets/pixel_mascot.dart';
 
@@ -44,7 +45,11 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     _initialized = true;
     final configAsync = ref.read(bootstrappedConfigProvider);
     configAsync.whenData((config) {
-      ref.read(onboardingControllerProvider.notifier).loadFromConfig(config);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(onboardingControllerProvider.notifier).loadFromConfig(config);
+        }
+      });
     });
   }
 
@@ -62,12 +67,9 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
         return KeyEventResult.handled;
       }
       if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-        controller.testProviderConnection();
-        return KeyEventResult.handled;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-          event.logicalKey == LogicalKeyboardKey.enter) {
-        controller.saveProvider();
+        if (state.canTest && !state.isTestingConnection) {
+          controller.testProviderConnection();
+        }
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
@@ -84,11 +86,6 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
         controller.startAddProvider();
         return KeyEventResult.handled;
       }
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-          event.logicalKey == LogicalKeyboardKey.enter) {
-        controller.saveConsoleConfig();
-        return KeyEventResult.handled;
-      }
       return KeyEventResult.ignored;
     }
 
@@ -102,7 +99,7 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
       _exportConfig();
       return KeyEventResult.handled;
     }
-    if (event.logicalKey == LogicalKeyboardKey.select) {
+    if (event.logicalKey == LogicalKeyboardKey.gameButtonSelect) {
       _importConfig();
       return KeyEventResult.handled;
     }
@@ -171,6 +168,9 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
 
     // Re-request focus after state changes (console deselect, form close, etc.)
     ref.listen(onboardingControllerProvider, (prev, next) {
+      // Don't interfere with focus while provider form is active —
+      // text fields manage their own focus
+      if (next.hasProviderForm) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_focusNode.hasFocus) {
           _focusNode.requestFocus();
@@ -251,83 +251,16 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
   }
 
   Widget _buildControls(OnboardingState state, Responsive rs) {
-    final List<Widget> buttons = [];
+    final shared = buildConsoleSetupHud(state: state, ref: ref);
+    if (shared != null) return shared;
 
-    if (state.hasProviderForm) {
-      buttons.addAll([
-        ControlButton(
-          label: 'A',
-          action: 'Save',
-          onTap: () =>
-              ref.read(onboardingControllerProvider.notifier).saveProvider(),
-        ),
-        ControlButton(
-          label: 'B',
-          action: 'Cancel',
-          onTap: () => ref
-              .read(onboardingControllerProvider.notifier)
-              .cancelProviderForm(),
-        ),
-        ControlButton(
-          label: 'Y',
-          action: 'Test',
-          onTap: state.isTestingConnection
-              ? null
-              : () => ref
-                  .read(onboardingControllerProvider.notifier)
-                  .testProviderConnection(),
-        ),
-      ]);
-    } else if (state.hasConsoleSelected) {
-      final sub = state.consoleSubState;
-      buttons.addAll([
-        ControlButton(
-          label: 'A',
-          action: 'Done',
-          onTap: sub?.isComplete == true
-              ? () => ref
-                  .read(onboardingControllerProvider.notifier)
-                  .saveConsoleConfig()
-              : null,
-          highlight: sub?.isComplete == true,
-        ),
-        ControlButton(
-          label: 'B',
-          action: 'Close',
-          onTap: () => ref
-              .read(onboardingControllerProvider.notifier)
-              .deselectConsole(),
-        ),
-        ControlButton(
-          label: 'Y',
-          action: 'Add Source',
-          onTap: () => ref
-              .read(onboardingControllerProvider.notifier)
-              .startAddProvider(),
-        ),
-      ]);
-    } else {
-      // Grid level — show import/export + back
-      buttons.addAll([
-        ControlButton(
-          label: 'B',
-          action: 'Save & Back',
-          onTap: _saveAndGoBack,
-        ),
-        ControlButton(
-          label: '+',
-          action: 'Export',
-          onTap: _exportConfig,
-        ),
-        ControlButton(
-          label: '\u2212',
-          action: 'Import',
-          onTap: _importConfig,
-        ),
-      ]);
-    }
-
-    return ConsoleHud(buttons: buttons);
+    // Grid level
+    return ConsoleHud(
+      b: HudAction('Save & Back', onTap: _saveAndGoBack),
+      start: HudAction('Export', onTap: _exportConfig),
+      select: HudAction('Import', onTap: _importConfig),
+      showDownloads: false,
+    );
   }
 }
 

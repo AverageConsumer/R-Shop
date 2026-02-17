@@ -18,12 +18,6 @@ class RepoManager {
   String? get baseUrl => _storage.getRepoUrl();
   bool get isConfigured => baseUrl != null && baseUrl!.isNotEmpty;
 
-  String buildSlugUrl(String slug) {
-    final base = baseUrl!;
-    final normalizedBase = base.endsWith('/') ? base : '$base/';
-    return '$normalizedBase$slug/';
-  }
-
   String get refererUrl {
     final base = baseUrl;
     if (base == null) return '';

@@ -131,6 +131,11 @@ class WebProvider implements SourceProvider {
     '.gb', '.gbc', '.gba', '.nds', '.3ds', '.cia',
     '.iso', '.cso', '.chd', '.pbp', '.cue', '.rvz',
     '.sms', '.md', '.gen', '.gg',
+    '.nsp', '.xci',
+    '.wua', '.wud', '.wux', '.rpx',
+    '.vpk', '.pkg',
+    '.ngc', '.ngp',
+    '.xex',
   ];
 }
 

@@ -75,6 +75,7 @@ class _OverlayFocusScopeState extends ConsumerState<OverlayFocusScope> {
     if (widget.priority.level > currentPriority.level) {
       _priorityController.state = widget.priority;
     }
+    _scopeNode.requestFocus();
   }
 
   void _releasePriority() {
@@ -124,6 +125,13 @@ class _DialogFocusScopeState extends ConsumerState<DialogFocusScope> {
   void initState() {
     super.initState();
     _priorityController = ref.read(overlayPriorityProvider.notifier);
+    if (widget.isVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _claimPriority();
+        }
+      });
+    }
   }
 
   @override
@@ -134,7 +142,6 @@ class _DialogFocusScopeState extends ConsumerState<DialogFocusScope> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _claimPriority();
-          _rootFocusNode.requestFocus();
         }
       });
     } else if (!widget.isVisible && oldWidget.isVisible) {
@@ -164,6 +171,7 @@ class _DialogFocusScopeState extends ConsumerState<DialogFocusScope> {
     if (OverlayPriority.dialog.level > currentPriority.level) {
       _priorityController.state = OverlayPriority.dialog;
     }
+    _rootFocusNode.requestFocus();
   }
 
   void _releasePriority() {
@@ -218,6 +226,13 @@ class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
   void initState() {
     super.initState();
     _priorityController = ref.read(overlayPriorityProvider.notifier);
+    if (widget.isVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _claimPriority();
+        }
+      });
+    }
   }
 
   @override
@@ -228,9 +243,6 @@ class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _claimPriority();
-          if (widget.textFieldFocusNode != null) {
-            widget.textFieldFocusNode!.requestFocus();
-          }
         }
       });
     } else if (!widget.isVisible && oldWidget.isVisible) {
@@ -258,6 +270,11 @@ class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
     final currentPriority = _priorityController.state;
     if (OverlayPriority.search.level > currentPriority.level) {
       _priorityController.state = OverlayPriority.search;
+    }
+    if (widget.textFieldFocusNode != null) {
+      widget.textFieldFocusNode!.requestFocus();
+    } else {
+      _scopeNode.requestFocus();
     }
   }
 

@@ -6,6 +6,9 @@ import 'app_intents.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/download_overlay.dart';
 
+bool _noOverlayActive(WidgetRef ref) =>
+    ref.read(overlayPriorityProvider) == OverlayPriority.none;
+
 class BackAction extends Action<BackIntent> {
   final BuildContext context;
   final WidgetRef ref;
@@ -13,12 +16,11 @@ class BackAction extends Action<BackIntent> {
   BackAction(this.context, this.ref);
 
   @override
+  bool isEnabled(BackIntent intent) => _noOverlayActive(ref);
+
+  @override
   Object? invoke(BackIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
-    final overlayPriority = ref.read(overlayPriorityProvider);
-    if (overlayPriority != OverlayPriority.none) {
-      return null;
-    }
 
     ref.read(feedbackServiceProvider).cancel();
 
@@ -34,6 +36,9 @@ class ConfirmAction extends Action<ConfirmIntent> {
   final VoidCallback? onConfirm;
 
   ConfirmAction(this.ref, {this.onConfirm});
+
+  @override
+  bool isEnabled(ConfirmIntent intent) => _noOverlayActive(ref);
 
   @override
   Object? invoke(ConfirmIntent intent) {
@@ -57,14 +62,11 @@ class SearchAction extends Action<SearchIntent> {
   SearchAction(this.ref, {this.onSearch});
 
   @override
+  bool isEnabled(SearchIntent intent) => _noOverlayActive(ref);
+
+  @override
   Object? invoke(SearchIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
-    // Search might be allowed even if overlay is open in some cases,
-    // but for now let's respect priority
-    final overlayPriority = ref.read(overlayPriorityProvider);
-    if (overlayPriority != OverlayPriority.none && overlayPriority != OverlayPriority.search) {
-      return null;
-    }
 
     ref.read(feedbackServiceProvider).tick();
 
@@ -96,19 +98,24 @@ class NavigateAction extends Action<NavigateIntent> {
   final WidgetRef ref;
   final bool Function(NavigateIntent intent)? onNavigate;
 
+  static int _lastInvokeTime = 0;
+  static const int _navCooldownMs = 100;
+
   NavigateAction(this.ref, {this.onNavigate});
 
   @override
+  bool isEnabled(NavigateIntent intent) => _noOverlayActive(ref);
+
+  @override
   Object? invoke(NavigateIntent intent) {
-    final overlayPriority = ref.read(overlayPriorityProvider);
-    if (overlayPriority != OverlayPriority.none) {
-      return null;
-    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastInvokeTime < _navCooldownMs) return null;
+    _lastInvokeTime = now;
 
     if (onNavigate != null) {
       final handled = onNavigate!(intent);
       if (handled) {
-        ref.read(feedbackServiceProvider).tick();
+        // Screen handles its own feedback
         return null;
       }
     }
@@ -146,12 +153,11 @@ class AdjustColumnsAction extends Action<AdjustColumnsIntent> {
   AdjustColumnsAction(this.ref, {this.onAdjust});
 
   @override
+  bool isEnabled(AdjustColumnsIntent intent) => _noOverlayActive(ref);
+
+  @override
   Object? invoke(AdjustColumnsIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
-    final overlayPriority = ref.read(overlayPriorityProvider);
-    if (overlayPriority != OverlayPriority.none) {
-      return null;
-    }
 
     ref.read(feedbackServiceProvider).tick();
     onAdjust?.call(intent.increase);
@@ -166,12 +172,11 @@ class InfoAction extends Action<InfoIntent> {
   InfoAction(this.ref, {this.onInfo});
 
   @override
+  bool isEnabled(InfoIntent intent) => _noOverlayActive(ref);
+
+  @override
   Object? invoke(InfoIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
-    final overlayPriority = ref.read(overlayPriorityProvider);
-    if (overlayPriority != OverlayPriority.none) {
-      return null;
-    }
 
     ref.read(feedbackServiceProvider).tick();
     onInfo?.call();
@@ -186,12 +191,11 @@ class MenuAction extends Action<MenuIntent> {
   MenuAction(this.ref, {this.onMenu});
 
   @override
+  bool isEnabled(MenuIntent intent) => _noOverlayActive(ref);
+
+  @override
   Object? invoke(MenuIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
-    final overlayPriority = ref.read(overlayPriorityProvider);
-    if (overlayPriority != OverlayPriority.none) {
-      return null;
-    }
 
     ref.read(feedbackServiceProvider).tick();
     onMenu?.call();
@@ -206,12 +210,11 @@ class TabLeftAction extends Action<TabLeftIntent> {
   TabLeftAction(this.ref, {this.onTabLeft});
 
   @override
+  bool isEnabled(TabLeftIntent intent) => _noOverlayActive(ref);
+
+  @override
   Object? invoke(TabLeftIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
-    final overlayPriority = ref.read(overlayPriorityProvider);
-    if (overlayPriority != OverlayPriority.none) {
-      return null;
-    }
 
     if (onTabLeft != null) {
       ref.read(feedbackServiceProvider).tick();
@@ -228,12 +231,11 @@ class TabRightAction extends Action<TabRightIntent> {
   TabRightAction(this.ref, {this.onTabRight});
 
   @override
+  bool isEnabled(TabRightIntent intent) => _noOverlayActive(ref);
+
+  @override
   Object? invoke(TabRightIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
-    final overlayPriority = ref.read(overlayPriorityProvider);
-    if (overlayPriority != OverlayPriority.none) {
-      return null;
-    }
 
     if (onTabRight != null) {
       ref.read(feedbackServiceProvider).tick();
@@ -256,7 +258,7 @@ class AppShortcuts {
     const SingleActivator(LogicalKeyboardKey.enter): const ConfirmIntent(),
     const SingleActivator(LogicalKeyboardKey.numpadEnter): const ConfirmIntent(),
     const SingleActivator(LogicalKeyboardKey.space): const ConfirmIntent(),
-    const SingleActivator(LogicalKeyboardKey.select): const ConfirmIntent(),
+    const SingleActivator(LogicalKeyboardKey.gameButtonSelect): const ConfirmIntent(),
 
     // Search
     const SingleActivator(LogicalKeyboardKey.gameButtonY): const SearchIntent(),
@@ -270,7 +272,7 @@ class AppShortcuts {
     const SingleActivator(LogicalKeyboardKey.arrowDown): const NavigateIntent(GridDirection.down),
     const SingleActivator(LogicalKeyboardKey.arrowLeft): const NavigateIntent(GridDirection.left),
     const SingleActivator(LogicalKeyboardKey.arrowRight): const NavigateIntent(GridDirection.right),
-    
+
     // Tabs / L1 R1
     const SingleActivator(LogicalKeyboardKey.gameButtonLeft1): const TabLeftIntent(),
     const SingleActivator(LogicalKeyboardKey.gameButtonRight1): const TabRightIntent(),

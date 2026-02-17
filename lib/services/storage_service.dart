@@ -11,6 +11,7 @@ class StorageService {
   static const _soundSettingsKey = 'sound_settings';
   static const _repoUrlKey = 'repo_url';
   static const _gridColumnsPrefix = 'grid_columns_';
+  static const _showFullFilenameKey = 'show_full_filename';
   SharedPreferences? _prefs;
 
   Future<void> init() async {
@@ -92,5 +93,13 @@ class StorageService {
 
   Future<void> setGridColumns(String systemName, int columns) async {
     await _prefs?.setInt('$_gridColumnsPrefix$systemName', columns);
+  }
+
+  bool getShowFullFilename() {
+    return _prefs?.getBool(_showFullFilenameKey) ?? false;
+  }
+
+  Future<void> setShowFullFilename(bool value) async {
+    await _prefs?.setBool(_showFullFilenameKey, value);
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../widgets/installed_indicator.dart';
 import '../../../widgets/smart_cover_image.dart';
 
 class GameCard extends StatelessWidget {
@@ -38,7 +39,6 @@ class GameCard extends StatelessWidget {
     final titleFontSize =
         isSelected ? (rs.isSmall ? 9.0 : 11.0) : (rs.isSmall ? 7.0 : 9.0);
     final variantFontSize = rs.isSmall ? 6.0 : 8.0;
-    final installedIconSize = rs.isSmall ? 10.0 : 14.0;
     final padding = rs.isSmall ? 4.0 : 6.0;
     final borderRadius = rs.isSmall ? 8.0 : 10.0;
     final innerBorderRadius = rs.isSmall ? 6.0 : 8.0;
@@ -102,23 +102,30 @@ class GameCard extends StatelessWidget {
                       onUrlFound: onCoverFound,
                     ),
                   ),
-                  if (isInstalled)
+                  if (isInstalled) ...[
                     Positioned(
                       top: padding,
                       right: padding,
                       child: Container(
-                        padding: EdgeInsets.all(rs.isSmall ? 2 : 3),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.7),
-                          shape: BoxShape.circle,
+                          color: Colors.black.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(3),
                         ),
-                        child: Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                          size: installedIconSize,
+                        child: const InstalledBadge(compact: true),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: InstalledLedStrip(
+                        borderRadius: BorderRadius.only(
+                          bottomLeft: Radius.circular(innerBorderRadius),
+                          bottomRight: Radius.circular(innerBorderRadius),
                         ),
                       ),
                     ),
+                  ],
                   Positioned(
                     bottom: 0,
                     left: 0,

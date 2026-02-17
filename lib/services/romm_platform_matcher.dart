@@ -14,14 +14,23 @@ class RommPlatformMatcher {
     'n3ds': 37,
     'gc': 21,
     'wii': 5,
+    'wiiu': 41,
+    'switch': 130,
     'psx': 7,
     'ps2': 8,
+    'ps3': 9,
+    'ps4': 48,
     'psp': 38,
+    'psvita': 46,
     'mastersystem': 64,
     'megadrive': 29,
     'gamegear': 35,
     'dreamcast': 23,
     'saturn': 32,
+    'ngpc': 136,
+    'arcade': 52,
+    'xbox': 11,
+    'xbox360': 12,
   };
 
   static String _normalize(String value) {
@@ -29,30 +38,30 @@ class RommPlatformMatcher {
   }
 
   static RommPlatform? findMatch(
-    String esdeFolder,
+    String systemId,
     List<RommPlatform> platforms,
   ) {
     // 1. Exact match on slug
     for (final p in platforms) {
-      if (esdeFolder == p.slug) return p;
+      if (systemId == p.slug) return p;
     }
 
     // 2. Exact match on fsSlug
     for (final p in platforms) {
-      if (esdeFolder == p.fsSlug) return p;
+      if (systemId == p.fsSlug) return p;
     }
 
     // 3. Normalized match
-    final normalizedFolder = _normalize(esdeFolder);
+    final normalizedId = _normalize(systemId);
     for (final p in platforms) {
-      if (normalizedFolder == _normalize(p.slug) ||
-          normalizedFolder == _normalize(p.fsSlug)) {
+      if (normalizedId == _normalize(p.slug) ||
+          normalizedId == _normalize(p.fsSlug)) {
         return p;
       }
     }
 
     // 4. IGDB ID fallback
-    final igdbId = _igdbIdMap[esdeFolder];
+    final igdbId = _igdbIdMap[systemId];
     if (igdbId != null) {
       for (final p in platforms) {
         if (p.igdbId == igdbId) return p;

@@ -67,7 +67,7 @@ class _VersionCarouselState extends State<VersionCarousel> {
   Widget build(BuildContext context) {
     final rs = context.rs;
     final cardWidth = rs.isSmall ? 130.0 : 160.0;
-    final listHeight = rs.isSmall ? 80.0 : 110.0;
+    final listHeight = rs.isSmall ? 100.0 : 130.0;
     final labelFontSize = rs.isSmall ? 10.0 : 12.0;
     final countFontSize = rs.isSmall ? 9.0 : 11.0;
 

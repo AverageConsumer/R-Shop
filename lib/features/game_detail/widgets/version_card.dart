@@ -4,7 +4,8 @@ import '../../../core/responsive/responsive.dart';
 import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../utils/game_metadata.dart';
-import 'metadata_badges.dart';
+import '../../../widgets/installed_indicator.dart';
+import 'metadata_badges.dart' hide InstalledBadge;
 
 class VersionCard extends StatelessWidget {
   final GameItem variant;
@@ -48,36 +49,52 @@ class VersionCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: isFocused
                 ? Colors.white.withValues(alpha: 0.12)
-                : Colors.black.withValues(alpha: 0.4),
+                : isInstalled
+                    ? Colors.green.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: isFocused
                   ? Colors.white.withValues(alpha: 0.9)
-                  : isSelected
-                      ? system.accentColor.withValues(alpha: 0.6)
-                      : Colors.white.withValues(alpha: 0.1),
+                  : isInstalled
+                      ? Colors.greenAccent.withValues(alpha: 0.4)
+                      : isSelected
+                          ? system.accentColor.withValues(alpha: 0.6)
+                          : Colors.white.withValues(alpha: 0.1),
               width: isFocused ? 2 : 1,
             ),
             boxShadow: isFocused
                 ? [
                     BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.35),
+                      color: isInstalled
+                          ? Colors.greenAccent.withValues(alpha: 0.4)
+                          : Colors.white.withValues(alpha: 0.35),
                       blurRadius: 16,
                       spreadRadius: 1,
                     ),
                     BoxShadow(
-                      color: system.accentColor.withValues(alpha: 0.25),
+                      color: isInstalled
+                          ? Colors.greenAccent.withValues(alpha: 0.3)
+                          : system.accentColor.withValues(alpha: 0.25),
                       blurRadius: 24,
                       spreadRadius: 3,
                     ),
                   ]
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 6,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
+                : isInstalled
+                    ? [
+                        BoxShadow(
+                          color: Colors.greenAccent.withValues(alpha: 0.2),
+                          blurRadius: 12,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
           ),
           child: Stack(
             clipBehavior: Clip.none,
@@ -95,28 +112,13 @@ class VersionCard extends StatelessWidget {
               ),
               if (isInstalled)
                 Positioned(
-                  top: rs.isSmall ? -3 : -4,
-                  right: rs.isSmall ? -3 : -4,
-                  child: Container(
-                    padding: EdgeInsets.all(rs.isSmall ? 2 : 3),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade600,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.green.withValues(alpha: 0.4),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: rs.isSmall ? 8 : 10,
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: InstalledLedStrip(
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(9),
+                      bottomRight: Radius.circular(9),
                     ),
                   ),
                 ),
@@ -308,76 +310,86 @@ class SingleVersionDisplay extends StatelessWidget {
   Widget build(BuildContext context) {
     final metadata = GameMetadata.parse(variant.filename);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              RegionBadge(region: metadata.region),
-              const SizedBox(width: 12),
-              LanguageBadges(languages: metadata.languages),
-              const Spacer(),
-              if (isInstalled)
-                const Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: Colors.greenAccent,
-                      size: 18,
+    return Stack(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isInstalled
+                ? Colors.green.withValues(alpha: 0.08)
+                : Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isInstalled
+                  ? Colors.greenAccent.withValues(alpha: 0.4)
+                  : Colors.white.withValues(alpha: 0.1),
+              width: 1,
+            ),
+            boxShadow: isInstalled
+                ? [
+                    BoxShadow(
+                      color: Colors.greenAccent.withValues(alpha: 0.15),
+                      blurRadius: 10,
                     ),
-                    SizedBox(width: 6),
-                    Text(
-                      'Installed',
-                      style: TextStyle(
-                        color: Colors.greenAccent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-            ],
+                  ]
+                : null,
           ),
-          if (metadata.primaryTags.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            TagBadges(tags: metadata.primaryTags, maxVisible: 5),
-          ],
-          if (metadata.hasInfoDetails && onInfoTap != null) ...[
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: onInfoTap,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 14,
-                    color: system.accentColor,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'View all tags',
-                    style: TextStyle(
-                      color: system.accentColor,
-                      fontSize: 12,
-                    ),
-                  ),
+                  RegionBadge(region: metadata.region),
+                  const SizedBox(width: 12),
+                  LanguageBadges(languages: metadata.languages),
+                  const Spacer(),
+                  if (isInstalled) const InstalledBadge(compact: false),
                 ],
               ),
+              if (metadata.primaryTags.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                TagBadges(tags: metadata.primaryTags, maxVisible: 5),
+              ],
+              if (metadata.hasInfoDetails && onInfoTap != null) ...[
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: onInfoTap,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: system.accentColor,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'View all tags',
+                        style: TextStyle(
+                          color: system.accentColor,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (isInstalled)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: InstalledLedStrip(
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(11),
+                bottomRight: Radius.circular(11),
+              ),
             ),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 }

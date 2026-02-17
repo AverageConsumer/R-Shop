@@ -1,8 +1,8 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/config/app_config.dart';
+import '../../models/config/system_config.dart';
 
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
@@ -13,8 +13,6 @@ import '../../providers/game_providers.dart';
 import '../../services/config_bootstrap.dart';
 import '../../services/input_debouncer.dart';
 import '../../utils/image_helper.dart';
-import '../../providers/download_providers.dart';
-import '../../widgets/download_overlay.dart';
 import '../game_detail/game_detail_screen.dart';
 import 'logic/focus_sync_manager.dart';
 import 'logic/game_list_controller.dart';
@@ -52,7 +50,6 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   bool _isSearching = false;
   bool _isSearchFocused = false;
   bool _isClosingSearch = false;
-  Timer? _searchFocusGuard;
 
   late int _columns;
   double _lastPinchScale = 1.0;
@@ -86,7 +83,6 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     _columns = ref.read(gridColumnsProvider(widget.system.name));
     _debouncer = ref.read(inputDebouncerProvider);
 
-    final repoManager = ref.read(repoManagerProvider);
     final appConfig =
         ref.read(bootstrappedConfigProvider).value ?? AppConfig.empty;
     final systemConfig =
@@ -95,8 +91,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     _controller = GameListController(
       system: widget.system,
       targetFolder: widget.targetFolder,
-      baseUrl: repoManager.baseUrl ?? '',
-      systemConfig: systemConfig,
+      systemConfig: systemConfig ?? SystemConfig(id: widget.system.id, name: widget.system.name, targetFolder: widget.targetFolder, providers: []),
     )..addListener(_onControllerChanged);
 
     _focusManager = FocusSyncManager(
@@ -128,9 +123,21 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   void _onSearchFocusChange() {
     if (!mounted) return;
 
+    final hasFocus = _searchFocusNode.hasFocus;
     setState(() {
-      _isSearchFocused = _searchFocusNode.hasFocus;
+      _isSearchFocused = hasFocus;
     });
+
+    // If search lost focus but is still active, redirect focus to screenFocusNode
+    if (!hasFocus && _isSearching && !_isClosingSearch) {
+      if (!screenFocusNode.hasFocus) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _isSearching && !_isClosingSearch && !_searchFocusNode.hasFocus) {
+            requestScreenFocus();
+          }
+        });
+      }
+    }
   }
 
   @override
@@ -141,7 +148,6 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       focusStateManager.saveFocusState(routeId, selectedIndex: selectedIndex);
     });
 
-    _stopSearchFocusGuard();
     _debouncer.stopHold();
     _controller.removeListener(_onControllerChanged);
     _controller.dispose();
@@ -195,41 +201,13 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     _updateItemKeys();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Future.delayed(const Duration(milliseconds: 50), () {
-          if (mounted && _isSearching) {
-            _searchFocusNode.requestFocus();
-            _startSearchFocusGuard();
-          }
-        });
+      if (mounted && _isSearching) {
+        _searchFocusNode.requestFocus();
       }
     });
-  }
-
-  void _startSearchFocusGuard() {
-    _searchFocusGuard?.cancel();
-    _searchFocusGuard = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      if (!mounted || !_isSearching || _isClosingSearch) {
-        _searchFocusGuard?.cancel();
-        return;
-      }
-
-      if (_searchFocusGuard!.tick < 3) return;
-
-      final hasAnyFocus = _searchFocusNode.hasFocus || screenFocusNode.hasFocus;
-      if (!hasAnyFocus) {
-        _closeSearch();
-      }
-    });
-  }
-
-  void _stopSearchFocusGuard() {
-    _searchFocusGuard?.cancel();
-    _searchFocusGuard = null;
   }
 
   void _closeSearch() {
-    _stopSearchFocusGuard();
     _isClosingSearch = true;
     FocusManager.instance.primaryFocus?.unfocus();
     FocusScope.of(context).unfocus();
@@ -337,7 +315,6 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         );
       } else if (direction == GridDirection.up && _isSearching) {
         _searchFocusNode.requestFocus();
-        _startSearchFocusGuard();
       }
     })) {
       ref.read(feedbackServiceProvider).tick();
@@ -366,7 +343,6 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
   Future<void> _openGameDetail(
       String displayName, List<GameItem> variants) async {
-    _stopSearchFocusGuard();
     _searchFocusNode.unfocus();
     ref.read(feedbackServiceProvider).confirm();
     await Navigator.push(
@@ -383,11 +359,16 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     await _controller.updateInstalledStatus(displayName);
     if (_isSearching && mounted) {
       requestScreenFocus();
-      _startSearchFocusGuard();
     }
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    // When search field is focused, stop key events from reaching
+    // the Shortcuts widget above, but let them through to text input.
+    if (_isSearching && _searchFocusNode.hasFocus) {
+      return KeyEventResult.skipRemainingHandlers;
+    }
+
     final isDown = event is KeyDownEvent;
     final isUp = event is KeyUpEvent;
 
@@ -397,17 +378,6 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     }
 
     if (!isDown) return KeyEventResult.ignored;
-
-    if (_isSearching && _searchFocusNode.hasFocus) {
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-          event.logicalKey == LogicalKeyboardKey.backspace ||
-          event.logicalKey == LogicalKeyboardKey.escape ||
-          event.logicalKey == LogicalKeyboardKey.goBack) {
-        _unfocusSearch();
-        return KeyEventResult.handled;
-      }
-      return KeyEventResult.ignored;
-    }
 
     return KeyEventResult.ignored;
   }
@@ -465,31 +435,22 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
               TintedOverlay(accentColor: widget.system.accentColor),
               _buildNormalContent(state, topPadding),
               if (_isSearching) _buildSearchContent(state),
-              ConsoleHud(
-                buttons: [
-                  ControlButton(label: 'A', action: 'Select', onTap: _openSelectedGame),
-                  if (_isSearching) ...[
-                    ControlButton(
-                      label: 'B',
-                      action: _isSearchFocused ? 'Keyboard' : 'Close',
-                      highlight: _isSearchFocused,
-                      onTap: () => Navigator.pop(context),
-                    ),
-                    if (!_isSearchFocused) const ControlButton(label: '↑', action: 'Search'),
-                  ] else ...[
-                    ControlButton(label: 'B', action: 'Back', onTap: () => Navigator.pop(context)),
-                    ControlButton(label: 'Y', action: 'Search', onTap: _openSearch),
-                    if (ref.watch(downloadCountProvider) > 0)
-                      ControlButton(
-                        label: '',
-                        action: 'Downloads',
-                        icon: Icons.play_arrow_rounded,
-                        highlight: true,
-                        onTap: () => toggleDownloadOverlay(ref),
+              _isSearching
+                  ? ConsoleHud(
+                      dpad: !_isSearchFocused ? (label: '\u2191', action: 'Search') : null,
+                      a: HudAction('Select', onTap: _openSelectedGame),
+                      b: HudAction(
+                        _isSearchFocused ? 'Keyboard' : 'Close',
+                        highlight: _isSearchFocused,
+                        onTap: () => Navigator.pop(context),
                       ),
-                  ],
-                ],
-              ),
+                      showDownloads: false,
+                    )
+                  : ConsoleHud(
+                      a: HudAction('Select', onTap: _openSelectedGame),
+                      b: HudAction('Back', onTap: () => Navigator.pop(context)),
+                      y: HudAction('Search', onTap: _openSearch),
+                    ),
             ],
           ),
         ),

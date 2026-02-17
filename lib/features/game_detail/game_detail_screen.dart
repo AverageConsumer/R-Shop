@@ -4,23 +4,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
+import '../../models/download_item.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
 import '../../services/download_queue_manager.dart';
-import '../../widgets/download_overlay.dart';
 import '../../services/input_debouncer.dart';
 import '../../utils/game_metadata.dart';
 import '../../utils/image_helper.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/console_hud.dart';
+import '../../widgets/installed_indicator.dart';
 import '../game_list/widgets/dynamic_background.dart';
 import '../game_list/widgets/tinted_overlay.dart';
 import 'game_detail_controller.dart';
 import 'game_detail_state.dart';
 import 'widgets/cover_section.dart';
-import 'widgets/metadata_badges.dart';
+import 'widgets/metadata_badges.dart' hide InstalledBadge;
 import 'widgets/tag_info_overlay.dart';
 import 'widgets/version_card.dart';
 import 'widgets/version_carousel.dart';
@@ -56,7 +57,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   Map<Type, Action<Intent>> get screenActions => {
         BackIntent: _DetailBackAction(this),
         ConfirmIntent: _DetailConfirmAction(this),
-        InfoIntent: _DetailInfoAction(this),
+        InfoIntent: _DetailFilenameToggleAction(this),
+        SearchIntent: _DetailTagInfoAction(this),
         NavigateIntent: _DetailNavigateAction(this),
       };
 
@@ -74,21 +76,47 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   }
 
   void _initController(DownloadQueueManager queueManager) {
+    final storage = ref.read(storageServiceProvider);
     _controller = GameDetailController(
       game: widget.game,
       variants: widget.variants,
       system: widget.system,
       targetFolder: widget.targetFolder,
+      showFullFilename: storage.getShowFullFilename(),
       queueManager: queueManager,
     );
     _controller!.addListener(_onControllerChanged);
 
     _updateBackground();
     setState(() {});
+    _listenForDownloadCompletions();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       requestScreenFocus();
     });
+  }
+
+  void _listenForDownloadCompletions() {
+    final expectedIds = <String>{
+      for (final variant in widget.variants)
+        '${widget.system.name}_${variant.filename}',
+    };
+
+    ref.listenManual<DownloadQueueManager>(
+      downloadQueueManagerProvider,
+      (previous, next) {
+        if (previous == null) return;
+        for (final item in next.state.queue) {
+          if (!expectedIds.contains(item.id)) continue;
+          if (item.status != DownloadItemStatus.completed) continue;
+          final prev = previous.state.getDownloadById(item.id);
+          if (prev != null && prev.status != DownloadItemStatus.completed) {
+            _controller?.checkInstallationStatus();
+            return;
+          }
+        }
+      },
+    );
   }
 
   void _onControllerChanged() {
@@ -180,7 +208,19 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     controller.performAction();
   }
 
-  void _handleInfo() {
+  void _handleFilenameToggle() {
+    final controller = _controller;
+    if (controller == null) return;
+    if (controller.state.isOverlayOpen) return;
+
+    ref.read(feedbackServiceProvider).tick();
+    controller.toggleFullFilename();
+    ref.read(storageServiceProvider).setShowFullFilename(
+      controller.state.showFullFilename,
+    );
+  }
+
+  void _handleTagInfo() {
     final controller = _controller;
     if (controller == null) return;
 
@@ -451,37 +491,15 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     if (controller == null) return const SizedBox.shrink();
 
     final actionLabel = state.isVariantInstalled ? 'Delete' : 'Download';
-    final hasDownloads = ref.watch(downloadCountProvider) > 0;
+
+    final filenameLabel = state.showFullFilename ? 'Title' : 'Filename';
 
     return ConsoleHud(
-      buttons: [
-        if (widget.variants.length > 1)
-          const ControlButton(label: '←→', action: 'Navigate'),
-        ControlButton(
-          label: 'A',
-          action: actionLabel,
-          onTap: controller.performAction,
-        ),
-        ControlButton(
-          label: 'B',
-          action: 'Back',
-          onTap: () => Navigator.pop(context),
-        ),
-        if (metadata.hasInfoDetails)
-          ControlButton(
-            label: 'X',
-            action: 'Info',
-            onTap: controller.toggleTagInfo,
-          ),
-        if (hasDownloads)
-          ControlButton(
-            label: '',
-            action: 'Downloads',
-            icon: Icons.play_arrow_rounded,
-            highlight: true,
-            onTap: () => toggleDownloadOverlay(ref),
-          ),
-      ],
+      dpad: widget.variants.length > 1 ? (label: '\u2190\u2192', action: 'Navigate') : null,
+      a: HudAction(actionLabel, onTap: controller.performAction),
+      b: HudAction('Back', onTap: () => Navigator.pop(context)),
+      x: HudAction(filenameLabel, onTap: controller.toggleFullFilename),
+      y: metadata.allTags.isNotEmpty ? HudAction('Tags', onTap: controller.toggleTagInfo) : null,
     );
   }
 
@@ -547,11 +565,17 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          controller.cleanTitle,
+          controller.displayTitle,
           style: TextStyle(
-            color: Colors.white,
-            fontSize: titleFontSize,
+            color: controller.state.showFullFilename
+                ? Colors.white.withValues(alpha: 0.85)
+                : Colors.white,
+            fontSize: controller.state.showFullFilename
+                ? titleFontSize * 0.8
+                : titleFontSize,
             fontWeight: FontWeight.bold,
+            fontFamily:
+                controller.state.showFullFilename ? 'monospace' : null,
             height: 1.1,
             shadows: const [
               Shadow(
@@ -560,7 +584,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               ),
             ],
           ),
-          maxLines: 2,
+          maxLines: controller.state.showFullFilename ? 3 : 2,
           overflow: TextOverflow.ellipsis,
         ),
         SizedBox(height: rs.spacing.sm),
@@ -609,6 +633,10 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
             ],
           ),
         ),
+        if (controller.state.isVariantInstalled) ...[
+          SizedBox(height: rs.spacing.xs),
+          const InstalledBadge(compact: false),
+        ],
       ],
     );
   }
@@ -656,14 +684,26 @@ class _DetailConfirmAction extends Action<ConfirmIntent> {
   }
 }
 
-class _DetailInfoAction extends Action<InfoIntent> {
+class _DetailFilenameToggleAction extends Action<InfoIntent> {
   final _GameDetailScreenState screen;
 
-  _DetailInfoAction(this.screen);
+  _DetailFilenameToggleAction(this.screen);
 
   @override
   Object? invoke(InfoIntent intent) {
-    screen._handleInfo();
+    screen._handleFilenameToggle();
+    return null;
+  }
+}
+
+class _DetailTagInfoAction extends Action<SearchIntent> {
+  final _GameDetailScreenState screen;
+
+  _DetailTagInfoAction(this.screen);
+
+  @override
+  Object? invoke(SearchIntent intent) {
+    screen._handleTagInfo();
     return null;
   }
 }

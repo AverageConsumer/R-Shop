@@ -43,6 +43,7 @@ class ConsoleConfigPanel extends ConsumerWidget {
           _buildHeader(rs, system, controller),
           Flexible(
             child: SingleChildScrollView(
+              key: ValueKey(state.hasProviderForm),
               padding: EdgeInsets.symmetric(
                 horizontal: rs.spacing.md,
                 vertical: rs.spacing.sm,
@@ -302,6 +303,7 @@ class ConsoleConfigPanel extends ConsumerWidget {
     double fontSize,
   ) {
     return ConsoleFocusable(
+      autofocus: true,
       onSelect: () async {
         final path = await FilePicker.platform.getDirectoryPath();
         if (path != null) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/widgets/console_focusable.dart';
@@ -17,6 +18,8 @@ class ProviderForm extends ConsumerStatefulWidget {
 class _ProviderFormState extends ConsumerState<ProviderForm> {
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, FocusNode> _focusNodes = {};
+  final Map<String, FocusNode> _consoleFocusNodes = {};
+  final FocusNode _typeSelectorFocusNode = FocusNode(debugLabel: 'typeSelector');
 
   TextEditingController _getController(String key, String? initialValue) {
     if (!_controllers.containsKey(key)) {
@@ -27,9 +30,16 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
 
   FocusNode _getFocusNode(String key) {
     if (!_focusNodes.containsKey(key)) {
-      _focusNodes[key] = FocusNode();
+      _focusNodes[key] = FocusNode(skipTraversal: true);
     }
     return _focusNodes[key]!;
+  }
+
+  FocusNode _getConsoleFocusNode(String key) {
+    if (!_consoleFocusNodes.containsKey(key)) {
+      _consoleFocusNodes[key] = FocusNode(debugLabel: 'console_$key');
+    }
+    return _consoleFocusNodes[key]!;
   }
 
   @override
@@ -40,11 +50,28 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
     for (final f in _focusNodes.values) {
       f.dispose();
     }
+    for (final f in _consoleFocusNodes.values) {
+      f.dispose();
+    }
+    _typeSelectorFocusNode.dispose();
     super.dispose();
   }
 
   void _syncField(String key, String value) {
     ref.read(onboardingControllerProvider.notifier).updateProviderField(key, value);
+  }
+
+  void _cycleType(int delta) {
+    final state = ref.read(onboardingControllerProvider);
+    final form = state.providerForm;
+    if (form == null) return;
+    final types = ProviderType.values;
+    final currentIndex = types.indexOf(form.type);
+    final newIndex = (currentIndex + delta) % types.length;
+    ref.read(onboardingControllerProvider.notifier).setProviderType(types[newIndex]);
+    for (final c in _controllers.values) {
+      c.clear();
+    }
   }
 
   @override
@@ -57,7 +84,6 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
     final controller = ref.read(onboardingControllerProvider.notifier);
 
     final isRomm = form.type == ProviderType.romm;
-    final canSave = !isRomm || state.hasRommPlatformSelected;
 
     return FocusTraversalGroup(
       child: Column(
@@ -79,8 +105,8 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
             SizedBox(height: rs.spacing.md),
             _buildRommPlatformSection(rs, state, controller),
           ],
-          SizedBox(height: rs.spacing.md),
-          _buildActions(rs, state, controller, canSave: canSave),
+          SizedBox(height: rs.spacing.lg),
+          _buildSaveButton(rs, state, controller),
         ],
       ),
     );
@@ -106,56 +132,59 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
     final types = ProviderType.values;
     final chipFontSize = rs.isSmall ? 11.0 : 13.0;
 
-    return Wrap(
-      spacing: rs.spacing.sm,
-      runSpacing: rs.spacing.sm,
-      children: types.map((type) {
-        final selected = form.type == type;
-        return ConsoleFocusable(
-          onSelect: () {
-            controller.setProviderType(type);
-            for (final c in _controllers.values) {
-              c.clear();
-            }
-          },
-          borderRadius: rs.radius.round,
-          child: GestureDetector(
-            onTap: () {
-              controller.setProviderType(type);
-              for (final c in _controllers.values) {
-                c.clear();
-              }
-            },
-            child: Container(
-              constraints: const BoxConstraints(minHeight: 48),
-              padding: EdgeInsets.symmetric(
-                horizontal: rs.spacing.md,
-                vertical: rs.spacing.md,
-              ),
-              decoration: BoxDecoration(
-                color: selected
-                    ? Colors.redAccent.withValues(alpha: 0.3)
-                    : Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(rs.radius.round),
-                border: Border.all(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () => _cycleType(-1),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () => _cycleType(1),
+      },
+      child: ConsoleFocusable(
+        focusNode: _typeSelectorFocusNode,
+        autofocus: true,
+        focusScale: 1.0,
+        borderRadius: rs.radius.sm,
+        child: Wrap(
+          spacing: rs.spacing.sm,
+          runSpacing: rs.spacing.sm,
+          children: types.map((type) {
+            final selected = form.type == type;
+            return GestureDetector(
+              onTap: () {
+                controller.setProviderType(type);
+                for (final c in _controllers.values) {
+                  c.clear();
+                }
+              },
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 48),
+                padding: EdgeInsets.symmetric(
+                  horizontal: rs.spacing.md,
+                  vertical: rs.spacing.md,
+                ),
+                decoration: BoxDecoration(
                   color: selected
-                      ? Colors.redAccent.withValues(alpha: 0.7)
-                      : Colors.white.withValues(alpha: 0.1),
+                      ? Colors.redAccent.withValues(alpha: 0.3)
+                      : Colors.white.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(rs.radius.round),
+                  border: Border.all(
+                    color: selected
+                        ? Colors.redAccent.withValues(alpha: 0.7)
+                        : Colors.white.withValues(alpha: 0.1),
+                  ),
+                ),
+                child: Text(
+                  type.name.toUpperCase(),
+                  style: TextStyle(
+                    color: selected ? Colors.white : Colors.white54,
+                    fontSize: chipFontSize,
+                    fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                    letterSpacing: 1,
+                  ),
                 ),
               ),
-              child: Text(
-                type.name.toUpperCase(),
-                style: TextStyle(
-                  color: selected ? Colors.white : Colors.white54,
-                  fontSize: chipFontSize,
-                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                  letterSpacing: 1,
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
+        ),
+      ),
     );
   }
 
@@ -369,6 +398,76 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
     );
   }
 
+  bool _canSave(ProviderFormState form, OnboardingState state) {
+    final fields = form.fields;
+    bool hasField(String key) =>
+        (fields[key]?.toString() ?? '').trim().isNotEmpty;
+
+    switch (form.type) {
+      case ProviderType.web:
+        return hasField('url');
+      case ProviderType.ftp:
+        return hasField('host') && hasField('port') && hasField('path');
+      case ProviderType.smb:
+        return hasField('host') && hasField('port') &&
+               hasField('share') && hasField('path');
+      case ProviderType.romm:
+        return hasField('url') && state.hasRommPlatformSelected;
+    }
+  }
+
+  Widget _buildSaveButton(
+    Responsive rs,
+    OnboardingState state,
+    OnboardingController controller,
+  ) {
+    final fontSize = rs.isSmall ? 12.0 : 14.0;
+    final form = state.providerForm;
+    final canSave = form != null && _canSave(form, state);
+
+    return ConsoleFocusable(
+      onSelect: canSave ? controller.saveProvider : null,
+      borderRadius: rs.radius.sm,
+      child: GestureDetector(
+        onTap: canSave ? controller.saveProvider : null,
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: EdgeInsets.symmetric(vertical: rs.spacing.md),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: canSave
+                  ? [
+                      Colors.green.withValues(alpha: 0.3),
+                      Colors.green.withValues(alpha: 0.15),
+                    ]
+                  : [
+                      Colors.grey.withValues(alpha: 0.1),
+                      Colors.grey.withValues(alpha: 0.05),
+                    ],
+            ),
+            borderRadius: BorderRadius.circular(rs.radius.sm),
+            border: Border.all(
+              color: canSave
+                  ? Colors.green.withValues(alpha: 0.5)
+                  : Colors.grey.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Center(
+            child: Text(
+              'Save',
+              style: TextStyle(
+                color: canSave ? Colors.white : Colors.white38,
+                fontSize: fontSize,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTextField(
     Responsive rs,
     String key,
@@ -380,145 +479,71 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
     final fontSize = rs.isSmall ? 12.0 : 14.0;
     final labelFontSize = rs.isSmall ? 10.0 : 12.0;
     final fieldController = _getController(key, form.fields[key]?.toString());
-    final focusNode = _getFocusNode(key);
+    final textFocusNode = _getFocusNode(key);
+    final consoleFocusNode = _getConsoleFocusNode(key);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.grey.shade400,
-            fontSize: labelFontSize,
-            letterSpacing: 1,
-          ),
-        ),
-        SizedBox(height: rs.spacing.xs),
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(rs.radius.sm),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          ),
-          child: TextField(
-            controller: fieldController,
-            focusNode: focusNode,
-            obscureText: obscure,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: fontSize,
-              fontFamily: 'monospace',
-            ),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: TextStyle(
-                color: Colors.grey.shade700,
-                fontSize: fontSize,
-              ),
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: rs.spacing.md,
-                vertical: rs.spacing.md,
-              ),
-            ),
-            onChanged: (value) => _syncField(key, value),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActions(
-    Responsive rs,
-    OnboardingState state,
-    OnboardingController controller, {
-    bool canSave = true,
-  }) {
-    final buttonFontSize = rs.isSmall ? 12.0 : 14.0;
-
-    return Row(
-      children: [
-        Expanded(
-          child: _buildActionButton(
-            rs: rs,
-            label: 'Test',
-            icon: Icons.wifi_tethering,
-            fontSize: buttonFontSize,
-            onTap: state.isTestingConnection ? null : controller.testProviderConnection,
-          ),
-        ),
-        SizedBox(width: rs.spacing.sm),
-        Expanded(
-          child: _buildActionButton(
-            rs: rs,
-            label: 'Save',
-            icon: Icons.check,
-            fontSize: buttonFontSize,
-            onTap: canSave ? controller.saveProvider : null,
-            primary: true,
-          ),
-        ),
-        SizedBox(width: rs.spacing.sm),
-        Expanded(
-          child: _buildActionButton(
-            rs: rs,
-            label: 'Cancel',
-            icon: Icons.close,
-            fontSize: buttonFontSize,
-            onTap: controller.cancelProviderForm,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButton({
-    required Responsive rs,
-    required String label,
-    required IconData icon,
-    required double fontSize,
-    VoidCallback? onTap,
-    bool primary = false,
-  }) {
-    final iconSize = rs.isSmall ? 14.0 : 18.0;
     return ConsoleFocusable(
-      onSelect: onTap,
+      key: ValueKey('field_$key'),
+      focusNode: consoleFocusNode,
+      focusScale: 1.0,
       borderRadius: rs.radius.sm,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: EdgeInsets.symmetric(
-            horizontal: rs.spacing.md,
-            vertical: rs.spacing.md,
-          ),
-          decoration: BoxDecoration(
-            color: primary
-                ? Colors.redAccent.withValues(alpha: 0.2)
-                : Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(rs.radius.sm),
-            border: Border.all(
-              color: primary
-                  ? Colors.redAccent.withValues(alpha: 0.5)
-                  : Colors.white.withValues(alpha: 0.1),
+      onSelect: () => textFocusNode.requestFocus(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade400,
+              fontSize: labelFontSize,
+              letterSpacing: 1,
             ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: onTap == null ? Colors.white24 : Colors.white70, size: iconSize),
-              SizedBox(width: rs.spacing.xs),
-              Text(
-                label,
+          SizedBox(height: rs.spacing.xs),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(rs.radius.sm),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            ),
+            child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.escape): () =>
+                    consoleFocusNode.requestFocus(),
+                const SingleActivator(LogicalKeyboardKey.gameButtonB): () =>
+                    consoleFocusNode.requestFocus(),
+                const SingleActivator(LogicalKeyboardKey.goBack): () =>
+                    consoleFocusNode.requestFocus(),
+              },
+              child: TextField(
+                controller: fieldController,
+                focusNode: textFocusNode,
+                obscureText: obscure,
                 style: TextStyle(
-                  color: onTap == null ? Colors.white24 : Colors.white,
+                  color: Colors.white,
                   fontSize: fontSize,
+                  fontFamily: 'monospace',
                 ),
+                decoration: InputDecoration(
+                  hintText: hint,
+                  hintStyle: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: fontSize,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: rs.spacing.md,
+                    vertical: rs.spacing.md,
+                  ),
+                ),
+                onChanged: (value) => _syncField(key, value),
+                onSubmitted: (_) => consoleFocusNode.requestFocus(),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
+
 }

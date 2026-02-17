@@ -37,7 +37,7 @@ class FolderAnalysisResult {
 class RomFolderService {
   static const ignoredFolders = {'3dsupdates', 'switchupdates'};
   List<String> get supportedFolderNames =>
-      SystemModel.supportedSystems.map((s) => s.esdeFolder).toList();
+      SystemModel.supportedSystems.map((s) => s.id).toList();
   Future<int> _countGamesInFolder(
       String folderPath, List<String> extensions) async {
     final dir = Directory(folderPath);
@@ -61,14 +61,14 @@ class RomFolderService {
     int existingCount = 0;
     int missingCount = 0;
     for (final system in SystemModel.supportedSystems) {
-      final folderPath = '$romPath/${system.esdeFolder}';
+      final folderPath = '$romPath/${system.id}';
       final dir = Directory(folderPath);
       final exists = await dir.exists();
       final gameCount = exists
           ? await _countGamesInFolder(folderPath, system.romExtensions)
           : 0;
       folders.add(FolderInfo(
-        folderName: system.esdeFolder,
+        folderName: system.id,
         systemName: system.name,
         exists: exists,
         gameCount: gameCount,
@@ -92,12 +92,12 @@ class RomFolderService {
   Future<List<String>> createMissingFolders(String romPath) async {
     final created = <String>[];
     for (final system in SystemModel.supportedSystems) {
-      final folderPath = '$romPath/${system.esdeFolder}';
+      final folderPath = '$romPath/${system.id}';
       final dir = Directory(folderPath);
       if (!await dir.exists()) {
         try {
           await dir.create(recursive: true);
-          created.add(system.esdeFolder);
+          created.add(system.id);
         } catch (_) {
         }
       }

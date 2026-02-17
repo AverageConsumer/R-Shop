@@ -8,11 +8,13 @@ class ChatBubble extends ConsumerStatefulWidget {
   final String message;
   final VoidCallback? onComplete;
   final Duration typewriterSpeed;
+  final Color? accentColor;
   const ChatBubble({
     super.key,
     required this.message,
     this.onComplete,
     this.typewriterSpeed = const Duration(milliseconds: 30),
+    this.accentColor,
   });
   @override
   ConsumerState<ChatBubble> createState() => _ChatBubbleState();
@@ -94,8 +96,8 @@ class _ChatBubbleState extends ConsumerState<ChatBubble> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.white.withValues(alpha: 0.12),
-              Colors.white.withValues(alpha: 0.06),
+              (widget.accentColor ?? Colors.white).withValues(alpha: 0.12),
+              (widget.accentColor ?? Colors.white).withValues(alpha: 0.06),
             ],
           ),
           borderRadius: const BorderRadius.only(
@@ -105,7 +107,7 @@ class _ChatBubbleState extends ConsumerState<ChatBubble> {
             bottomRight: Radius.circular(20),
           ),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.15),
+            color: (widget.accentColor ?? Colors.white).withValues(alpha: 0.15),
             width: 1,
           ),
           boxShadow: [
@@ -135,7 +137,7 @@ class _ChatBubbleState extends ConsumerState<ChatBubble> {
                 child: Container(
                   width: cursorWidth,
                   height: cursorHeight,
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: (widget.accentColor ?? Colors.white).withValues(alpha: 0.8),
                 ),
               ),
           ],

@@ -24,10 +24,12 @@ class GameDetailController extends ChangeNotifier {
     required this.variants,
     required this.system,
     required this.targetFolder,
+    bool showFullFilename = false,
     RomManager? romManager,
     DownloadQueueManager? queueManager,
   })  : _romManager = romManager ?? RomManager(),
         _queueManager = queueManager ?? DownloadQueueManager() {
+    _state = GameDetailState(showFullFilename: showFullFilename);
     checkInstallationStatus();
   }
 
@@ -83,7 +85,15 @@ class GameDetailController extends ChangeNotifier {
     }
   }
 
-  String get cleanTitle => GameMetadata.cleanTitle(game.filename);
+  String get cleanTitle => GameMetadata.cleanTitle(selectedVariant.filename);
+
+  String get displayTitle =>
+      _state.showFullFilename ? selectedVariant.filename : cleanTitle;
+
+  void toggleFullFilename() {
+    _state = _state.copyWith(showFullFilename: !_state.showFullFilename);
+    notifyListeners();
+  }
 
   void showDeleteDialog() {
     _state = _state.copyWith(

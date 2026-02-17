@@ -29,9 +29,13 @@ class FocusScopeObserver extends NavigatorObserver {
     final previousRouteId = _getRouteId(previousRoute);
     if (previousRouteId != null) {
       final savedState = focusStateManager.getFocusState(previousRouteId);
-      if (savedState?.savedFocusNode?.canRequestFocus == true) {
+      if (savedState?.savedFocusNode != null &&
+          savedState!.savedFocusNode!.canRequestFocus) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          savedState!.savedFocusNode!.requestFocus();
+          // Re-check canRequestFocus after the frame, as the node may have been disposed
+          if (savedState.savedFocusNode!.canRequestFocus) {
+            savedState.savedFocusNode!.requestFocus();
+          }
         });
       }
     }

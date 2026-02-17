@@ -1,28 +1,118 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/responsive/responsive.dart';
+import '../providers/download_providers.dart';
+import 'control_button.dart';
+import 'download_overlay.dart';
 
-export 'control_button.dart' show ControlButton;
+class HudAction {
+  const HudAction(this.action, {this.onTap, this.highlight = false});
+  final String action;
+  final VoidCallback? onTap;
+  final bool highlight;
+}
 
 /// Unified floating HUD that displays controller button hints.
 ///
 /// Always sits bottom-right (landscape) or bottom-center (portrait).
 /// Set [embedded] to true when used inside a modal (no Positioned wrapper).
-class ConsoleHud extends StatelessWidget {
-  final List<Widget> buttons;
+///
+/// Slots are rendered in fixed Switch-convention order (left to right):
+/// [D-pad] [−] [+] [Y] [X] [B] [A]  [Downloads]
+class ConsoleHud extends ConsumerWidget {
+  final HudAction? a, b, x, y, start, select;
+  final ({String label, String action})? dpad;
+  final bool showDownloads;
   final bool embedded;
 
   const ConsoleHud({
     super.key,
-    required this.buttons,
+    this.a,
+    this.b,
+    this.x,
+    this.y,
+    this.start,
+    this.select,
+    this.dpad,
+    this.showDownloads = true,
     this.embedded = false,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final buttons = <Widget>[];
+
+    // Fixed order: dpad, select(−), start(+), Y, X, B, A
+    if (dpad != null) {
+      buttons.add(ControlButton(
+        label: dpad!.label,
+        action: dpad!.action,
+      ));
+    }
+    if (select != null) {
+      buttons.add(ControlButton(
+        label: '\u2212',
+        action: select!.action,
+        onTap: select!.onTap,
+        highlight: select!.highlight,
+      ));
+    }
+    if (start != null) {
+      buttons.add(ControlButton(
+        label: '+',
+        action: start!.action,
+        onTap: start!.onTap,
+        highlight: start!.highlight,
+      ));
+    }
+    if (y != null) {
+      buttons.add(ControlButton(
+        label: 'Y',
+        action: y!.action,
+        onTap: y!.onTap,
+        highlight: y!.highlight,
+      ));
+    }
+    if (x != null) {
+      buttons.add(ControlButton(
+        label: 'X',
+        action: x!.action,
+        onTap: x!.onTap,
+        highlight: x!.highlight,
+      ));
+    }
+    if (b != null) {
+      buttons.add(ControlButton(
+        label: 'B',
+        action: b!.action,
+        onTap: b!.onTap,
+        highlight: b!.highlight,
+      ));
+    }
+    if (a != null) {
+      buttons.add(ControlButton(
+        label: 'A',
+        action: a!.action,
+        onTap: a!.onTap,
+        highlight: a!.highlight,
+      ));
+    }
+
+    // Auto-inject downloads button
+    if (showDownloads && ref.watch(downloadCountProvider) > 0) {
+      buttons.add(ControlButton(
+        label: '',
+        action: 'Downloads',
+        icon: Icons.play_arrow_rounded,
+        highlight: true,
+        onTap: () => toggleDownloadOverlay(ref),
+      ));
+    }
+
     if (buttons.isEmpty) return const SizedBox.shrink();
 
     final rs = context.rs;
-    final content = _buildContent(rs);
+    final content = _buildContent(rs, buttons);
 
     if (embedded) return Center(child: content);
 
@@ -42,7 +132,7 @@ class ConsoleHud extends StatelessWidget {
     );
   }
 
-  Widget _buildContent(Responsive rs) {
+  Widget _buildContent(Responsive rs, List<Widget> buttons) {
     return Material(
       type: MaterialType.transparency,
       child: Container(
@@ -59,13 +149,13 @@ class ConsoleHud extends StatelessWidget {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: _buildWithSpacing(rs),
+          children: _buildWithSpacing(rs, buttons),
         ),
       ),
     );
   }
 
-  List<Widget> _buildWithSpacing(Responsive rs) {
+  List<Widget> _buildWithSpacing(Responsive rs, List<Widget> buttons) {
     final spacing = rs.isSmall ? rs.spacing.sm : rs.spacing.md;
     final result = <Widget>[];
     for (var i = 0; i < buttons.length; i++) {

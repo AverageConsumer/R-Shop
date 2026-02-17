@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../models/config/system_config.dart';
 import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
-import '../../../services/game_source_service.dart';
+import '../../../services/database_service.dart';
 import '../../../services/rom_manager.dart';
 import '../../../services/unified_game_service.dart';
 
@@ -54,10 +54,9 @@ class GameListState {
 class GameListController extends ChangeNotifier {
   final SystemModel system;
   final String targetFolder;
-  final String baseUrl;
-  final SystemConfig? systemConfig;
-  final GameSourceService _gameSourceService;
+  final SystemConfig systemConfig;
   final UnifiedGameService _unifiedService;
+  final DatabaseService _databaseService;
 
   GameListState _state = const GameListState();
   GameListState get state => _state;
@@ -65,13 +64,11 @@ class GameListController extends ChangeNotifier {
   GameListController({
     required this.system,
     required this.targetFolder,
-    required this.baseUrl,
-    this.systemConfig,
-    GameSourceService? gameSourceService,
+    required this.systemConfig,
     UnifiedGameService? unifiedService,
-  })  : _gameSourceService =
-            gameSourceService ?? GameSourceService(baseUrl: baseUrl),
-        _unifiedService = unifiedService ?? UnifiedGameService() {
+    DatabaseService? databaseService,
+  })  : _unifiedService = unifiedService ?? UnifiedGameService(),
+        _databaseService = databaseService ?? DatabaseService() {
     loadGames();
   }
 
@@ -80,15 +77,7 @@ class GameListController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final List<GameItem> games;
-      if (systemConfig != null) {
-        games = await _unifiedService.fetchGamesForSystem(systemConfig!);
-      } else {
-        games = await _gameSourceService.fetchGames(
-          system,
-          forceRefresh: forceRefresh,
-        );
-      }
+      final games = await _unifiedService.fetchGamesForSystem(systemConfig);
       _state = _state.copyWith(allGames: games);
       _groupGames();
       await _checkInstalledStatus();
@@ -166,6 +155,6 @@ class GameListController extends ChangeNotifier {
   }
 
   Future<void> updateCoverUrl(String filename, String url) async {
-    await _gameSourceService.updateCoverUrl(filename, url);
+    await _databaseService.updateGameCover(filename, url);
   }
 }

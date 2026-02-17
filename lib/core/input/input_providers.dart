@@ -29,9 +29,11 @@ final mainFocusRequestProvider = StateProvider<FocusNode?>((ref) {
 void restoreMainFocus(WidgetRef ref) {
   final focusNode = ref.read(mainFocusRequestProvider);
   if (focusNode != null && focusNode.canRequestFocus) {
-    focusNode.requestFocus();
-  } else {
-    FocusManager.instance.primaryFocus?.requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (focusNode.canRequestFocus) {
+        focusNode.requestFocus();
+      }
+    });
   }
 }
 

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../providers/app_providers.dart';
 import '../theme/app_theme.dart';
 
 class ConsoleFocusable extends ConsumerStatefulWidget {
@@ -71,20 +70,20 @@ class _ConsoleFocusableState extends ConsumerState<ConsoleFocusable>
       parent: _controller,
       curve: Curves.easeOut,
     ));
+
   }
 
   @override
   void didUpdateWidget(ConsoleFocusable oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.focusNode != oldWidget.focusNode) {
-      oldWidget.focusNode?.removeListener(_onFocusChange);
       _focusNode.removeListener(_onFocusChange);
-      if (widget.focusNode != null) {
+      if (oldWidget.focusNode == null) {
         _focusNode.dispose();
-        _focusNode = widget.focusNode!;
-        _focusNode.addListener(_onFocusChange);
-        _updateFocusState();
       }
+      _focusNode = widget.focusNode ?? FocusNode();
+      _focusNode.addListener(_onFocusChange);
+      _updateFocusState();
     }
   }
 
@@ -108,7 +107,12 @@ class _ConsoleFocusableState extends ConsumerState<ConsoleFocusable>
       _isFocused = hasFocus;
       if (hasFocus) {
         _controller.forward();
-        ref.read(feedbackServiceProvider).tick();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Scrollable.ensureVisible(context,
+                duration: const Duration(milliseconds: 200));
+          }
+        });
       } else {
         _controller.reverse();
       }
@@ -262,14 +266,13 @@ class _ConsoleFocusableCardState extends ConsumerState<ConsoleFocusableCard>
   void didUpdateWidget(ConsoleFocusableCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.focusNode != oldWidget.focusNode) {
-      oldWidget.focusNode?.removeListener(_onFocusChange);
       _focusNode.removeListener(_onFocusChange);
-      if (widget.focusNode != null) {
+      if (oldWidget.focusNode == null) {
         _focusNode.dispose();
-        _focusNode = widget.focusNode!;
-        _focusNode.addListener(_onFocusChange);
-        _updateFocusState();
       }
+      _focusNode = widget.focusNode ?? FocusNode();
+      _focusNode.addListener(_onFocusChange);
+      _updateFocusState();
     }
   }
 
@@ -293,7 +296,12 @@ class _ConsoleFocusableCardState extends ConsumerState<ConsoleFocusableCard>
       _isFocused = hasFocus;
       if (hasFocus) {
         _controller.forward();
-        ref.read(feedbackServiceProvider).tick();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Scrollable.ensureVisible(context,
+                duration: const Duration(milliseconds: 200));
+          }
+        });
       } else {
         _controller.reverse();
       }
@@ -440,14 +448,13 @@ class _ConsoleFocusableListItemState
   void didUpdateWidget(ConsoleFocusableListItem oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.focusNode != oldWidget.focusNode) {
-      oldWidget.focusNode?.removeListener(_onFocusChange);
       _focusNode.removeListener(_onFocusChange);
-      if (widget.focusNode != null) {
+      if (oldWidget.focusNode == null) {
         _focusNode.dispose();
-        _focusNode = widget.focusNode!;
-        _focusNode.addListener(_onFocusChange);
-        _updateFocusState();
       }
+      _focusNode = widget.focusNode ?? FocusNode();
+      _focusNode.addListener(_onFocusChange);
+      _updateFocusState();
     }
   }
 
@@ -471,7 +478,12 @@ class _ConsoleFocusableListItemState
       _isFocused = hasFocus;
       if (hasFocus) {
         _controller.forward();
-        ref.read(feedbackServiceProvider).tick();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Scrollable.ensureVisible(context,
+                duration: const Duration(milliseconds: 200));
+          }
+        });
       } else {
         _controller.reverse();
       }

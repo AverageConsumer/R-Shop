@@ -46,14 +46,16 @@ mixin ConsoleScreenMixin<T extends ConsumerStatefulWidget> on ConsumerState<T> {
 
   @override
   void dispose() {
-    // Schedule focus state save to avoid modifying provider during build/dispose
-    Future.delayed(Duration.zero, () {
-      _focusStateManager.saveFocusState(
-        routeId,
-        savedFocusNode: FocusManager.instance.primaryFocus,
-      );
-    });
-
+    // Capture focus state synchronously before FocusNode is disposed
+    final currentFocus = FocusManager.instance.primaryFocus;
+    if (currentFocus != null && currentFocus != screenFocusNode) {
+      final id = routeId;
+      // Defer state modification — dispose runs during widget tree
+      // finalization where Riverpod prohibits provider mutations
+      Future.microtask(() {
+        _focusStateManager.saveFocusState(id, savedFocusNode: currentFocus);
+      });
+    }
     screenFocusNode.dispose();
     super.dispose();
   }
@@ -72,7 +74,7 @@ mixin ConsoleScreenMixin<T extends ConsumerStatefulWidget> on ConsumerState<T> {
   }
 
   FocusStateEntry? getSavedFocusState() {
-    return _focusStateManager.state[routeId];
+    return _focusStateManager.getFocusState(routeId);
   }
 
   int? get savedSelectedIndex => getSavedFocusState()?.selectedIndex;
@@ -137,14 +139,13 @@ mixin ConsoleGridScreenMixin<T extends ConsumerStatefulWidget>
 
   @override
   void dispose() {
-    // Schedule focus state save to avoid modifying provider during build/dispose
-    Future.delayed(Duration.zero, () {
-      _focusStateManager.saveFocusState(
-        routeId,
-        selectedIndex: currentSelectedIndex,
-      );
+    final index = currentSelectedIndex;
+    final id = routeId;
+    // Defer state modification — dispose runs during widget tree
+    // finalization where Riverpod prohibits provider mutations
+    Future.microtask(() {
+      _focusStateManager.saveFocusState(id, selectedIndex: index);
     });
-
     screenFocusNode.dispose();
     super.dispose();
   }

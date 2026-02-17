@@ -45,9 +45,9 @@ class InputDebouncer {
     _holdCount++;
 
     if (_holdCount > 8) {
-      _holdIntervalMs = 30;
+      _holdIntervalMs = 60;
     } else if (_holdCount > 4) {
-      _holdIntervalMs = 50;
+      _holdIntervalMs = 80;
     }
 
     _holdTimer?.cancel();

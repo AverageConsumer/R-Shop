@@ -85,13 +85,6 @@ class SearchOverlay extends StatelessWidget {
                       onClose();
                     }
                   },
-                  const SingleActivator(LogicalKeyboardKey.backspace): () {
-                    if (searchFocusNode.hasFocus) {
-                      onUnfocus();
-                    } else {
-                      onClose();
-                    }
-                  },
                   const SingleActivator(LogicalKeyboardKey.gameButtonB): () {
                     if (searchFocusNode.hasFocus) {
                       onUnfocus();

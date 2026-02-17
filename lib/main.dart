@@ -42,16 +42,16 @@ void main() async {
   );
 }
 
-class RShopApp extends StatefulWidget {
+class RShopApp extends ConsumerStatefulWidget {
   final AudioManager audioManager;
 
   const RShopApp({super.key, required this.audioManager});
 
   @override
-  State<RShopApp> createState() => _RShopAppState();
+  ConsumerState<RShopApp> createState() => _RShopAppState();
 }
 
-class _RShopAppState extends State<RShopApp> with WidgetsBindingObserver {
+class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -76,6 +76,7 @@ class _RShopAppState extends State<RShopApp> with WidgetsBindingObserver {
         break;
       case AppLifecycleState.resumed:
         widget.audioManager.resume();
+        restoreMainFocus(ref);
         break;
       case AppLifecycleState.detached:
         widget.audioManager.dispose();
@@ -87,38 +88,34 @@ class _RShopAppState extends State<RShopApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, child) {
-        final storage = ref.read(storageServiceProvider);
-        final onboardingCompleted = storage.getOnboardingCompleted();
+    final storage = ref.read(storageServiceProvider);
+    final onboardingCompleted = storage.getOnboardingCompleted();
 
-        return GlobalInputWrapper(
-          child: MaterialApp(
-            title: 'R-Shop',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.darkTheme,
-            builder: (context, child) {
-              return ScrollConfiguration(
-                behavior: NoGlowScrollBehavior(),
-                child: Stack(
-                  children: [
-                    child!,
-                    Builder(
-                      builder: (context) => const DownloadOverlay(),
-                    ),
-                  ],
+    return GlobalInputWrapper(
+      child: MaterialApp(
+        title: 'R-Shop',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.darkTheme,
+        builder: (context, child) {
+          return ScrollConfiguration(
+            behavior: NoGlowScrollBehavior(),
+            child: Stack(
+              children: [
+                child!,
+                Builder(
+                  builder: (context) => const DownloadOverlay(),
                 ),
-              );
-            },
-            routes: {
-              '/home': (context) => const HomeView(),
-            },
-            home: onboardingCompleted
-                ? const HomeView()
-                : const OnboardingScreen(),
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+        routes: {
+          '/home': (context) => const HomeView(),
+        },
+        home: onboardingCompleted
+            ? const HomeView()
+            : const OnboardingScreen(),
+      ),
     );
   }
 }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/input/input_providers.dart';
 import '../core/responsive/responsive.dart';
 import '../core/theme/app_theme.dart';
 import 'glass_overlay.dart';
 
-class ExitConfirmationOverlay extends StatefulWidget {
+class ExitConfirmationOverlay extends ConsumerStatefulWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
   final String title;
@@ -25,10 +27,10 @@ class ExitConfirmationOverlay extends StatefulWidget {
   });
 
   @override
-  State<ExitConfirmationOverlay> createState() => _ExitConfirmationOverlayState();
+  ConsumerState<ExitConfirmationOverlay> createState() => _ExitConfirmationOverlayState();
 }
 
-class _ExitConfirmationOverlayState extends State<ExitConfirmationOverlay>
+class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverlay>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -54,10 +56,11 @@ class _ExitConfirmationOverlayState extends State<ExitConfirmationOverlay>
     );
 
     _controller.forward();
-    
-    // Ensure focus is requested after build
+
+    // Set overlay priority to dialog
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        ref.read(overlayPriorityProvider.notifier).state = OverlayPriority.dialog;
         FocusScope.of(context).requestFocus(_focusNode);
       }
     });
@@ -67,6 +70,13 @@ class _ExitConfirmationOverlayState extends State<ExitConfirmationOverlay>
 
   @override
   void dispose() {
+    // Reset overlay priority
+    final controller = ref.read(overlayPriorityProvider.notifier);
+    Future(() {
+      if (controller.state == OverlayPriority.dialog) {
+        controller.state = OverlayPriority.none;
+      }
+    });
     _focusNode.dispose();
     _controller.dispose();
     super.dispose();
@@ -89,13 +99,16 @@ class _ExitConfirmationOverlayState extends State<ExitConfirmationOverlay>
   }
 
   void _close() {
-    _controller.reverse().then((_) => widget.onCancel());
+    _controller.reverse().then((_) {
+      restoreMainFocus(ref);
+      widget.onCancel();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
-    
+
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.arrowRight): () => _handleNavigate(true),
@@ -208,7 +221,7 @@ class _ExitConfirmationOverlayState extends State<ExitConfirmationOverlay>
     required VoidCallback onTap,
   }) {
     final color = isPrimary ? AppTheme.primaryColor : Colors.redAccent;
-    
+
     return Expanded(
       child: GestureDetector(
         onTap: onTap,

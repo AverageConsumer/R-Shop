@@ -5,12 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/responsive/responsive.dart';
 import '../../providers/app_providers.dart';
-import '../../providers/download_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../services/config_storage_service.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/download_overlay.dart';
 import 'onboarding_controller.dart';
+import 'widgets/console_setup_hud.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/console_setup_step.dart';
 import 'widgets/pixel_mascot.dart';
@@ -60,12 +60,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           return KeyEventResult.handled;
         }
         if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-          controller.testProviderConnection();
-          return KeyEventResult.handled;
-        }
-        if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-            event.logicalKey == LogicalKeyboardKey.enter) {
-          controller.saveProvider();
+          if (state.canTest && !state.isTestingConnection) {
+            controller.testProviderConnection();
+          }
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
@@ -82,29 +79,31 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           controller.startAddProvider();
           return KeyEventResult.handled;
         }
-        if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-            event.logicalKey == LogicalKeyboardKey.enter) {
-          controller.saveConsoleConfig();
-          return KeyEventResult.handled;
-        }
         return KeyEventResult.ignored;
       }
 
-      // Grid level: Start = export, Select = import
+      // Grid level: Start = continue, Select = import
       if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
-        _exportConfig();
+        _handleContinue();
         return KeyEventResult.handled;
       }
-      if (event.logicalKey == LogicalKeyboardKey.select) {
+      if (event.logicalKey == LogicalKeyboardKey.gameButtonSelect) {
         _importConfig();
         return KeyEventResult.handled;
       }
     }
 
+    // Complete step: Select = export
+    if (state.isLastStep &&
+        event.logicalKey == LogicalKeyboardKey.gameButtonSelect) {
+      _exportConfig();
+      return KeyEventResult.handled;
+    }
+
     if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
         event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.space ||
-        event.logicalKey == LogicalKeyboardKey.select) {
+        event.logicalKey == LogicalKeyboardKey.gameButtonSelect) {
       _handleContinue();
       return KeyEventResult.handled;
     }
@@ -202,6 +201,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final state = ref.watch(onboardingControllerProvider);
     final rs = context.rs;
     ref.listen(onboardingControllerProvider.select((s) => s.currentStep), (prev, next) {
+      if (next == OnboardingStep.consoleSetup) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_focusNode.hasFocus) {
           _focusNode.requestFocus();
@@ -302,108 +302,30 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _buildControls(OnboardingState state, Responsive rs) {
-    // Dynamic HUD buttons based on sub-state
-    final List<Widget> buttons = [];
-
     if (state.currentStep == OnboardingStep.consoleSetup) {
-      if (state.hasProviderForm) {
-        // Form level
-        buttons.addAll([
-          ControlButton(
-            label: 'A',
-            action: 'Save',
-            onTap: () => ref.read(onboardingControllerProvider.notifier).saveProvider(),
-          ),
-          ControlButton(
-            label: 'B',
-            action: 'Cancel',
-            onTap: () => ref.read(onboardingControllerProvider.notifier).cancelProviderForm(),
-          ),
-          ControlButton(
-            label: 'Y',
-            action: 'Test',
-            onTap: state.isTestingConnection
-                ? null
-                : () => ref.read(onboardingControllerProvider.notifier).testProviderConnection(),
-          ),
-        ]);
-      } else if (state.hasConsoleSelected) {
-        // Panel level
-        final sub = state.consoleSubState;
-        buttons.addAll([
-          ControlButton(
-            label: 'A',
-            action: 'Done',
-            onTap: sub?.isComplete == true
-                ? () => ref.read(onboardingControllerProvider.notifier).saveConsoleConfig()
-                : null,
-            highlight: sub?.isComplete == true,
-          ),
-          ControlButton(
-            label: 'B',
-            action: 'Close',
-            onTap: () => ref.read(onboardingControllerProvider.notifier).deselectConsole(),
-          ),
-          ControlButton(
-            label: 'Y',
-            action: 'Add Source',
-            onTap: () => ref.read(onboardingControllerProvider.notifier).startAddProvider(),
-          ),
-        ]);
-      } else {
-        // Grid level
-        buttons.addAll([
-          ControlButton(
-            label: 'A',
-            action: 'Continue',
-            onTap: state.configuredCount > 0 ? _handleContinue : null,
-            highlight: state.configuredCount > 0,
-          ),
-          if (!state.isFirstStep)
-            ControlButton(
-              label: 'B',
-              action: 'Back',
-              onTap: _handleBack,
-            ),
-          if (state.configuredCount > 0)
-            ControlButton(label: '+', action: 'Export', onTap: _exportConfig),
-          ControlButton(label: '\u2212', action: 'Import', onTap: _importConfig),
-        ]);
-      }
-    } else {
-      // Standard step buttons
-      buttons.add(
-        ControlButton(
-          label: 'A',
-          action: state.isLastStep ? 'Start!' : 'Continue',
-          onTap: state.canProceed ? _handleContinue : null,
-          highlight: state.canProceed,
-        ),
-      );
-      if (!state.isFirstStep) {
-        buttons.add(
-          ControlButton(
-            label: 'B',
-            action: 'Back',
-            onTap: _handleBack,
-          ),
-        );
-      }
-    }
+      final shared = buildConsoleSetupHud(state: state, ref: ref);
+      if (shared != null) return shared;
 
-    if (ref.watch(downloadCountProvider) > 0) {
-      buttons.add(
-        ControlButton(
-          label: '',
-          action: 'Downloads',
-          icon: Icons.play_arrow_rounded,
-          highlight: true,
-          onTap: () => toggleDownloadOverlay(ref),
-        ),
+      // Grid level
+      return ConsoleHud(
+        start: state.configuredCount > 0
+            ? HudAction('Continue', onTap: _handleContinue, highlight: true)
+            : null,
+        b: !state.isFirstStep ? HudAction('Back', onTap: _handleBack) : null,
+        select: HudAction('Import', onTap: _importConfig),
       );
     }
 
-    return ConsoleHud(buttons: buttons);
+    // Standard steps
+    return ConsoleHud(
+      a: HudAction(
+        state.isLastStep ? 'Start!' : 'Continue',
+        onTap: state.canProceed ? _handleContinue : null,
+        highlight: state.canProceed,
+      ),
+      b: !state.isFirstStep ? HudAction('Back', onTap: _handleBack) : null,
+      select: state.isLastStep ? HudAction('Export', onTap: _exportConfig) : null,
+    );
   }
 }
 

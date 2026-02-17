@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.9.2] Beta — 2026-02-18
+
+### Added
+- Installed indicator LED strip on game cards for downloaded ROMs
+- Shared `ConsoleSetupHud` widget for onboarding and config-mode screens
+- `ConsoleHud` slot-based API (`a`, `b`, `x`, `y`, `start`, `select`, `dpad`) replacing raw button lists
+- Auto-scroll on focus for `ConsoleFocusable` via `Scrollable.ensureVisible`
+
+### Improved
+- Onboarding rework — streamlined flow with guard checks for provider test/save actions
+- Input system: global Actions now use `isEnabled()` overlay checks instead of inline guard clauses
+- `NavigateAction` cooldown (100ms) prevents rapid-fire navigation on DPAD hold
+- `OverlayFocusScope` claims priority and requests focus in a single operation
+- Focus state restoration uses `getFocusState()` public API instead of direct `StateNotifier.state` access
+- `ConfigModeScreen` simplified, shares HUD logic with onboarding
+
+### Fixed
+- DPAD hold producing duplicate navigation by removing `tick()` feedback from `ConsoleFocusable`
+- `ConsoleFocusable.didUpdateWidget` correctly handles focus node swaps
+- `ExitConfirmationOverlay` overlay priority lifecycle (set in `initState`, reset in `dispose`)
+
+### Internal
+- Removed `GameSourceService` (replaced by unified provider system)
+- `SystemModel` restructured for multi-source provider configs
+- `FocusScopeObserver` and `OverlayScope` cleanup
+
+---
+
 ## [0.9.1] Beta — 2026-02-17
 
 ### Added

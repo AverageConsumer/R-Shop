@@ -154,11 +154,28 @@ class OnboardingState {
   int get configuredCount => configuredSystems.length;
   bool get hasRommPlatformSelected => rommMatchedPlatform != null;
 
+  bool get canTest {
+    final form = providerForm;
+    if (form == null) return false;
+    final fields = form.fields;
+    bool has(String k) => (fields[k]?.toString() ?? '').trim().isNotEmpty;
+    switch (form.type) {
+      case ProviderType.web:
+        return has('url');
+      case ProviderType.ftp:
+        return has('host') && has('port') && has('path');
+      case ProviderType.smb:
+        return has('host') && has('port') && has('share') && has('path');
+      case ProviderType.romm:
+        return has('url');
+    }
+  }
+
   SystemModel? get selectedSystem {
     if (selectedConsoleId == null) return null;
     try {
       return SystemModel.supportedSystems.firstWhere(
-        (s) => s.esdeFolder == selectedConsoleId,
+        (s) => s.id == selectedConsoleId,
       );
     } catch (_) {
       return null;
@@ -212,7 +229,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   void selectConsole(String id) {
     final existing = state.configuredSystems[id];
     final system = SystemModel.supportedSystems.firstWhere(
-      (s) => s.esdeFolder == id,
+      (s) => s.id == id,
     );
 
     final subState = existing != null
@@ -386,6 +403,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   }
 
   Future<void> testProviderConnection() async {
+    if (!state.canTest) return;
     final form = state.providerForm;
     if (form == null) return;
 
@@ -466,10 +484,10 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       if (!mounted) return;
 
       // Try auto-match
-      final esdeFolder = state.selectedConsoleId;
+      final systemId = state.selectedConsoleId;
       RommPlatform? matched;
-      if (esdeFolder != null) {
-        matched = RommPlatformMatcher.findMatch(esdeFolder, platforms);
+      if (systemId != null) {
+        matched = RommPlatformMatcher.findMatch(systemId, platforms);
       }
 
       state = state.copyWith(
@@ -564,7 +582,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     if (id == null || sub == null || !sub.isComplete) return;
 
     final system = SystemModel.supportedSystems.firstWhere(
-      (s) => s.esdeFolder == id,
+      (s) => s.id == id,
     );
 
     final config = SystemConfig(

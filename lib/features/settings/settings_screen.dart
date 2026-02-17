@@ -20,7 +20,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen>
+    with ConsoleScreenMixin {
   late bool _hapticEnabled;
   late bool _soundEnabled;
   late double _bgmVolume;
@@ -29,17 +30,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final FocusNode _hapticFocusNode = FocusNode();
 
   @override
+  String get routeId => 'settings';
+
+  @override
+  Map<Type, Action<Intent>> get screenActions => {
+        BackIntent: CallbackAction<BackIntent>(onInvoke: (_) {
+          _exitSettings();
+          return null;
+        }),
+      };
+
+  @override
   void initState() {
     super.initState();
     final storage = ref.read(storageServiceProvider);
-    final haptic = ref.read(hapticServiceProvider);
     _hapticEnabled = storage.getHapticEnabled();
     final soundSettings = ref.read(soundSettingsProvider);
     _soundEnabled = soundSettings.enabled;
     _bgmVolume = soundSettings.bgmVolume;
     _sfxVolume = soundSettings.sfxVolume;
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(mainFocusRequestProvider.notifier).state = screenFocusNode;
       _hapticFocusNode.requestFocus();
     });
   }
@@ -79,7 +91,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final newVolume = (_sfxVolume + delta).clamp(0.0, 1.0);
     setState(() => _sfxVolume = newVolume);
     await ref.read(soundSettingsProvider.notifier).setSfxVolume(newVolume);
-    ref.read(audioManagerProvider).playNavigation();
   }
 
   void _setBgmVolume(double volume) async {
@@ -127,18 +138,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
-    
-    return Shortcuts(
-      shortcuts: AppShortcuts.defaultShortcuts,
-      child: Actions(
-      actions: {
-        NavigateIntent: NavigateAction(ref, onNavigate: (intent) => false),
-        BackIntent: CallbackAction<BackIntent>(onInvoke: (intent) {
-          _exitSettings();
-          return null;
-        }),
-      },
-      child: PopScope(
+
+    return buildWithActions(
+      PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) {
@@ -165,7 +167,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
           ),
-          
+
           Column(
             children: [
               SizedBox(height: rs.safeAreaTop + rs.spacing.lg),
@@ -174,118 +176,124 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 800),
-                    child: ListView(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: rs.spacing.lg,
-                        vertical: rs.spacing.md,
+                    child: FocusTraversalGroup(
+                      child: ListView(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: rs.spacing.lg,
+                          vertical: rs.spacing.md,
+                        ),
+                        children: [
+                          _buildSectionHeader('Preferences', rs),
+                          _buildSettingsItemWrapper(
+                            onNavigate: (dir) {
+                              if (dir == GridDirection.left || dir == GridDirection.right) {
+                                _toggleHaptic();
+                                return true;
+                              }
+                              return false;
+                            },
+                            child: SettingsItem(
+                              focusNode: _hapticFocusNode,
+                              title: 'Haptic Feedback',
+                              subtitle: 'Vibration on button presses',
+                              trailing: _buildSwitch(_hapticEnabled),
+                              onTap: _toggleHaptic,
+                            ),
+                          ),
+                          SizedBox(height: rs.spacing.md),
+                          _buildSettingsItemWrapper(
+                            onNavigate: (dir) {
+                               if (dir == GridDirection.left || dir == GridDirection.right) {
+                                _toggleSound();
+                                return true;
+                              }
+                              return false;
+                            },
+                            child: SettingsItem(
+                              title: 'Sound Effects',
+                              subtitle: 'Audio feedback for actions',
+                              trailing: _buildSwitch(_soundEnabled),
+                              onTap: _toggleSound,
+                            ),
+                          ),
+
+                          SizedBox(height: rs.spacing.xl),
+                          _buildSectionHeader('Audio', rs),
+
+                          _buildSettingsItemWrapper(
+                            onNavigate: (dir) {
+                              if (dir == GridDirection.left) {
+                                _adjustBgmVolume(-0.05);
+                                ref.read(feedbackServiceProvider).tick();
+                                return true;
+                              } else if (dir == GridDirection.right) {
+                                _adjustBgmVolume(0.05);
+                                ref.read(feedbackServiceProvider).tick();
+                                return true;
+                              }
+                              return false;
+                            },
+                            child: SettingsItem(
+                              title: 'Background Music',
+                              subtitle: 'Ambient background music volume',
+                              trailingBuilder: (isFocused) => VolumeSlider(
+                                volume: _bgmVolume,
+                                isSelected: isFocused,
+                                onChanged: _setBgmVolume,
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: rs.spacing.md),
+                          _buildSettingsItemWrapper(
+                             onNavigate: (dir) {
+                              if (dir == GridDirection.left) {
+                                _adjustSfxVolume(-0.05);
+                                ref.read(feedbackServiceProvider).tick();
+                                return true;
+                              } else if (dir == GridDirection.right) {
+                                _adjustSfxVolume(0.05);
+                                ref.read(feedbackServiceProvider).tick();
+                                return true;
+                              }
+                              return false;
+                            },
+                            child: SettingsItem(
+                              title: 'SFX Volume',
+                              subtitle: 'Interface sound effects volume',
+                              trailingBuilder: (isFocused) => VolumeSlider(
+                                volume: _sfxVolume,
+                                isSelected: isFocused,
+                                onChanged: _setSfxVolume,
+                              ),
+                            ),
+                          ),
+
+                          SizedBox(height: rs.spacing.xl),
+                          _buildSectionHeader('System', rs),
+
+                          SettingsItem(
+                            title: 'Edit Consoles',
+                            subtitle: 'Add, remove or reconfigure consoles',
+                            trailing: const Icon(Icons.tune, color: Colors.white70),
+                            onTap: _openConfigMode,
+                          ),
+                          SizedBox(height: rs.spacing.md),
+                          SettingsItem(
+                            title: 'Reset App',
+                            subtitle: 'Delete config and return to onboarding',
+                            trailing: const Icon(Icons.refresh, color: Colors.white70),
+                            onTap: _showResetDialog,
+                            isDestructive: true,
+                          ),
+                        ],
                       ),
-                      children: [
-                        _buildSectionHeader('Preferences', rs),
-                        _buildSettingsItemWrapper(
-                          onNavigate: (dir) {
-                            if (dir == GridDirection.left || dir == GridDirection.right) {
-                              _toggleHaptic();
-                              return true;
-                            }
-                            return false;
-                          },
-                          child: SettingsItem(
-                            focusNode: _hapticFocusNode,
-                            title: 'Haptic Feedback',
-                            subtitle: 'Vibration on button presses',
-                            trailing: _buildSwitch(_hapticEnabled),
-                            onTap: _toggleHaptic,
-                          ),
-                        ),
-                        SizedBox(height: rs.spacing.md),
-                        _buildSettingsItemWrapper(
-                          onNavigate: (dir) {
-                             if (dir == GridDirection.left || dir == GridDirection.right) {
-                              _toggleSound();
-                              return true;
-                            }
-                            return false;
-                          },
-                          child: SettingsItem(
-                            title: 'Sound Effects',
-                            subtitle: 'Audio feedback for actions',
-                            trailing: _buildSwitch(_soundEnabled),
-                            onTap: _toggleSound,
-                          ),
-                        ),
-                        
-                        SizedBox(height: rs.spacing.xl),
-                        _buildSectionHeader('Audio', rs),
-                        
-                        _buildSettingsItemWrapper(
-                          onNavigate: (dir) {
-                            if (dir == GridDirection.left) {
-                              _adjustBgmVolume(-0.05);
-                              return true;
-                            } else if (dir == GridDirection.right) {
-                              _adjustBgmVolume(0.05);
-                              return true;
-                            }
-                            return false;
-                          },
-                          child: SettingsItem(
-                            title: 'Background Music',
-                            subtitle: 'Ambient background music volume',
-                            trailingBuilder: (isFocused) => VolumeSlider(
-                              volume: _bgmVolume,
-                              isSelected: isFocused,
-                              onChanged: _setBgmVolume,
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: rs.spacing.md),
-                        _buildSettingsItemWrapper(
-                           onNavigate: (dir) {
-                            if (dir == GridDirection.left) {
-                              _adjustSfxVolume(-0.05);
-                              return true;
-                            } else if (dir == GridDirection.right) {
-                              _adjustSfxVolume(0.05);
-                              return true;
-                            }
-                            return false;
-                          },
-                          child: SettingsItem(
-                            title: 'SFX Volume',
-                            subtitle: 'Interface sound effects volume',
-                            trailingBuilder: (isFocused) => VolumeSlider(
-                              volume: _sfxVolume,
-                              isSelected: isFocused,
-                              onChanged: _setSfxVolume,
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(height: rs.spacing.xl),
-                        _buildSectionHeader('System', rs),
-
-                        SettingsItem(
-                          title: 'Edit Consoles',
-                          subtitle: 'Add, remove or reconfigure consoles',
-                          trailing: const Icon(Icons.tune, color: Colors.white70),
-                          onTap: _openConfigMode,
-                        ),
-                        SizedBox(height: rs.spacing.md),
-                        SettingsItem(
-                          title: 'Reset App',
-                          subtitle: 'Delete config and return to onboarding',
-                          trailing: const Icon(Icons.refresh, color: Colors.white70),
-                          onTap: _showResetDialog,
-                          isDestructive: true,
-                        ),
-                      ],
                     ),
                   ),
                 ),
               ),
             ],
           ),
-          
+
           if (_showResetConfirm)
              ExitConfirmationOverlay(
                title: 'RESET APPLICATION',
@@ -296,10 +304,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                onConfirm: _performReset,
                onCancel: _hideResetDialog,
              ),
-          
+
         ],
       ),
-    ),
     ),
     ),
     );
@@ -312,7 +319,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       height: 28,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: value ? AppTheme.primaryColor : Colors.grey.withOpacity(0.3),
+        color: value ? AppTheme.primaryColor : Colors.grey.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Align(
@@ -350,7 +357,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-  
+
   Widget _buildTitle(Responsive rs) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: rs.spacing.lg),

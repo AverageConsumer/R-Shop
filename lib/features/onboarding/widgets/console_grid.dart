@@ -31,12 +31,12 @@ class ConsoleGrid extends ConsumerWidget {
         itemCount: systems.length,
         itemBuilder: (context, index) {
           final system = systems[index];
-          final isConfigured = state.configuredSystems.containsKey(system.esdeFolder);
+          final isConfigured = state.configuredSystems.containsKey(system.id);
 
           return _ConsoleTile(
             system: system,
             isConfigured: isConfigured,
-            onTap: () => controller.selectConsole(system.esdeFolder),
+            onTap: () => controller.selectConsole(system.id),
             autofocus: index == 0,
           );
         },
@@ -73,12 +73,21 @@ class _ConsoleTileState extends State<_ConsoleTile> {
 
     return Focus(
       autofocus: widget.autofocus,
-      onFocusChange: (focused) => setState(() => _focused = focused),
+      onFocusChange: (focused) {
+        setState(() => _focused = focused);
+        if (focused) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              Scrollable.ensureVisible(context,
+                  duration: const Duration(milliseconds: 200));
+            }
+          });
+        }
+      },
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent &&
             (event.logicalKey == LogicalKeyboardKey.enter ||
-             event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-             event.logicalKey == LogicalKeyboardKey.select)) {
+             event.logicalKey == LogicalKeyboardKey.gameButtonA)) {
           widget.onTap();
           return KeyEventResult.handled;
         }
