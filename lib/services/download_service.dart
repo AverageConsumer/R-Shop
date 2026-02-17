@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/game_item.dart';
 import '../models/system_model.dart';
+import 'download_handle.dart';
+import 'provider_factory.dart';
 
 enum DownloadStatus {
   idle,
@@ -62,7 +64,7 @@ class DownloadProgress {
 }
 
 class DownloadService {
-  static const _zipChannel = MethodChannel('com.example.r_shop/zip');
+  static const _zipChannel = MethodChannel('com.retro.rshop/zip');
 
   HttpClient? _httpClient;
   String? _tempFilePath;
@@ -140,11 +142,6 @@ class DownloadService {
     _isDownloadInProgress = true;
     _isCancelled = false;
 
-    _httpClient?.close(force: true);
-    _httpClient = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 30)
-      ..idleTimeout = const Duration(minutes: 5);
-
     if (_progressController?.isClosed == false) {
       _progressController?.add(DownloadProgress(
         status: DownloadStatus.downloading,
@@ -158,13 +155,7 @@ class DownloadService {
       await Future.delayed(const Duration(milliseconds: _initialDelayMs));
 
       if (_isCancelled) {
-        if (_progressController?.isClosed == false) {
-          _progressController?.add(DownloadProgress(
-            status: DownloadStatus.cancelled,
-          ));
-          _progressController?.close();
-        }
-        _isDownloadInProgress = false;
+        _emitCancelled();
         return;
       }
 
@@ -175,42 +166,147 @@ class DownloadService {
       if (await tempFile.exists()) {
         await tempFile.delete();
       }
+      await tempFile.parent.create(recursive: true);
 
-      final encodedUrl = _encodeUrl(game.url);
+      // Resolve download handle via provider
+      if (game.providerConfig == null) {
+        _emitError('No provider configured for this game');
+        return;
+      }
+      final provider = ProviderFactory.getProvider(game.providerConfig!);
+      final handle = await provider.resolveDownload(game);
 
-      final uri = Uri.parse(encodedUrl);
-      final request = await _httpClient!.openUrl('GET', uri);
-
-      request.headers.set('User-Agent',
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-      request.headers.set('Accept', '*/*');
-      request.headers.set('Accept-Language', 'en-US,en;q=0.9');
-      final gameUri = Uri.parse(encodedUrl);
-      request.headers.set('Referer', '${gameUri.scheme}://${gameUri.host}/');
-
-      final response = await request.close();
-
-      final statusCode = response.statusCode;
-
-      if (statusCode != 200) {
-        throw Exception('Server returned status $statusCode');
+      if (_isCancelled) {
+        _emitCancelled();
+        return;
       }
 
-      final contentLength = response.contentLength;
+      switch (handle) {
+        case HttpDownloadHandle():
+          await _downloadHttp(handle, tempFile);
+        case SmbDownloadHandle():
+          await _downloadSmb(handle, tempFile);
+        case FtpDownloadHandle():
+          await _downloadFtp(handle, tempFile);
+      }
 
-      await tempFile.parent.create(recursive: true);
+      if (_isCancelled) return;
+
+      await _handlePostDownload(game, tempFile, targetFolder, system);
+    } catch (e) {
+      if (!_isCancelled && _progressController?.isClosed == false) {
+        _progressController?.add(DownloadProgress(
+          status: DownloadStatus.error,
+          error: _getUserFriendlyError(e),
+        ));
+        _progressController?.close();
+      }
+    } finally {
+      _isDownloadInProgress = false;
+    }
+  }
+
+  Future<void> _downloadHttp(
+    HttpDownloadHandle handle,
+    File tempFile,
+  ) async {
+    _httpClient?.close(force: true);
+    _httpClient = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 30)
+      ..idleTimeout = const Duration(minutes: 5);
+
+    final encodedUrl = _encodeUrl(handle.url);
+    final uri = Uri.parse(encodedUrl);
+    final request = await _httpClient!.openUrl('GET', uri);
+
+    request.headers.set('User-Agent',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    request.headers.set('Accept', '*/*');
+    request.headers.set('Accept-Language', 'en-US,en;q=0.9');
+    request.headers.set('Referer', '${uri.scheme}://${uri.host}/');
+
+    // Apply auth headers from the download handle
+    if (handle.headers != null) {
+      for (final entry in handle.headers!.entries) {
+        request.headers.set(entry.key, entry.value);
+      }
+    }
+
+    final response = await request.close();
+
+    if (response.statusCode != 200) {
+      // Drain the response to free resources
+      await response.drain<void>();
+      throw Exception('Server returned status ${response.statusCode}');
+    }
+
+    final contentLength = response.contentLength;
+    final sink = tempFile.openWrite();
+    int downloadedBytes = 0;
+    int lastUpdateTime = DateTime.now().millisecondsSinceEpoch;
+    final stopwatch = Stopwatch()..start();
+
+    final completer = Completer<void>();
+
+    _downloadSubscription = response.listen(
+      (chunk) {
+        if (_isCancelled) {
+          try {
+            sink.close();
+          } catch (_) {}
+          return;
+        }
+
+        sink.add(chunk);
+        downloadedBytes += chunk.length;
+
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - lastUpdateTime >= _progressIntervalMs) {
+          lastUpdateTime = now;
+          _emitProgress(downloadedBytes, contentLength, stopwatch);
+        }
+      },
+      onDone: () async {
+        if (_isCancelled) {
+          completer.complete();
+          return;
+        }
+        try {
+          await sink.close();
+          _emitProgress(downloadedBytes, contentLength, stopwatch);
+          completer.complete();
+        } catch (e) {
+          completer.completeError(e);
+        }
+      },
+      onError: (e) async {
+        try {
+          await sink.close();
+        } catch (_) {}
+        completer.completeError(e);
+      },
+      cancelOnError: true,
+    );
+
+    await completer.future;
+  }
+
+  Future<void> _downloadSmb(
+    SmbDownloadHandle handle,
+    File tempFile,
+  ) async {
+    final reader = await handle.openFile();
+    try {
       final sink = tempFile.openWrite();
-
       int downloadedBytes = 0;
-      int lastUpdateTime = DateTime.now().millisecondsSinceEpoch;
+      final totalBytes = reader.size;
       final stopwatch = Stopwatch()..start();
+      int lastUpdateTime = DateTime.now().millisecondsSinceEpoch;
 
-      _downloadSubscription = response.listen(
-        (chunk) {
+      try {
+        await for (final chunk in reader.stream) {
           if (_isCancelled) {
-            try {
-              sink.close();
-            } catch (_) {}
+            await sink.close();
             return;
           }
 
@@ -220,92 +316,79 @@ class DownloadService {
           final now = DateTime.now().millisecondsSinceEpoch;
           if (now - lastUpdateTime >= _progressIntervalMs) {
             lastUpdateTime = now;
-            double progress = 0;
-            if (contentLength > 0) {
-              progress = downloadedBytes / contentLength;
-            }
-            final speed = stopwatch.elapsedMilliseconds > 0
-                ? (downloadedBytes /
-                    stopwatch.elapsedMilliseconds *
-                    1000 /
-                    1024)
-                : 0.0;
-
-            if (_progressController?.isClosed == false) {
-              _progressController?.add(DownloadProgress(
-                status: DownloadStatus.downloading,
-                progress: progress,
-                receivedBytes: downloadedBytes,
-                totalBytes: contentLength,
-                downloadSpeed: speed,
-              ));
-            }
+            _emitProgress(downloadedBytes, totalBytes, stopwatch);
           }
-        },
-        onDone: () async {
-          if (_isCancelled) return;
-          try {
-            await sink.close();
+        }
 
-            double finalProgress =
-                contentLength > 0 ? downloadedBytes / contentLength : 0;
-            final speed = stopwatch.elapsedMilliseconds > 0
-                ? (downloadedBytes /
-                    stopwatch.elapsedMilliseconds *
-                    1000 /
-                    1024)
-                : 0.0;
-
-            if (_progressController?.isClosed == false) {
-              _progressController?.add(DownloadProgress(
-                status: DownloadStatus.downloading,
-                progress: finalProgress,
-                receivedBytes: downloadedBytes,
-                totalBytes: contentLength,
-                downloadSpeed: speed,
-              ));
-            }
-
-            await _handlePostDownload(game, tempFile, targetFolder, system);
-          } catch (e) {
-            if (!_isCancelled && _progressController?.isClosed == false) {
-              _progressController?.add(DownloadProgress(
-                status: DownloadStatus.error,
-                error: _getUserFriendlyError(e),
-              ));
-              _progressController?.close();
-            }
-          }
-
-          _isDownloadInProgress = false;
-          _tempFilePath = null;
-        },
-        onError: (e) async {
-          try {
-            await sink.close();
-          } catch (_) {}
-          _isDownloadInProgress = false;
-
-          if (!_isCancelled && _progressController?.isClosed == false) {
-            _progressController?.add(DownloadProgress(
-              status: DownloadStatus.error,
-              error: _getUserFriendlyError(e),
-            ));
-            _progressController?.close();
-          }
-        },
-        cancelOnError: true,
-      );
-    } catch (e) {
-      _isDownloadInProgress = false;
-      if (!_isCancelled && _progressController?.isClosed == false) {
-        _progressController?.add(DownloadProgress(
-          status: DownloadStatus.error,
-          error: _getUserFriendlyError(e),
-        ));
-        _progressController?.close();
+        await sink.close();
+        _emitProgress(downloadedBytes, totalBytes, stopwatch);
+      } catch (e) {
+        try {
+          await sink.close();
+        } catch (_) {}
+        rethrow;
       }
+    } finally {
+      await reader.close();
     }
+  }
+
+  Future<void> _downloadFtp(
+    FtpDownloadHandle handle,
+    File tempFile,
+  ) async {
+    // FTP library downloads directly to file — no stream progress available
+    if (_progressController?.isClosed == false) {
+      _progressController?.add(DownloadProgress(
+        status: DownloadStatus.downloading,
+        progress: 0,
+        receivedBytes: 0,
+        totalBytes: null,
+      ));
+    }
+
+    await handle.downloadToFile(tempFile);
+  }
+
+  void _emitProgress(int downloadedBytes, int totalBytes, Stopwatch stopwatch) {
+    if (_progressController?.isClosed != false) return;
+
+    double progress = 0;
+    if (totalBytes > 0) {
+      progress = downloadedBytes / totalBytes;
+    }
+    final speed = stopwatch.elapsedMilliseconds > 0
+        ? (downloadedBytes / stopwatch.elapsedMilliseconds * 1000 / 1024)
+        : 0.0;
+
+    _progressController?.add(DownloadProgress(
+      status: DownloadStatus.downloading,
+      progress: progress,
+      receivedBytes: downloadedBytes,
+      totalBytes: totalBytes,
+      downloadSpeed: speed,
+    ));
+  }
+
+  void _emitError(String message) {
+    if (_progressController?.isClosed == false) {
+      _progressController?.add(DownloadProgress(
+        status: DownloadStatus.error,
+        error: message,
+      ));
+      _progressController?.close();
+    }
+    _isDownloadInProgress = false;
+  }
+
+  void _emitCancelled() {
+    if (_progressController?.isClosed == false) {
+      _progressController?.add(DownloadProgress(
+        status: DownloadStatus.cancelled,
+      ));
+      _progressController?.close();
+    }
+    _isDownloadInProgress = false;
   }
 
   Future<void> _handlePostDownload(
@@ -345,11 +428,11 @@ class DownloadService {
     } else if (extension.endsWith('.7z')) {
       if (_progressController?.isClosed == false) {
         _progressController?.add(DownloadProgress(
-          status: DownloadStatus.extracting,
+          status: DownloadStatus.moving,
           progress: 1.0,
         ));
       }
-      await _extract7z(tempFile, targetFolder);
+      await _moveToTarget(tempFile, targetFolder);
       if (await tempFile.exists()) {
         await tempFile.delete();
       }
@@ -470,7 +553,7 @@ class DownloadService {
     return name;
   }
 
-  Future<void> _extract7z(File file, String targetFolder) async {
+  Future<void> _moveToTarget(File file, String targetFolder) async {
     final targetFile = File('$targetFolder/${file.uri.pathSegments.last}');
     await targetFile.parent.create(recursive: true);
     await file.copy(targetFile.path);
@@ -516,13 +599,13 @@ class DownloadService {
     return resolved;
   }
 
+  void dispose() {
+    _httpClient?.close(force: true);
+    _httpClient = null;
+  }
+
   String _encodeUrl(String url) {
     final uri = Uri.parse(url);
-    final encodedUri = Uri(
-      scheme: uri.scheme,
-      host: uri.host,
-      pathSegments: uri.pathSegments,
-    );
-    return encodedUri.toString();
+    return uri.replace(pathSegments: uri.pathSegments).toString();
   }
 }

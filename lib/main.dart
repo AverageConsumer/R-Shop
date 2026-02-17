@@ -90,8 +90,6 @@ class _RShopAppState extends State<RShopApp> with WidgetsBindingObserver {
     return Consumer(
       builder: (context, ref, child) {
         final storage = ref.read(storageServiceProvider);
-        final romPath = ref.watch(romPathProvider) ?? storage.getRomPath();
-        final repoUrl = ref.watch(repoUrlProvider) ?? storage.getRepoUrl();
         final onboardingCompleted = storage.getOnboardingCompleted();
 
         return GlobalInputWrapper(
@@ -115,7 +113,7 @@ class _RShopAppState extends State<RShopApp> with WidgetsBindingObserver {
             routes: {
               '/home': (context) => const HomeView(),
             },
-            home: (romPath != null && repoUrl != null && onboardingCompleted)
+            home: onboardingCompleted
                 ? const HomeView()
                 : const OnboardingScreen(),
           ),

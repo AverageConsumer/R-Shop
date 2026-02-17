@@ -10,7 +10,7 @@ class GameDetailController extends ChangeNotifier {
   final GameItem game;
   final List<GameItem> variants;
   final SystemModel system;
-  final String romPath;
+  final String targetFolder;
   final RomManager _romManager;
   final DownloadQueueManager _queueManager;
 
@@ -23,7 +23,7 @@ class GameDetailController extends ChangeNotifier {
     required this.game,
     required this.variants,
     required this.system,
-    required this.romPath,
+    required this.targetFolder,
     RomManager? romManager,
     DownloadQueueManager? queueManager,
   })  : _romManager = romManager ?? RomManager(),
@@ -42,7 +42,7 @@ class GameDetailController extends ChangeNotifier {
     final status = await _romManager.checkMultipleExists(
       variants,
       system,
-      romPath,
+      targetFolder,
     );
     _state = _state.copyWith(installedStatus: status);
     notifyListeners();
@@ -55,7 +55,7 @@ class GameDetailController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _queueManager.addToQueue(selectedVariant, system, romPath);
+      _queueManager.addToQueue(selectedVariant, system, targetFolder);
       await Future.delayed(const Duration(milliseconds: 300));
       await checkInstallationStatus();
     } catch (e) {
@@ -72,7 +72,7 @@ class GameDetailController extends ChangeNotifier {
     _state = _state.copyWith(isDeleting: true, clearError: true);
     notifyListeners();
     try {
-      await _romManager.delete(selectedVariant, system, romPath);
+      await _romManager.delete(selectedVariant, system, targetFolder);
       await Future.delayed(const Duration(milliseconds: 300));
       await checkInstallationStatus();
     } catch (e) {

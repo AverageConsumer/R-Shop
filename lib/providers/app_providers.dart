@@ -39,14 +39,6 @@ final feedbackServiceProvider = Provider<FeedbackService>((ref) {
   );
 });
 
-final romPathProvider = StateProvider<String?>((ref) {
-  return null;
-});
-
-final repoUrlProvider = StateProvider<String?>((ref) {
-  return null;
-});
-
 final repoManagerProvider = Provider<RepoManager>((ref) {
   return RepoManager(ref.read(storageServiceProvider));
 });

@@ -29,14 +29,14 @@ class GameDetailScreen extends ConsumerStatefulWidget {
   final GameItem game;
   final List<GameItem> variants;
   final SystemModel system;
-  final String romPath;
+  final String targetFolder;
 
   const GameDetailScreen({
     super.key,
     required this.game,
     required this.variants,
     required this.system,
-    required this.romPath,
+    required this.targetFolder,
   });
 
   @override
@@ -78,7 +78,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       game: widget.game,
       variants: widget.variants,
       system: widget.system,
-      romPath: widget.romPath,
+      targetFolder: widget.targetFolder,
       queueManager: queueManager,
     );
     _controller!.addListener(_onControllerChanged);
@@ -254,7 +254,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent) {
       _debouncer.stopHold();
-      return KeyEventResult.handled;
+      return KeyEventResult.ignored;
     }
 
     if (event is! KeyDownEvent) return KeyEventResult.ignored;

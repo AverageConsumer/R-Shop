@@ -7,11 +7,21 @@ import 'glass_overlay.dart';
 class ExitConfirmationOverlay extends StatefulWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
+  final String title;
+  final String message;
+  final IconData icon;
+  final String confirmLabel;
+  final String cancelLabel;
 
   const ExitConfirmationOverlay({
     super.key,
     required this.onConfirm,
     required this.onCancel,
+    this.title = 'EXIT APPLICATION',
+    this.message = 'Are you sure you want to quit?',
+    this.icon = Icons.power_settings_new_rounded,
+    this.confirmLabel = 'EXIT',
+    this.cancelLabel = 'STAY',
   });
 
   @override
@@ -129,13 +139,13 @@ class _ExitConfirmationOverlayState extends State<ExitConfirmationOverlay>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Icons.power_settings_new_rounded,
+                        widget.icon,
                         size: rs.isSmall ? 48 : 64,
                         color: AppTheme.primaryColor,
                       ),
                       SizedBox(height: rs.spacing.lg),
                       Text(
-                        'EXIT APPLICATION',
+                        widget.title,
                         style: AppTheme.headlineMedium.copyWith(
                           fontSize: rs.isSmall ? 24 : 32,
                           fontWeight: FontWeight.w900,
@@ -144,7 +154,7 @@ class _ExitConfirmationOverlayState extends State<ExitConfirmationOverlay>
                       ),
                       SizedBox(height: rs.spacing.sm),
                       Text(
-                        'Are you sure you want to quit?',
+                        widget.message,
                         style: AppTheme.bodyLarge.copyWith(
                           color: Colors.white60,
                         ),
@@ -154,7 +164,7 @@ class _ExitConfirmationOverlayState extends State<ExitConfirmationOverlay>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _buildButton(
-                            label: 'STAY',
+                            label: widget.cancelLabel,
                             isSelected: _selectedIndex == 0,
                             isPrimary: true,
                             onTap: () {
@@ -167,9 +177,9 @@ class _ExitConfirmationOverlayState extends State<ExitConfirmationOverlay>
                           ),
                           SizedBox(width: rs.spacing.lg),
                           _buildButton(
-                            label: 'EXIT',
+                            label: widget.confirmLabel,
                             isSelected: _selectedIndex == 1,
-                            isPrimary: false, 
+                            isPrimary: false,
                             onTap: () {
                                 if (_selectedIndex != 1) {
                                   setState(() => _selectedIndex = 1);

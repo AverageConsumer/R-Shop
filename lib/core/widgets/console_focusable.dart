@@ -39,7 +39,7 @@ class ConsoleFocusable extends ConsumerStatefulWidget {
 
 class _ConsoleFocusableState extends ConsumerState<ConsoleFocusable>
     with SingleTickerProviderStateMixin {
-  late final FocusNode _focusNode;
+  late FocusNode _focusNode;
   late final AnimationController _controller;
   late final Animation<double> _scaleAnimation;
   late final Animation<double> _glowAnimation;
@@ -117,7 +117,7 @@ class _ConsoleFocusableState extends ConsumerState<ConsoleFocusable>
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent) {
-      return KeyEventResult.handled;
+      return KeyEventResult.ignored;
     }
 
     if (event is! KeyDownEvent) {
@@ -167,11 +167,18 @@ class _ConsoleFocusableState extends ConsumerState<ConsoleFocusable>
                     ]
                   : null,
             ),
-            child: Focus(
-              focusNode: _focusNode,
-              onKeyEvent: _handleKeyEvent,
-              autofocus: widget.autofocus,
-              child: widget.child,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                _focusNode.requestFocus();
+                widget.onSelect?.call();
+              },
+              child: Focus(
+                focusNode: _focusNode,
+                onKeyEvent: _handleKeyEvent,
+                autofocus: widget.autofocus,
+                child: widget.child,
+              ),
             ),
           ),
         );
@@ -217,7 +224,7 @@ class ConsoleFocusableCard extends ConsumerStatefulWidget {
 
 class _ConsoleFocusableCardState extends ConsumerState<ConsoleFocusableCard>
     with SingleTickerProviderStateMixin {
-  late final FocusNode _focusNode;
+  late FocusNode _focusNode;
   late final AnimationController _controller;
   late final Animation<double> _scaleAnimation;
   late final Animation<double> _glowAnimation;
@@ -295,7 +302,7 @@ class _ConsoleFocusableCardState extends ConsumerState<ConsoleFocusableCard>
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent) {
-      return KeyEventResult.handled;
+      return KeyEventResult.ignored;
     }
 
     if (event is! KeyDownEvent) {
@@ -347,13 +354,20 @@ class _ConsoleFocusableCardState extends ConsumerState<ConsoleFocusableCard>
                     ]
                   : null,
             ),
-            child: Focus(
-              focusNode: _focusNode,
-              onKeyEvent: _handleKeyEvent,
-              autofocus: widget.autofocus,
-              child: Padding(
-                padding: widget.padding ?? EdgeInsets.zero,
-                child: widget.child,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                _focusNode.requestFocus();
+                widget.onSelect?.call();
+              },
+              child: Focus(
+                focusNode: _focusNode,
+                onKeyEvent: _handleKeyEvent,
+                autofocus: widget.autofocus,
+                child: Padding(
+                  padding: widget.padding ?? EdgeInsets.zero,
+                  child: widget.child,
+                ),
               ),
             ),
           ),
@@ -397,7 +411,7 @@ class ConsoleFocusableListItem extends ConsumerStatefulWidget {
 class _ConsoleFocusableListItemState
     extends ConsumerState<ConsoleFocusableListItem>
     with SingleTickerProviderStateMixin {
-  late final FocusNode _focusNode;
+  late FocusNode _focusNode;
   late final AnimationController _controller;
   late final Animation<double> _highlightAnimation;
   bool _isFocused = false;
@@ -466,7 +480,7 @@ class _ConsoleFocusableListItemState
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent) {
-      return KeyEventResult.handled;
+      return KeyEventResult.ignored;
     }
 
     if (event is! KeyDownEvent) {
@@ -509,13 +523,20 @@ class _ConsoleFocusableListItemState
               width: _isFocused ? 2 : 1,
             ),
           ),
-          child: Focus(
-            focusNode: _focusNode,
-            onKeyEvent: _handleKeyEvent,
-            autofocus: widget.autofocus,
-            child: Padding(
-              padding: widget.padding ?? EdgeInsets.zero,
-              child: widget.child,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              _focusNode.requestFocus();
+              widget.onSelect?.call();
+            },
+            child: Focus(
+              focusNode: _focusNode,
+              onKeyEvent: _handleKeyEvent,
+              autofocus: widget.autofocus,
+              child: Padding(
+                padding: widget.padding ?? EdgeInsets.zero,
+                child: widget.child,
+              ),
             ),
           ),
         );

@@ -7,7 +7,7 @@ A premium console-style game manager for Android — built for handhelds, contro
   <img src="screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
 </p>
 
-![Version](https://img.shields.io/badge/version-0.9.0_Beta-blue)
+![Version](https://img.shields.io/badge/version-0.9.1_Beta-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Android-brightgreen)
 ![Status](https://img.shields.io/badge/status-Public_Beta-orange)
@@ -27,12 +27,15 @@ It's built with love for **Android gaming handhelds** (Retroid, Odin, AYN, Anber
 ## ✨ Features
 
 - 🎮 **Built for Controllers** — Full D-pad/analog navigation, haptic feedback on every interaction, satisfying click sounds. Feels like a real console UI, not a phone app.
+- 🌐 **Multi-Source Providers** — Each console can pull from Web directories, SMB shares, FTP servers, or a RomM instance. Mix and match per system.
+- 🔗 **RomM Integration** — Connect to your RomM server and let R-Shop automatically match platforms via IGDB.
 - 📥 **Smart Download Queue** — Queue up your entire library. Downloads run with live progress and auto-extraction (ZIP/7z).
 - 🖼️ **Automatic Box Art** — Every game gets its cover art fetched and cached automatically via [libretro-thumbnails](https://github.com/libretro-thumbnails).
 - ⚡ **Aggressive Caching** — Optimized for huge libraries (5000+ items). After the first load, the app feels instant even without internet.
 - 🔍 **Instant Search** — Find any game across all systems in milliseconds.
 - 🗂️ **17 Systems Supported** — Nintendo (NES to 3DS), Sony (PS1, PS2, PSP), SEGA (Master System to Dreamcast).
 - 📱 **Hybrid Input** — Seamlessly switch between touchscreen and gamepad. Both feel native.
+- 💾 **Config Import/Export** — Save your entire setup as JSON and restore it on any device.
 
 ---
 
@@ -64,16 +67,15 @@ The best way to install and keep R-Shop updated is via **[Obtainium](https://git
 ## 🕹️ How to Use
 
 1. **Open the app.**
-2. **Setup Source:** On first launch, you need to provide a URL. R-Shop works with any **Apache Directory Listing**.
-    > *Hint: It works perfectly with standard community ROM archives. Just point it to the main files directory.*
-3. **Pick a Folder:** Choose where games should be stored (e.g., your generic ROMs folder).
-4. **Browse & Download:** The app handles the rest.
+2. **Onboarding Wizard:** On first launch, the setup wizard walks you through configuring each console. For every system you want, pick a source type (Web directory, SMB share, FTP server, or RomM) and enter the connection details.
+3. **Pick a Folder:** Choose where games should be stored per console (e.g., your ROMs folder).
+4. **Browse & Download:** The app handles the rest. You can edit your console configuration later in **Settings > Config Editor**.
 
 ---
 
 ## 🐛 Known Issues (Beta)
 
-* **Background Downloads:** In v0.9.0, downloads might pause if your device enters "Deep Sleep". Please keep the screen on for massive batch downloads. (A background service is coming in v0.9.1!).
+* **Background Downloads:** Downloads might pause if your device enters "Deep Sleep". Please keep the screen on for massive batch downloads.
 * **Initial Cache:** Scrolling through a list of 2000+ games for the very first time might show placeholders briefly while the cache builds up.
 
 ---

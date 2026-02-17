@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../core/responsive/responsive.dart';
 
 class ControlButton extends StatelessWidget {
+  static int _lastTapTime = 0;
+  static const int _tapCooldownMs = 300;
+
   final String label;
   final String action;
   final VoidCallback? onTap;
@@ -78,7 +81,12 @@ class ControlButton extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: onTap == null ? null : () {
+          final now = DateTime.now().millisecondsSinceEpoch;
+          if (now - _lastTapTime < _tapCooldownMs) return;
+          _lastTapTime = now;
+          onTap!();
+        },
         borderRadius: BorderRadius.circular(20),
         splashColor: Colors.white.withValues(alpha: 0.1),
         highlightColor: Colors.white.withValues(alpha: 0.05),

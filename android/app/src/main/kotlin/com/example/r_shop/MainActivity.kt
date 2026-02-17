@@ -11,7 +11,7 @@ import java.io.*
 import java.util.zip.ZipInputStream
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.example.r_shop/zip"
+    private val CHANNEL = "com.retro.rshop/zip"
     private val TAG = "MainActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {

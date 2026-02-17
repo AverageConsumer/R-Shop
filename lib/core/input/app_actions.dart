@@ -14,6 +14,7 @@ class BackAction extends Action<BackIntent> {
 
   @override
   Object? invoke(BackIntent intent) {
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
     final overlayPriority = ref.read(overlayPriorityProvider);
     if (overlayPriority != OverlayPriority.none) {
       return null;
@@ -36,6 +37,7 @@ class ConfirmAction extends Action<ConfirmIntent> {
 
   @override
   Object? invoke(ConfirmIntent intent) {
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
     if (onConfirm != null) {
       ref.read(feedbackServiceProvider).confirm();
       onConfirm!();
@@ -56,6 +58,7 @@ class SearchAction extends Action<SearchIntent> {
 
   @override
   Object? invoke(SearchIntent intent) {
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
     // Search might be allowed even if overlay is open in some cases,
     // but for now let's respect priority
     final overlayPriority = ref.read(overlayPriorityProvider);
@@ -82,6 +85,7 @@ class ToggleOverlayAction extends Action<ToggleOverlayIntent> {
 
   @override
   Object? invoke(ToggleOverlayIntent intent) {
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
     ref.read(feedbackServiceProvider).tick();
     toggleDownloadOverlay(ref);
     return null;
@@ -143,6 +147,7 @@ class AdjustColumnsAction extends Action<AdjustColumnsIntent> {
 
   @override
   Object? invoke(AdjustColumnsIntent intent) {
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
     final overlayPriority = ref.read(overlayPriorityProvider);
     if (overlayPriority != OverlayPriority.none) {
       return null;
@@ -162,6 +167,7 @@ class InfoAction extends Action<InfoIntent> {
 
   @override
   Object? invoke(InfoIntent intent) {
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
     final overlayPriority = ref.read(overlayPriorityProvider);
     if (overlayPriority != OverlayPriority.none) {
       return null;
@@ -181,6 +187,7 @@ class MenuAction extends Action<MenuIntent> {
 
   @override
   Object? invoke(MenuIntent intent) {
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
     final overlayPriority = ref.read(overlayPriorityProvider);
     if (overlayPriority != OverlayPriority.none) {
       return null;
@@ -200,6 +207,7 @@ class TabLeftAction extends Action<TabLeftIntent> {
 
   @override
   Object? invoke(TabLeftIntent intent) {
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
     final overlayPriority = ref.read(overlayPriorityProvider);
     if (overlayPriority != OverlayPriority.none) {
       return null;
@@ -221,6 +229,7 @@ class TabRightAction extends Action<TabRightIntent> {
 
   @override
   Object? invoke(TabRightIntent intent) {
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
     final overlayPriority = ref.read(overlayPriorityProvider);
     if (overlayPriority != OverlayPriority.none) {
       return null;

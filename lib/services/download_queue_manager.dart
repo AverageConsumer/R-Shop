@@ -4,7 +4,6 @@ import '../models/download_item.dart';
 import '../models/game_item.dart';
 import '../models/system_model.dart';
 import 'download_service.dart';
-import 'rom_manager.dart';
 
 class DownloadQueueState {
   final List<DownloadItem> queue;
@@ -77,7 +76,7 @@ class DownloadQueueManager extends ChangeNotifier {
 
   DownloadQueueManager();
 
-  String addToQueue(GameItem game, SystemModel system, String romPath) {
+  String addToQueue(GameItem game, SystemModel system, String targetFolder) {
     final id = _generateId(game, system);
 
     final existing = _state.getDownloadById(id);
@@ -89,7 +88,7 @@ class DownloadQueueManager extends ChangeNotifier {
       id: id,
       game: game,
       system: system,
-      romPath: romPath,
+      targetFolder: targetFolder,
     );
 
     final newQueue = List<DownloadItem>.from(_state.queue);
@@ -173,7 +172,7 @@ class DownloadQueueManager extends ChangeNotifier {
   void _startDownload(DownloadItem item) {
     _updateItem(item.id, status: DownloadItemStatus.downloading);
 
-    final targetFolder = RomManager.getTargetFolder(item.system, item.romPath);
+    final targetFolder = item.targetFolder;
 
     _subscriptions[item.id]?.cancel();
 
@@ -199,12 +198,14 @@ class DownloadQueueManager extends ChangeNotifier {
       },
       onDone: () {
         _subscriptions.remove(item.id);
-        _downloadServices.remove(item.id);
+        final service = _downloadServices.remove(item.id);
+        service?.dispose();
         _onDownloadComplete(item.id);
       },
       onError: (error) {
         _subscriptions.remove(item.id);
-        _downloadServices.remove(item.id);
+        final service = _downloadServices.remove(item.id);
+        service?.dispose();
         _updateItem(
           item.id,
           status: DownloadItemStatus.error,
@@ -222,8 +223,8 @@ class DownloadQueueManager extends ChangeNotifier {
     final item = _state.getDownloadById(id);
     if (item == null) return;
 
-    if (item.status == DownloadItemStatus.extracting ||
-        item.status == DownloadItemStatus.moving) {
+    if (item.status != DownloadItemStatus.completed &&
+        item.status != DownloadItemStatus.error) {
       _updateItem(id, status: DownloadItemStatus.completed);
     }
 
@@ -290,7 +291,8 @@ class DownloadQueueManager extends ChangeNotifier {
     _subscriptions.clear();
 
     for (final service in _downloadServices.values) {
-      service.cancelDownload();
+      service.reset();
+      service.dispose();
     }
     _downloadServices.clear();
 

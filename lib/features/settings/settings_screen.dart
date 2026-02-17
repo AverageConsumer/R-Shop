@@ -5,10 +5,11 @@ import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/screen_layout.dart';
 import '../../providers/app_providers.dart';
-import '../../services/repo_manager.dart';
+import '../../services/config_storage_service.dart';
+import '../../services/database_service.dart';
+import '../../services/image_cache_service.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
-import '../../widgets/download_overlay.dart';
-import '../../providers/download_providers.dart';
+import 'config_mode_screen.dart';
 import 'widgets/settings_item.dart';
 import 'widgets/volume_slider.dart';
 
@@ -81,96 +82,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ref.read(audioManagerProvider).playNavigation();
   }
 
-  void _showRepoUrlDialog() {
-    final storage = ref.read(storageServiceProvider);
-    final currentUrl = ref.read(repoUrlProvider) ?? storage.getRepoUrl() ?? '';
-    final controller = TextEditingController(text: currentUrl);
+  void _setBgmVolume(double volume) async {
+    final clamped = volume.clamp(0.0, 1.0);
+    setState(() => _bgmVolume = clamped);
+    await ref.read(soundSettingsProvider.notifier).setBgmVolume(clamped);
+  }
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        String? errorText;
-        bool isTesting = false;
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF1A1A1A),
-              title: const Text('Repository URL', style: TextStyle(color: Colors.white)),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: controller,
-                    enabled: !isTesting,
-                    style: const TextStyle(color: Colors.white, fontFamily: 'monospace'),
-                    decoration: InputDecoration(
-                      hintText: 'https://...',
-                      hintStyle: TextStyle(color: Colors.grey.shade600),
-                      errorText: errorText,
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
-                      ),
-                      focusedBorder: const OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.redAccent),
-                      ),
-                    ),
-                  ),
-                  if (isTesting)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Row(
-                        children: [
-                          const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.redAccent),
-                          ),
-                          const SizedBox(width: 8),
-                          Text('Testing connection...', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isTesting ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-                ),
-                TextButton(
-                  onPressed: isTesting
-                      ? null
-                      : () async {
-                          final url = controller.text.trim();
-                          if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                            setDialogState(() => errorText = 'URL must start with http:// or https://');
-                            return;
-                          }
-                          setDialogState(() {
-                            isTesting = true;
-                            errorText = null;
-                          });
-                          final result = await RepoManager.testConnection(url);
-                          if (!context.mounted) return;
-                          if (result.success) {
-                            await storage.setRepoUrl(url);
-                            ref.read(repoUrlProvider.notifier).state = url;
-                            if (context.mounted) Navigator.pop(context);
-                          } else {
-                            setDialogState(() {
-                              isTesting = false;
-                              errorText = result.error;
-                            });
-                          }
-                        },
-                  child: const Text('Save', style: TextStyle(color: Colors.redAccent)),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+  void _setSfxVolume(double volume) async {
+    final clamped = volume.clamp(0.0, 1.0);
+    setState(() => _sfxVolume = clamped);
+    await ref.read(soundSettingsProvider.notifier).setSfxVolume(clamped);
   }
 
   void _showResetDialog() {
@@ -183,13 +104,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   void _performReset() async {
     final storage = ref.read(storageServiceProvider);
-    await storage.resetOnboarding();
+    await storage.resetAll();
+    await ConfigStorageService().deleteConfig();
+    await DatabaseService().clearCache();
+    await GameCoverCacheManager.instance.emptyCache();
+    FailedUrlsCache.instance.clear();
     _hideResetDialog();
     widget.onResetOnboarding?.call();
   }
 
   void _exitSettings() {
     Navigator.pop(context);
+  }
+
+  void _openConfigMode() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ConfigModeScreen()),
+    );
   }
 
   @override
@@ -300,8 +232,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             title: 'Background Music',
                             subtitle: 'Ambient background music volume',
                             trailingBuilder: (isFocused) => VolumeSlider(
-                              volume: _bgmVolume, 
+                              volume: _bgmVolume,
                               isSelected: isFocused,
+                              onChanged: _setBgmVolume,
                             ),
                           ),
                         ),
@@ -323,6 +256,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             trailingBuilder: (isFocused) => VolumeSlider(
                               volume: _sfxVolume,
                               isSelected: isFocused,
+                              onChanged: _setSfxVolume,
                             ),
                           ),
                         ),
@@ -331,17 +265,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         _buildSectionHeader('System', rs),
 
                         SettingsItem(
-                          title: 'Repository URL',
-                          subtitle: ref.watch(repoUrlProvider) ??
-                              ref.read(storageServiceProvider).getRepoUrl() ??
-                              'Not configured',
-                          trailing: const Icon(Icons.link, color: Colors.white70),
-                          onTap: _showRepoUrlDialog,
+                          title: 'Edit Consoles',
+                          subtitle: 'Add, remove or reconfigure consoles',
+                          trailing: const Icon(Icons.tune, color: Colors.white70),
+                          onTap: _openConfigMode,
                         ),
                         SizedBox(height: rs.spacing.md),
                         SettingsItem(
                           title: 'Reset App',
-                          subtitle: 'Return to onboarding screen',
+                          subtitle: 'Delete config and return to onboarding',
                           trailing: const Icon(Icons.refresh, color: Colors.white70),
                           onTap: _showResetDialog,
                           isDestructive: true,
@@ -356,16 +288,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           
           if (_showResetConfirm)
              ExitConfirmationOverlay(
+               title: 'RESET APPLICATION',
+               message: 'This will delete all settings and restart the setup.',
+               icon: Icons.restart_alt_rounded,
+               confirmLabel: 'RESET',
+               cancelLabel: 'CANCEL',
                onConfirm: _performReset,
                onCancel: _hideResetDialog,
-             ), // Reusing the exit overlay style for reset confirmation as well? 
-                // Or I should make ExitConfirmationOverlay more generic if I want to reuse it.
-                // The current ExitConfirmationOverlay says "EXIT APPLICATION". 
-                // I should probably make it generic. 
-                // For now, let's stick to the ExitConfirmationOverlay for exit, 
-                // and maybe refactor it to GenericConfirmationOverlay? 
-                // OR I can just use it and accept the text is wrong (BAD).
-                // OR I can update ExitConfirmationOverlay to accept title/message.
+             ),
           
         ],
       ),

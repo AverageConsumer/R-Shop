@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../providers/app_providers.dart';
+import '../../../services/audio_manager.dart';
 class ChatBubble extends ConsumerStatefulWidget {
   final String message;
   final VoidCallback? onComplete;
@@ -22,9 +23,11 @@ class _ChatBubbleState extends ConsumerState<ChatBubble> {
   Timer? _timer;
   bool _isComplete = false;
   bool _typingSoundStarted = false;
+  late final AudioManager _audioManager;
   @override
   void initState() {
     super.initState();
+    _audioManager = ref.read(audioManagerProvider);
     _startTypewriter();
   }
   @override
@@ -36,17 +39,18 @@ class _ChatBubbleState extends ConsumerState<ChatBubble> {
   void _stopTypingSound() {
     if (_typingSoundStarted) {
       try {
-        ref.read(audioManagerProvider).stopTyping();
+        _audioManager.stopTyping();
         _typingSoundStarted = false;
       } catch (_) {}
     }
   }
   void _startTypewriter() {
     try {
-      ref.read(audioManagerProvider).startTyping();
+      _audioManager.startTyping();
       _typingSoundStarted = true;
     } catch (_) {}
     _timer = Timer.periodic(widget.typewriterSpeed, (timer) {
+      if (!mounted) { timer.cancel(); return; }
       if (_charIndex < widget.message.length) {
         setState(() {
           _displayedText = widget.message.substring(0, _charIndex + 1);

@@ -15,7 +15,7 @@ class DownloadItem {
   final String id;
   final GameItem game;
   final SystemModel system;
-  final String romPath;
+  final String targetFolder;
   final DateTime addedAt;
 
   DownloadItemStatus status;
@@ -29,7 +29,7 @@ class DownloadItem {
     required this.id,
     required this.game,
     required this.system,
-    required this.romPath,
+    required this.targetFolder,
     DateTime? addedAt,
     this.status = DownloadItemStatus.queued,
     this.progress = 0.0,
@@ -98,7 +98,7 @@ class DownloadItem {
       id: id,
       game: game,
       system: system,
-      romPath: romPath,
+      targetFolder: targetFolder,
       addedAt: addedAt,
       status: status ?? this.status,
       progress: progress ?? this.progress,
@@ -117,7 +117,7 @@ class DownloadItem {
       'gameDisplayName': game.displayName,
       'gameCachedCoverUrl': game.cachedCoverUrl,
       'systemName': system.name,
-      'romPath': romPath,
+      'targetFolder': targetFolder,
       'addedAt': addedAt.toIso8601String(),
       'status': status.index,
       'progress': progress,
@@ -134,9 +134,11 @@ class DownloadItem {
         cachedCoverUrl: json['gameCachedCoverUrl'] as String?,
       ),
       system: system,
-      romPath: json['romPath'] as String,
+      targetFolder: (json['targetFolder'] ?? json['romPath']) as String,
       addedAt: DateTime.parse(json['addedAt'] as String),
-      status: DownloadItemStatus.values[json['status'] as int],
+      status: (json['status'] as int) < DownloadItemStatus.values.length
+          ? DownloadItemStatus.values[json['status'] as int]
+          : DownloadItemStatus.queued,
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
     );
   }

@@ -2,12 +2,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/config/app_config.dart';
 
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
+import '../../providers/game_providers.dart';
+import '../../services/config_bootstrap.dart';
 import '../../services/input_debouncer.dart';
 import '../../utils/image_helper.dart';
 import '../../providers/download_providers.dart';
@@ -24,12 +27,12 @@ import 'widgets/tinted_overlay.dart';
 
 class GameListScreen extends ConsumerStatefulWidget {
   final SystemModel system;
-  final String romPath;
+  final String targetFolder;
 
   const GameListScreen({
     super.key,
     required this.system,
-    required this.romPath,
+    required this.targetFolder,
   });
 
   @override
@@ -84,10 +87,16 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     _debouncer = ref.read(inputDebouncerProvider);
 
     final repoManager = ref.read(repoManagerProvider);
+    final appConfig =
+        ref.read(bootstrappedConfigProvider).value ?? AppConfig.empty;
+    final systemConfig =
+        ConfigBootstrap.configForSystem(appConfig, widget.system);
+
     _controller = GameListController(
       system: widget.system,
-      romPath: widget.romPath,
+      targetFolder: widget.targetFolder,
       baseUrl: repoManager.baseUrl ?? '',
+      systemConfig: systemConfig,
     )..addListener(_onControllerChanged);
 
     _focusManager = FocusSyncManager(
@@ -163,7 +172,8 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final selectedIndex = _focusManager.selectedIndex;
     if (selectedIndex >= 0 && selectedIndex < state.filteredGroups.length) {
       final displayName = state.filteredGroups[selectedIndex];
-      final variants = state.groupedGames[displayName]!;
+      final variants = state.groupedGames[displayName];
+      if (variants == null || variants.isEmpty) return;
       final coverUrls = ImageHelper.getCoverUrls(
         widget.system,
         variants.map((v) => v.filename).toList(),
@@ -348,7 +358,8 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final selectedIndex = _focusManager.selectedIndex;
     if (selectedIndex >= 0 && selectedIndex < state.filteredGroups.length) {
       final displayName = state.filteredGroups[selectedIndex];
-      final variants = state.groupedGames[displayName]!;
+      final variants = state.groupedGames[displayName];
+      if (variants == null || variants.isEmpty) return;
       _openGameDetail(displayName, variants);
     }
   }
@@ -365,7 +376,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
           game: variants.first,
           variants: variants,
           system: widget.system,
-          romPath: widget.romPath,
+          targetFolder: widget.targetFolder,
         ),
       ),
     );
@@ -382,7 +393,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
     if (isUp) {
       _debouncer.stopHold();
-      return KeyEventResult.handled;
+      return KeyEventResult.ignored;
     }
 
     if (!isDown) return KeyEventResult.ignored;

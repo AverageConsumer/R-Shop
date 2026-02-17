@@ -1,16 +1,19 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/responsive/responsive.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
+import '../../providers/game_providers.dart';
+import '../../services/config_storage_service.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/download_overlay.dart';
 import 'onboarding_controller.dart';
 import 'widgets/chat_bubble.dart';
-import 'widgets/folder_analysis_view.dart';
+import 'widgets/console_setup_step.dart';
 import 'widgets/pixel_mascot.dart';
-import '../../services/rom_folder_service.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -20,7 +23,7 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final FocusNode _focusNode = FocusNode();
-  final GlobalKey<_RepoUrlStepState> _repoUrlKey = GlobalKey<_RepoUrlStepState>();
+
   @override
   void initState() {
     super.initState();
@@ -37,31 +40,67 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     final isOverlayExpanded = ref.read(downloadOverlayExpandedProvider);
-    if (isOverlayExpanded) {
+    if (isOverlayExpanded) return KeyEventResult.handled;
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) {
       return KeyEventResult.handled;
     }
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
     final state = ref.read(onboardingControllerProvider);
-    if (state.needsRepoUrl) {
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-          event.logicalKey == LogicalKeyboardKey.enter ||
-          event.logicalKey == LogicalKeyboardKey.space ||
-          event.logicalKey == LogicalKeyboardKey.select) {
-        _repoUrlKey.currentState?.submit();
+    final controller = ref.read(onboardingControllerProvider.notifier);
+
+    // Console setup step — delegate based on sub-state
+    if (state.currentStep == OnboardingStep.consoleSetup) {
+      // Provider form is open
+      if (state.hasProviderForm) {
+        if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+            event.logicalKey == LogicalKeyboardKey.escape) {
+          controller.cancelProviderForm();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
+          controller.testProviderConnection();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
+            event.logicalKey == LogicalKeyboardKey.enter) {
+          controller.saveProvider();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      }
+
+      // Console panel is open
+      if (state.hasConsoleSelected) {
+        if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+            event.logicalKey == LogicalKeyboardKey.escape) {
+          controller.deselectConsole();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
+          controller.startAddProvider();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
+            event.logicalKey == LogicalKeyboardKey.enter) {
+          controller.saveConsoleConfig();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      }
+
+      // Grid level: Start = export, Select = import
+      if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
+        _exportConfig();
         return KeyEventResult.handled;
       }
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-        _repoUrlKey.currentState?.pasteFromClipboard();
+      if (event.logicalKey == LogicalKeyboardKey.select) {
+        _importConfig();
         return KeyEventResult.handled;
       }
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-          event.logicalKey == LogicalKeyboardKey.backspace ||
-          event.logicalKey == LogicalKeyboardKey.escape) {
-        _handleBack();
-        return KeyEventResult.handled;
-      }
-      return KeyEventResult.ignored;
     }
+
     if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
         event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.space ||
@@ -83,18 +122,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final controller = ref.read(onboardingControllerProvider.notifier);
     final feedback = ref.read(feedbackServiceProvider);
     final audioManager = ref.read(audioManagerProvider);
+
     if (!state.canProceed) return;
-    if (state.needsRepoUrl) {
-      _repoUrlKey.currentState?.submit();
-      return;
-    }
+
     audioManager.stopTyping();
+
     if (state.isLastStep) {
       feedback.success();
       _finishOnboarding();
-    } else if (state.needsFolderSelection && state.folderAnalysis == null) {
+    } else if (state.currentStep == OnboardingStep.consoleSetup) {
+      // Need at least one console configured to proceed
+      if (state.configuredCount == 0) return;
       feedback.tick();
-      _pickFolder();
+      controller.nextStep();
     } else {
       feedback.tick();
       controller.nextStep();
@@ -113,26 +153,45 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
-  Future<void> _pickFolder() async {
-    final storageService = ref.read(storageServiceProvider);
-    final controller = ref.read(onboardingControllerProvider.notifier);
-    final path = await storageService.pickFolder();
-    if (path != null) {
-      await controller.setRomPath(path);
+  Future<void> _exportConfig() async {
+    try {
+      final controller = ref.read(onboardingControllerProvider.notifier);
+      await controller.exportConfig();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Export failed: $e'), backgroundColor: Colors.red.shade800),
+      );
+    }
+  }
+
+  Future<void> _importConfig() async {
+    final result = await importConfigFile(ref);
+    if (!mounted) return;
+    if (result.cancelled) return;
+    if (result.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Invalid config: ${result.error}'), backgroundColor: Colors.red.shade800),
+      );
+    } else {
+      ref.read(onboardingControllerProvider.notifier).loadFromConfig(result.config!);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Config imported successfully!'), backgroundColor: Color(0xFF2E7D32)),
+      );
     }
   }
 
   void _finishOnboarding() async {
-    final state = ref.read(onboardingControllerProvider);
+    final controller = ref.read(onboardingControllerProvider.notifier);
+    final audioManager = ref.read(audioManagerProvider);
+    audioManager.stopTyping();
     final storage = ref.read(storageServiceProvider);
-    final romPath = state.romPath;
-    if (romPath != null) {
-      ref.read(romPathProvider.notifier).state = romPath;
-    }
-    final repoUrl = state.repoUrl;
-    if (repoUrl != null) {
-      ref.read(repoUrlProvider.notifier).state = repoUrl;
-    }
+
+    // Build and persist config
+    final config = controller.buildFinalConfig();
+    final jsonString = const JsonEncoder.withIndent('  ').convert(config.toJson());
+    await ConfigStorageService().saveConfig(jsonString);
+
     await storage.setOnboardingCompleted(true);
     if (!mounted) return;
     Navigator.of(context).pushReplacementNamed('/home');
@@ -143,13 +202,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final state = ref.watch(onboardingControllerProvider);
     final rs = context.rs;
     ref.listen(onboardingControllerProvider.select((s) => s.currentStep), (prev, next) {
-      if (next != OnboardingStep.repoUrl) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && !_focusNode.hasFocus) {
-            _focusNode.requestFocus();
-          }
-        });
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_focusNode.hasFocus) {
+          _focusNode.requestFocus();
+        }
+      });
     });
     return Focus(
       focusNode: _focusNode,
@@ -172,16 +229,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               child: Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: rs.isSmall ? rs.spacing.md : rs.spacing.lg,
-                  vertical: rs.isSmall ? rs.spacing.lg : rs.spacing.xxl,
+                  vertical: rs.isSmall ? rs.spacing.md : rs.spacing.xxl,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: rs.isSmall ? rs.spacing.xl : 40),
                     rs.isPortrait
                         ? _buildPortraitContent(state, rs)
                         : _buildLandscapeContent(state, rs),
-                    const Spacer(),
                   ],
                 ),
               ),
@@ -195,30 +250,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _buildLandscapeContent(OnboardingState state, Responsive rs) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        PixelMascot(size: rs.isSmall ? 36 : 48),
-        Expanded(
-          child: _buildContent(state),
-        ),
-      ],
+    return Expanded(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PixelMascot(size: rs.isSmall ? 36 : 48),
+          Expanded(
+            child: _buildContent(state),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildPortraitContent(OnboardingState state, Responsive rs) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            PixelMascot(size: rs.isSmall ? 32 : 40),
-            SizedBox(width: rs.spacing.sm),
-          ],
-        ),
-        SizedBox(height: rs.spacing.sm),
-        _buildContent(state),
-      ],
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PixelMascot(size: rs.isSmall ? 28 : 40),
+          SizedBox(height: rs.spacing.sm),
+          Expanded(child: _buildContent(state)),
+        ],
+      ),
     );
   }
 
@@ -236,73 +290,120 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         return _WelcomeStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.legalNotice:
         return _LegalNoticeStep(onComplete: controller.onMessageComplete);
-      case OnboardingStep.repoUrl:
-        return _RepoUrlStep(
-          key: _repoUrlKey,
-          isTestingConnection: state.isTestingConnection,
-          error: state.repoUrlError,
-          onSubmit: controller.submitRepoUrl,
-          onComplete: controller.onMessageComplete,
-        );
-      case OnboardingStep.folderSelect:
-        return _FolderSelectStep(
-          canProceed: state.canProceed,
-          onSelectFolder: _pickFolder,
-          onComplete: controller.onMessageComplete,
-        );
-      case OnboardingStep.folderAnalysis:
-        return _FolderAnalysisStep(
-          result: state.folderAnalysis,
-          isCreatingFolders: state.isCreatingFolders,
-          createdFolders: state.createdFolders,
-          onComplete: controller.onMessageComplete,
-        );
+      case OnboardingStep.consoleSetup:
+        return ConsoleSetupStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.complete:
         return _CompleteStep(
-          gameCount: state.folderAnalysis?.totalGames ?? 0,
-          systemCount: state.folderAnalysis?.existingFoldersCount ?? 0,
+          configuredCount: state.configuredCount,
           onComplete: controller.onMessageComplete,
+          onExport: controller.exportConfig,
         );
     }
   }
 
   Widget _buildControls(OnboardingState state, Responsive rs) {
-    return ConsoleHud(
-      buttons: [
+    // Dynamic HUD buttons based on sub-state
+    final List<Widget> buttons = [];
+
+    if (state.currentStep == OnboardingStep.consoleSetup) {
+      if (state.hasProviderForm) {
+        // Form level
+        buttons.addAll([
+          ControlButton(
+            label: 'A',
+            action: 'Save',
+            onTap: () => ref.read(onboardingControllerProvider.notifier).saveProvider(),
+          ),
+          ControlButton(
+            label: 'B',
+            action: 'Cancel',
+            onTap: () => ref.read(onboardingControllerProvider.notifier).cancelProviderForm(),
+          ),
+          ControlButton(
+            label: 'Y',
+            action: 'Test',
+            onTap: state.isTestingConnection
+                ? null
+                : () => ref.read(onboardingControllerProvider.notifier).testProviderConnection(),
+          ),
+        ]);
+      } else if (state.hasConsoleSelected) {
+        // Panel level
+        final sub = state.consoleSubState;
+        buttons.addAll([
+          ControlButton(
+            label: 'A',
+            action: 'Done',
+            onTap: sub?.isComplete == true
+                ? () => ref.read(onboardingControllerProvider.notifier).saveConsoleConfig()
+                : null,
+            highlight: sub?.isComplete == true,
+          ),
+          ControlButton(
+            label: 'B',
+            action: 'Close',
+            onTap: () => ref.read(onboardingControllerProvider.notifier).deselectConsole(),
+          ),
+          ControlButton(
+            label: 'Y',
+            action: 'Add Source',
+            onTap: () => ref.read(onboardingControllerProvider.notifier).startAddProvider(),
+          ),
+        ]);
+      } else {
+        // Grid level
+        buttons.addAll([
+          ControlButton(
+            label: 'A',
+            action: 'Continue',
+            onTap: state.configuredCount > 0 ? _handleContinue : null,
+            highlight: state.configuredCount > 0,
+          ),
+          if (!state.isFirstStep)
+            ControlButton(
+              label: 'B',
+              action: 'Back',
+              onTap: _handleBack,
+            ),
+          if (state.configuredCount > 0)
+            ControlButton(label: '+', action: 'Export', onTap: _exportConfig),
+          ControlButton(label: '\u2212', action: 'Import', onTap: _importConfig),
+        ]);
+      }
+    } else {
+      // Standard step buttons
+      buttons.add(
         ControlButton(
           label: 'A',
-          action: state.isLastStep
-              ? 'Start!'
-              : state.needsFolderSelection
-                  ? 'Select'
-                  : state.needsRepoUrl
-                      ? 'Connect'
-                      : 'Continue',
+          action: state.isLastStep ? 'Start!' : 'Continue',
           onTap: state.canProceed ? _handleContinue : null,
           highlight: state.canProceed,
         ),
-        if (!state.isFirstStep)
+      );
+      if (!state.isFirstStep) {
+        buttons.add(
           ControlButton(
             label: 'B',
             action: 'Back',
             onTap: _handleBack,
           ),
-        if (state.needsRepoUrl)
-          ControlButton(
-            label: 'Y',
-            action: 'Paste',
-            onTap: () => _repoUrlKey.currentState?.pasteFromClipboard(),
-          ),
-        if (ref.watch(downloadCountProvider) > 0)
-          ControlButton(
-            label: '',
-            action: 'Downloads',
-            icon: Icons.play_arrow_rounded,
-            highlight: true,
-            onTap: () => toggleDownloadOverlay(ref),
-          ),
-      ],
-    );
+        );
+      }
+    }
+
+    if (ref.watch(downloadCountProvider) > 0) {
+      buttons.add(
+        ControlButton(
+          label: '',
+          action: 'Downloads',
+          icon: Icons.play_arrow_rounded,
+          highlight: true,
+          onTap: () => toggleDownloadOverlay(ref),
+        ),
+      );
+    }
+
+    return ConsoleHud(buttons: buttons);
   }
 }
 
@@ -402,7 +503,7 @@ class _LegalNoticeStep extends StatelessWidget {
       children: [
         ChatBubble(
           message:
-              "Heads up! R-Shop connects to a file server YOU configure to browse and download ROMs. Make sure you have the legal right to download any content \u2013 respect copyright laws in your region.",
+              "Heads up! R-Shop connects to file servers YOU configure to browse and download ROMs. Make sure you have the legal right to download any content \u2013 respect copyright laws in your region.",
           onComplete: onComplete,
         ),
         SizedBox(height: rs.spacing.md),
@@ -429,552 +530,104 @@ class _LegalNoticeStep extends StatelessWidget {
   }
 }
 
-class _RepoUrlStep extends StatefulWidget {
-  final bool isTestingConnection;
-  final String? error;
-  final Future<void> Function(String url) onSubmit;
-  final VoidCallback onComplete;
-
-  const _RepoUrlStep({
-    super.key,
-    required this.isTestingConnection,
-    required this.error,
-    required this.onSubmit,
-    required this.onComplete,
-  });
-
-  @override
-  State<_RepoUrlStep> createState() => _RepoUrlStepState();
-}
-
-class _RepoUrlStepState extends State<_RepoUrlStep> {
-  final TextEditingController _urlController = TextEditingController();
-  final FocusNode _textFieldFocusNode = FocusNode();
-  bool _connectionSuccess = false;
-
-  bool get hasText => _urlController.text.trim().isNotEmpty;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _textFieldFocusNode.requestFocus();
-    });
-  }
-
-  @override
-  void dispose() {
-    _urlController.dispose();
-    _textFieldFocusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(covariant _RepoUrlStep oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.isTestingConnection && !widget.isTestingConnection && widget.error == null) {
-      setState(() => _connectionSuccess = true);
-    }
-  }
-
-  Future<void> pasteFromClipboard() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    if (data?.text != null) {
-      _urlController.text = data!.text!;
-    }
-  }
-
-  void submit() {
-    if (widget.isTestingConnection) return;
-    final url = _urlController.text.trim();
-    if (url.isNotEmpty) {
-      setState(() => _connectionSuccess = false);
-      widget.onSubmit(url);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final rs = context.rs;
-    final labelFontSize = rs.isSmall ? 10.0 : 12.0;
-    final iconSize = rs.isSmall ? 12.0 : 16.0;
-
-    return Column(
-      key: const ValueKey('repoUrl'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ChatBubble(
-          message:
-              "Now paste your repository URL. This should point to a file server with an Apache-style directory listing.",
-          onComplete: widget.onComplete,
-        ),
-        SizedBox(height: rs.isSmall ? rs.spacing.md : rs.spacing.lg),
-        Padding(
-          padding: EdgeInsets.only(left: rs.isSmall ? 40 : 60),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      const Color(0xFF2A2A2A),
-                      const Color(0xFF1A1A1A),
-                      const Color(0xFF222222),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(rs.radius.md),
-                  border: Border.all(
-                    color: widget.error != null
-                        ? Colors.redAccent.withValues(alpha: 0.8)
-                        : _connectionSuccess
-                            ? Colors.green.withValues(alpha: 0.8)
-                            : Colors.redAccent.withValues(alpha: 0.3),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.error != null
-                          ? Colors.redAccent.withValues(alpha: 0.15)
-                          : _connectionSuccess
-                              ? Colors.green.withValues(alpha: 0.15)
-                              : Colors.redAccent.withValues(alpha: 0.08),
-                      blurRadius: 12,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _urlController,
-                        focusNode: _textFieldFocusNode,
-                        enabled: !widget.isTestingConnection,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: rs.isSmall ? 13.0 : 15.0,
-                          fontFamily: 'monospace',
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'https://...',
-                          hintStyle: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: rs.isSmall ? 13.0 : 15.0,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: rs.spacing.md,
-                            vertical: rs.spacing.sm,
-                          ),
-                        ),
-                        onSubmitted: (_) => submit(),
-                      ),
-                    ),
-                    _FocusableIconButton(
-                      onTap: widget.isTestingConnection ? null : pasteFromClipboard,
-                      icon: Icons.content_paste_rounded,
-                      size: rs.isSmall ? 20.0 : 24.0,
-                      padding: rs.spacing.sm,
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: rs.spacing.sm),
-              if (widget.isTestingConnection)
-                Row(
-                  children: [
-                    SizedBox(
-                      width: iconSize,
-                      height: iconSize,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.redAccent.withValues(alpha: 0.7),
-                      ),
-                    ),
-                    SizedBox(width: rs.spacing.sm),
-                    Text(
-                      'Testing connection...',
-                      style: TextStyle(
-                        color: Colors.grey.shade400,
-                        fontSize: labelFontSize,
-                      ),
-                    ),
-                  ],
-                )
-              else if (_connectionSuccess)
-                Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green, size: iconSize),
-                    SizedBox(width: rs.spacing.sm),
-                    Text(
-                      'Connection successful!',
-                      style: TextStyle(
-                        color: Colors.green.shade300,
-                        fontSize: labelFontSize,
-                      ),
-                    ),
-                  ],
-                )
-              else if (widget.error != null)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.error_outline, color: Colors.redAccent, size: iconSize),
-                    SizedBox(width: rs.spacing.sm),
-                    Expanded(
-                      child: Text(
-                        widget.error!,
-                        style: TextStyle(
-                          color: Colors.redAccent.shade100,
-                          fontSize: labelFontSize,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              SizedBox(height: rs.spacing.md),
-              _FocusableButton(
-                onTap: widget.isTestingConnection ? null : submit,
-                disabled: widget.isTestingConnection,
-                borderRadius: rs.radius.lg,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.link_rounded,
-                      color: widget.isTestingConnection ? Colors.white38 : Colors.white,
-                      size: rs.isSmall ? 18 : 24,
-                    ),
-                    SizedBox(width: rs.spacing.sm),
-                    Text(
-                      'Connect',
-                      style: TextStyle(
-                        color: widget.isTestingConnection ? Colors.white38 : Colors.white,
-                        fontSize: rs.isSmall ? 13.0 : 16.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FolderSelectStep extends StatelessWidget {
-  final bool canProceed;
-  final VoidCallback onSelectFolder;
-  final VoidCallback onComplete;
-  const _FolderSelectStep({
-    required this.canProceed,
-    required this.onSelectFolder,
-    required this.onComplete,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final rs = context.rs;
-    final buttonFontSize = rs.isSmall ? 13.0 : 16.0;
-    final iconSize = rs.isSmall ? 18.0 : 24.0;
-    return Column(
-      key: const ValueKey('folderSelect'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ChatBubble(
-          message:
-              "Let's set up your ROM folder! Press A or tap the button below to select your ES-DE roms directory.",
-          onComplete: onComplete,
-        ),
-        SizedBox(height: rs.isSmall ? rs.spacing.lg : rs.spacing.xl),
-        Padding(
-          padding: EdgeInsets.only(left: rs.isSmall ? 40 : 60),
-          child: GestureDetector(
-            onTap: onSelectFolder,
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: rs.isSmall ? rs.spacing.lg : rs.spacing.xl,
-                vertical: rs.isSmall ? rs.spacing.sm : rs.spacing.md,
-              ),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.redAccent.withValues(alpha: 0.3),
-                    Colors.redAccent.withValues(alpha: 0.15),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(rs.radius.lg),
-                border: Border.all(
-                  color: Colors.redAccent.withValues(alpha: 0.5),
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.redAccent.withValues(alpha: 0.2),
-                    blurRadius: 20,
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.folder_open, color: Colors.white, size: iconSize),
-                  SizedBox(width: rs.spacing.sm),
-                  Text(
-                    'Select ROM Folder',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: buttonFontSize,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FolderAnalysisStep extends StatelessWidget {
-  final FolderAnalysisResult? result;
-  final bool isCreatingFolders;
-  final List<String> createdFolders;
-  final VoidCallback onComplete;
-  const _FolderAnalysisStep({
-    required this.result,
-    required this.isCreatingFolders,
-    required this.createdFolders,
-    required this.onComplete,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final rs = context.rs;
-    if (result == null) {
-      return const Column(
-        key: ValueKey('folderAnalysis'),
-        children: [
-          ChatBubble(message: "Scanning your ROM folder...", onComplete: null),
-        ],
-      );
-    }
-    return Column(
-      key: const ValueKey('folderAnalysis'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ChatBubble(
-          message:
-              "Check this out! I found ${result!.totalGames} games across ${result!.existingFoldersCount} systems!",
-          onComplete: onComplete,
-        ),
-        SizedBox(height: rs.spacing.md),
-        FolderAnalysisView(
-          result: result!,
-          isCreatingFolders: isCreatingFolders,
-          createdFolders: createdFolders,
-        ),
-      ],
-    );
-  }
-}
-
 class _CompleteStep extends StatelessWidget {
-  final int gameCount;
-  final int systemCount;
+  final int configuredCount;
   final VoidCallback onComplete;
+  final Future<void> Function() onExport;
+
   const _CompleteStep({
-    required this.gameCount,
-    required this.systemCount,
+    required this.configuredCount,
     required this.onComplete,
+    required this.onExport,
   });
+
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
     final labelFontSize = rs.isSmall ? 11.0 : 14.0;
     final iconSize = rs.isSmall ? 16.0 : 20.0;
+    final buttonFontSize = rs.isSmall ? 12.0 : 14.0;
+
     return Column(
       key: const ValueKey('complete'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ChatBubble(
           message:
-              "Perfect! You're all set up with $gameCount games across $systemCount systems. Have fun exploring! Press A to jump in.",
+              "Perfect! $configuredCount ${configuredCount == 1 ? 'console' : 'consoles'} set up. Export your config to use it on other devices. Press A to jump in!",
           onComplete: onComplete,
         ),
         SizedBox(height: rs.isSmall ? rs.spacing.lg : rs.spacing.xl),
         Padding(
           padding: EdgeInsets.only(left: rs.isSmall ? 40 : 60),
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: rs.isSmall ? rs.spacing.md : rs.spacing.lg,
-              vertical: rs.isSmall ? rs.spacing.sm : rs.spacing.md,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(rs.radius.md),
-              border: Border.all(
-                color: Colors.green.withValues(alpha: 0.3),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.check_circle, color: Colors.green, size: iconSize),
-                SizedBox(width: rs.spacing.sm),
-                Text(
-                  'Setup Complete',
-                  style: TextStyle(
-                    color: Colors.green.shade300,
-                    fontSize: labelFontSize,
-                    fontWeight: FontWeight.bold,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Summary badge
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: rs.isSmall ? rs.spacing.md : rs.spacing.lg,
+                  vertical: rs.isSmall ? rs.spacing.sm : rs.spacing.md,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(rs.radius.md),
+                  border: Border.all(
+                    color: Colors.green.withValues(alpha: 0.3),
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FocusableIconButton extends StatefulWidget {
-  final VoidCallback? onTap;
-  final IconData icon;
-  final double size;
-  final double padding;
-
-  const _FocusableIconButton({
-    required this.onTap,
-    required this.icon,
-    required this.size,
-    required this.padding,
-  });
-
-  @override
-  State<_FocusableIconButton> createState() => _FocusableIconButtonState();
-}
-
-class _FocusableIconButtonState extends State<_FocusableIconButton> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Focus(
-      onFocusChange: (focused) => setState(() => _focused = focused),
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent &&
-            (event.logicalKey == LogicalKeyboardKey.enter ||
-             event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-             event.logicalKey == LogicalKeyboardKey.select)) {
-          widget.onTap?.call();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: widget.padding),
-          decoration: _focused
-              ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                    color: Colors.redAccent.withValues(alpha: 0.8),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.redAccent.withValues(alpha: 0.3),
-                      blurRadius: 8,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: iconSize),
+                    SizedBox(width: rs.spacing.sm),
+                    Text(
+                      'Setup Complete',
+                      style: TextStyle(
+                        color: Colors.green.shade300,
+                        fontSize: labelFontSize,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
-                )
-              : null,
-          child: Icon(
-            widget.icon,
-            color: _focused ? Colors.white : Colors.grey.shade400,
-            size: widget.size,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FocusableButton extends StatefulWidget {
-  final VoidCallback? onTap;
-  final bool disabled;
-  final double borderRadius;
-  final Widget child;
-
-  const _FocusableButton({
-    required this.onTap,
-    required this.disabled,
-    required this.borderRadius,
-    required this.child,
-  });
-
-  @override
-  State<_FocusableButton> createState() => _FocusableButtonState();
-}
-
-class _FocusableButtonState extends State<_FocusableButton> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final rs = context.rs;
-    return Focus(
-      onFocusChange: (focused) => setState(() => _focused = focused),
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent &&
-            (event.logicalKey == LogicalKeyboardKey.enter ||
-             event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-             event.logicalKey == LogicalKeyboardKey.select)) {
-          widget.onTap?.call();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: rs.isSmall ? rs.spacing.lg : rs.spacing.xl,
-            vertical: rs.isSmall ? rs.spacing.sm : rs.spacing.md,
-          ),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.redAccent.withValues(alpha: widget.disabled ? 0.15 : 0.3),
-                Colors.redAccent.withValues(alpha: widget.disabled ? 0.08 : 0.15),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(widget.borderRadius),
-            border: Border.all(
-              color: _focused
-                  ? Colors.redAccent.withValues(alpha: 0.9)
-                  : Colors.redAccent.withValues(alpha: widget.disabled ? 0.2 : 0.5),
-              width: _focused ? 2.5 : 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.redAccent.withValues(alpha: _focused ? 0.4 : 0.2),
-                blurRadius: _focused ? 24 : 20,
+                ),
+              ),
+              SizedBox(height: rs.spacing.md),
+              // Export button
+              GestureDetector(
+                onTap: onExport,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: rs.spacing.lg,
+                    vertical: rs.spacing.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(rs.radius.md),
+                    border: Border.all(
+                      color: Colors.redAccent.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.share, color: Colors.redAccent, size: iconSize),
+                      SizedBox(width: rs.spacing.sm),
+                      Text(
+                        'Export Config',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: buttonFontSize,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
-          child: widget.child,
         ),
-      ),
+      ],
     );
   }
 }

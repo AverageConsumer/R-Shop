@@ -7,6 +7,8 @@ import '../../core/widgets/screen_layout.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
+import '../../providers/game_providers.dart';
+import '../../services/config_bootstrap.dart';
 import '../../services/input_debouncer.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
 import '../../widgets/console_hud.dart';
@@ -33,6 +35,9 @@ class _HomeViewState extends ConsumerState<HomeView> {
 
   late InputDebouncer _debouncer;
 
+  /// Filtered list of systems that have a config entry.
+  List<SystemModel> _configuredSystems = SystemModel.supportedSystems;
+
   @override
   void initState() {
     super.initState();
@@ -42,7 +47,7 @@ class _HomeViewState extends ConsumerState<HomeView> {
       viewportFraction: 0.5,
       initialPage: _initialPage,
     );
-    _currentIndex = _initialPage % SystemModel.supportedSystems.length;
+    _currentIndex = _initialPage % _configuredSystems.length;
     _lastStablePage = _initialPage;
     _pageController.addListener(_onPageScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -95,27 +100,33 @@ class _HomeViewState extends ConsumerState<HomeView> {
     }
   }
 
-  int get _systemCount => SystemModel.supportedSystems.length;
+  int get _systemCount => _configuredSystems.length;
   SystemModel _getSystem(int index) {
-    return SystemModel.supportedSystems[index % _systemCount];
+    return _configuredSystems[index % _systemCount];
   }
 
   void _navigateToCurrentSystem() {
-    final romPath = ref.read(romPathProvider) ??
-        ref.read(storageServiceProvider).getRomPath();
     final system = _getSystem(_currentIndex);
+    final appConfig =
+        ref.read(bootstrappedConfigProvider).value;
+    final systemConfig = appConfig != null
+        ? ConfigBootstrap.configForSystem(appConfig, system)
+        : null;
+    final targetFolder = systemConfig?.targetFolder ?? '';
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => GameListScreen(
           system: system,
-          romPath: romPath ?? '',
+          targetFolder: targetFolder,
         ),
       ),
     );
   }
 
   void _navigateLeft() {
+    final page = _pageController.page;
+    if (page != null && page != page.roundToDouble()) return;
     _pageController.previousPage(
       duration: const Duration(milliseconds: 350),
       curve: Curves.easeOutCubic,
@@ -123,6 +134,8 @@ class _HomeViewState extends ConsumerState<HomeView> {
   }
 
   void _navigateRight() {
+    final page = _pageController.page;
+    if (page != null && page != page.roundToDouble()) return;
     _pageController.nextPage(
       duration: const Duration(milliseconds: 350),
       curve: Curves.easeOutCubic,
@@ -132,13 +145,14 @@ class _HomeViewState extends ConsumerState<HomeView> {
   void _openSettings() async {
     // Stop holding inputs before navigating
     _debouncer.stopHold();
+    final homeContext = context;
     await Navigator.push(
-      context,
+      homeContext,
       MaterialPageRoute(
         builder: (context) => SettingsScreen(
           onResetOnboarding: () {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-            Navigator.of(context).pushReplacement(
+            Navigator.of(homeContext).popUntil((route) => route.isFirst);
+            Navigator.of(homeContext).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => const OnboardingScreen(),
               ),
@@ -147,11 +161,11 @@ class _HomeViewState extends ConsumerState<HomeView> {
         ),
       ),
     );
+    if (!mounted) return;
   }
 
   void _showExitDialogOverlay() {
     setState(() {
-      _showExitDialog = true;
       _showExitDialog = true;
     });
   }
@@ -167,6 +181,50 @@ class _HomeViewState extends ConsumerState<HomeView> {
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+
+    // Filter systems based on config
+    final configAsync = ref.watch(bootstrappedConfigProvider);
+    configAsync.whenData((config) {
+      final configuredIds = config.systems.map((s) => s.id).toSet();
+      final filtered = SystemModel.supportedSystems
+          .where((s) => configuredIds.contains(s.esdeFolder))
+          .toList();
+      if (filtered.isNotEmpty && filtered.length != _configuredSystems.length) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _configuredSystems = filtered;
+              _currentIndex = _currentIndex % filtered.length;
+            });
+          }
+        });
+      }
+    });
+
+    if (_configuredSystems.isEmpty) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.videogame_asset_off, size: 64, color: Colors.white24),
+              const SizedBox(height: 16),
+              Text(
+                'No consoles configured',
+                style: TextStyle(color: Colors.grey[500], fontSize: 18),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Go to Settings to set up your consoles',
+                style: TextStyle(color: Colors.grey[700], fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final currentSystem = _getSystem(_currentIndex);
     final accentColor = currentSystem.accentColor;
 
@@ -226,14 +284,10 @@ class _HomeViewState extends ConsumerState<HomeView> {
         return false;
       }),
       ConfirmIntent: ConfirmAction(ref, onConfirm: () {
-        if (_debouncer.canPerformAction()) {
-          _navigateToCurrentSystem();
-        }
+        _navigateToCurrentSystem();
       }),
       InfoIntent: InfoAction(ref, onInfo: () {
-        if (_debouncer.canPerformAction()) {
-          _openSettings();
-        }
+        _openSettings();
       }),
       BackIntent: CallbackAction<BackIntent>(onInvoke: (_) {
          if (_debouncer.canPerformAction()) {

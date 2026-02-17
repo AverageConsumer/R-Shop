@@ -4,7 +4,7 @@ import '../models/game_item.dart';
 import '../models/system_model.dart';
 
 class RomManager {
-  static const _archiveExtensions = ['.zip', '.7z', '.rar'];
+  static const _archiveExtensions = ['.zip', '.rar'];
 
   static String _safePath(String baseDir, String filename) {
     final sanitized = filename.replaceAll(RegExp(r'\.\.[\\/]'), '');
@@ -16,8 +16,7 @@ class RomManager {
   }
 
   static String getTargetPath(
-      GameItem game, SystemModel system, String romPath) {
-    final folder = _safePath(romPath, system.esdeFolder);
+      GameItem game, SystemModel system, String targetFolder) {
     var filename = game.filename;
 
     for (final ext in _archiveExtensions) {
@@ -29,11 +28,7 @@ class RomManager {
       }
     }
 
-    return _safePath(folder, filename);
-  }
-
-  static String getTargetFolder(SystemModel system, String romPath) {
-    return _safePath(romPath, system.esdeFolder);
+    return _safePath(targetFolder, filename);
   }
 
   static String? extractGameName(String filename) {
@@ -58,8 +53,8 @@ class RomManager {
     return name.isEmpty ? null : name;
   }
 
-  Future<bool> exists(GameItem game, SystemModel system, String romPath) async {
-    final directPath = getTargetPath(game, system, romPath);
+  Future<bool> exists(GameItem game, SystemModel system, String targetFolder) async {
+    final directPath = getTargetPath(game, system, targetFolder);
     if (await File(directPath).exists()) {
       return true;
     }
@@ -68,8 +63,7 @@ class RomManager {
         system.multiFileExtensions!.isNotEmpty) {
       final gameName = extractGameName(game.filename);
       if (gameName != null) {
-        final subfolderPath =
-            _safePath(getTargetFolder(system, romPath), gameName);
+        final subfolderPath = _safePath(targetFolder, gameName);
         final subfolder = Directory(subfolderPath);
         if (await subfolder.exists()) {
           final files = subfolder.listSync();
@@ -93,17 +87,17 @@ class RomManager {
   Future<Map<int, bool>> checkMultipleExists(
     List<GameItem> variants,
     SystemModel system,
-    String romPath,
+    String targetFolder,
   ) async {
     final result = <int, bool>{};
     for (int i = 0; i < variants.length; i++) {
-      result[i] = await exists(variants[i], system, romPath);
+      result[i] = await exists(variants[i], system, targetFolder);
     }
     return result;
   }
 
-  Future<void> delete(GameItem game, SystemModel system, String romPath) async {
-    final path = getTargetPath(game, system, romPath);
+  Future<void> delete(GameItem game, SystemModel system, String targetFolder) async {
+    final path = getTargetPath(game, system, targetFolder);
     final file = File(path);
     if (await file.exists()) {
       await file.delete();
@@ -114,8 +108,7 @@ class RomManager {
         system.multiFileExtensions!.isNotEmpty) {
       final gameName = extractGameName(game.filename);
       if (gameName != null) {
-        final subfolderPath =
-            _safePath(getTargetFolder(system, romPath), gameName);
+        final subfolderPath = _safePath(targetFolder, gameName);
         final subfolder = Directory(subfolderPath);
         if (await subfolder.exists()) {
           await subfolder.delete(recursive: true);
@@ -127,11 +120,11 @@ class RomManager {
   Future<Set<String>> getInstalledFilenames(
     List<GameItem> variants,
     SystemModel system,
-    String romPath,
+    String targetFolder,
   ) async {
     final installed = <String>{};
     for (final variant in variants) {
-      if (await exists(variant, system, romPath)) {
+      if (await exists(variant, system, targetFolder)) {
         installed.add(variant.filename);
       }
     }
@@ -141,10 +134,10 @@ class RomManager {
   Future<bool> isAnyVariantInstalled(
     List<GameItem> variants,
     SystemModel system,
-    String romPath,
+    String targetFolder,
   ) async {
     for (final variant in variants) {
-      if (await exists(variant, system, romPath)) {
+      if (await exists(variant, system, targetFolder)) {
         return true;
       }
     }

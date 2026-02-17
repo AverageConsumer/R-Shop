@@ -7,7 +7,7 @@ import 'package:retro_eshop/services/rom_manager.dart';
 void main() {
   group('RomManager.getTargetPath', () {
     late SystemModel testSystem;
-    const testRomPath = '/storage/emulated/0/ROMs';
+    const testTargetFolder = '/storage/emulated/0/ROMs/gba';
 
     setUp(() {
       testSystem = const SystemModel(
@@ -30,23 +30,25 @@ void main() {
         url: 'https://example.com/pokemon.zip',
       );
 
-      final path = RomManager.getTargetPath(game, testSystem, testRomPath);
+      final path =
+          RomManager.getTargetPath(game, testSystem, testTargetFolder);
 
       expect(path,
           equals('/storage/emulated/0/ROMs/gba/Pokemon Emerald (USA).gba'));
     });
 
-    test('7z archive extension is replaced', () {
+    test('7z extension is preserved (not extracted)', () {
       final game = GameItem(
         filename: 'Game Name (Japan).7z',
         displayName: 'Game Name',
         url: 'https://example.com/game.7z',
       );
 
-      final path = RomManager.getTargetPath(game, testSystem, testRomPath);
+      final path =
+          RomManager.getTargetPath(game, testSystem, testTargetFolder);
 
       expect(
-          path, equals('/storage/emulated/0/ROMs/gba/Game Name (Japan).gba'));
+          path, equals('/storage/emulated/0/ROMs/gba/Game Name (Japan).7z'));
     });
 
     test('RAR archive extension is replaced', () {
@@ -56,7 +58,8 @@ void main() {
         url: 'https://example.com/game.rar',
       );
 
-      final path = RomManager.getTargetPath(game, testSystem, testRomPath);
+      final path =
+          RomManager.getTargetPath(game, testSystem, testTargetFolder);
 
       expect(path, equals('/storage/emulated/0/ROMs/gba/Another Game.gba'));
     });
@@ -68,7 +71,8 @@ void main() {
         url: 'https://example.com/game.gba',
       );
 
-      final path = RomManager.getTargetPath(game, testSystem, testRomPath);
+      final path =
+          RomManager.getTargetPath(game, testSystem, testTargetFolder);
 
       expect(path, equals('/storage/emulated/0/ROMs/gba/Direct Game.gba'));
     });
@@ -92,7 +96,9 @@ void main() {
         url: 'https://example.com/ffx.iso',
       );
 
-      final path = RomManager.getTargetPath(game, ps2System, testRomPath);
+      const ps2TargetFolder = '/storage/emulated/0/ROMs/ps2';
+      final path =
+          RomManager.getTargetPath(game, ps2System, ps2TargetFolder);
 
       expect(path,
           equals('/storage/emulated/0/ROMs/ps2/Final Fantasy X (USA).iso'));
@@ -105,15 +111,10 @@ void main() {
         url: 'https://example.com/game.ZIP',
       );
 
-      final path = RomManager.getTargetPath(game, testSystem, testRomPath);
+      final path =
+          RomManager.getTargetPath(game, testSystem, testTargetFolder);
 
       expect(path, equals('/storage/emulated/0/ROMs/gba/Game Name.gba'));
-    });
-
-    test('getTargetFolder returns correct folder path', () {
-      final folder = RomManager.getTargetFolder(testSystem, testRomPath);
-
-      expect(folder, equals('/storage/emulated/0/ROMs/gba'));
     });
   });
 
@@ -137,10 +138,10 @@ void main() {
         accentColor: Color(0xFF4CAF50),
       );
 
-      const romPath = '/test/path';
+      const targetFolder = '/test/path/gba';
 
-      final path1 = RomManager.getTargetPath(game, system, romPath);
-      final path2 = RomManager.getTargetPath(game, system, romPath);
+      final path1 = RomManager.getTargetPath(game, system, targetFolder);
+      final path2 = RomManager.getTargetPath(game, system, targetFolder);
 
       expect(path1, equals(path2));
       expect(path1, equals('/test/path/gba/Test Game (USA).gba'));

@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../models/config/system_config.dart';
 import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../services/game_source_service.dart';
 import '../../../services/rom_manager.dart';
+import '../../../services/unified_game_service.dart';
 
 class GameListState {
   final List<GameItem> allGames;
@@ -51,20 +53,25 @@ class GameListState {
 
 class GameListController extends ChangeNotifier {
   final SystemModel system;
-  final String romPath;
+  final String targetFolder;
+  final String baseUrl;
+  final SystemConfig? systemConfig;
   final GameSourceService _gameSourceService;
+  final UnifiedGameService _unifiedService;
 
   GameListState _state = const GameListState();
   GameListState get state => _state;
 
-  final String baseUrl;
-
   GameListController({
     required this.system,
-    required this.romPath,
+    required this.targetFolder,
     required this.baseUrl,
+    this.systemConfig,
     GameSourceService? gameSourceService,
-  }) : _gameSourceService = gameSourceService ?? GameSourceService(baseUrl: baseUrl) {
+    UnifiedGameService? unifiedService,
+  })  : _gameSourceService =
+            gameSourceService ?? GameSourceService(baseUrl: baseUrl),
+        _unifiedService = unifiedService ?? UnifiedGameService() {
     loadGames();
   }
 
@@ -73,10 +80,15 @@ class GameListController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final games = await _gameSourceService.fetchGames(
-        system,
-        forceRefresh: forceRefresh,
-      );
+      final List<GameItem> games;
+      if (systemConfig != null) {
+        games = await _unifiedService.fetchGamesForSystem(systemConfig!);
+      } else {
+        games = await _gameSourceService.fetchGames(
+          system,
+          forceRefresh: forceRefresh,
+        );
+      }
       _state = _state.copyWith(allGames: games);
       _groupGames();
       await _checkInstalledStatus();
@@ -115,7 +127,7 @@ class GameListController extends ChangeNotifier {
 
   Future<bool> _isAnyVariantInstalled(List<GameItem> variants) async {
     final romManager = RomManager();
-    return romManager.isAnyVariantInstalled(variants, system, romPath);
+    return romManager.isAnyVariantInstalled(variants, system, targetFolder);
   }
 
   void filterGames(String query) {

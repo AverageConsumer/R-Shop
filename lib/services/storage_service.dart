@@ -55,6 +55,10 @@ class StorageService {
     await _prefs?.remove(_repoUrlKey);
   }
 
+  Future<void> resetAll() async {
+    await _prefs?.clear();
+  }
+
   SoundSettings getSoundSettings() {
     final json = _prefs?.getString(_soundSettingsKey);
     if (json == null) return const SoundSettings();
