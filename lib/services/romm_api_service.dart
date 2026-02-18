@@ -105,8 +105,8 @@ class RommApiService {
     final List<dynamic> list;
     if (data is List) {
       list = data;
-    } else if (data is Map && data.containsKey('results')) {
-      list = data['results'] as List<dynamic>;
+    } else if (data is Map) {
+      list = (data['items'] ?? data['results']) as List<dynamic>? ?? [];
     } else {
       list = [];
     }
@@ -122,28 +122,40 @@ class RommApiService {
     AuthConfig? auth,
   }) async {
     final url = '${_normalizeBaseUrl(baseUrl)}/api/roms';
-    final response = await _dio.get<dynamic>(
-      url,
-      queryParameters: {
-        'platform_ids': '[$platformId]',
-        'limit': 10000,
-      },
-      options: _buildAuthOptions(auth),
-    );
+    const pageSize = 500;
+    final allRoms = <RommRom>[];
+    var offset = 0;
 
-    final data = response.data;
-    final List<dynamic> list;
-    if (data is List) {
-      list = data;
-    } else if (data is Map && data.containsKey('results')) {
-      list = data['results'] as List<dynamic>;
-    } else {
-      list = [];
+    while (true) {
+      final response = await _dio.get<dynamic>(
+        url,
+        queryParameters: {
+          'platform_ids': [platformId],
+          'limit': pageSize,
+          'offset': offset,
+        },
+        options: _buildAuthOptions(auth),
+      );
+
+      final data = response.data;
+      final List<dynamic> list;
+      if (data is List) {
+        list = data;
+      } else if (data is Map) {
+        list = (data['items'] ?? data['results']) as List<dynamic>? ?? [];
+      } else {
+        break;
+      }
+
+      allRoms.addAll(
+        list.map((e) => RommRom.fromJson(e as Map<String, dynamic>)),
+      );
+
+      if (list.length < pageSize) break;
+      offset += pageSize;
     }
 
-    return list
-        .map((e) => RommRom.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return allRoms;
   }
 
   Future<SourceConnectionResult> testConnection(

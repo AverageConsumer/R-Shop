@@ -166,11 +166,16 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     // Initialize on first build once config is available
     ref.watch(bootstrappedConfigProvider).whenData((_) => _initFromConfig());
 
-    // Re-request focus after state changes (console deselect, form close, etc.)
+    // Re-request focus only after structural changes (console select/deselect,
+    // form open/close). Skip minor changes (folder path, toggles, merge mode)
+    // to avoid fighting with child focus restoration (e.g. after folder picker).
     ref.listen(onboardingControllerProvider, (prev, next) {
-      // Don't interfere with focus while provider form is active —
-      // text fields manage their own focus
       if (next.hasProviderForm) return;
+      if (prev != null &&
+          prev.hasConsoleSelected == next.hasConsoleSelected &&
+          prev.hasProviderForm == next.hasProviderForm) {
+        return; // Minor change — don't steal focus
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_focusNode.hasFocus) {
           _focusNode.requestFocus();

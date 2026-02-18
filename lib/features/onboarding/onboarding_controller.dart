@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/config/app_config.dart';
@@ -5,13 +6,16 @@ import '../../models/config/provider_config.dart';
 import '../../models/config/system_config.dart';
 import '../../models/system_model.dart';
 import '../../services/config_storage_service.dart';
+import '../../services/local_folder_matcher.dart';
 import '../../services/provider_factory.dart';
+import '../../services/rom_folder_service.dart';
 import '../../services/romm_api_service.dart';
 import '../../services/romm_platform_matcher.dart';
 
 enum OnboardingStep {
   welcome,
   legalNotice,
+  rommSetup,
   consoleSetup,
   complete,
 }
@@ -20,6 +24,105 @@ enum ConsoleSubStep {
   folder,
   options,
   providers,
+}
+
+enum RommSetupSubStep { ask, connect, select, folder }
+
+class ScannedFolder {
+  final String name;
+  final int fileCount;
+  final String? autoMatchedSystemId;
+  final bool isLocalOnly;
+
+  const ScannedFolder({
+    required this.name,
+    required this.fileCount,
+    this.autoMatchedSystemId,
+    this.isLocalOnly = false,
+  });
+}
+
+class RommSetupState {
+  final RommSetupSubStep subStep;
+  final String url;
+  final String apiKey;
+  final String user;
+  final String pass;
+  final List<RommPlatform> discoveredPlatforms;
+  final Map<String, RommPlatform> systemMatches;
+  final Set<String> selectedSystemIds;
+  final String? romBasePath;
+  final List<ScannedFolder>? scannedFolders;
+  final Map<String, String> folderAssignments;
+  final bool isScanning;
+  final Set<String> localOnlySystemIds;
+
+  const RommSetupState({
+    this.subStep = RommSetupSubStep.ask,
+    this.url = '',
+    this.apiKey = '',
+    this.user = '',
+    this.pass = '',
+    this.discoveredPlatforms = const [],
+    this.systemMatches = const {},
+    this.selectedSystemIds = const {},
+    this.romBasePath,
+    this.scannedFolders,
+    this.folderAssignments = const {},
+    this.isScanning = false,
+    this.localOnlySystemIds = const {},
+  });
+
+  RommSetupState copyWith({
+    RommSetupSubStep? subStep,
+    String? url,
+    String? apiKey,
+    String? user,
+    String? pass,
+    List<RommPlatform>? discoveredPlatforms,
+    Map<String, RommPlatform>? systemMatches,
+    Set<String>? selectedSystemIds,
+    String? romBasePath,
+    List<ScannedFolder>? scannedFolders,
+    Map<String, String>? folderAssignments,
+    bool? isScanning,
+    Set<String>? localOnlySystemIds,
+    bool clearRomBasePath = false,
+    bool clearScannedFolders = false,
+  }) {
+    return RommSetupState(
+      subStep: subStep ?? this.subStep,
+      url: url ?? this.url,
+      apiKey: apiKey ?? this.apiKey,
+      user: user ?? this.user,
+      pass: pass ?? this.pass,
+      discoveredPlatforms: discoveredPlatforms ?? this.discoveredPlatforms,
+      systemMatches: systemMatches ?? this.systemMatches,
+      selectedSystemIds: selectedSystemIds ?? this.selectedSystemIds,
+      romBasePath: clearRomBasePath ? null : (romBasePath ?? this.romBasePath),
+      scannedFolders: clearScannedFolders ? null : (scannedFolders ?? this.scannedFolders),
+      folderAssignments: folderAssignments ?? this.folderAssignments,
+      isScanning: isScanning ?? this.isScanning,
+      localOnlySystemIds: localOnlySystemIds ?? this.localOnlySystemIds,
+    );
+  }
+
+  bool get hasConnection => url.trim().isNotEmpty;
+  int get matchedCount => systemMatches.length;
+  int get selectedCount => selectedSystemIds.length;
+  int get localOnlyCount => localOnlySystemIds.length;
+
+  AuthConfig? get authConfig {
+    final hasApiKey = apiKey.trim().isNotEmpty;
+    final hasUser = user.trim().isNotEmpty;
+    final hasPass = pass.trim().isNotEmpty;
+    if (!hasApiKey && !hasUser && !hasPass) return null;
+    return AuthConfig(
+      apiKey: hasApiKey ? apiKey.trim() : null,
+      user: hasUser ? user.trim() : null,
+      pass: hasPass ? pass.trim() : null,
+    );
+  }
 }
 
 class ProviderFormState {
@@ -76,7 +179,7 @@ class ConsoleSetupState {
     );
   }
 
-  bool get isComplete => targetFolder != null && providers.isNotEmpty;
+  bool get isComplete => targetFolder != null;
 }
 
 class OnboardingState {
@@ -93,6 +196,7 @@ class OnboardingState {
   final RommPlatform? rommMatchedPlatform;
   final String? rommFetchError;
   final bool isFetchingRommPlatforms;
+  final RommSetupState? rommSetupState;
 
   const OnboardingState({
     this.currentStep = OnboardingStep.welcome,
@@ -108,6 +212,7 @@ class OnboardingState {
     this.rommMatchedPlatform,
     this.rommFetchError,
     this.isFetchingRommPlatforms = false,
+    this.rommSetupState,
   });
 
   OnboardingState copyWith({
@@ -124,11 +229,13 @@ class OnboardingState {
     RommPlatform? rommMatchedPlatform,
     String? rommFetchError,
     bool? isFetchingRommPlatforms,
+    RommSetupState? rommSetupState,
     bool clearSelectedConsole = false,
     bool clearConsoleSubState = false,
     bool clearProviderForm = false,
     bool clearConnectionError = false,
     bool clearRommState = false,
+    bool clearRommSetupState = false,
   }) {
     return OnboardingState(
       currentStep: currentStep ?? this.currentStep,
@@ -144,6 +251,7 @@ class OnboardingState {
       rommMatchedPlatform: clearRommState ? null : (rommMatchedPlatform ?? this.rommMatchedPlatform),
       rommFetchError: clearRommState ? null : (rommFetchError ?? this.rommFetchError),
       isFetchingRommPlatforms: isFetchingRommPlatforms ?? this.isFetchingRommPlatforms,
+      rommSetupState: clearRommSetupState ? null : (rommSetupState ?? this.rommSetupState),
     );
   }
 
@@ -153,6 +261,13 @@ class OnboardingState {
   bool get hasProviderForm => providerForm != null;
   int get configuredCount => configuredSystems.length;
   bool get hasRommPlatformSelected => rommMatchedPlatform != null;
+
+  Set<String> get rommSelectedSystemIds =>
+      rommSetupState?.selectedSystemIds ?? const {};
+  Map<String, RommPlatform> get rommSystemMatches =>
+      rommSetupState?.systemMatches ?? const {};
+  Set<String> get localOnlySystemIds =>
+      rommSetupState?.localOnlySystemIds ?? const {};
 
   bool get canTest {
     final form = providerForm;
@@ -202,21 +317,170 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   // --- Step navigation ---
 
   void nextStep() {
-    final steps = OnboardingStep.values;
+    // Handle RomM sub-step transitions within rommSetup
+    if (state.currentStep == OnboardingStep.rommSetup) {
+      final rs = state.rommSetupState;
+      if (rs != null && rs.subStep == RommSetupSubStep.select) {
+        // select → folder
+        state = state.copyWith(
+          rommSetupState: rs.copyWith(subStep: RommSetupSubStep.folder),
+          canProceed: true,
+        );
+        return;
+      }
+      // folder → consoleSetup (fall through to normal step advance)
+    }
+
+    const steps = OnboardingStep.values;
     final currentIndex = steps.indexOf(state.currentStep);
     if (currentIndex < steps.length - 1) {
+      final nextStepValue = steps[currentIndex + 1];
+
+      if (nextStepValue == OnboardingStep.rommSetup) {
+        state = state.copyWith(
+          currentStep: nextStepValue,
+          rommSetupState: state.rommSetupState ?? const RommSetupState(),
+          canProceed: true,
+        );
+        return;
+      }
+
+      if (nextStepValue == OnboardingStep.consoleSetup) {
+        _autoConfigureRommSystems();
+        state = state.copyWith(
+          currentStep: nextStepValue,
+          canProceed: state.configuredSystems.isNotEmpty,
+        );
+        return;
+      }
+
       state = state.copyWith(
-        currentStep: steps[currentIndex + 1],
+        currentStep: nextStepValue,
         canProceed: false,
       );
     }
   }
 
+  static const _defaultRomBasePath = '/storage/emulated/0/Roms';
+
+  void _autoConfigureRommSystems() {
+    final rommSetup = state.rommSetupState;
+    if (rommSetup == null ||
+        (rommSetup.selectedSystemIds.isEmpty &&
+            rommSetup.localOnlySystemIds.isEmpty)) {
+      return;
+    }
+
+    final basePath = rommSetup.romBasePath ?? _defaultRomBasePath;
+    final updated = Map<String, SystemConfig>.from(state.configuredSystems);
+
+    // RomM-selected systems with provider
+    for (final systemId in rommSetup.selectedSystemIds) {
+      if (updated.containsKey(systemId)) continue;
+
+      final match = rommSetup.systemMatches[systemId];
+      if (match == null) continue;
+
+      final system = SystemModel.supportedSystems.firstWhere(
+        (s) => s.id == systemId,
+      );
+
+      final rommProvider = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 0,
+        url: rommSetup.url.trim(),
+        auth: rommSetup.authConfig,
+        platformId: match.id,
+        platformName: match.name,
+      );
+
+      final folderName = _folderForSystem(rommSetup, systemId);
+
+      updated[systemId] = SystemConfig(
+        id: systemId,
+        name: system.name,
+        targetFolder: '$basePath/$folderName',
+        providers: [rommProvider],
+        autoExtract: system.isZipped,
+        mergeMode: false,
+      );
+    }
+
+    // Local-only systems — folder path but no providers
+    for (final systemId in rommSetup.localOnlySystemIds) {
+      if (updated.containsKey(systemId)) continue;
+
+      final system = SystemModel.supportedSystems.firstWhere(
+        (s) => s.id == systemId,
+      );
+
+      final folderName = _folderForSystem(rommSetup, systemId);
+
+      updated[systemId] = SystemConfig(
+        id: systemId,
+        name: system.name,
+        targetFolder: '$basePath/$folderName',
+        providers: const [],
+        autoExtract: system.isZipped,
+        mergeMode: false,
+      );
+    }
+
+    // Manual folder assignments to non-RomM/non-local systems
+    for (final entry in rommSetup.folderAssignments.entries) {
+      final systemId = entry.key;
+      if (updated.containsKey(systemId)) continue;
+      if (rommSetup.selectedSystemIds.contains(systemId)) continue;
+      if (rommSetup.localOnlySystemIds.contains(systemId)) continue;
+
+      final system = SystemModel.supportedSystems
+          .where((s) => s.id == systemId)
+          .firstOrNull;
+      if (system == null) continue;
+
+      updated[systemId] = SystemConfig(
+        id: systemId,
+        name: system.name,
+        targetFolder: '$basePath/${entry.value}',
+        providers: const [],
+        autoExtract: system.isZipped,
+        mergeMode: false,
+      );
+    }
+
+    state = state.copyWith(configuredSystems: updated);
+  }
+
+  String _folderForSystem(RommSetupState rommSetup, String systemId) {
+    // 1. Manual assignment from dropdown
+    final manual = rommSetup.folderAssignments[systemId];
+    if (manual != null) return manual;
+
+    // 2. Auto-match from scan
+    final scanned = rommSetup.scannedFolders;
+    if (scanned != null) {
+      final autoMatch = scanned.where((f) => f.autoMatchedSystemId == systemId);
+      if (autoMatch.isNotEmpty) return autoMatch.first.name;
+    }
+
+    // 3. Default: system.id
+    return systemId;
+  }
+
   void previousStep() {
-    final steps = OnboardingStep.values;
+    const steps = OnboardingStep.values;
     final currentIndex = steps.indexOf(state.currentStep);
     if (currentIndex > 0) {
-      state = state.copyWith(currentStep: steps[currentIndex - 1]);
+      final prevStep = steps[currentIndex - 1];
+      if (prevStep == OnboardingStep.rommSetup) {
+        state = state.copyWith(
+          currentStep: prevStep,
+          rommSetupState: state.rommSetupState ?? const RommSetupState(),
+          canProceed: true,
+        );
+        return;
+      }
+      state = state.copyWith(currentStep: prevStep);
     }
   }
 
@@ -232,16 +496,36 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       (s) => s.id == id,
     );
 
-    final subState = existing != null
-        ? ConsoleSetupState(
-            targetFolder: existing.targetFolder,
-            autoExtract: existing.autoExtract,
-            mergeMode: existing.mergeMode,
-            providers: List.of(existing.providers),
-          )
-        : ConsoleSetupState(
-            autoExtract: system.isZipped,
-          );
+    ConsoleSetupState subState;
+    if (existing != null) {
+      subState = ConsoleSetupState(
+        targetFolder: existing.targetFolder,
+        autoExtract: existing.autoExtract,
+        mergeMode: existing.mergeMode,
+        providers: List.of(existing.providers),
+      );
+    } else {
+      subState = ConsoleSetupState(
+        autoExtract: system.isZipped,
+      );
+
+      // Auto-add RomM provider for newly selected consoles with a RomM match
+      final rommSetup = state.rommSetupState;
+      if (rommSetup != null &&
+          rommSetup.selectedSystemIds.contains(id) &&
+          rommSetup.systemMatches.containsKey(id)) {
+        final match = rommSetup.systemMatches[id]!;
+        final rommProvider = ProviderConfig(
+          type: ProviderType.romm,
+          priority: 0,
+          url: rommSetup.url.trim(),
+          auth: rommSetup.authConfig,
+          platformId: match.id,
+          platformName: match.name,
+        );
+        subState = subState.copyWith(providers: [rommProvider]);
+      }
+    }
 
     state = state.copyWith(
       selectedConsoleId: id,
@@ -528,6 +812,274 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       rommFetchError: state.rommFetchError,
       isFetchingRommPlatforms: state.isFetchingRommPlatforms,
     );
+  }
+
+  // --- RomM setup step methods ---
+
+  void rommSetupAnswer(bool useRomm) {
+    if (useRomm) {
+      final rs = state.rommSetupState ?? const RommSetupState();
+      state = state.copyWith(
+        rommSetupState: rs.copyWith(subStep: RommSetupSubStep.connect),
+      );
+    } else {
+      state = state.copyWith(clearRommSetupState: true);
+      nextStep();
+    }
+  }
+
+  void rommSetupBack() {
+    final rs = state.rommSetupState;
+    if (rs == null) return;
+
+    switch (rs.subStep) {
+      case RommSetupSubStep.ask:
+        previousStep();
+      case RommSetupSubStep.connect:
+        state = state.copyWith(
+          rommSetupState: rs.copyWith(subStep: RommSetupSubStep.ask),
+          clearConnectionError: true,
+          connectionTestSuccess: false,
+          isTestingConnection: false,
+        );
+      case RommSetupSubStep.select:
+        state = state.copyWith(
+          rommSetupState: rs.copyWith(subStep: RommSetupSubStep.connect),
+        );
+      case RommSetupSubStep.folder:
+        state = state.copyWith(
+          rommSetupState: rs.copyWith(subStep: RommSetupSubStep.select),
+        );
+    }
+  }
+
+  void updateRommSetupField(String key, String value) {
+    final rs = state.rommSetupState;
+    if (rs == null) return;
+
+    RommSetupState updated;
+    switch (key) {
+      case 'url':
+        updated = rs.copyWith(url: value);
+      case 'apiKey':
+        updated = rs.copyWith(apiKey: value);
+      case 'user':
+        updated = rs.copyWith(user: value);
+      case 'pass':
+        updated = rs.copyWith(pass: value);
+      default:
+        return;
+    }
+    state = state.copyWith(
+      rommSetupState: updated,
+      clearConnectionError: true,
+      connectionTestSuccess: false,
+    );
+  }
+
+  Future<void> testRommSetupConnection() async {
+    final rs = state.rommSetupState;
+    if (rs == null || !rs.hasConnection) return;
+    if (state.isTestingConnection) return;
+
+    state = state.copyWith(
+      isTestingConnection: true,
+      clearConnectionError: true,
+      connectionTestSuccess: false,
+    );
+
+    try {
+      final api = RommApiService();
+      final platforms = await api.fetchPlatforms(
+        rs.url.trim(),
+        auth: rs.authConfig,
+      );
+
+      if (!mounted) return;
+
+      // Auto-match all supported systems
+      final matches = <String, RommPlatform>{};
+      for (final system in SystemModel.supportedSystems) {
+        final match = RommPlatformMatcher.findMatch(system.id, platforms);
+        if (match != null) {
+          matches[system.id] = match;
+        }
+      }
+
+      // Pre-select all matched systems
+      final selected = Set<String>.from(matches.keys);
+
+      state = state.copyWith(
+        isTestingConnection: false,
+        connectionTestSuccess: true,
+        rommSetupState: rs.copyWith(
+          discoveredPlatforms: platforms,
+          systemMatches: matches,
+          selectedSystemIds: selected,
+          subStep: RommSetupSubStep.select,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      state = state.copyWith(
+        isTestingConnection: false,
+        connectionTestError: e.toString(),
+      );
+    }
+  }
+
+  void toggleRommSystem(String systemId) {
+    final rs = state.rommSetupState;
+    if (rs == null) return;
+
+    final updated = Set<String>.from(rs.selectedSystemIds);
+    if (updated.contains(systemId)) {
+      updated.remove(systemId);
+    } else {
+      updated.add(systemId);
+    }
+    state = state.copyWith(
+      rommSetupState: rs.copyWith(selectedSystemIds: updated),
+    );
+  }
+
+  void toggleAllRommSystems(bool selectAll) {
+    final rs = state.rommSetupState;
+    if (rs == null) return;
+
+    final updated = selectAll ? Set<String>.from(rs.systemMatches.keys) : <String>{};
+    state = state.copyWith(
+      rommSetupState: rs.copyWith(selectedSystemIds: updated),
+    );
+  }
+
+  void toggleLocalSystem(String systemId) {
+    final rs = state.rommSetupState;
+    if (rs == null) return;
+
+    final updated = Set<String>.from(rs.localOnlySystemIds);
+    if (updated.contains(systemId)) {
+      updated.remove(systemId);
+    } else {
+      updated.add(systemId);
+    }
+    state = state.copyWith(
+      rommSetupState: rs.copyWith(localOnlySystemIds: updated),
+    );
+  }
+
+  // --- RomM folder step methods ---
+
+  void rommFolderChoice(bool pickExisting) {
+    if (pickExisting) {
+      pickRomFolder();
+    } else {
+      // "Create new" — skip folder selection, use defaults
+      final rs = state.rommSetupState;
+      if (rs == null) return;
+      state = state.copyWith(
+        rommSetupState: rs.copyWith(
+          clearRomBasePath: true,
+          clearScannedFolders: true,
+          folderAssignments: const {},
+          localOnlySystemIds: const {},
+        ),
+      );
+      nextStep();
+    }
+  }
+
+  Future<void> pickRomFolder() async {
+    final rs = state.rommSetupState;
+    if (rs == null) return;
+
+    final path = await FilePicker.platform.getDirectoryPath();
+    if (path == null) return;
+    if (!mounted) return;
+
+    state = state.copyWith(
+      rommSetupState: rs.copyWith(
+        romBasePath: path,
+        isScanning: true,
+        clearScannedFolders: true,
+        folderAssignments: const {},
+        localOnlySystemIds: const {},
+      ),
+    );
+
+    try {
+      final service = RomFolderService();
+      final subfolders = await service.scanAllSubfolders(path);
+      if (!mounted) return;
+
+      // Match against ALL supported systems, not just RomM-selected ones
+      const allSystems = SystemModel.supportedSystems;
+      final selectedIds = state.rommSetupState!.selectedSystemIds;
+      final platforms = state.rommSetupState!.discoveredPlatforms;
+
+      final localOnlyIds = <String>{};
+
+      final scanned = subfolders.map((f) {
+        final matchedId = LocalFolderMatcher.matchFolder(
+          f.name,
+          allSystems,
+          platforms,
+        );
+        final isLocalOnly = matchedId != null && !selectedIds.contains(matchedId);
+
+        if (isLocalOnly && f.fileCount > 0) {
+          localOnlyIds.add(matchedId);
+        }
+
+        return ScannedFolder(
+          name: f.name,
+          fileCount: f.fileCount,
+          autoMatchedSystemId: matchedId,
+          isLocalOnly: isLocalOnly,
+        );
+      }).toList();
+
+      state = state.copyWith(
+        rommSetupState: state.rommSetupState!.copyWith(
+          scannedFolders: scanned,
+          isScanning: false,
+          localOnlySystemIds: localOnlyIds,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      state = state.copyWith(
+        rommSetupState: state.rommSetupState!.copyWith(
+          isScanning: false,
+          scannedFolders: const [],
+          localOnlySystemIds: const {},
+        ),
+      );
+    }
+  }
+
+  void assignFolderToSystem(String folderName, String? systemId) {
+    final rs = state.rommSetupState;
+    if (rs == null) return;
+
+    final updated = Map<String, String>.from(rs.folderAssignments);
+
+    // Remove any previous assignment of this folder
+    updated.removeWhere((_, v) => v == folderName);
+
+    if (systemId != null) {
+      // Remove any previous assignment for this system
+      updated.remove(systemId);
+      updated[systemId] = folderName;
+    }
+
+    state = state.copyWith(
+      rommSetupState: rs.copyWith(folderAssignments: updated),
+    );
+  }
+
+  void rommFolderConfirm() {
+    nextStep();
   }
 
   void saveProvider() {

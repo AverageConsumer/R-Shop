@@ -89,6 +89,39 @@ class RomFolderService {
     );
   }
 
+  static final Set<String> _allRomExtensions = {
+    for (final s in SystemModel.supportedSystems) ...s.romExtensions,
+    '.zip',
+    '.7z',
+  };
+
+  /// Scans all subdirectories of [basePath] and counts ROM files in each.
+  Future<List<({String name, int fileCount})>> scanAllSubfolders(
+      String basePath) async {
+    final baseDir = Directory(basePath);
+    if (!await baseDir.exists()) return [];
+
+    final results = <({String name, int fileCount})>[];
+    await for (final entity in baseDir.list()) {
+      if (entity is Directory) {
+        final name = entity.path.split('/').last;
+        if (name.startsWith('.')) continue;
+        int count = 0;
+        await for (final file in entity.list()) {
+          if (file is File) {
+            final lower = file.path.toLowerCase();
+            if (_allRomExtensions.any((ext) => lower.endsWith(ext))) {
+              count++;
+            }
+          }
+        }
+        results.add((name: name, fileCount: count));
+      }
+    }
+    results.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return results;
+  }
+
   Future<List<String>> createMissingFolders(String romPath) async {
     final created = <String>[];
     for (final system in SystemModel.supportedSystems) {

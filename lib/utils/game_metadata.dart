@@ -108,7 +108,7 @@ class GameMetadata {
   }
 
   static List<_RegionPattern> _getOrderedRegionPatterns() {
-    return [
+    return const [
       _RegionPattern('Japan', '🇯🇵', [
         r'\(Japan\)',
         r'\(J\)',
@@ -286,7 +286,7 @@ class GameMetadata {
   }
 
   static List<_LanguagePattern> _getLanguagePatterns() {
-    return [
+    return const [
       _LanguagePattern('En', 'English', '🇬🇧', [
         r'\(En[,)]',
         r'English',

@@ -14,6 +14,7 @@ import 'widgets/console_setup_hud.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/console_setup_step.dart';
 import 'widgets/pixel_mascot.dart';
+import 'widgets/romm_setup_step.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -49,6 +50,64 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     final state = ref.read(onboardingControllerProvider);
     final controller = ref.read(onboardingControllerProvider.notifier);
+
+    // RomM setup step — delegate based on sub-step
+    if (state.currentStep == OnboardingStep.rommSetup) {
+      final rs = state.rommSetupState;
+      if (rs != null) {
+        switch (rs.subStep) {
+          case RommSetupSubStep.ask:
+            // ConsoleFocusable buttons handle A/Enter; only handle B here
+            if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+                event.logicalKey == LogicalKeyboardKey.escape) {
+              _handleBack();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          case RommSetupSubStep.connect:
+            if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+                event.logicalKey == LogicalKeyboardKey.escape) {
+              controller.rommSetupBack();
+              return KeyEventResult.handled;
+            }
+            if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
+              if (rs.hasConnection && !state.isTestingConnection) {
+                controller.testRommSetupConnection();
+              }
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          case RommSetupSubStep.select:
+            if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+                event.logicalKey == LogicalKeyboardKey.escape) {
+              controller.rommSetupBack();
+              return KeyEventResult.handled;
+            }
+            if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
+              _handleContinue();
+              return KeyEventResult.handled;
+            }
+            if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
+              final allSelected =
+                  rs.selectedCount == rs.matchedCount;
+              controller.toggleAllRommSystems(!allSelected);
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          case RommSetupSubStep.folder:
+            if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+                event.logicalKey == LogicalKeyboardKey.escape) {
+              controller.rommSetupBack();
+              return KeyEventResult.handled;
+            }
+            if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
+              _handleContinue();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+        }
+      }
+    }
 
     // Console setup step — delegate based on sub-state
     if (state.currentStep == OnboardingStep.consoleSetup) {
@@ -129,6 +188,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (state.isLastStep) {
       feedback.success();
       _finishOnboarding();
+    } else if (state.currentStep == OnboardingStep.rommSetup) {
+      final rommState = state.rommSetupState;
+      if (rommState != null) {
+        if (rommState.subStep == RommSetupSubStep.select) {
+          _persistRommCredentials(rommState);
+          feedback.tick();
+          controller.nextStep();
+        } else if (rommState.subStep == RommSetupSubStep.folder) {
+          feedback.tick();
+          controller.rommFolderConfirm();
+        }
+      }
+      return;
     } else if (state.currentStep == OnboardingStep.consoleSetup) {
       // Need at least one console configured to proceed
       if (state.configuredCount == 0) return;
@@ -145,6 +217,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final controller = ref.read(onboardingControllerProvider.notifier);
     final feedback = ref.read(feedbackServiceProvider);
     final audioManager = ref.read(audioManagerProvider);
+
+    if (state.currentStep == OnboardingStep.rommSetup) {
+      audioManager.stopTyping();
+      feedback.cancel();
+      controller.rommSetupBack();
+      return;
+    }
+
     if (!state.isFirstStep) {
       audioManager.stopTyping();
       feedback.cancel();
@@ -180,6 +260,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
+  void _persistRommCredentials(RommSetupState rommState) {
+    final storage = ref.read(storageServiceProvider);
+    if (rommState.hasConnection) {
+      storage.setRommUrl(rommState.url.trim());
+      final auth = rommState.authConfig;
+      if (auth != null) {
+        storage.setRommAuth(const JsonEncoder().convert(auth.toJson()));
+      } else {
+        storage.setRommAuth(null);
+      }
+    }
+  }
+
   void _finishOnboarding() async {
     final controller = ref.read(onboardingControllerProvider.notifier);
     final audioManager = ref.read(audioManagerProvider);
@@ -202,6 +295,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final rs = context.rs;
     ref.listen(onboardingControllerProvider.select((s) => s.currentStep), (prev, next) {
       if (next == OnboardingStep.consoleSetup) return;
+      if (next == OnboardingStep.rommSetup) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_focusNode.hasFocus) {
           _focusNode.requestFocus();
@@ -290,6 +384,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         return _WelcomeStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.legalNotice:
         return _LegalNoticeStep(onComplete: controller.onMessageComplete);
+      case OnboardingStep.rommSetup:
+        return RommSetupStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.consoleSetup:
         return ConsoleSetupStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.complete:
@@ -302,6 +398,57 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _buildControls(OnboardingState state, Responsive rs) {
+    if (state.currentStep == OnboardingStep.rommSetup) {
+      final rommState = state.rommSetupState;
+      if (rommState != null) {
+        switch (rommState.subStep) {
+          case RommSetupSubStep.ask:
+            return ConsoleHud(
+              b: HudAction('Back', onTap: _handleBack),
+              showDownloads: false,
+            );
+          case RommSetupSubStep.connect:
+            final controller =
+                ref.read(onboardingControllerProvider.notifier);
+            return ConsoleHud(
+              b: HudAction('Back', onTap: () => controller.rommSetupBack()),
+              y: HudAction(
+                'Test & Discover',
+                onTap: rommState.hasConnection && !state.isTestingConnection
+                    ? controller.testRommSetupConnection
+                    : null,
+              ),
+              showDownloads: false,
+            );
+          case RommSetupSubStep.select:
+            final controller =
+                ref.read(onboardingControllerProvider.notifier);
+            final allSelected =
+                rommState.selectedCount == rommState.matchedCount;
+            return ConsoleHud(
+              start: HudAction('Continue', onTap: _handleContinue,
+                  highlight: true),
+              b: HudAction('Back', onTap: () => controller.rommSetupBack()),
+              y: HudAction(
+                allSelected ? 'Deselect All' : 'Select All',
+                onTap: () =>
+                    controller.toggleAllRommSystems(!allSelected),
+              ),
+              showDownloads: false,
+            );
+          case RommSetupSubStep.folder:
+            final controller =
+                ref.read(onboardingControllerProvider.notifier);
+            return ConsoleHud(
+              start: HudAction('Continue', onTap: _handleContinue,
+                  highlight: true),
+              b: HudAction('Back', onTap: () => controller.rommSetupBack()),
+              showDownloads: false,
+            );
+        }
+      }
+    }
+
     if (state.currentStep == OnboardingStep.consoleSetup) {
       final shared = buildConsoleSetupHud(state: state, ref: ref);
       if (shared != null) return shared;

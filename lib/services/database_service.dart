@@ -3,6 +3,22 @@ import 'package:sqflite/sqflite.dart';
 
 import '../models/game_item.dart';
 
+class GameSearchResult {
+  final String systemSlug;
+  final String filename;
+  final String displayName;
+  final String url;
+  final String? coverUrl;
+
+  const GameSearchResult({
+    required this.systemSlug,
+    required this.filename,
+    required this.displayName,
+    required this.url,
+    this.coverUrl,
+  });
+}
+
 class DatabaseService {
   static Database? _database;
   static const String _tableName = 'games';
@@ -128,10 +144,11 @@ class DatabaseService {
         .toList();
   }
 
-  Future<List<GameItem>> searchGames(String query) async {
+  Future<List<GameSearchResult>> searchGames(String query) async {
     final db = await database;
     final maps = await db.query(
       _tableName,
+      columns: ['systemSlug', 'filename', 'displayName', 'url', 'cover_url'],
       where: 'displayName LIKE ? OR filename LIKE ?',
       whereArgs: ['%$query%', '%$query%'],
       orderBy: 'displayName ASC',
@@ -139,11 +156,12 @@ class DatabaseService {
     );
 
     return maps
-        .map((map) => GameItem(
+        .map((map) => GameSearchResult(
+              systemSlug: map['systemSlug'] as String,
               filename: map['filename'] as String,
               displayName: map['displayName'] as String,
               url: map['url'] as String,
-              cachedCoverUrl: map['cover_url'] as String?,
+              coverUrl: map['cover_url'] as String?,
             ))
         .toList();
   }
@@ -166,10 +184,12 @@ class DatabaseService {
 
   String _extractRegion(String filename) {
     if (filename.contains('(USA)') || filename.contains('(U)')) return 'USA';
-    if (filename.contains('(Europe)') || filename.contains('(E)'))
+    if (filename.contains('(Europe)') || filename.contains('(E)')) {
       return 'Europe';
-    if (filename.contains('(Japan)') || filename.contains('(J)'))
+    }
+    if (filename.contains('(Japan)') || filename.contains('(J)')) {
       return 'Japan';
+    }
     if (filename.contains('(Germany)')) return 'Germany';
     if (filename.contains('(France)')) return 'France';
     if (filename.contains('(Spain)')) return 'Spain';

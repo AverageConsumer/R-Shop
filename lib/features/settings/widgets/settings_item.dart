@@ -59,7 +59,7 @@ class _SettingsItemState extends State<SettingsItem> {
     return ConsoleFocusableListItem(
       focusNode: _focusNode,
       onSelect: widget.onTap ?? () {},
-      backgroundColor: widget.isDestructive ? Colors.redAccent.withOpacity(0.1) : null,
+      backgroundColor: widget.isDestructive ? Colors.redAccent.withValues(alpha: 0.1) : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
@@ -83,7 +83,7 @@ class _SettingsItemState extends State<SettingsItem> {
                     widget.subtitle,
                     style: AppTheme.bodySmall.copyWith(
                       color: widget.isDestructive
-                          ? Colors.redAccent.withOpacity(0.7)
+                          ? Colors.redAccent.withValues(alpha: 0.7)
                           : (_isFocused ? Colors.white70 : Colors.white38),
                     ),
                   ),

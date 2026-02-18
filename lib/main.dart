@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/input/input.dart';
 import 'core/theme/app_theme.dart';
+import 'models/system_model.dart';
 import 'providers/app_providers.dart';
+import 'providers/download_providers.dart';
 import 'features/home/home_view.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'services/storage_service.dart';
 import 'services/haptic_service.dart';
 import 'services/audio_manager.dart';
+import 'services/download_foreground_service.dart';
 import 'widgets/download_overlay.dart';
 
 class NoGlowScrollBehavior extends ScrollBehavior {
@@ -29,6 +32,8 @@ void main() async {
   final audioManager = AudioManager();
   await audioManager.init();
   audioManager.updateSettings(storageService.getSoundSettings());
+
+  DownloadForegroundService.init();
 
   runApp(
     ProviderScope(
@@ -56,6 +61,11 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(downloadQueueManagerProvider)
+          .restoreQueue(SystemModel.supportedSystems);
+    });
   }
 
   @override

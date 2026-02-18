@@ -13,7 +13,7 @@ class ConsoleGrid extends ConsumerWidget {
     final state = ref.watch(onboardingControllerProvider);
     final controller = ref.read(onboardingControllerProvider.notifier);
     final rs = context.rs;
-    final systems = SystemModel.supportedSystems;
+    const systems = SystemModel.supportedSystems;
 
     final crossAxisCount = rs.isSmall
         ? (rs.isPortrait ? 3 : 5)
@@ -32,10 +32,16 @@ class ConsoleGrid extends ConsumerWidget {
         itemBuilder: (context, index) {
           final system = systems[index];
           final isConfigured = state.configuredSystems.containsKey(system.id);
+          final hasRommMatch =
+              state.rommSelectedSystemIds.contains(system.id);
+          final hasLocalMatch =
+              state.localOnlySystemIds.contains(system.id);
 
           return _ConsoleTile(
             system: system,
             isConfigured: isConfigured,
+            hasRommMatch: hasRommMatch,
+            hasLocalMatch: hasLocalMatch,
             onTap: () => controller.selectConsole(system.id),
             autofocus: index == 0,
           );
@@ -48,12 +54,16 @@ class ConsoleGrid extends ConsumerWidget {
 class _ConsoleTile extends StatefulWidget {
   final SystemModel system;
   final bool isConfigured;
+  final bool hasRommMatch;
+  final bool hasLocalMatch;
   final VoidCallback onTap;
   final bool autofocus;
 
   const _ConsoleTile({
     required this.system,
     required this.isConfigured,
+    this.hasRommMatch = false,
+    this.hasLocalMatch = false,
     required this.onTap,
     this.autofocus = false,
   });
@@ -154,6 +164,40 @@ class _ConsoleTileState extends State<_ConsoleTile> {
                   ],
                 ),
               ),
+              if (widget.hasRommMatch && !widget.isConfigured)
+                Positioned(
+                  top: rs.spacing.xs,
+                  left: rs.spacing.xs,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade700,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.dns_rounded,
+                      color: Colors.white,
+                      size: rs.isSmall ? 8.0 : 10.0,
+                    ),
+                  ),
+                ),
+              if (widget.hasLocalMatch && !widget.isConfigured && !widget.hasRommMatch)
+                Positioned(
+                  top: rs.spacing.xs,
+                  left: rs.spacing.xs,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Colors.cyan,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.folder_rounded,
+                      color: Colors.white,
+                      size: rs.isSmall ? 8.0 : 10.0,
+                    ),
+                  ),
+                ),
               if (widget.isConfigured)
                 Positioned(
                   top: rs.spacing.xs,

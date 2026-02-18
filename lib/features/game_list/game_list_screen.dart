@@ -20,6 +20,7 @@ import '../../widgets/console_hud.dart';
 import 'widgets/dynamic_background.dart';
 import 'widgets/game_grid.dart';
 import 'widgets/game_list_header.dart';
+import 'widgets/filter_overlay.dart';
 import 'widgets/search_overlay.dart';
 import 'widgets/tinted_overlay.dart';
 
@@ -50,6 +51,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   bool _isSearching = false;
   bool _isSearchFocused = false;
   bool _isClosingSearch = false;
+  bool _isFiltering = false;
 
   late int _columns;
   double _lastPinchScale = 1.0;
@@ -71,7 +73,13 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         BackIntent: _BackAction(this),
         SearchIntent: CallbackAction<SearchIntent>(
           onInvoke: (_) {
-            _openSearch();
+            if (!_isFiltering) _openSearch();
+            return null;
+          },
+        ),
+        InfoIntent: CallbackAction<InfoIntent>(
+          onInvoke: (_) {
+            _toggleFilter();
             return null;
           },
         ),
@@ -92,6 +100,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       system: widget.system,
       targetFolder: widget.targetFolder,
       systemConfig: systemConfig ?? SystemConfig(id: widget.system.id, name: widget.system.name, targetFolder: widget.targetFolder, providers: []),
+      storage: ref.read(storageServiceProvider),
     )..addListener(_onControllerChanged);
 
     _focusManager = FocusSyncManager(
@@ -178,7 +187,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final selectedIndex = _focusManager.selectedIndex;
     if (selectedIndex >= 0 && selectedIndex < state.filteredGroups.length) {
       final displayName = state.filteredGroups[selectedIndex];
-      final variants = state.groupedGames[displayName];
+      final variants = state.filteredGroupedGames[displayName];
       if (variants == null || variants.isEmpty) return;
       final coverUrls = ImageHelper.getCoverUrls(
         widget.system,
@@ -193,6 +202,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   }
 
   void _openSearch() {
+    if (_isFiltering) setState(() => _isFiltering = false);
     _searchController.clear();
     _controller.resetFilter();
     _focusManager.reset(0);
@@ -227,6 +237,37 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       }
       _isClosingSearch = false;
     });
+  }
+
+  void _toggleFilter() {
+    if (_isFiltering) {
+      _closeFilter();
+    } else {
+      if (_isSearching) _closeSearch();
+      _openFilter();
+    }
+  }
+
+  void _openFilter() {
+    setState(() => _isFiltering = true);
+  }
+
+  void _closeFilter() {
+    setState(() => _isFiltering = false);
+    _resetFocusAfterFilterChange();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) requestScreenFocus();
+    });
+  }
+
+  void _resetFocusAfterFilterChange() {
+    final count = _controller.state.filteredGroups.length;
+    if (count == 0) {
+      _focusManager.reset(0);
+    } else if (_focusManager.selectedIndex >= count) {
+      _focusManager.reset(count - 1);
+    }
+    _updateItemKeys();
   }
 
   void _onSearchChanged(String query) {
@@ -323,7 +364,9 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
   void _handleBack() {
     ref.read(feedbackServiceProvider).cancel();
-    if (_isSearching && !_searchFocusNode.hasFocus) {
+    if (_isFiltering) {
+      _closeFilter();
+    } else if (_isSearching && !_searchFocusNode.hasFocus) {
       _closeSearch();
     } else {
       Navigator.pop(context);
@@ -335,7 +378,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final selectedIndex = _focusManager.selectedIndex;
     if (selectedIndex >= 0 && selectedIndex < state.filteredGroups.length) {
       final displayName = state.filteredGroups[selectedIndex];
-      final variants = state.groupedGames[displayName];
+      final variants = state.filteredGroupedGames[displayName];
       if (variants == null || variants.isEmpty) return;
       _openGameDetail(displayName, variants);
     }
@@ -387,7 +430,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final rs = context.rs;
     final state = _controller.state;
     final baseTopPadding = rs.safeAreaTop + (rs.isSmall ? 60 : 80);
-    final searchExtraPadding = rs.isSmall ? 70.0 : 80.0;
+    final searchExtraPadding = rs.isSmall ? 16.0 : 20.0;
     final topPadding =
         _isSearching ? baseTopPadding + searchExtraPadding : baseTopPadding;
 
@@ -435,22 +478,38 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
               TintedOverlay(accentColor: widget.system.accentColor),
               _buildNormalContent(state, topPadding),
               if (_isSearching) _buildSearchContent(state),
-              _isSearching
+              if (_isFiltering) _buildFilterContent(state),
+              _isFiltering
                   ? ConsoleHud(
-                      dpad: !_isSearchFocused ? (label: '\u2191', action: 'Search') : null,
-                      a: HudAction('Select', onTap: _openSelectedGame),
-                      b: HudAction(
-                        _isSearchFocused ? 'Keyboard' : 'Close',
-                        highlight: _isSearchFocused,
-                        onTap: () => Navigator.pop(context),
-                      ),
+                      a: const HudAction('Toggle'),
+                      b: HudAction('Close', onTap: _closeFilter),
+                      x: HudAction('Clear', onTap: () {
+                        _controller.clearFilters();
+                        _resetFocusAfterFilterChange();
+                        setState(() {});
+                      }),
                       showDownloads: false,
                     )
-                  : ConsoleHud(
-                      a: HudAction('Select', onTap: _openSelectedGame),
-                      b: HudAction('Back', onTap: () => Navigator.pop(context)),
-                      y: HudAction('Search', onTap: _openSearch),
-                    ),
+                  : _isSearching
+                      ? ConsoleHud(
+                          dpad: !_isSearchFocused ? (label: '\u2191', action: 'Search') : null,
+                          a: HudAction('Select', onTap: _openSelectedGame),
+                          b: HudAction(
+                            _isSearchFocused ? 'Keyboard' : 'Close',
+                            highlight: _isSearchFocused,
+                            onTap: () => Navigator.pop(context),
+                          ),
+                          showDownloads: false,
+                        )
+                      : ConsoleHud(
+                          a: HudAction('Select', onTap: _openSelectedGame),
+                          b: HudAction('Back', onTap: () => Navigator.pop(context)),
+                          x: HudAction(
+                            state.activeFilters.isNotEmpty ? 'Filter \u25CF' : 'Filter',
+                            onTap: _toggleFilter,
+                          ),
+                          y: HudAction('Search', onTap: _openSearch),
+                        ),
             ],
           ),
         ),
@@ -470,6 +529,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         GameListHeader(
           system: widget.system,
           gameCount: state.filteredGroups.length,
+          hasActiveFilters: state.activeFilters.isNotEmpty,
         ),
       ],
     );
@@ -490,7 +550,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       key: ValueKey('grid_$_columns'),
       system: widget.system,
       filteredGroups: state.filteredGroups,
-      groupedGames: state.groupedGames,
+      groupedGames: state.filteredGroupedGames,
       installedCache: state.installedCache,
       itemKeys: _itemKeys,
       focusNodes: _focusManager.focusNodes,
@@ -529,6 +589,36 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         onClose: _closeSearch,
         onUnfocus: _unfocusSearch,
         onSubmitted: _onSearchSubmitted,
+      ),
+    );
+  }
+
+  Widget _buildFilterContent(GameListState state) {
+    return DialogFocusScope(
+      isVisible: _isFiltering,
+      onClose: _closeFilter,
+      child: FilterOverlay(
+        accentColor: widget.system.accentColor,
+        availableRegions: state.availableRegions,
+        availableLanguages: state.availableLanguages,
+        selectedRegions: state.activeFilters.selectedRegions,
+        selectedLanguages: state.activeFilters.selectedLanguages,
+        onToggleRegion: (r) {
+          _controller.toggleRegionFilter(r);
+          _resetFocusAfterFilterChange();
+          setState(() {});
+        },
+        onToggleLanguage: (l) {
+          _controller.toggleLanguageFilter(l);
+          _resetFocusAfterFilterChange();
+          setState(() {});
+        },
+        onClearAll: () {
+          _controller.clearFilters();
+          _resetFocusAfterFilterChange();
+          setState(() {});
+        },
+        onClose: _closeFilter,
       ),
     );
   }

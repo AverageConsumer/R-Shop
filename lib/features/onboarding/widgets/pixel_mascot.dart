@@ -65,10 +65,10 @@ class _PixelMascotPainter extends CustomPainter {
         paint,
       );
     }
-    final bodyColor = const Color(0xFFFF6B6B);
-    final darkColor = const Color(0xFFCC5555);
-    final eyeColor = const Color(0xFF1A1A2E);
-    final highlightColor = const Color(0xFFFFB3B3);
+    const bodyColor = Color(0xFFFF6B6B);
+    const darkColor = Color(0xFFCC5555);
+    const eyeColor = Color(0xFF1A1A2E);
+    const highlightColor = Color(0xFFFFB3B3);
     // Body (rounded blob shape)
     drawPixel(2, 2, bodyColor);
     drawPixel(3, 2, bodyColor);

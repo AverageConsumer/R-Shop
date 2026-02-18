@@ -379,14 +379,14 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
             child: FadeTransition(
               opacity: _fadeAnimation,
               child: Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      const Color(0xFF0A0A0A),
-                      const Color(0xFF111111),
-                      const Color(0xFF0D0D0D),
+                      Color(0xFF0A0A0A),
+                      Color(0xFF111111),
+                      Color(0xFF0D0D0D),
                     ],
                   ),
                 ),
@@ -417,13 +417,22 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
   }
 
   Widget _buildControls(bool hasActive, bool hasFinished) {
+    final targetIndex = _hoveredIndex ?? _focusedIndex;
+    final targetItem = targetIndex < widget.recentItems.length
+        ? widget.recentItems[targetIndex]
+        : null;
+    final label = targetItem?.isActive == true
+        ? 'Cancel'
+        : targetItem?.isFailed == true
+            ? 'Retry'
+            : 'Clear';
+
     return ConsoleHud(
       a: HudAction(
-        hasActive ? 'Cancel' : 'Clear',
+        label,
         onTap: () {
-          final targetIndex = _hoveredIndex ?? _focusedIndex;
-          if (targetIndex < widget.recentItems.length) {
-            _performAction(widget.recentItems[targetIndex]);
+          if (targetItem != null) {
+            _performAction(targetItem);
           }
         },
       ),
@@ -489,7 +498,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
               ],
             ),
           ),
-          Spacer(),
+          const Spacer(),
           GestureDetector(
             onTap: _close,
             child: Container(
@@ -589,7 +598,9 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
   void _performAction(DownloadItem item) {
     if (item.isActive) {
       ref.read(downloadQueueManagerProvider).cancelDownload(item.id);
-    } else if (item.isFailed || item.isFinished) {
+    } else if (item.isFailed) {
+      ref.read(downloadQueueManagerProvider).retryDownload(item.id);
+    } else if (item.isFinished) {
       ref.read(downloadQueueManagerProvider).removeDownload(item.id);
     }
   }

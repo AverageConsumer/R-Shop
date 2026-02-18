@@ -111,12 +111,12 @@ class VersionCard extends StatelessWidget {
                 ],
               ),
               if (isInstalled)
-                Positioned(
+                const Positioned(
                   bottom: 0,
                   left: 0,
                   right: 0,
                   child: InstalledLedStrip(
-                    borderRadius: const BorderRadius.only(
+                    borderRadius: BorderRadius.only(
                       bottomLeft: Radius.circular(9),
                       bottomRight: Radius.circular(9),
                     ),
@@ -378,12 +378,12 @@ class SingleVersionDisplay extends StatelessWidget {
           ),
         ),
         if (isInstalled)
-          Positioned(
+          const Positioned(
             bottom: 0,
             left: 0,
             right: 0,
             child: InstalledLedStrip(
-              borderRadius: const BorderRadius.only(
+              borderRadius: BorderRadius.only(
                 bottomLeft: Radius.circular(11),
                 bottomRight: Radius.circular(11),
               ),

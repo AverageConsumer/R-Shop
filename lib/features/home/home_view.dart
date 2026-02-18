@@ -16,6 +16,7 @@ import '../../widgets/download_overlay.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../settings/settings_screen.dart';
 import '../game_list/game_list_screen.dart';
+import 'widgets/global_search_overlay.dart';
 import 'widgets/hero_carousel_item.dart';
 
 class HomeView extends ConsumerStatefulWidget {
@@ -32,6 +33,7 @@ class _HomeViewState extends ConsumerState<HomeView>
   bool _isUserScrolling = false;
   int _lastStablePage = _initialPage;
   bool _showExitDialog = false;
+  bool _showGlobalSearch = false;
 
   late InputDebouncer _debouncer;
 
@@ -58,6 +60,8 @@ class _HomeViewState extends ConsumerState<HomeView>
           return false;
         }),
         ConfirmIntent: ConfirmAction(ref, onConfirm: _navigateToCurrentSystem),
+        // TODO: re-enable for next release
+        // SearchIntent: SearchAction(ref, onSearch: _openGlobalSearch),
         InfoIntent: InfoAction(ref, onInfo: _openSettings),
         BackIntent: _HomeBackAction(this),
         ToggleOverlayIntent: ToggleOverlayAction(ref),
@@ -190,6 +194,20 @@ class _HomeViewState extends ConsumerState<HomeView>
     if (!mounted) return;
   }
 
+  // TODO: re-enable for next release
+  // void _openGlobalSearch() {
+  //   if (_showGlobalSearch) return;
+  //   _debouncer.stopHold();
+  //   setState(() => _showGlobalSearch = true);
+  // }
+
+  void _closeGlobalSearch() {
+    setState(() => _showGlobalSearch = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) screenFocusNode.requestFocus();
+    });
+  }
+
   void _showExitDialogOverlay() {
     setState(() {
       _showExitDialog = true;
@@ -220,7 +238,7 @@ class _HomeViewState extends ConsumerState<HomeView>
           if (mounted) {
             setState(() {
               _configuredSystems = filtered;
-              _currentIndex = _currentIndex % filtered.length;
+              _currentIndex = _lastStablePage % filtered.length;
             });
           }
         });
@@ -277,6 +295,8 @@ class _HomeViewState extends ConsumerState<HomeView>
                 _buildPortraitLayout(rs, currentSystem)
               else
                 _buildLandscapeLayout(rs, currentSystem),
+              if (_showGlobalSearch)
+                GlobalSearchOverlay(onClose: _closeGlobalSearch),
               if (_showExitDialog)
                 ExitConfirmationOverlay(
                   onConfirm: _exitApp,
@@ -476,9 +496,11 @@ class _HomeViewState extends ConsumerState<HomeView>
     // Only hide controls if the overlay is expanded AND there is content to show.
     // If the queue is empty, DownloadOverlay returns SizedBox.shrink(), so we should keep showing controls.
     if (isOverlayExpanded && hasAnyDownloads) return const SizedBox.shrink();
+    if (_showGlobalSearch || _showExitDialog) return const SizedBox.shrink();
 
     return ConsoleHud(
       a: HudAction('Select', onTap: _navigateToCurrentSystem),
+      // y: HudAction('Search', onTap: _openGlobalSearch),
       x: HudAction('Settings', onTap: _openSettings),
       b: HudAction('Exit', onTap: _showExitDialogOverlay),
     );

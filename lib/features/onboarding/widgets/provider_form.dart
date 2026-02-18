@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/widgets/console_focusable.dart';
 import '../../../models/config/provider_config.dart';
+import '../../../providers/app_providers.dart';
 import '../../../services/romm_api_service.dart';
 import '../onboarding_controller.dart';
 import 'connection_test_indicator.dart';
@@ -65,14 +68,50 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
     final state = ref.read(onboardingControllerProvider);
     final form = state.providerForm;
     if (form == null) return;
-    final types = ProviderType.values;
+    const types = ProviderType.values;
     final currentIndex = types.indexOf(form.type);
     final newIndex = (currentIndex + delta) % types.length;
     ref.read(onboardingControllerProvider.notifier).setProviderType(types[newIndex]);
     for (final c in _controllers.values) {
       c.clear();
     }
+    if (types[newIndex] == ProviderType.romm) {
+      _autoFillRommFromGlobal();
+    }
   }
+
+  void _autoFillRommFromGlobal() {
+    final storage = ref.read(storageServiceProvider);
+    final globalUrl = storage.getRommUrl();
+    if (globalUrl == null || globalUrl.isEmpty) return;
+
+    // Pre-fill URL
+    _getController('url', null).text = globalUrl;
+    _syncField('url', globalUrl);
+
+    // Pre-fill auth
+    final authJson = storage.getRommAuth();
+    if (authJson != null) {
+      try {
+        final map = jsonDecode(authJson) as Map<String, dynamic>;
+        final auth = AuthConfig.fromJson(map);
+        if (auth.apiKey != null && auth.apiKey!.isNotEmpty) {
+          _getController('apiKey', null).text = auth.apiKey!;
+          _syncField('apiKey', auth.apiKey!);
+        }
+        if (auth.user != null && auth.user!.isNotEmpty) {
+          _getController('user', null).text = auth.user!;
+          _syncField('user', auth.user!);
+        }
+        if (auth.pass != null && auth.pass!.isNotEmpty) {
+          _getController('pass', null).text = auth.pass!;
+          _syncField('pass', auth.pass!);
+        }
+      } catch (_) {}
+    }
+  }
+
+  bool _didAutoFill = false;
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +123,18 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
     final controller = ref.read(onboardingControllerProvider.notifier);
 
     final isRomm = form.type == ProviderType.romm;
+
+    // Auto-fill from global config on first render if RomM and URL empty
+    if (isRomm && !_didAutoFill && !form.isEditing) {
+      final urlField = form.fields['url']?.toString() ?? '';
+      if (urlField.isEmpty) {
+        _didAutoFill = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _autoFillRommFromGlobal();
+        });
+      }
+    }
+    if (!isRomm) _didAutoFill = false;
 
     return FocusTraversalGroup(
       child: Column(
@@ -129,7 +180,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
     ProviderFormState form,
     OnboardingController controller,
   ) {
-    final types = ProviderType.values;
+    const types = ProviderType.values;
     final chipFontSize = rs.isSmall ? 11.0 : 13.0;
 
     return CallbackShortcuts(

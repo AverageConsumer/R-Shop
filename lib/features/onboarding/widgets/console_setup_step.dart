@@ -44,6 +44,10 @@ class ConsoleSetupStep extends ConsumerWidget {
         }
       } else if (sub != null && sub.providers.isNotEmpty && sub.targetFolder != null) {
         message = "Looking good! Add more sources or tap Done when you're ready.";
+      } else if (sub != null && sub.targetFolder != null && sub.providers.isEmpty &&
+          state.localOnlySystemIds.contains(state.selectedConsoleId)) {
+        message = "This is a local collection. Add a source to download more, or just hit Done!";
+        accentColor = Colors.cyanAccent;
       } else if (sub != null && sub.targetFolder != null) {
         message = "Now add at least one source so I know where to find the ROMs.";
       } else {
@@ -83,8 +87,19 @@ class ConsoleSetupStep extends ConsumerWidget {
 
     // Grid view
     final configuredCount = state.configuredCount;
+    final rommCount = state.rommSelectedSystemIds.length;
+    final localCount = state.localOnlySystemIds.length;
     String message;
-    if (configuredCount == 0) {
+    if (configuredCount == 0 && rommCount > 0 && localCount > 0) {
+      message =
+          "I found $rommCount RomM and $localCount local ${localCount == 1 ? 'console' : 'consoles'}! Tap one to configure.";
+    } else if (configuredCount == 0 && rommCount > 0) {
+      message =
+          "I found $rommCount RomM ${rommCount == 1 ? 'console' : 'consoles'}! Tap one to configure \u2013 I'll pre-fill the RomM source.";
+    } else if (configuredCount == 0 && localCount > 0) {
+      message =
+          "I found $localCount local ${localCount == 1 ? 'collection' : 'collections'}! Tap one to configure.";
+    } else if (configuredCount == 0) {
       message = "Let's set up your consoles! Tap any system to get started.";
     } else {
       message =

@@ -116,7 +116,7 @@ void main() {
     });
 
     test('Priority: Japan checked before ambiguous codes', () {
-      final filename = 'Game (Japan) (No).zip';
+      const filename = 'Game (Japan) (No).zip';
       final region = GameMetadata.extractRegion(filename);
       expect(region.name, equals('Japan'));
     });
@@ -228,15 +228,15 @@ void main() {
     });
 
     test('Tag colors are assigned correctly', () {
-      final betaTag =
+      const betaTag =
           TagInfo(raw: '(Beta 1)', content: 'Beta 1', type: TagType.build);
-      final versionTag =
+      const versionTag =
           TagInfo(raw: '(v1.0)', content: 'v1.0', type: TagType.version);
-      final discTag =
+      const discTag =
           TagInfo(raw: '(Disc 1)', content: 'Disc 1', type: TagType.disc);
-      final qualityTag =
+      const qualityTag =
           TagInfo(raw: '[b1]', content: 'b1', type: TagType.quality);
-      final secondaryTag = TagInfo(
+      const secondaryTag = TagInfo(
           raw: '(trunk, 34356M)',
           content: 'trunk, 34356M',
           type: TagType.secondary);

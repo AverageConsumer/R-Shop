@@ -606,6 +606,7 @@ class DownloadService {
 
   String _encodeUrl(String url) {
     final uri = Uri.parse(url);
+    // re-serialize with properly encoded path segments (no double-encoding)
     return uri.replace(pathSegments: uri.pathSegments).toString();
   }
 }

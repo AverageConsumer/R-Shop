@@ -22,7 +22,7 @@ class GlassOverlay extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
         child: Container(
           decoration: BoxDecoration(
-            color: tint.withOpacity(opacity),
+            color: tint.withValues(alpha: opacity),
           ),
           child: child,
         ),

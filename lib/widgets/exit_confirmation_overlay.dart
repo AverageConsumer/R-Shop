@@ -36,6 +36,7 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
   int _selectedIndex = 0; // 0 = Stay (Default), 1 = Exit
+  StateController<OverlayPriority>? _overlayNotifier;
 
   @override
   void initState() {
@@ -60,7 +61,8 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
     // Set overlay priority to dialog
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        ref.read(overlayPriorityProvider.notifier).state = OverlayPriority.dialog;
+        _overlayNotifier = ref.read(overlayPriorityProvider.notifier);
+        _overlayNotifier!.state = OverlayPriority.dialog;
         FocusScope.of(context).requestFocus(_focusNode);
       }
     });
@@ -70,13 +72,15 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
 
   @override
   void dispose() {
-    // Reset overlay priority
-    final controller = ref.read(overlayPriorityProvider.notifier);
-    Future(() {
-      if (controller.state == OverlayPriority.dialog) {
-        controller.state = OverlayPriority.none;
-      }
-    });
+    // Reset overlay priority using cached notifier (ref is invalid during unmount)
+    final notifier = _overlayNotifier;
+    if (notifier != null) {
+      Future(() {
+        if (notifier.state == OverlayPriority.dialog) {
+          notifier.state = OverlayPriority.none;
+        }
+      });
+    }
     _focusNode.dispose();
     _controller.dispose();
     super.dispose();
@@ -138,11 +142,11 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
                     color: const Color(0xFF1A1A1A),
                     borderRadius: BorderRadius.circular(rs.radius.lg),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
+                        color: Colors.black.withValues(alpha: 0.5),
                         blurRadius: 30,
                         offset: const Offset(0, 10),
                       ),
@@ -239,7 +243,7 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: color.withOpacity(0.4),
+                      color: color.withValues(alpha: 0.4),
                       blurRadius: 15,
                       spreadRadius: 2,
                     )

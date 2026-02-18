@@ -28,8 +28,8 @@ class VolumeSlider extends StatelessWidget {
         // Calculate opacity/color based on index for a gradient effect
         final opacity = isActive ? 0.6 + (index / totalBars) * 0.4 : 0.2;
         final color = isSelected
-            ? AppTheme.primaryColor.withOpacity(opacity)
-            : Colors.white.withOpacity(opacity);
+            ? AppTheme.primaryColor.withValues(alpha: opacity)
+            : Colors.white.withValues(alpha: opacity);
 
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -42,7 +42,7 @@ class VolumeSlider extends StatelessWidget {
             boxShadow: isActive && isSelected
                 ? [
                     BoxShadow(
-                      color: AppTheme.primaryColor.withOpacity(0.5),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.5),
                       blurRadius: 4,
                       spreadRadius: 0,
                     )

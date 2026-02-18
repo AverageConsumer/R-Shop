@@ -24,6 +24,7 @@ class DownloadItem {
   int? totalBytes;
   double? downloadSpeed;
   String? error;
+  int retryCount;
 
   DownloadItem({
     required this.id,
@@ -37,11 +38,13 @@ class DownloadItem {
     this.totalBytes,
     this.downloadSpeed,
     this.error,
+    this.retryCount = 0,
   }) : addedAt = addedAt ?? DateTime.now();
 
   String get displayText {
     switch (status) {
       case DownloadItemStatus.queued:
+        if (retryCount > 0) return 'Retrying ($retryCount/3)...';
         return 'Queued';
       case DownloadItemStatus.extracting:
         return 'Extracting...';
@@ -93,6 +96,7 @@ class DownloadItem {
     String? error,
     bool clearError = false,
     bool clearSpeed = false,
+    int? retryCount,
   }) {
     return DownloadItem(
       id: id,
@@ -106,6 +110,7 @@ class DownloadItem {
       totalBytes: totalBytes ?? this.totalBytes,
       downloadSpeed: clearSpeed ? null : (downloadSpeed ?? this.downloadSpeed),
       error: clearError ? null : (error ?? this.error),
+      retryCount: retryCount ?? this.retryCount,
     );
   }
 
@@ -121,6 +126,7 @@ class DownloadItem {
       'addedAt': addedAt.toIso8601String(),
       'status': status.index,
       'progress': progress,
+      'retryCount': retryCount,
     };
   }
 
@@ -140,6 +146,7 @@ class DownloadItem {
           ? DownloadItemStatus.values[json['status'] as int]
           : DownloadItemStatus.queued,
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
+      retryCount: (json['retryCount'] as int?) ?? 0,
     );
   }
 }

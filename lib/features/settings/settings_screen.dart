@@ -5,11 +5,14 @@ import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/screen_layout.dart';
 import '../../providers/app_providers.dart';
+import '../../providers/download_providers.dart';
 import '../../services/config_storage_service.dart';
 import '../../services/database_service.dart';
 import '../../services/image_cache_service.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
 import 'config_mode_screen.dart';
+// TODO: re-enable for next release
+// import 'romm_config_screen.dart';
 import 'widgets/settings_item.dart';
 import 'widgets/volume_slider.dart';
 
@@ -26,6 +29,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   late bool _soundEnabled;
   late double _bgmVolume;
   late double _sfxVolume;
+  late int _maxDownloads;
   bool _showResetConfirm = false;
   final FocusNode _hapticFocusNode = FocusNode();
 
@@ -45,6 +49,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     super.initState();
     final storage = ref.read(storageServiceProvider);
     _hapticEnabled = storage.getHapticEnabled();
+    _maxDownloads = storage.getMaxConcurrentDownloads();
     final soundSettings = ref.read(soundSettingsProvider);
     _soundEnabled = soundSettings.enabled;
     _bgmVolume = soundSettings.bgmVolume;
@@ -105,6 +110,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     await ref.read(soundSettingsProvider.notifier).setSfxVolume(clamped);
   }
 
+  void _adjustMaxDownloads(int delta) {
+    final newValue = (_maxDownloads + delta).clamp(1, 3);
+    if (newValue == _maxDownloads) return;
+    setState(() => _maxDownloads = newValue);
+    ref.read(downloadQueueManagerProvider).setMaxConcurrent(newValue);
+  }
+
+  // TODO: re-enable for next release
+  // void _openRommConfig() {
+  //   Navigator.push(
+  //     context,
+  //     MaterialPageRoute(builder: (context) => const RommConfigScreen()),
+  //   );
+  // }
+
   void _showResetDialog() {
     setState(() => _showResetConfirm = true);
   }
@@ -155,12 +175,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           // Background decoration
           Positioned.fill(
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFF1A1A1A),
+                    Color(0xFF1A1A1A),
                     Colors.black,
                   ],
                 ),
@@ -269,6 +289,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                           ),
 
                           SizedBox(height: rs.spacing.xl),
+                          _buildSectionHeader('Downloads', rs),
+
+                          _buildSettingsItemWrapper(
+                            onNavigate: (dir) {
+                              if (dir == GridDirection.left) {
+                                _adjustMaxDownloads(-1);
+                                ref.read(feedbackServiceProvider).tick();
+                                return true;
+                              } else if (dir == GridDirection.right) {
+                                _adjustMaxDownloads(1);
+                                ref.read(feedbackServiceProvider).tick();
+                                return true;
+                              }
+                              return false;
+                            },
+                            child: SettingsItem(
+                              title: 'Max Concurrent Downloads',
+                              subtitle: 'Number of simultaneous downloads',
+                              trailing: Text(
+                                '$_maxDownloads',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // TODO: re-enable for next release
+                          // SizedBox(height: rs.spacing.xl),
+                          // _buildSectionHeader('Connections', rs),
+                          //
+                          // SettingsItem(
+                          //   title: 'RomM Server',
+                          //   subtitle: 'Global RomM connection settings',
+                          //   trailing: const Icon(Icons.dns_outlined, color: Colors.white70),
+                          //   onTap: _openRommConfig,
+                          // ),
+
+                          SizedBox(height: rs.spacing.xl),
                           _buildSectionHeader('System', rs),
 
                           SettingsItem(
@@ -348,7 +409,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       padding: EdgeInsets.only(bottom: rs.spacing.sm, left: rs.spacing.xs),
       child: Text(
         title.toUpperCase(),
-        style: TextStyle(
+        style: const TextStyle(
           color: AppTheme.primaryColor,
           fontSize: 12,
           fontWeight: FontWeight.bold,
@@ -364,7 +425,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-           Icon(Icons.settings, size: 48, color: Colors.white24),
+           const Icon(Icons.settings, size: 48, color: Colors.white24),
            SizedBox(height: rs.spacing.sm),
            Text(
             'SETTINGS',

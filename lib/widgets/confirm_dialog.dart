@@ -59,11 +59,11 @@ class ConfirmDialog extends StatelessWidget {
     final messageFontSize = rs.isSmall ? 13.0 : rs.typography.bodySmall;
     final dialogPadding = rs.isSmall ? rs.spacing.md : rs.spacing.lg;
     final buttonPadding = rs.isSmall
-        ? EdgeInsets.symmetric(horizontal: 16, vertical: 10)
-        : EdgeInsets.symmetric(horizontal: 24, vertical: 12);
+        ? const EdgeInsets.symmetric(horizontal: 16, vertical: 10)
+        : const EdgeInsets.symmetric(horizontal: 24, vertical: 12);
 
     return Container(
-      color: Colors.black.withOpacity(0.7),
+      color: Colors.black.withValues(alpha: 0.7),
       child: Center(
         child: Container(
           margin: EdgeInsets.symmetric(horizontal: rs.spacing.xl),
@@ -73,7 +73,7 @@ class ConfirmDialog extends StatelessWidget {
             borderRadius: BorderRadius.circular(rs.radius.lg),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 blurRadius: 20,
               ),
             ],
@@ -161,10 +161,10 @@ class _DialogButton extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: padding,
         decoration: BoxDecoration(
-          color: isSelected ? color : color.withOpacity(0.2),
+          color: isSelected ? color : color.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(rs.radius.md),
           border: Border.all(
-            color: isSelected ? color : color.withOpacity(0.5),
+            color: isSelected ? color : color.withValues(alpha: 0.5),
             width: 2,
           ),
         ),

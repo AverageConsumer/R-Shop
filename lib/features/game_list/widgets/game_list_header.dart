@@ -6,11 +6,13 @@ import '../../../models/system_model.dart';
 class GameListHeader extends StatelessWidget {
   final SystemModel system;
   final int gameCount;
+  final bool hasActiveFilters;
 
   const GameListHeader({
     super.key,
     required this.system,
     required this.gameCount,
+    this.hasActiveFilters = false,
   });
 
   @override
@@ -93,6 +95,14 @@ class GameListHeader extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (hasActiveFilters) ...[
+                    Icon(
+                      Icons.filter_list,
+                      size: iconSize,
+                      color: system.accentColor,
+                    ),
+                    SizedBox(width: rs.isSmall ? 4 : 6),
+                  ],
                   Icon(
                     Icons.games,
                     size: iconSize,

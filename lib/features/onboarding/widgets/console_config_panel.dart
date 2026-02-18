@@ -8,11 +8,25 @@ import '../onboarding_controller.dart';
 import 'provider_form.dart';
 import 'provider_list_item.dart';
 
-class ConsoleConfigPanel extends ConsumerWidget {
+class ConsoleConfigPanel extends ConsumerStatefulWidget {
   const ConsoleConfigPanel({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ConsoleConfigPanel> createState() =>
+      _ConsoleConfigPanelState();
+}
+
+class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
+  final _folderFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _folderFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(onboardingControllerProvider);
     final controller = ref.read(onboardingControllerProvider.notifier);
     final system = state.selectedSystem;
@@ -51,7 +65,7 @@ class ConsoleConfigPanel extends ConsumerWidget {
               child: FocusTraversalGroup(
                 child: state.hasProviderForm
                     ? const ProviderForm()
-                    : _buildConfigBody(rs, system, sub, state, controller, ref),
+                    : _buildConfigBody(rs, system, sub, state, controller),
               ),
             ),
           ),
@@ -143,7 +157,6 @@ class ConsoleConfigPanel extends ConsumerWidget {
     ConsoleSetupState sub,
     OnboardingState state,
     OnboardingController controller,
-    WidgetRef ref,
   ) {
     final fontSize = rs.isSmall ? 12.0 : 14.0;
     final labelFontSize = rs.isSmall ? 10.0 : 12.0;
@@ -154,7 +167,7 @@ class ConsoleConfigPanel extends ConsumerWidget {
         // ROM Folder
         _buildSectionLabel('ROM FOLDER', labelFontSize),
         SizedBox(height: rs.spacing.sm),
-        _buildFolderRow(rs, sub, controller, ref, fontSize),
+        _buildFolderRow(rs, sub, controller, fontSize),
         SizedBox(height: rs.spacing.lg),
 
         // Auto-Extract toggle
@@ -299,25 +312,30 @@ class ConsoleConfigPanel extends ConsumerWidget {
     Responsive rs,
     ConsoleSetupState sub,
     OnboardingController controller,
-    WidgetRef ref,
     double fontSize,
   ) {
+    Future<void> pickFolder() async {
+      final path = await FilePicker.platform.getDirectoryPath();
+      if (path != null) {
+        controller.setTargetFolder(path);
+      }
+      // Delay focus restoration so it runs after the platform has fully
+      // restored window focus AND after ref.listen's postFrameCallback
+      // (which grabs screen-level focus) has already completed.
+      Future<void>.delayed(const Duration(milliseconds: 150), () {
+        if (_folderFocusNode.canRequestFocus) {
+          _folderFocusNode.requestFocus();
+        }
+      });
+    }
+
     return ConsoleFocusable(
       autofocus: true,
-      onSelect: () async {
-        final path = await FilePicker.platform.getDirectoryPath();
-        if (path != null) {
-          controller.setTargetFolder(path);
-        }
-      },
+      focusNode: _folderFocusNode,
+      onSelect: pickFolder,
       borderRadius: rs.radius.sm,
       child: GestureDetector(
-        onTap: () async {
-          final path = await FilePicker.platform.getDirectoryPath();
-          if (path != null) {
-            controller.setTargetFolder(path);
-          }
-        },
+        onTap: pickFolder,
         child: Container(
           constraints: const BoxConstraints(minHeight: 48),
           padding: EdgeInsets.symmetric(

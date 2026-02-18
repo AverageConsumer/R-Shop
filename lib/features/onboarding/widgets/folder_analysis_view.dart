@@ -163,16 +163,16 @@ class _FolderRow extends StatelessWidget {
 
   Widget _buildIcon() {
     if (isBeingCreated) {
-      return Icon(Icons.add_circle_outline, color: Colors.orange, size: 18);
+      return const Icon(Icons.add_circle_outline, color: Colors.orange, size: 18);
     }
     if (wasCreated) {
-      return Icon(Icons.check_circle, color: Colors.green, size: 18);
+      return const Icon(Icons.check_circle, color: Colors.green, size: 18);
     }
     if (folder.exists) {
       if (folder.gameCount > 0) {
-        return Icon(Icons.check_circle, color: Colors.green, size: 18);
+        return const Icon(Icons.check_circle, color: Colors.green, size: 18);
       } else {
-        return Icon(Icons.remove_circle_outline,
+        return const Icon(Icons.remove_circle_outline,
             color: Colors.orange, size: 18);
       }
     } else {

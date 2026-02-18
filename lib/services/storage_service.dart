@@ -12,6 +12,11 @@ class StorageService {
   static const _repoUrlKey = 'repo_url';
   static const _gridColumnsPrefix = 'grid_columns_';
   static const _showFullFilenameKey = 'show_full_filename';
+  static const _maxConcurrentDownloadsKey = 'max_concurrent_downloads';
+  static const _downloadQueueKey = 'download_queue';
+  static const _filterPrefix = 'filters_';
+  static const _rommUrlKey = 'romm_url';
+  static const _rommAuthKey = 'romm_auth';
   SharedPreferences? _prefs;
 
   Future<void> init() async {
@@ -101,5 +106,61 @@ class StorageService {
 
   Future<void> setShowFullFilename(bool value) async {
     await _prefs?.setBool(_showFullFilenameKey, value);
+  }
+
+  // --- Max Concurrent Downloads ---
+
+  int getMaxConcurrentDownloads() =>
+      _prefs?.getInt(_maxConcurrentDownloadsKey) ?? 2;
+
+  Future<void> setMaxConcurrentDownloads(int value) async {
+    await _prefs?.setInt(_maxConcurrentDownloadsKey, value);
+  }
+
+  // --- Download Queue Persistence ---
+
+  String? getDownloadQueue() => _prefs?.getString(_downloadQueueKey);
+
+  Future<void> setDownloadQueue(String json) async {
+    await _prefs?.setString(_downloadQueueKey, json);
+  }
+
+  Future<void> clearDownloadQueue() async {
+    await _prefs?.remove(_downloadQueueKey);
+  }
+
+  // --- Filter Persistence ---
+
+  String? getFilters(String systemId) =>
+      _prefs?.getString('$_filterPrefix$systemId');
+
+  Future<void> setFilters(String systemId, String json) async {
+    await _prefs?.setString('$_filterPrefix$systemId', json);
+  }
+
+  Future<void> removeFilters(String systemId) async {
+    await _prefs?.remove('$_filterPrefix$systemId');
+  }
+
+  // --- Global RomM Connection ---
+
+  String? getRommUrl() => _prefs?.getString(_rommUrlKey);
+
+  Future<void> setRommUrl(String? url) async {
+    if (url == null || url.isEmpty) {
+      await _prefs?.remove(_rommUrlKey);
+    } else {
+      await _prefs?.setString(_rommUrlKey, url);
+    }
+  }
+
+  String? getRommAuth() => _prefs?.getString(_rommAuthKey);
+
+  Future<void> setRommAuth(String? json) async {
+    if (json == null) {
+      await _prefs?.remove(_rommAuthKey);
+    } else {
+      await _prefs?.setString(_rommAuthKey, json);
+    }
   }
 }

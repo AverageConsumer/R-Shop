@@ -21,7 +21,7 @@ void main() {
     });
 
     test('Archive extension is replaced with system romExtensions.first', () {
-      final game = GameItem(
+      const game = GameItem(
         filename: 'Pokemon Emerald (USA).zip',
         displayName: 'Pokemon Emerald',
         url: 'https://example.com/pokemon.zip',
@@ -35,7 +35,7 @@ void main() {
     });
 
     test('7z extension is preserved (not extracted)', () {
-      final game = GameItem(
+      const game = GameItem(
         filename: 'Game Name (Japan).7z',
         displayName: 'Game Name',
         url: 'https://example.com/game.7z',
@@ -49,7 +49,7 @@ void main() {
     });
 
     test('RAR archive extension is replaced', () {
-      final game = GameItem(
+      const game = GameItem(
         filename: 'Another Game.rar',
         displayName: 'Another Game',
         url: 'https://example.com/game.rar',
@@ -62,7 +62,7 @@ void main() {
     });
 
     test('Non-archive extension is preserved', () {
-      final game = GameItem(
+      const game = GameItem(
         filename: 'Direct Game.gba',
         displayName: 'Direct Game',
         url: 'https://example.com/game.gba',
@@ -84,7 +84,7 @@ void main() {
         accentColor: Color(0xFF2196F3),
       );
 
-      final game = GameItem(
+      const game = GameItem(
         filename: 'Final Fantasy X (USA).iso',
         displayName: 'Final Fantasy X',
         url: 'https://example.com/ffx.iso',
@@ -99,7 +99,7 @@ void main() {
     });
 
     test('Case insensitive archive detection', () {
-      final game = GameItem(
+      const game = GameItem(
         filename: 'Game Name.ZIP',
         displayName: 'Game Name',
         url: 'https://example.com/game.ZIP',
@@ -114,7 +114,7 @@ void main() {
 
   group('RomManager path consistency', () {
     test('Same game produces same path regardless of call location', () {
-      final game = GameItem(
+      const game = GameItem(
         filename: 'Test Game (USA).zip',
         displayName: 'Test Game',
         url: 'https://example.com/test.zip',

@@ -26,9 +26,9 @@ class GameDetailController extends ChangeNotifier {
     required this.targetFolder,
     bool showFullFilename = false,
     RomManager? romManager,
-    DownloadQueueManager? queueManager,
+    required DownloadQueueManager queueManager,
   })  : _romManager = romManager ?? RomManager(),
-        _queueManager = queueManager ?? DownloadQueueManager() {
+        _queueManager = queueManager {
     _state = GameDetailState(showFullFilename: showFullFilename);
     checkInstallationStatus();
   }

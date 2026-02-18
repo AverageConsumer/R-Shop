@@ -187,7 +187,7 @@ class GameCard extends StatelessWidget {
                       right: 0,
                       child: Container(
                         height: rs.isSmall ? 2 : 3,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
                               Colors.transparent,

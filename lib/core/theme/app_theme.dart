@@ -11,8 +11,8 @@ class AppTheme {
   static const Color focusColor = Colors.white;
   static const Color focusGlowColor = primaryColor;
   
-  static final Color focusOverlayColor = Colors.white.withOpacity(0.1);
-  static final Color hoverOverlayColor = Colors.white.withOpacity(0.05);
+  static final Color focusOverlayColor = Colors.white.withValues(alpha: 0.1);
+  static final Color hoverOverlayColor = Colors.white.withValues(alpha: 0.05);
 
   // Spacing
   static const double spacingXs = 4.0;
@@ -86,7 +86,6 @@ class AppTheme {
       colorScheme: const ColorScheme.dark(
         primary: primaryColor,
         surface: surfaceColor,
-        background: backgroundColor,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: backgroundColor,
