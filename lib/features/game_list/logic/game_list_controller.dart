@@ -141,6 +141,14 @@ class GameListController extends ChangeNotifier {
           if (targetName != game.filename) {
             remoteTargetNames.add(targetName);
           }
+          // Multi-file archives extract to a folder with the stripped archive name
+          if (system.multiFileExtensions != null &&
+              system.multiFileExtensions!.isNotEmpty) {
+            final folderName = RomManager.extractGameName(game.filename);
+            if (folderName != null && folderName != game.filename) {
+              remoteTargetNames.add(folderName);
+            }
+          }
         }
 
         // Merge: remote wins on filename collision (has URL, cover, provider info)
@@ -212,6 +220,8 @@ class GameListController extends ChangeNotifier {
       final restored = ActiveFilters(
         selectedRegions: Set<String>.from(map['regions'] as List),
         selectedLanguages: Set<String>.from(map['languages'] as List),
+        favoritesOnly: map['favoritesOnly'] as bool? ?? false,
+        localOnly: map['localOnly'] as bool? ?? false,
       );
       if (restored.isNotEmpty) {
         _state = _state.copyWith(activeFilters: restored);
@@ -232,6 +242,8 @@ class GameListController extends ChangeNotifier {
       storage.setFilters(system.id, jsonEncode({
         'regions': filters.selectedRegions.toList(),
         'languages': filters.selectedLanguages.toList(),
+        'favoritesOnly': filters.favoritesOnly,
+        'localOnly': filters.localOnly,
       }));
     }
   }
@@ -274,6 +286,22 @@ class GameListController extends ChangeNotifier {
   void toggleLanguageFilter(String language) {
     _state = _state.copyWith(
       activeFilters: _state.activeFilters.toggleLanguage(language),
+    );
+    _applyFilters();
+    _saveFilters();
+  }
+
+  void toggleFavoritesFilter() {
+    _state = _state.copyWith(
+      activeFilters: _state.activeFilters.toggleFavoritesOnly(),
+    );
+    _applyFilters();
+    _saveFilters();
+  }
+
+  void toggleLocalFilter() {
+    _state = _state.copyWith(
+      activeFilters: _state.activeFilters.toggleLocalOnly(),
     );
     _applyFilters();
     _saveFilters();
@@ -329,6 +357,17 @@ class GameListController extends ChangeNotifier {
       final languages = _state.languageCache[game.filename];
       if (languages == null ||
           !languages.any((l) => filters.selectedLanguages.contains(l.code))) {
+        return false;
+      }
+    }
+
+    if (filters.favoritesOnly) {
+      final isFavorite = _storage?.getFavorites().contains(game.displayName) ?? false;
+      if (!isFavorite) return false;
+    }
+
+    if (filters.localOnly) {
+      if (_state.installedCache[game.displayName] != true) {
         return false;
       }
     }

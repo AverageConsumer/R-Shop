@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/responsive/responsive.dart';
-import '../providers/download_providers.dart';
+import '../providers/app_providers.dart';
 import 'control_button.dart';
-import 'download_overlay.dart';
 
 class HudAction {
   const HudAction(this.action, {this.onTap, this.highlight = false});
@@ -18,11 +17,10 @@ class HudAction {
 /// Set [embedded] to true when used inside a modal (no Positioned wrapper).
 ///
 /// Slots are rendered in fixed Switch-convention order (left to right):
-/// [D-pad] [−] [+] [Y] [X] [B] [A]  [Downloads]
+/// [D-pad] [L] [R] [ZL] [ZR] [−] [+] [Y] [X] [B] [A]  [Downloads]
 class ConsoleHud extends ConsumerWidget {
-  final HudAction? a, b, x, y, start, select;
+  final HudAction? a, b, x, y, start, select, lb, rb, lt, rt;
   final ({String label, String action})? dpad;
-  final bool showDownloads;
   final bool embedded;
 
   const ConsoleHud({
@@ -33,20 +31,75 @@ class ConsoleHud extends ConsumerWidget {
     this.y,
     this.start,
     this.select,
+    this.lb,
+    this.rb,
+    this.lt,
+    this.rt,
     this.dpad,
-    this.showDownloads = true,
     this.embedded = false,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final buttons = <Widget>[];
+    final layout = ref.watch(controllerLayoutProvider);
 
-    // Fixed order: dpad, select(−), start(+), Y, X, B, A
+    // Xbox and PlayStation swap positions (confirm = bottom, back = right)
+    final bool swapPositions = layout != ControllerLayout.nintendo;
+    final displayA = swapPositions ? b : a;
+    final displayB = swapPositions ? a : b;
+    final displayX = swapPositions ? y : x;
+    final displayY = swapPositions ? x : y;
+
+    final (labelA, labelB, labelX, labelY) = switch (layout) {
+      ControllerLayout.nintendo => ('A', 'B', 'X', 'Y'),
+      ControllerLayout.xbox => ('B', 'A', 'Y', 'X'),
+      ControllerLayout.playstation => ('○', '✕', '△', '□'),
+    };
+
+    final (labelLB, labelRB, labelLT, labelRT) = switch (layout) {
+      ControllerLayout.nintendo => ('L', 'R', 'ZL', 'ZR'),
+      ControllerLayout.xbox => ('LB', 'RB', 'LT', 'RT'),
+      ControllerLayout.playstation => ('L1', 'R1', 'L2', 'R2'),
+    };
+
+    // Fixed order: dpad, LB, RB, select(−), start(+), Y, X, B, A
     if (dpad != null) {
       buttons.add(ControlButton(
         label: dpad!.label,
         action: dpad!.action,
+      ));
+    }
+    if (lb != null) {
+      buttons.add(ControlButton(
+        label: labelLB,
+        action: lb!.action,
+        onTap: lb!.onTap,
+        highlight: lb!.highlight,
+      ));
+    }
+    if (rb != null) {
+      buttons.add(ControlButton(
+        label: labelRB,
+        action: rb!.action,
+        onTap: rb!.onTap,
+        highlight: rb!.highlight,
+      ));
+    }
+    if (lt != null) {
+      buttons.add(ControlButton(
+        label: labelLT,
+        action: lt!.action,
+        onTap: lt!.onTap,
+        highlight: lt!.highlight,
+      ));
+    }
+    if (rt != null) {
+      buttons.add(ControlButton(
+        label: labelRT,
+        action: rt!.action,
+        onTap: rt!.onTap,
+        highlight: rt!.highlight,
       ));
     }
     if (select != null) {
@@ -65,47 +118,36 @@ class ConsoleHud extends ConsumerWidget {
         highlight: start!.highlight,
       ));
     }
-    if (y != null) {
+    if (displayY != null) {
       buttons.add(ControlButton(
-        label: 'Y',
-        action: y!.action,
-        onTap: y!.onTap,
-        highlight: y!.highlight,
+        label: labelY,
+        action: displayY.action,
+        onTap: displayY.onTap,
+        highlight: displayY.highlight,
       ));
     }
-    if (x != null) {
+    if (displayX != null) {
       buttons.add(ControlButton(
-        label: 'X',
-        action: x!.action,
-        onTap: x!.onTap,
-        highlight: x!.highlight,
+        label: labelX,
+        action: displayX.action,
+        onTap: displayX.onTap,
+        highlight: displayX.highlight,
       ));
     }
-    if (b != null) {
+    if (displayB != null) {
       buttons.add(ControlButton(
-        label: 'B',
-        action: b!.action,
-        onTap: b!.onTap,
-        highlight: b!.highlight,
+        label: labelB,
+        action: displayB.action,
+        onTap: displayB.onTap,
+        highlight: displayB.highlight,
       ));
     }
-    if (a != null) {
+    if (displayA != null) {
       buttons.add(ControlButton(
-        label: 'A',
-        action: a!.action,
-        onTap: a!.onTap,
-        highlight: a!.highlight,
-      ));
-    }
-
-    // Auto-inject downloads button
-    if (showDownloads && ref.watch(downloadCountProvider) > 0) {
-      buttons.add(ControlButton(
-        label: '',
-        action: 'Downloads',
-        icon: Icons.play_arrow_rounded,
-        highlight: true,
-        onTap: () => toggleDownloadOverlay(ref),
+        label: labelA,
+        action: displayA.action,
+        onTap: displayA.onTap,
+        highlight: displayA.highlight,
       ));
     }
 

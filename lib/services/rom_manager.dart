@@ -48,11 +48,6 @@ class RomManager {
       }
     }
 
-    final parenIndex = name.indexOf('(');
-    if (parenIndex > 0) {
-      name = name.substring(0, parenIndex).trim();
-    }
-
     name = name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
     name = name.replaceAll(RegExp(r'\s+'), ' ').trim();
 
@@ -70,39 +65,46 @@ class RomManager {
       ...system.romExtensions.map((e) => e.toLowerCase()),
       ..._archiveExtensions,
     ];
-    final multiExts = system.multiFileExtensions
-            ?.map((e) => e.toLowerCase())
-            .toList() ??
-        [];
+    final multiExts =
+        system.multiFileExtensions?.map((e) => e.toLowerCase()).toList() ?? [];
 
+    final dirNames = <String>{};
     final games = <GameItem>[];
     final entities = await dir.list().toList();
 
+    // Pass 1: Directories containing ROM files (multi-file or single ROM in subfolder)
+    final subDirExts = {
+      ...system.romExtensions.map((e) => e.toLowerCase()),
+      ...multiExts,
+    };
     for (final entity in entities) {
+      if (entity is! Directory) continue;
       final name = p.basename(entity.path);
-
-      if (entity is File) {
-        final ext = p.extension(name).toLowerCase();
-        if (allExtensions.contains(ext)) {
-          games.add(GameItem(
-            filename: name,
-            displayName: GameItem.cleanDisplayName(name),
-            url: '',
-          ));
-        }
-      } else if (entity is Directory && multiExts.isNotEmpty) {
-        final subFiles = entity.listSync();
-        final hasMatchingFile = subFiles.any((f) =>
-            f is File &&
-            multiExts.contains(p.extension(f.path).toLowerCase()));
-        if (hasMatchingFile) {
-          games.add(GameItem(
-            filename: name,
-            displayName: GameItem.cleanDisplayName(name),
-            url: '',
-          ));
-        }
+      final subFiles = entity.listSync();
+      final hasMatchingFile = subFiles.any((f) =>
+          f is File && subDirExts.contains(p.extension(f.path).toLowerCase()));
+      if (hasMatchingFile) {
+        dirNames.add(name);
+        games.add(GameItem(
+          filename: name,
+          displayName: GameItem.cleanDisplayName(name),
+          url: '',
+        ));
       }
+    }
+
+    // Pass 2: Individual files (skip if a multi-file dir with same base name exists)
+    for (final entity in entities) {
+      if (entity is! File) continue;
+      final name = p.basename(entity.path);
+      final ext = p.extension(name).toLowerCase();
+      if (!allExtensions.contains(ext)) continue;
+      if (dirNames.contains(p.basenameWithoutExtension(name))) continue;
+      games.add(GameItem(
+        filename: name,
+        displayName: GameItem.cleanDisplayName(name),
+        url: '',
+      ));
     }
 
     games.sort((a, b) =>
@@ -110,28 +112,28 @@ class RomManager {
     return games;
   }
 
-  Future<bool> exists(GameItem game, SystemModel system, String targetFolder) async {
+  Future<bool> exists(
+      GameItem game, SystemModel system, String targetFolder) async {
     final directPath = getTargetPath(game, system, targetFolder);
     if (await File(directPath).exists()) {
       return true;
     }
 
-    if (system.multiFileExtensions != null &&
-        system.multiFileExtensions!.isNotEmpty) {
-      final gameName = extractGameName(game.filename);
-      if (gameName != null) {
-        final subfolderPath = _safePath(targetFolder, gameName);
-        final subfolder = Directory(subfolderPath);
-        if (await subfolder.exists()) {
-          final files = subfolder.listSync();
-          for (final file in files) {
-            if (file is File) {
-              final ext = '.${file.path.split('.').last.toLowerCase()}';
-              if (system.multiFileExtensions!
-                  .map((e) => e.toLowerCase())
-                  .contains(ext)) {
-                return true;
-              }
+    final gameName = extractGameName(game.filename);
+    if (gameName != null) {
+      final subfolderPath = _safePath(targetFolder, gameName);
+      final subfolder = Directory(subfolderPath);
+      if (await subfolder.exists()) {
+        final validExts = {
+          ...system.romExtensions.map((e) => e.toLowerCase()),
+          ...?system.multiFileExtensions?.map((e) => e.toLowerCase()),
+        };
+        final files = subfolder.listSync();
+        for (final file in files) {
+          if (file is File) {
+            final ext = p.extension(file.path).toLowerCase();
+            if (validExts.contains(ext)) {
+              return true;
             }
           }
         }
@@ -153,7 +155,8 @@ class RomManager {
     return result;
   }
 
-  Future<void> delete(GameItem game, SystemModel system, String targetFolder) async {
+  Future<void> delete(
+      GameItem game, SystemModel system, String targetFolder) async {
     final path = getTargetPath(game, system, targetFolder);
     final file = File(path);
     if (await file.exists()) {
@@ -161,15 +164,12 @@ class RomManager {
       return;
     }
 
-    if (system.multiFileExtensions != null &&
-        system.multiFileExtensions!.isNotEmpty) {
-      final gameName = extractGameName(game.filename);
-      if (gameName != null) {
-        final subfolderPath = _safePath(targetFolder, gameName);
-        final subfolder = Directory(subfolderPath);
-        if (await subfolder.exists()) {
-          await subfolder.delete(recursive: true);
-        }
+    final gameName = extractGameName(game.filename);
+    if (gameName != null) {
+      final subfolderPath = _safePath(targetFolder, gameName);
+      final subfolder = Directory(subfolderPath);
+      if (await subfolder.exists()) {
+        await subfolder.delete(recursive: true);
       }
     }
   }

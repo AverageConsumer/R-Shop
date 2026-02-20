@@ -4,6 +4,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/sound_settings.dart';
 
+enum ControllerLayout { nintendo, xbox, playstation }
+
 class StorageService {
   static const _romPathKey = 'rom_path';
   static const _hapticEnabledKey = 'haptic_enabled';
@@ -17,6 +19,10 @@ class StorageService {
   static const _filterPrefix = 'filters_';
   static const _rommUrlKey = 'romm_url';
   static const _rommAuthKey = 'romm_auth';
+  static const _favoritesKey = 'favorite_games';
+  static const _xboxLayoutKey = 'xbox_layout'; // legacy bool key
+  static const _controllerLayoutKey = 'controller_layout';
+  static const _homeLayoutKey = 'home_layout';
   SharedPreferences? _prefs;
 
   Future<void> init() async {
@@ -162,5 +168,57 @@ class StorageService {
     } else {
       await _prefs?.setString(_rommAuthKey, json);
     }
+  }
+
+  // --- Favorites Persistence ---
+
+  List<String> getFavorites() {
+    return _prefs?.getStringList(_favoritesKey) ?? [];
+  }
+
+  Future<void> setFavorites(List<String> favorites) async {
+    await _prefs?.setStringList(_favoritesKey, favorites);
+  }
+
+  Future<void> toggleFavorite(String gameId) async {
+    final favorites = getFavorites();
+    if (favorites.contains(gameId)) {
+      favorites.remove(gameId);
+    } else {
+      favorites.add(gameId);
+    }
+    await _prefs?.setStringList(_favoritesKey, favorites);
+  }
+
+  bool isFavorite(String gameId) {
+    return getFavorites().contains(gameId);
+  }
+
+  // Controller Layout
+  ControllerLayout getControllerLayout() {
+    final stored = _prefs?.getString(_controllerLayoutKey);
+    if (stored != null) {
+      return ControllerLayout.values.firstWhere(
+        (e) => e.name == stored,
+        orElse: () => ControllerLayout.nintendo,
+      );
+    }
+    // Migration: read old bool key
+    final oldBool = _prefs?.getBool(_xboxLayoutKey);
+    if (oldBool == true) return ControllerLayout.xbox;
+    return ControllerLayout.nintendo;
+  }
+
+  Future<void> setControllerLayout(ControllerLayout layout) async {
+    await _prefs?.setString(_controllerLayoutKey, layout.name);
+  }
+
+  // Home Layout
+  bool getHomeLayoutIsGrid() {
+    return _prefs?.getBool(_homeLayoutKey) ?? false;
+  }
+
+  Future<void> setHomeLayoutIsGrid(bool value) async {
+    await _prefs?.setBool(_homeLayoutKey, value);
   }
 }

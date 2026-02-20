@@ -43,3 +43,8 @@ class TabLeftIntent extends Intent {
 class TabRightIntent extends Intent {
   const TabRightIntent();
 }
+
+class FavoriteIntent extends Intent {
+  const FavoriteIntent();
+}
+

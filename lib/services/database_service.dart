@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -182,6 +183,56 @@ class DatabaseService {
         .toList();
   }
 
+  Future<List<Map<String, dynamic>>> getAllGames({
+    String? orderBy,
+    String? searchQuery,
+    List<String>? systemSlugs,
+  }) async {
+    final db = await database;
+    String? where;
+    List<dynamic>? whereArgs;
+
+    final conditions = <String>[];
+    final args = <dynamic>[];
+
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      conditions.add('displayName LIKE ?');
+      args.add('%$searchQuery%');
+    }
+    if (systemSlugs != null && systemSlugs.isNotEmpty) {
+      final placeholders = List.filled(systemSlugs.length, '?').join(', ');
+      conditions.add('systemSlug IN ($placeholders)');
+      args.addAll(systemSlugs);
+    }
+
+    if (conditions.isNotEmpty) {
+      where = conditions.join(' AND ');
+      whereArgs = args;
+    }
+
+    return db.query(
+      _tableName,
+      where: where,
+      whereArgs: whereArgs,
+      orderBy: orderBy ?? 'displayName ASC',
+    );
+  }
+
+  Future<Set<String>> getAllSystemSlugs() async {
+    final db = await database;
+    final result = await db.query(
+      _tableName,
+      columns: ['DISTINCT systemSlug'],
+    );
+    return result.map((r) => r['systemSlug'] as String).toSet();
+  }
+
+  Future<int> getGameCount() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM $_tableName');
+    return result.first['count'] as int;
+  }
+
   Future<bool> hasCache(String systemSlug) async {
     final db = await database;
     final result = await db.query(
@@ -203,7 +254,8 @@ class DatabaseService {
     try {
       return ProviderConfig.fromJson(
           jsonDecode(json) as Map<String, dynamic>);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Failed to decode provider config: $e');
       return null;
     }
   }

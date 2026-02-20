@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app_intents.dart';
 import '../../providers/app_providers.dart';
-import '../../widgets/download_overlay.dart';
 
 bool _noOverlayActive(WidgetRef ref) =>
     ref.read(overlayPriorityProvider) == OverlayPriority.none;
@@ -44,7 +43,6 @@ class ConfirmAction extends Action<ConfirmIntent> {
   Object? invoke(ConfirmIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
     if (onConfirm != null) {
-      ref.read(feedbackServiceProvider).confirm();
       onConfirm!();
       return null;
     }
@@ -68,8 +66,6 @@ class SearchAction extends Action<SearchIntent> {
   Object? invoke(SearchIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
 
-    ref.read(feedbackServiceProvider).tick();
-
     if (onSearch != null) {
       onSearch!();
     } else {
@@ -82,14 +78,14 @@ class SearchAction extends Action<SearchIntent> {
 
 class ToggleOverlayAction extends Action<ToggleOverlayIntent> {
   final WidgetRef ref;
+  final VoidCallback? onToggle;
 
-  ToggleOverlayAction(this.ref);
+  ToggleOverlayAction(this.ref, {this.onToggle});
 
   @override
   Object? invoke(ToggleOverlayIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
-    ref.read(feedbackServiceProvider).tick();
-    toggleDownloadOverlay(ref);
+    onToggle?.call();
     return null;
   }
 }
@@ -152,7 +148,6 @@ class AdjustColumnsAction extends Action<AdjustColumnsIntent> {
   Object? invoke(AdjustColumnsIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
 
-    ref.read(feedbackServiceProvider).tick();
     onAdjust?.call(intent.increase);
     return null;
   }
@@ -171,7 +166,6 @@ class InfoAction extends Action<InfoIntent> {
   Object? invoke(InfoIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
 
-    ref.read(feedbackServiceProvider).tick();
     onInfo?.call();
     return null;
   }
@@ -190,7 +184,6 @@ class MenuAction extends Action<MenuIntent> {
   Object? invoke(MenuIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
 
-    ref.read(feedbackServiceProvider).tick();
     onMenu?.call();
     return null;
   }
@@ -210,7 +203,6 @@ class TabLeftAction extends Action<TabLeftIntent> {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
 
     if (onTabLeft != null) {
-      ref.read(feedbackServiceProvider).tick();
       onTabLeft!();
     }
     return null;
@@ -231,8 +223,27 @@ class TabRightAction extends Action<TabRightIntent> {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
 
     if (onTabRight != null) {
-      ref.read(feedbackServiceProvider).tick();
       onTabRight!();
+    }
+    return null;
+  }
+}
+
+class FavoriteAction extends Action<FavoriteIntent> {
+  final WidgetRef ref;
+  final VoidCallback? onFavorite;
+
+  FavoriteAction(this.ref, {this.onFavorite});
+
+  @override
+  bool isEnabled(FavoriteIntent intent) => _noOverlayActive(ref);
+
+  @override
+  Object? invoke(FavoriteIntent intent) {
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
+
+    if (onFavorite != null) {
+      onFavorite!();
     }
     return null;
   }
@@ -251,7 +262,7 @@ class AppShortcuts {
     const SingleActivator(LogicalKeyboardKey.enter, includeRepeats: false): const ConfirmIntent(),
     const SingleActivator(LogicalKeyboardKey.numpadEnter, includeRepeats: false): const ConfirmIntent(),
     const SingleActivator(LogicalKeyboardKey.space, includeRepeats: false): const ConfirmIntent(),
-    const SingleActivator(LogicalKeyboardKey.gameButtonSelect, includeRepeats: false): const ConfirmIntent(),
+    const SingleActivator(LogicalKeyboardKey.gameButtonSelect, includeRepeats: false): const FavoriteIntent(),
 
     // Search (no repeat)
     const SingleActivator(LogicalKeyboardKey.gameButtonY, includeRepeats: false): const SearchIntent(),
@@ -276,5 +287,9 @@ class AppShortcuts {
 
     // Info (no repeat)
     const SingleActivator(LogicalKeyboardKey.gameButtonX, includeRepeats: false): const InfoIntent(),
+
+    // Favorite (no repeat)
+    const SingleActivator(LogicalKeyboardKey.gameButtonRight2, includeRepeats: false): const FavoriteIntent(),
+    const SingleActivator(LogicalKeyboardKey.keyF, includeRepeats: false): const FavoriteIntent(),
   };
 }

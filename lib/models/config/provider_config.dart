@@ -97,6 +97,24 @@ class ProviderConfig {
     }
   }
 
+  String get hostLabel {
+    switch (type) {
+      case ProviderType.web:
+      case ProviderType.romm:
+        if (url == null) return '';
+        final uri = Uri.tryParse(url!);
+        return uri?.host ?? '';
+      case ProviderType.ftp:
+      case ProviderType.smb:
+        return host ?? '';
+    }
+  }
+
+  String get detailLabel {
+    final h = hostLabel;
+    return h.isEmpty ? shortLabel : '$shortLabel · $h';
+  }
+
   /// Validates this config. Returns null if valid, or an error message.
   String? validate() {
     switch (type) {

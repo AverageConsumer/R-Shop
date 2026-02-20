@@ -6,12 +6,14 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/screen_layout.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
+import '../../widgets/download_overlay.dart';
 import '../../services/config_storage_service.dart';
 import '../../services/database_service.dart';
 import '../../services/image_cache_service.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
+import '../../widgets/quick_menu.dart';
 import 'config_mode_screen.dart';
 import 'romm_config_screen.dart';
 import 'widgets/settings_item.dart';
@@ -32,7 +34,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   late double _sfxVolume;
   late int _maxDownloads;
   bool _showResetConfirm = false;
+  bool _showQuickMenu = false;
   final FocusNode _hapticFocusNode = FocusNode();
+  final FocusNode _layoutFocusNode = FocusNode();
+  final FocusNode _homeLayoutFocusNode = FocusNode();
 
   @override
   String get routeId => 'settings';
@@ -43,6 +48,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           _exitSettings();
           return null;
         }),
+        InfoIntent: InfoAction(ref, onInfo: _showResetDialog),
+        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _toggleQuickMenu),
       };
 
   @override
@@ -58,13 +65,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(mainFocusRequestProvider.notifier).state = screenFocusNode;
-      _hapticFocusNode.requestFocus();
+      _homeLayoutFocusNode.requestFocus();
     });
   }
 
   @override
   void dispose() {
     _hapticFocusNode.dispose();
+    _layoutFocusNode.dispose();
+    _homeLayoutFocusNode.dispose();
     super.dispose();
   }
 
@@ -126,6 +135,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   }
 
   void _showResetDialog() {
+    ref.read(feedbackServiceProvider).tick();
     setState(() => _showResetConfirm = true);
   }
 
@@ -155,6 +165,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     Navigator.pop(context);
   }
 
+  void _toggleQuickMenu() {
+    if (_showQuickMenu) return;
+    if (ref.read(overlayPriorityProvider) != OverlayPriority.none) return;
+    ref.read(feedbackServiceProvider).tick();
+    setState(() => _showQuickMenu = true);
+  }
+
+  void _closeQuickMenu() {
+    setState(() => _showQuickMenu = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) requestScreenFocus();
+    });
+  }
+
+  List<QuickMenuItem> _buildQuickMenuItems() {
+    final hasDownloads = ref.read(hasQueueItemsProvider);
+    return [
+      QuickMenuItem(
+        label: 'Reset App',
+        icon: Icons.restart_alt_rounded,
+        shortcutHint: 'X',
+        onSelect: _showResetDialog,
+      ),
+      if (hasDownloads)
+        QuickMenuItem(
+          label: 'Downloads',
+          icon: Icons.download_rounded,
+          onSelect: () => toggleDownloadOverlay(ref),
+          highlight: true,
+        ),
+    ];
+  }
+
   void _openConfigMode() {
     Navigator.push(
       context,
@@ -162,9 +205,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     );
   }
 
+  void _cycleLayout() {
+    ref.read(feedbackServiceProvider).tick();
+    ref.read(controllerLayoutProvider.notifier).cycle();
+  }
+
+  void _toggleHomeLayout() {
+    ref.read(feedbackServiceProvider).tick();
+    ref.read(homeLayoutProvider.notifier).toggle();
+  }
+
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+    final controllerLayout = ref.watch(controllerLayoutProvider);
+    final isHomeGrid = ref.watch(homeLayoutProvider);
 
     return buildWithActions(
       PopScope(
@@ -211,6 +266,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                         ),
                         children: [
                           _buildSectionHeader('Preferences', rs),
+                          _buildSettingsItemWrapper(
+                            onNavigate: (dir) {
+                              if (dir == GridDirection.left || dir == GridDirection.right) {
+                                _toggleHomeLayout();
+                                return true;
+                              }
+                              return false;
+                            },
+                            child: SettingsItem(
+                              focusNode: _homeLayoutFocusNode,
+                              title: 'Home Screen Layout',
+                              subtitle: isHomeGrid ? 'Grid View' : 'Horizontal Carousel',
+                              trailing: _buildSwitch(isHomeGrid),
+                              onTap: _toggleHomeLayout,
+                            ),
+                          ),
+                          SizedBox(height: rs.spacing.md),
+                          _buildSettingsItemWrapper(
+                            onNavigate: (dir) {
+                              if (dir == GridDirection.left || dir == GridDirection.right) {
+                                _cycleLayout();
+                                return true;
+                              }
+                              return false;
+                            },
+                            child: SettingsItem(
+                              focusNode: _layoutFocusNode,
+                              title: 'Controller Layout',
+                              subtitle: switch (controllerLayout) {
+                                ControllerLayout.nintendo => 'Nintendo (default)',
+                                ControllerLayout.xbox => 'Xbox (A/B & X/Y swapped)',
+                                ControllerLayout.playstation => 'PlayStation (✕ ○ □ △)',
+                              },
+                              trailing: _buildLayoutLabel(controllerLayout),
+                              onTap: _cycleLayout,
+                            ),
+                          ),
+                          SizedBox(height: rs.spacing.md),
                           _buildSettingsItemWrapper(
                             onNavigate: (dir) {
                               if (dir == GridDirection.left || dir == GridDirection.right) {
@@ -391,14 +484,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   ),
                 ),
               ),
-              ConsoleHud(
-                b: HudAction('Back', onTap: _exitSettings),
-                x: HudAction('Reset', onTap: _showResetDialog),
-                showDownloads: false,
-                embedded: true,
-              ),
+              if (!_showQuickMenu)
+                ConsoleHud(
+                  b: HudAction('Back', onTap: _exitSettings),
+                  start: HudAction('Menu', onTap: _toggleQuickMenu),
+                  embedded: true,
+                ),
             ],
           ),
+
+          if (_showQuickMenu)
+            QuickMenuOverlay(
+              items: _buildQuickMenuItems(),
+              onClose: _closeQuickMenu,
+            ),
 
           if (_showResetConfirm)
              ExitConfirmationOverlay(
@@ -444,6 +543,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLayoutLabel(ControllerLayout layout) {
+    final label = switch (layout) {
+      ControllerLayout.nintendo => 'NIN',
+      ControllerLayout.xbox => 'XBOX',
+      ControllerLayout.playstation => 'PS',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppTheme.primaryColor.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppTheme.primaryColor,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1,
         ),
       ),
     );

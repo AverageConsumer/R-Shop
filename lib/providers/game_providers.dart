@@ -31,11 +31,15 @@ final gamesProvider =
 
 /// Systems visible on the home screen.
 ///
-/// Hides consoles that have no providers (local-only) AND no local files in
-/// their target folder. They reappear once a provider is added or a file is
-/// placed in the folder.
+/// Hides consoles that have no providers configured (local-only systems)
+/// AND have no local files in their target folder. They reappear once a
+/// provider is added or a file is placed in the folder.
 final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
   final config = await ref.watch(bootstrappedConfigProvider.future);
+  
+  // If no systems configured at all, return empty
+  if (config.systems.isEmpty) return [];
+
   final configuredIds = config.systems.map((s) => s.id).toSet();
   final configured = SystemModel.supportedSystems
       .where((s) => configuredIds.contains(s.id))
@@ -46,25 +50,35 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
     final sysConfig = config.systemById(system.id);
     if (sysConfig == null) continue;
 
-    // Has remote providers → always visible
+    // Has remote providers configured → always visible
     if (sysConfig.providers.isNotEmpty) {
       visible.add(system);
       continue;
     }
 
-    // Local-only: visible only if targetFolder contains ROM files
+    // Local-only: visible only if targetFolder actually exists and contains ROM files
     final dir = Directory(sysConfig.targetFolder);
     if (await dir.exists()) {
-      final romExts = {
-        ...system.romExtensions.map((e) => e.toLowerCase()),
-        '.zip',
-        '.rar',
-      };
-      final hasRoms = await dir.list().any((entity) {
-        if (entity is! File) return false;
-        final name = entity.path.toLowerCase();
-        return romExts.any((ext) => name.endsWith(ext));
-      });
+      final romExts = system.romExtensions.map((e) => e.toLowerCase()).toList();
+      
+      // Standard extra extensions for archives
+      romExts.addAll(['.zip', '.rar', '.7z']);
+
+      bool hasRoms = false;
+      try {
+        await for (final entity in dir.list(followLinks: false)) {
+          if (entity is File) {
+            final name = entity.path.toLowerCase();
+            if (romExts.any((ext) => name.endsWith(ext))) {
+              hasRoms = true;
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore permission or access errors when scanning directory
+      }
+      
       if (hasRoms) {
         visible.add(system);
       }

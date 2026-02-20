@@ -17,6 +17,9 @@ import '../game_detail/game_detail_screen.dart';
 import 'logic/focus_sync_manager.dart';
 import 'logic/game_list_controller.dart';
 import '../../widgets/console_hud.dart';
+import '../../widgets/download_overlay.dart';
+import '../../widgets/quick_menu.dart';
+import '../../providers/download_providers.dart';
 import 'widgets/dynamic_background.dart';
 import 'widgets/game_grid.dart';
 import 'widgets/game_list_header.dart';
@@ -52,6 +55,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   bool _isSearchFocused = false;
   bool _isClosingSearch = false;
   bool _isFiltering = false;
+  bool _showQuickMenu = false;
 
   late int _columns;
   double _lastPinchScale = 1.0;
@@ -59,6 +63,23 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
   @override
   String get routeId => 'game_list_${widget.system.name}';
+
+  @override
+  Map<ShortcutActivator, Intent>? get additionalShortcuts => {
+        // LB = Zoom Out (more columns), RB = Zoom In (fewer columns)
+        const SingleActivator(LogicalKeyboardKey.gameButtonLeft1,
+                includeRepeats: false):
+            const AdjustColumnsIntent(increase: true),
+        const SingleActivator(LogicalKeyboardKey.gameButtonRight1,
+                includeRepeats: false):
+            const AdjustColumnsIntent(increase: false),
+        const SingleActivator(LogicalKeyboardKey.pageUp,
+                includeRepeats: false):
+            const AdjustColumnsIntent(increase: true),
+        const SingleActivator(LogicalKeyboardKey.pageDown,
+                includeRepeats: false):
+            const AdjustColumnsIntent(increase: false),
+      };
 
   @override
   Map<Type, Action<Intent>> get screenActions => {
@@ -83,6 +104,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
             return null;
           },
         ),
+        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _toggleQuickMenu),
       };
 
   @override
@@ -203,6 +225,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   }
 
   void _openSearch() {
+    ref.read(feedbackServiceProvider).tick();
     if (_isFiltering) setState(() => _isFiltering = false);
     _searchController.clear();
     _controller.resetFilter();
@@ -241,6 +264,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   }
 
   void _toggleFilter() {
+    ref.read(feedbackServiceProvider).tick();
     if (_isFiltering) {
       _closeFilter();
     } else {
@@ -374,6 +398,58 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     }
   }
 
+  void _toggleQuickMenu() {
+    if (_showQuickMenu) return;
+    if (ref.read(overlayPriorityProvider) != OverlayPriority.none) return;
+    ref.read(feedbackServiceProvider).tick();
+    setState(() => _showQuickMenu = true);
+  }
+
+  void _closeQuickMenu() {
+    setState(() => _showQuickMenu = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) requestScreenFocus();
+    });
+  }
+
+  List<QuickMenuItem> _buildQuickMenuItems() {
+    final state = _controller.state;
+    final hasDownloads = ref.read(hasQueueItemsProvider);
+    return [
+      QuickMenuItem(
+        label: 'Search',
+        icon: Icons.search_rounded,
+        shortcutHint: 'Y',
+        onSelect: _openSearch,
+      ),
+      QuickMenuItem(
+        label: state.activeFilters.isNotEmpty ? 'Filter (active)' : 'Filter',
+        icon: Icons.filter_list_rounded,
+        shortcutHint: 'X',
+        onSelect: _toggleFilter,
+      ),
+      QuickMenuItem(
+        label: 'Zoom In',
+        icon: Icons.zoom_in_rounded,
+        shortcutHint: 'R',
+        onSelect: () => _adjustColumns(false),
+      ),
+      QuickMenuItem(
+        label: 'Zoom Out',
+        icon: Icons.zoom_out_rounded,
+        shortcutHint: 'L',
+        onSelect: () => _adjustColumns(true),
+      ),
+      if (hasDownloads)
+        QuickMenuItem(
+          label: 'Downloads',
+          icon: Icons.download_rounded,
+          onSelect: () => toggleDownloadOverlay(ref),
+          highlight: true,
+        ),
+    ];
+  }
+
   void _openSelectedGame() {
     final state = _controller.state;
     final selectedIndex = _focusManager.selectedIndex;
@@ -488,37 +564,37 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
               _buildNormalContent(state, topPadding),
               if (_isSearching) _buildSearchContent(state),
               if (_isFiltering) _buildFilterContent(state),
-              _isFiltering
-                  ? ConsoleHud(
-                      a: const HudAction('Toggle'),
-                      b: HudAction('Close', onTap: _closeFilter),
-                      x: HudAction('Clear', onTap: () {
-                        _controller.clearFilters();
-                        _resetFocusAfterFilterChange();
-                        setState(() {});
-                      }),
-                      showDownloads: false,
-                    )
-                  : _isSearching
-                      ? ConsoleHud(
-                          dpad: !_isSearchFocused ? (label: '\u2191', action: 'Search') : null,
-                          a: HudAction('Select', onTap: _openSelectedGame),
-                          b: HudAction(
-                            _isSearchFocused ? 'Keyboard' : 'Close',
-                            highlight: _isSearchFocused,
-                            onTap: () => Navigator.pop(context),
-                          ),
-                          showDownloads: false,
-                        )
-                      : ConsoleHud(
-                          a: HudAction('Select', onTap: _openSelectedGame),
-                          b: HudAction('Back', onTap: () => Navigator.pop(context)),
-                          x: HudAction(
-                            state.activeFilters.isNotEmpty ? 'Filter \u25CF' : 'Filter',
-                            onTap: _toggleFilter,
-                          ),
-                          y: HudAction('Search', onTap: _openSearch),
-                        ),
+              if (_isFiltering)
+                ConsoleHud(
+                  a: const HudAction('Toggle'),
+                  b: HudAction('Close', onTap: _closeFilter),
+                  x: HudAction('Clear', onTap: () {
+                    _controller.clearFilters();
+                    _resetFocusAfterFilterChange();
+                    setState(() {});
+                  }),
+                )
+              else if (_isSearching)
+                ConsoleHud(
+                  dpad: !_isSearchFocused ? (label: '\u2191', action: 'Search') : null,
+                  a: HudAction('Select', onTap: _openSelectedGame),
+                  b: HudAction(
+                    _isSearchFocused ? 'Keyboard' : 'Close',
+                    highlight: _isSearchFocused,
+                    onTap: () => Navigator.pop(context),
+                  ),
+                )
+              else if (!_showQuickMenu)
+                ConsoleHud(
+                  a: HudAction('Select', onTap: _openSelectedGame),
+                  b: HudAction('Back', onTap: () => Navigator.pop(context)),
+                  start: HudAction('Menu', onTap: _toggleQuickMenu),
+                ),
+              if (_showQuickMenu)
+                QuickMenuOverlay(
+                  items: _buildQuickMenuItems(),
+                  onClose: _closeQuickMenu,
+                ),
             ],
           ),
         ),
@@ -557,12 +633,14 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         onRetry: _controller.loadGames,
       );
     }
+    final favorites = ref.watch(favoriteGamesProvider).toSet();
     return GameGrid(
       key: ValueKey('grid_$_columns'),
       system: widget.system,
       filteredGroups: state.filteredGroups,
       groupedGames: state.filteredGroupedGames,
       installedCache: state.installedCache,
+      favorites: favorites,
       itemKeys: _itemKeys,
       focusNodes: _focusManager.focusNodes,
       selectedIndex: _focusManager.selectedIndex,
@@ -618,6 +696,9 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         availableLanguages: state.availableLanguages,
         selectedRegions: state.activeFilters.selectedRegions,
         selectedLanguages: state.activeFilters.selectedLanguages,
+        favoritesOnly: state.activeFilters.favoritesOnly,
+        localOnly: state.activeFilters.localOnly,
+        isLocalSystem: state.isLocalOnly,
         onToggleRegion: (r) {
           _controller.toggleRegionFilter(r);
           _resetFocusAfterFilterChange();
@@ -625,6 +706,16 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         },
         onToggleLanguage: (l) {
           _controller.toggleLanguageFilter(l);
+          _resetFocusAfterFilterChange();
+          setState(() {});
+        },
+        onToggleFavorites: () {
+          _controller.toggleFavoritesFilter();
+          _resetFocusAfterFilterChange();
+          setState(() {});
+        },
+        onToggleLocal: () {
+          _controller.toggleLocalFilter();
           _resetFocusAfterFilterChange();
           setState(() {});
         },

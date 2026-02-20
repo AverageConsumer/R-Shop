@@ -596,11 +596,6 @@ class DownloadService {
       }
     }
 
-    final parenIndex = name.indexOf('(');
-    if (parenIndex > 0) {
-      name = name.substring(0, parenIndex).trim();
-    }
-
     name = name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
     name = name.replaceAll(RegExp(r'\s+'), ' ').trim();
 

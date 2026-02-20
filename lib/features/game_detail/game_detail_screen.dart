@@ -9,6 +9,7 @@ import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
+import '../../providers/game_providers.dart';
 import '../../services/download_queue_manager.dart';
 import '../../services/input_debouncer.dart';
 import '../../utils/game_metadata.dart';
@@ -16,7 +17,9 @@ import '../../utils/image_helper.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/console_notification.dart';
 import '../../widgets/console_hud.dart';
+import '../../widgets/download_overlay.dart';
 import '../../widgets/installed_indicator.dart';
+import '../../widgets/quick_menu.dart';
 import '../game_list/widgets/dynamic_background.dart';
 import '../game_list/widgets/tinted_overlay.dart';
 import 'game_detail_controller.dart';
@@ -52,6 +55,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   GameDetailController? _controller;
   late final ValueNotifier<String?> _backgroundNotifier;
   late InputDebouncer _debouncer;
+  bool _showQuickMenu = false;
+  bool _variantNavHeld = false;
 
   @override
   String get routeId => 'game_detail_${widget.game.filename}';
@@ -63,6 +68,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         InfoIntent: _DetailFilenameToggleAction(this),
         SearchIntent: _DetailTagInfoAction(this),
         NavigateIntent: _DetailNavigateAction(this),
+        FavoriteIntent: _DetailFavoriteAction(this),
+        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _toggleQuickMenu),
       };
 
   @override
@@ -237,6 +244,68 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     controller.toggleTagInfo();
   }
 
+  void _handleFavorite() {
+    final controller = _controller;
+    if (controller == null) return;
+    if (controller.state.isOverlayOpen) return;
+
+    ref.read(feedbackServiceProvider).tick();
+    final wasFavorite = ref.read(favoriteGamesProvider).contains(widget.game.displayName);
+    ref.read(favoriteGamesProvider.notifier).toggleFavorite(widget.game.displayName);
+    showConsoleNotification(context, message: wasFavorite ? 'Removed from favorites' : 'Added to favorites');
+  }
+
+  void _toggleQuickMenu() {
+    if (_showQuickMenu) return;
+    if (ref.read(overlayPriorityProvider) != OverlayPriority.none) return;
+    ref.read(feedbackServiceProvider).tick();
+    setState(() => _showQuickMenu = true);
+  }
+
+  void _closeQuickMenu() {
+    setState(() => _showQuickMenu = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) requestScreenFocus();
+    });
+  }
+
+  List<QuickMenuItem> _buildQuickMenuItems() {
+    final controller = _controller;
+    if (controller == null) return [];
+    final metadata = GameMetadata.parse(controller.selectedVariant.filename);
+    final isFavorite = ref.read(favoriteGamesProvider).contains(widget.game.displayName);
+    final hasDownloads = ref.read(hasQueueItemsProvider);
+    return [
+      QuickMenuItem(
+        label: isFavorite ? 'Unfavorite' : 'Favorite',
+        icon: isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+        shortcutHint: '−',
+        onSelect: _handleFavorite,
+        highlight: isFavorite,
+      ),
+      if (metadata.allTags.isNotEmpty)
+        QuickMenuItem(
+          label: 'Tags',
+          icon: Icons.label_rounded,
+          shortcutHint: 'Y',
+          onSelect: _handleTagInfo,
+        ),
+      QuickMenuItem(
+        label: controller.state.showFullFilename ? 'Show Title' : 'Show Filename',
+        icon: Icons.text_fields_rounded,
+        shortcutHint: 'X',
+        onSelect: _handleFilenameToggle,
+      ),
+      if (hasDownloads)
+        QuickMenuItem(
+          label: 'Downloads',
+          icon: Icons.download_rounded,
+          onSelect: () => toggleDownloadOverlay(ref),
+          highlight: true,
+        ),
+    ];
+  }
+
   void _handleNavigate(GridDirection direction) {
     final controller = _controller;
     if (controller == null) return;
@@ -256,34 +325,26 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
     if (widget.variants.length <= 1) return;
 
-    if (direction == GridDirection.left) {
+    if (direction == GridDirection.up) {
+      if (_variantNavHeld) return;
+      _variantNavHeld = true;
       if (controller.selectedIndex <= 0) {
         ref.read(feedbackServiceProvider).error();
         return;
       }
-      if (_debouncer.startHold(() {
-        final newIndex = controller.selectedIndex - 1;
-        if (newIndex >= 0) {
-          controller.selectVariant(newIndex);
-          _updateBackground();
-        }
-      })) {
-        ref.read(feedbackServiceProvider).tick();
-      }
-    } else if (direction == GridDirection.right) {
+      ref.read(feedbackServiceProvider).tick();
+      controller.selectVariant(controller.selectedIndex - 1);
+      _updateBackground();
+    } else if (direction == GridDirection.down) {
+      if (_variantNavHeld) return;
+      _variantNavHeld = true;
       if (controller.selectedIndex >= widget.variants.length - 1) {
         ref.read(feedbackServiceProvider).error();
         return;
       }
-      if (_debouncer.startHold(() {
-        final newIndex = controller.selectedIndex + 1;
-        if (newIndex < widget.variants.length) {
-          controller.selectVariant(newIndex);
-          _updateBackground();
-        }
-      })) {
-        ref.read(feedbackServiceProvider).tick();
-      }
+      ref.read(feedbackServiceProvider).tick();
+      controller.selectVariant(controller.selectedIndex + 1);
+      _updateBackground();
     }
   }
 
@@ -292,6 +353,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
     if (selection == 0) {
       await controller.deleteRom();
+      ref.invalidate(visibleSystemsProvider);
       controller.cancelDialog();
     } else {
       controller.cancelDialog();
@@ -300,6 +362,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent) {
+      _variantNavHeld = false;
       _debouncer.stopHold();
       return KeyEventResult.ignored;
     }
@@ -351,6 +414,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final GameMetadataFull metadata =
         GameMetadata.parse(selectedVariant.filename);
     final isMultiRom = widget.variants.length > 1;
+    final isFavorite = ref.watch(favoriteGamesProvider).contains(widget.game.displayName);
     return buildWithActions(
       PopScope(
         canPop: false,
@@ -372,11 +436,16 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               bottom: false,
               child: rs.isPortrait
                   ? _buildPortraitLayout(rs, state, controller, metadata,
-                      isMultiRom, coverUrls, selectedVariant)
+                      isMultiRom, coverUrls, selectedVariant, isFavorite)
                   : _buildLandscapeLayout(rs, state, controller, metadata,
-                      isMultiRom, coverUrls, selectedVariant),
+                      isMultiRom, coverUrls, selectedVariant, isFavorite),
             ),
             _buildControls(state, metadata),
+            if (_showQuickMenu)
+              QuickMenuOverlay(
+                items: _buildQuickMenuItems(),
+                onClose: _closeQuickMenu,
+              ),
             DialogFocusScope(
               isVisible: state.isDialogOpen,
               onClose: controller.cancelDialog,
@@ -386,6 +455,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                 gameTitle: controller.cleanTitle,
                 onPrimary: () async {
                   await controller.deleteRom();
+                  ref.invalidate(visibleSystemsProvider);
                   controller.cancelDialog();
                   requestScreenFocus();
                 },
@@ -418,6 +488,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     bool isMultiRom,
     List<String> coverUrls,
     GameItem selectedVariant,
+    bool isFavorite,
   ) {
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -437,6 +508,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               coverUrls: coverUrls,
               cachedUrl: selectedVariant.cachedCoverUrl,
               metadata: metadata,
+              isFavorite: isFavorite,
             ),
           ),
           SizedBox(width: rs.spacing.lg),
@@ -458,6 +530,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     bool isMultiRom,
     List<String> coverUrls,
     GameItem selectedVariant,
+    bool isFavorite,
   ) {
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: rs.spacing.md),
@@ -473,6 +546,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               coverUrls: coverUrls,
               cachedUrl: selectedVariant.cachedCoverUrl,
               metadata: metadata,
+              isFavorite: isFavorite,
             ),
           ),
           SizedBox(height: rs.spacing.md),
@@ -490,7 +564,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                 controller.selectVariant(index);
                 _updateBackground();
               },
-              onInfoTap: controller.toggleTagInfo,
             )
           else ...[
             Text(
@@ -507,8 +580,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               variant: controller.selectedVariant,
               system: widget.system,
               isInstalled: state.isVariantInstalled,
-              onInfoTap:
-                  metadata.hasInfoDetails ? controller.toggleTagInfo : null,
             ),
           ],
           SizedBox(height: rs.spacing.xxl),
@@ -532,14 +603,13 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       actionCallback = controller.performAction;
     }
 
-    final filenameLabel = state.showFullFilename ? 'Title' : 'Filename';
+    if (_showQuickMenu) return const SizedBox.shrink();
 
     return ConsoleHud(
-      dpad: widget.variants.length > 1 ? (label: '\u2190\u2192', action: 'Navigate') : null,
+      dpad: widget.variants.length > 1 ? (label: '\u2191\u2193', action: 'Navigate') : null,
       a: HudAction(actionLabel, onTap: actionCallback),
       b: HudAction('Back', onTap: () => Navigator.pop(context)),
-      x: HudAction(filenameLabel, onTap: controller.toggleFullFilename),
-      y: metadata.allTags.isNotEmpty ? HudAction('Tags', onTap: controller.toggleTagInfo) : null,
+      start: HudAction('Menu', onTap: _toggleQuickMenu),
     );
   }
 
@@ -559,16 +629,17 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         SizedBox(height: rs.spacing.lg),
         if (isMultiRom)
           Expanded(
-            child: VersionCarousel(
-              variants: widget.variants,
-              system: widget.system,
-              selectedIndex: state.selectedIndex,
-              installedStatus: state.installedStatus,
-              onSelectionChanged: (index) {
-                controller.selectVariant(index);
-                _updateBackground();
-              },
-              onInfoTap: controller.toggleTagInfo,
+            child: SingleChildScrollView(
+              child: VersionCarousel(
+                variants: widget.variants,
+                system: widget.system,
+                selectedIndex: state.selectedIndex,
+                installedStatus: state.installedStatus,
+                onSelectionChanged: (index) {
+                  controller.selectVariant(index);
+                  _updateBackground();
+                },
+                ),
             ),
           )
         else ...[
@@ -587,8 +658,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
             variant: controller.selectedVariant,
             system: widget.system,
             isInstalled: state.isVariantInstalled,
-            onInfoTap:
-                metadata.hasInfoDetails ? controller.toggleTagInfo : null,
           ),
           const Spacer(),
         ],
@@ -778,6 +847,22 @@ class _DetailNavigateAction extends Action<NavigateIntent> {
   @override
   Object? invoke(NavigateIntent intent) {
     screen._handleNavigate(intent.direction);
+    return null;
+  }
+}
+
+class _DetailFavoriteAction extends Action<FavoriteIntent> {
+  final _GameDetailScreenState screen;
+
+  _DetailFavoriteAction(this.screen);
+
+  @override
+  bool isEnabled(FavoriteIntent intent) =>
+      screen.ref.read(overlayPriorityProvider) == OverlayPriority.none;
+
+  @override
+  Object? invoke(FavoriteIntent intent) {
+    screen._handleFavorite();
     return null;
   }
 }

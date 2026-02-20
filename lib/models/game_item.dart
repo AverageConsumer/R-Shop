@@ -1,3 +1,4 @@
+import '../utils/game_metadata.dart';
 import 'config/provider_config.dart';
 
 class GameItem {
@@ -26,22 +27,6 @@ class GameItem {
   }
 
   static String cleanDisplayName(String filename) {
-    var name = filename;
-
-    final extensions = ['.zip', '.7z', '.3ds', '.rar', '.iso'];
-    for (final ext in extensions) {
-      if (name.toLowerCase().endsWith(ext)) {
-        name = name.substring(0, name.length - ext.length);
-        break;
-      }
-    }
-
-    name = name.replaceAll(RegExp(r'\s*\([^)]*\)'), '');
-    name = name.replaceAll(RegExp(r'\s*\[[^\]]*\]'), '');
-
-    name = name.replaceAll('_', ' ');
-    name = name.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-    return name;
+    return GameMetadata.cleanTitle(filename);
   }
 }

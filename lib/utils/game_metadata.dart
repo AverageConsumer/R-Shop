@@ -93,6 +93,7 @@ class GameMetadata {
   static RegionInfo extractRegion(String filename) {
     final regionPatterns = _getOrderedRegionPatterns();
 
+    // First try exact single-region patterns
     for (final entry in regionPatterns) {
       for (final pattern in entry.patterns) {
         if (RegExp(pattern, caseSensitive: false).hasMatch(filename)) {
@@ -104,7 +105,45 @@ class GameMetadata {
       }
     }
 
+    // Try comma-separated multi-region tags like (USA,Europe) or (Usa,Europe)
+    final multiMatch =
+        RegExp(r'\(([^)]+,[^)]+)\)', caseSensitive: false).firstMatch(filename);
+    if (multiMatch != null) {
+      final content = multiMatch.group(1)!;
+      final parts = content.split(',').map((p) => p.trim()).toList();
+      final matched = <_RegionPattern>[];
+      for (final part in parts) {
+        final region = _findRegionByName(part);
+        if (region != null) {
+          matched.add(region);
+        }
+      }
+      if (matched.isNotEmpty && matched.length == parts.length) {
+        return RegionInfo(
+          name: matched.map((r) => r.regionName).join(' / '),
+          flag: matched.map((r) => r.flag).join(''),
+        );
+      }
+    }
+
     return const RegionInfo(name: 'Unknown', flag: '🌐');
+  }
+
+  static _RegionPattern? _findRegionByName(String name) {
+    final lower = name.toLowerCase();
+    for (final entry in _getOrderedRegionPatterns()) {
+      if (entry.regionName.toLowerCase() == lower) return entry;
+      // Also match short codes (JP, US, EUR, etc.)
+      for (final pattern in entry.patterns) {
+        // Extract the content from patterns like \(USA\) → USA
+        final inner = RegExp(r'[(\[](.*?)[)\]]')
+            .firstMatch(pattern.replaceAll(r'\', ''));
+        if (inner != null && inner.group(1)!.toLowerCase() == lower) {
+          return entry;
+        }
+      }
+    }
+    return null;
   }
 
   static List<_RegionPattern> _getOrderedRegionPatterns() {
@@ -492,7 +531,7 @@ class GameMetadata {
   }
 
   static bool _isRegionContent(String content) {
-    final regionCodes = [
+    final regionCodes = {
       'japan',
       'j',
       'jp',
@@ -539,8 +578,15 @@ class GameMetadata {
       'netherlands',
       'nl',
       'world',
-    ];
-    return regionCodes.contains(content);
+    };
+    if (regionCodes.contains(content)) return true;
+    // Handle comma-separated multi-region like "usa,europe"
+    if (content.contains(',')) {
+      return content
+          .split(',')
+          .every((part) => regionCodes.contains(part.trim()));
+    }
+    return false;
   }
 
   static bool _isLanguageContent(String content) {

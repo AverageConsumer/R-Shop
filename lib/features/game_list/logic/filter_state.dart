@@ -18,16 +18,20 @@ class FilterOption {
 class ActiveFilters {
   final Set<String> selectedRegions;
   final Set<String> selectedLanguages;
+  final bool favoritesOnly;
+  final bool localOnly;
 
   const ActiveFilters({
     this.selectedRegions = const {},
     this.selectedLanguages = const {},
+    this.favoritesOnly = false,
+    this.localOnly = false,
   });
 
-  bool get isEmpty => selectedRegions.isEmpty && selectedLanguages.isEmpty;
+  bool get isEmpty => selectedRegions.isEmpty && selectedLanguages.isEmpty && !favoritesOnly && !localOnly;
   bool get isNotEmpty => !isEmpty;
 
-  int get activeCount => selectedRegions.length + selectedLanguages.length;
+  int get activeCount => selectedRegions.length + selectedLanguages.length + (favoritesOnly ? 1 : 0) + (localOnly ? 1 : 0);
 
   ActiveFilters toggleRegion(String region) {
     final newRegions = Set<String>.from(selectedRegions);
@@ -39,6 +43,8 @@ class ActiveFilters {
     return ActiveFilters(
       selectedRegions: newRegions,
       selectedLanguages: selectedLanguages,
+      favoritesOnly: favoritesOnly,
+      localOnly: localOnly,
     );
   }
 
@@ -52,6 +58,26 @@ class ActiveFilters {
     return ActiveFilters(
       selectedRegions: selectedRegions,
       selectedLanguages: newLanguages,
+      favoritesOnly: favoritesOnly,
+      localOnly: localOnly,
+    );
+  }
+
+  ActiveFilters toggleFavoritesOnly() {
+    return ActiveFilters(
+      selectedRegions: selectedRegions,
+      selectedLanguages: selectedLanguages,
+      favoritesOnly: !favoritesOnly,
+      localOnly: localOnly,
+    );
+  }
+
+  ActiveFilters toggleLocalOnly() {
+    return ActiveFilters(
+      selectedRegions: selectedRegions,
+      selectedLanguages: selectedLanguages,
+      favoritesOnly: favoritesOnly,
+      localOnly: !localOnly,
     );
   }
 

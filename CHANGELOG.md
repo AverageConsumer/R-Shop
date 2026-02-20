@@ -6,7 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.9.5] Beta — 2026-02-20
+
+### Added
+- **Library screen** — unified cross-system game browser with All/Installed/Favorites tabs, search, sort modes (A-Z / by system), and adjustable grid zoom (LB/RB)
+- **Background library sync** — automatic provider sync on launch with live progress badge on home screen
+- **Quick Menu** (Start/+ button) — contextual overlay with shortcuts to Search, Settings, Zoom, and Downloads
+- **Home grid layout** — toggle between carousel and grid view on the home screen; grid columns adjustable via LB/RB
+- **ROM header parser** — extracts internal game titles from GB, GBC, GBA, NDS, and SNES ROM headers (raw + ZIP)
+- **Favorite toggle** (Select/- button) — quick-favorite from game detail screen
+- **Tab switching** (LB/RB) — navigate filter tabs in Library and Filter overlay
+- **Local-only filter** — new toggle in filter overlay to show only locally installed ROMs
+
+### Improved
+- **BaseGameCard** replaces old game card — unified design with system badge, installed indicator, favorite heart, variant count, and provider label
+- **Version card** simplified — significant refactor removing redundant layout logic
+- **ConsoleHud** refactored — cleaner slot rendering, consistent spacing, proper embedded vs positioned modes
+- **Filter overlay** — improved layout with local-only toggle and multi-tier filtering
+- **Global search** — results now show provider label and region flags consistently
+- **Controller layout** preference persisted across sessions
+- **Home layout** preference (carousel/grid) persisted across sessions
+
+### Fixed
+- **Download overlay HUD position** — button legend was stuck top-left instead of bottom-right (AnimatedOpacity wrapping Positioned broke Stack layout)
+- **Quick Menu downloads option** now shows whenever queue has any items (including completed/failed), not just active+queued
+- Favorite names migration cleans up legacy IDs on app start
+- **Duplicate library entries for multi-file ROMs** — remote archive merge now adds extracted folder names to dedup set (bin/cue games no longer appear twice)
+- **ROMs in subdirectories not detected** — `scanLocalGames`, `exists`, and `delete` now check subdirectories for all ROM extensions, not just multi-file formats
+
+### Internal
+- New `QuickMenuOverlay` widget with overlay priority and controller-aware shortcut hints
+- `AdjustColumnsIntent` consolidates zoom controls across screens
+- `ToggleOverlayAction` uses `onToggle` callback instead of publishing a state request
+- `SyncBadge` widget for real-time sync progress display
+- `LibrarySyncService` as `StateNotifier<LibrarySyncState>`
+- `homeLayoutProvider`, `homeGridColumnsProvider`, `controllerLayoutProvider` in app_providers
+
+---
+
 ## [0.9.4] Beta — 2026-02-20
+
+> [!WARNING]
+> **Migration Notice:** Upgrading from versions `<= 0.9.3` to `0.9.4` or newer requires a **fresh installation** due to significant backend database and config architecture changes. Legacy configurations will not transfer over cleanly.
 
 ### Added
 - Global search activated (Home screen, Y button) — cross-system search with region flags and tag badges

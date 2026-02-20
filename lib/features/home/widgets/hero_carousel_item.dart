@@ -149,3 +149,145 @@ class HeroCarouselItem extends StatelessWidget {
     );
   }
 }
+
+class HeroLibraryCarouselItem extends StatelessWidget {
+  final double scale;
+  final double opacity;
+  final bool isSelected;
+  final Responsive rs;
+  final VoidCallback onTap;
+
+  const HeroLibraryCarouselItem({
+    required this.scale,
+    required this.opacity,
+    required this.isSelected,
+    required this.rs,
+    required this.onTap,
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final iconSize = rs.isPortrait
+        ? (rs.isSmall ? rs.screenHeight * 0.25 : rs.screenHeight * 0.32)
+        : (rs.isSmall ? rs.screenHeight * 0.4 : rs.screenHeight * 0.5);
+    const accentColor = Colors.cyanAccent;
+    final borderRadius = rs.isSmall ? 24.0 : 32.0;
+    final innerBorderRadius = rs.isSmall ? 22.0 : 30.0;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Center(
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 200),
+          opacity: opacity,
+          child: AnimatedScale(
+            scale: scale,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            child: SizedBox(
+              height: iconSize,
+              width: iconSize,
+              child: AspectRatio(
+                aspectRatio: 1.0,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                  margin: EdgeInsets.symmetric(horizontal: rs.spacing.md),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF0A1628),
+                        Color(0xFF0F0F0F),
+                      ],
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: accentColor.withValues(alpha: 0.6),
+                              blurRadius: rs.isSmall ? 30 : 60,
+                              spreadRadius: rs.isSmall ? 5 : 10,
+                            ),
+                            BoxShadow(
+                              color: accentColor.withValues(alpha: 0.4),
+                              blurRadius: rs.isSmall ? 50 : 100,
+                              spreadRadius: rs.isSmall ? 10 : 20,
+                            ),
+                            BoxShadow(
+                              color: accentColor.withValues(alpha: 0.2),
+                              blurRadius: rs.isSmall ? 75 : 150,
+                              spreadRadius: rs.isSmall ? 20 : 40,
+                            ),
+                            BoxShadow(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              blurRadius: 30,
+                              spreadRadius: 0,
+                            ),
+                          ]
+                        : [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              blurRadius: 25,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(innerBorderRadius),
+                    child: Stack(
+                      children: [
+                        if (isSelected)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                gradient: RadialGradient(
+                                  center: Alignment.center,
+                                  radius: 0.7,
+                                  colors: [
+                                    accentColor.withValues(alpha: 0.15),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        Center(
+                          child: Icon(
+                            Icons.library_books_rounded,
+                            size: iconSize * 0.35,
+                            color: accentColor.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        if (isSelected)
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              height: rs.isSmall ? 1.5 : 2,
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.transparent,
+                                    accentColor,
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

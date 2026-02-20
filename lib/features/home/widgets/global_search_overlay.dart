@@ -200,7 +200,8 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
     }
     if (key == LogicalKeyboardKey.gameButtonB ||
         key == LogicalKeyboardKey.escape ||
-        key == LogicalKeyboardKey.backspace) {
+        key == LogicalKeyboardKey.backspace ||
+        key == LogicalKeyboardKey.goBack) {
       widget.onClose();
       return KeyEventResult.handled;
     }
@@ -272,11 +273,24 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
               widget.onClose();
             }
           },
+          const SingleActivator(LogicalKeyboardKey.goBack, includeRepeats: false): () {
+            if (_searchFocusNode.hasFocus) {
+              if (_flatResults.isNotEmpty) {
+                _listFocusNode.requestFocus();
+              } else {
+                widget.onClose();
+              }
+            } else {
+              widget.onClose();
+            }
+          },
           const SingleActivator(LogicalKeyboardKey.arrowDown, includeRepeats: false): () {
             if (_flatResults.isNotEmpty) {
               _listFocusNode.requestFocus();
             }
           },
+          const SingleActivator(LogicalKeyboardKey.arrowLeft): () {},
+          const SingleActivator(LogicalKeyboardKey.arrowRight): () {},
         },
         child: Container(
           decoration: BoxDecoration(
@@ -303,6 +317,7 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
             focusNode: _searchFocusNode,
             autofocus: true,
             autocorrect: false,
+            onTapOutside: (_) {},
             textInputAction: TextInputAction.search,
             style: TextStyle(
               color: Colors.white,
@@ -465,7 +480,6 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
             })
           : null,
       b: HudAction('Close', onTap: widget.onClose),
-      showDownloads: false,
       embedded: true,
     );
   }

@@ -253,6 +253,10 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
   String? _focusedItemId;
   String? _hoveredItemId;
 
+  // HUD fade when focused item overlaps the button bar
+  final GlobalKey _hudKey = GlobalKey();
+  bool _hudFaded = false;
+
   // Stagger animation
   late AnimationController _staggerController;
 
@@ -361,6 +365,24 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
     if (_hoveredItemId != null && _indexOfId(_hoveredItemId, items) < 0) {
       _hoveredItemId = null;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkHudOverlap();
+    });
+  }
+
+  void _checkHudOverlap() {
+    final hudBox = _hudKey.currentContext?.findRenderObject() as RenderBox?;
+    final targetId = _hoveredItemId ?? _focusedItemId;
+    final itemKey = _itemKeys[targetId];
+    final itemBox = itemKey?.currentContext?.findRenderObject() as RenderBox?;
+    if (hudBox == null || itemBox == null) {
+      if (_hudFaded) setState(() => _hudFaded = false);
+      return;
+    }
+    final hudRect = hudBox.localToGlobal(Offset.zero) & hudBox.size;
+    final itemRect = itemBox.localToGlobal(Offset.zero) & itemBox.size;
+    final overlaps = hudRect.overlaps(itemRect);
+    if (overlaps != _hudFaded) setState(() => _hudFaded = overlaps);
   }
 
   void _scrollToFocused() {
@@ -373,6 +395,9 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
         curve: Curves.easeOutCubic,
       );
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _checkHudOverlap();
+    });
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
@@ -497,22 +522,35 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
           ? 'Cancel'
           : targetItem.isFailed
               ? 'Retry'
-              : 'Clear';
+              : targetItem.status == DownloadItemStatus.queued
+                  ? 'Remove'
+                  : 'Clear';
       aAction = HudAction(label, onTap: () => _performAction(targetItem));
     } else {
       aAction = null;
     }
 
-    return ConsoleHud(
-      a: aAction,
-      b: HudAction('Close', onTap: _close),
-      y: hasFinished
-          ? HudAction('Clear Done', onTap: () {
-              ref.read(downloadQueueManagerProvider).clearCompleted();
-            })
-          : null,
-      showDownloads: false,
-      embedded: false,
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SafeArea(
+        child: AnimatedOpacity(
+          opacity: _hudFaded ? 0.15 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          child: ConsoleHud(
+            key: _hudKey,
+            a: aAction,
+            b: HudAction('Close', onTap: _close),
+            y: hasFinished
+                ? HudAction('Clear Done', onTap: () {
+                    ref.read(downloadQueueManagerProvider).clearCompleted();
+                  })
+                : null,
+            embedded: true,
+          ),
+        ),
+      ),
     );
   }
 
@@ -730,6 +768,9 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
           onTap: () => _performAction(item),
           onHover: (isHovering) {
             setState(() => _hoveredItemId = isHovering ? item.id : null);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _checkHudOverlap();
+            });
           },
         ),
       ),
@@ -741,6 +782,8 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
       ref.read(downloadQueueManagerProvider).cancelDownload(item.id);
     } else if (item.isFailed) {
       ref.read(downloadQueueManagerProvider).retryDownload(item.id);
+    } else if (item.status == DownloadItemStatus.queued) {
+      ref.read(downloadQueueManagerProvider).removeDownload(item.id);
     } else if (item.isFinished) {
       ref.read(downloadQueueManagerProvider).removeDownload(item.id);
     }
@@ -1350,7 +1393,7 @@ class _ActionButton extends StatelessWidget {
     } else if (item.isActive) {
       return (Colors.red.shade300, Icons.stop_rounded, 'Cancel');
     } else {
-      return (Colors.white38, Icons.schedule_rounded, 'Queued');
+      return (Colors.white38, Icons.close_rounded, 'Remove');
     }
   }
 }

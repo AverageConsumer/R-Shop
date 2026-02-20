@@ -28,3 +28,7 @@ final downloadCountProvider = Provider<int>((ref) {
   final state = ref.watch(downloadQueueManagerProvider).state;
   return state.activeCount + state.queuedCount;
 });
+
+final hasQueueItemsProvider = Provider<bool>((ref) {
+  return !ref.watch(downloadQueueManagerProvider).state.isEmpty;
+});

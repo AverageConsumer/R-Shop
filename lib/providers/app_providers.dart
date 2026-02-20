@@ -1,11 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/storage_service.dart';
+export '../services/storage_service.dart' show ControllerLayout;
 import '../services/repo_manager.dart';
 import '../services/haptic_service.dart';
 import '../services/audio_manager.dart';
 import '../services/feedback_service.dart';
 import '../models/sound_settings.dart';
+import '../utils/game_metadata.dart';
 
 export '../core/input/input_providers.dart'
     show
@@ -121,3 +123,104 @@ final gridColumnsProvider =
     systemName,
   ),
 );
+
+final homeGridColumnsProvider =
+    StateNotifierProvider<GridColumnsNotifier, int>(
+  (ref) => GridColumnsNotifier(
+    ref.read(storageServiceProvider),
+    'home',
+    minColumns: 2,
+    maxColumns: 6,
+  ),
+);
+
+class FavoriteGamesNotifier extends StateNotifier<List<String>> {
+  final StorageService _storage;
+
+  FavoriteGamesNotifier(this._storage) : super(_storage.getFavorites()) {
+    _migrateFavoriteNames();
+  }
+
+  void _migrateFavoriteNames() {
+    final current = state;
+    final migrated = current.map(GameMetadata.cleanTitle).toSet().toList();
+    if (migrated.length != current.length ||
+        !_listEquals(current, migrated)) {
+      _storage.setFavorites(migrated);
+      state = migrated;
+    }
+  }
+
+  static bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  void toggleFavorite(String gameId) {
+    _storage.toggleFavorite(gameId);
+    state = _storage.getFavorites();
+  }
+
+  bool isFavorite(String gameId) {
+    return state.contains(gameId);
+  }
+}
+
+// ==========================================
+// Controller Layout
+// ==========================================
+class ControllerLayoutNotifier extends StateNotifier<ControllerLayout> {
+  final StorageService _storage;
+
+  ControllerLayoutNotifier(this._storage) : super(_storage.getControllerLayout());
+
+  Future<void> cycle() async {
+    final next = switch (state) {
+      ControllerLayout.nintendo => ControllerLayout.xbox,
+      ControllerLayout.xbox => ControllerLayout.playstation,
+      ControllerLayout.playstation => ControllerLayout.nintendo,
+    };
+    await _storage.setControllerLayout(next);
+    state = next;
+  }
+
+  Future<void> setLayout(ControllerLayout layout) async {
+    await _storage.setControllerLayout(layout);
+    state = layout;
+  }
+}
+
+final controllerLayoutProvider =
+    StateNotifierProvider<ControllerLayoutNotifier, ControllerLayout>((ref) {
+  final storage = ref.watch(storageServiceProvider);
+  return ControllerLayoutNotifier(storage);
+});
+
+// ==========================================
+// Home Layout
+// ==========================================
+class HomeLayoutNotifier extends StateNotifier<bool> {
+  final StorageService _storage;
+
+  HomeLayoutNotifier(this._storage) : super(_storage.getHomeLayoutIsGrid());
+
+  Future<void> toggle() async {
+    final newValue = !state;
+    await _storage.setHomeLayoutIsGrid(newValue);
+    state = newValue;
+  }
+}
+
+final homeLayoutProvider = StateNotifierProvider<HomeLayoutNotifier, bool>((ref) {
+  final storage = ref.watch(storageServiceProvider);
+  return HomeLayoutNotifier(storage);
+});
+
+final favoriteGamesProvider =
+    StateNotifierProvider<FavoriteGamesNotifier, List<String>>((ref) {
+  return FavoriteGamesNotifier(ref.read(storageServiceProvider));
+});
+

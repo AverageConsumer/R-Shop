@@ -4,13 +4,14 @@ import '../../../core/responsive/responsive.dart';
 import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../utils/image_helper.dart';
-import 'game_card.dart';
+import '../../../widgets/base_game_card.dart';
 
 class GameGrid extends StatefulWidget {
   final SystemModel system;
   final List<String> filteredGroups;
   final Map<String, List<GameItem>> groupedGames;
   final Map<String, bool> installedCache;
+  final Set<String> favorites;
   final Map<int, GlobalKey> itemKeys;
   final Map<int, FocusNode> focusNodes;
   final int selectedIndex;
@@ -31,6 +32,7 @@ class GameGrid extends StatefulWidget {
     required this.filteredGroups,
     required this.groupedGames,
     required this.installedCache,
+    this.favorites = const {},
     required this.itemKeys,
     required this.focusNodes,
     required this.selectedIndex,
@@ -142,17 +144,21 @@ class _GameGridState extends State<GameGrid> {
     final cachedUrl = variants.first.cachedCoverUrl;
     final isInstalled = widget.installedCache[displayName] ?? false;
     final isSelected = index == widget.selectedIndex;
+    final isFavorite = widget.favorites.contains(displayName);
+    final providerLabel = variants.first.providerConfig?.shortLabel;
 
     return RepaintBoundary(
       key: widget.itemKeys[index],
-      child: GameCard(
+      child: BaseGameCard(
         displayName: displayName,
         coverUrls: coverUrls,
         cachedUrl: cachedUrl,
         variantCount: variants.length,
         isInstalled: isInstalled,
         isSelected: isSelected,
+        isFavorite: isFavorite,
         accentColor: widget.system.accentColor,
+        providerLabel: providerLabel,
         focusNode: widget.focusNodes[index],
         onTap: () => widget.onOpenGame(displayName, variants),
         onTapSelect: () => widget.onSelectionChanged(index),

@@ -254,7 +254,6 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
       b: HudAction('Save & Back', onTap: _saveAndGoBack),
       start: HudAction('Export', onTap: _exportConfig),
       select: HudAction('Import', onTap: _importConfig),
-      showDownloads: false,
     );
   }
 }

@@ -401,7 +401,6 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
                     x: HudAction('Clear', onTap: _clear),
                     b: HudAction('Back', onTap: _goBack),
                     start: HudAction('Save', onTap: _save, highlight: true),
-                    showDownloads: false,
                     embedded: true,
                   ),
                 ],

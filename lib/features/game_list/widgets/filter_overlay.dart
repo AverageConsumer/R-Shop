@@ -27,8 +27,13 @@ class FilterOverlay extends StatefulWidget {
   final List<FilterOption> availableLanguages;
   final Set<String> selectedRegions;
   final Set<String> selectedLanguages;
+  final bool favoritesOnly;
+  final bool localOnly;
+  final bool isLocalSystem;
   final void Function(String region) onToggleRegion;
   final void Function(String language) onToggleLanguage;
+  final VoidCallback onToggleFavorites;
+  final VoidCallback onToggleLocal;
   final VoidCallback onClearAll;
   final VoidCallback onClose;
 
@@ -39,8 +44,13 @@ class FilterOverlay extends StatefulWidget {
     required this.availableLanguages,
     required this.selectedRegions,
     required this.selectedLanguages,
+    required this.favoritesOnly,
+    required this.localOnly,
+    required this.isLocalSystem,
     required this.onToggleRegion,
     required this.onToggleLanguage,
+    required this.onToggleFavorites,
+    required this.onToggleLocal,
     required this.onClearAll,
     required this.onClose,
   });
@@ -106,6 +116,23 @@ class _FilterOverlayState extends State<FilterOverlay>
   void _buildItems() {
     _items = [];
     _selectableIndices = [];
+
+    // Boolean filters first (most used)
+    _selectableIndices.add(_items.length);
+    _items.add(const _FilterItem(
+      type: _FilterItemType.option,
+      category: _FilterCategory.region,
+      label: 'Favorites Only',
+    ));
+
+    if (!widget.isLocalSystem) {
+      _selectableIndices.add(_items.length);
+      _items.add(const _FilterItem(
+        type: _FilterItemType.option,
+        category: _FilterCategory.language,
+        label: 'Installed Only',
+      ));
+    }
 
     if (widget.availableRegions.isNotEmpty) {
       _regionSectionStart = _items.length;
@@ -183,6 +210,17 @@ class _FilterOverlayState extends State<FilterOverlay>
   void _toggleCurrent() {
     if (!_selectableIndices.contains(_focusedIndex)) return;
     final item = _items[_focusedIndex];
+    
+    // Handle toggle filters
+    if (item.label == 'Favorites Only') {
+      widget.onToggleFavorites();
+      return;
+    }
+    if (item.label == 'Installed Only') {
+      widget.onToggleLocal();
+      return;
+    }
+    
     if (item.option == null) return;
 
     if (item.category == _FilterCategory.region) {
@@ -215,6 +253,8 @@ class _FilterOverlayState extends State<FilterOverlay>
   }
 
   bool _isSelected(_FilterItem item) {
+    if (item.label == 'Favorites Only') return widget.favoritesOnly;
+    if (item.label == 'Installed Only') return widget.localOnly;
     if (item.option == null) return false;
     if (item.category == _FilterCategory.region) {
       return widget.selectedRegions.contains(item.option!.id);
@@ -225,7 +265,7 @@ class _FilterOverlayState extends State<FilterOverlay>
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
-    final totalActive = widget.selectedRegions.length + widget.selectedLanguages.length;
+    final totalActive = widget.selectedRegions.length + widget.selectedLanguages.length + (widget.favoritesOnly ? 1 : 0) + (widget.localOnly ? 1 : 0);
 
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -417,7 +457,8 @@ class _FilterOverlayState extends State<FilterOverlay>
     required bool isSelected,
     required int index,
   }) {
-    final option = item.option!;
+    final option = item.option;
+    final isToggle = option == null;
     final fontSize = rs.isSmall ? 13.0 : 15.0;
     final countFontSize = rs.isSmall ? 11.0 : 12.0;
     final horizontalPadding = rs.isSmall ? rs.spacing.md : rs.spacing.lg;
@@ -478,15 +519,24 @@ class _FilterOverlayState extends State<FilterOverlay>
             ),
             const SizedBox(width: 8),
             // Flag
-            Text(
-              option.flag,
-              style: const TextStyle(fontSize: 16),
-            ),
-            const SizedBox(width: 8),
+            if (!isToggle) ...[
+              Text(
+                option.flag,
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(width: 8),
+            ] else ...[
+              Icon(
+                item.label == 'Favorites Only' ? Icons.star : Icons.save_alt,
+                size: 16,
+                color: isSelected ? Colors.white : Colors.grey[400],
+              ),
+              const SizedBox(width: 8),
+            ],
             // Label
             Expanded(
               child: Text(
-                option.label,
+                isToggle ? item.label : option.label,
                 style: TextStyle(
                   fontSize: fontSize,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
@@ -500,21 +550,22 @@ class _FilterOverlayState extends State<FilterOverlay>
               ),
             ),
             // Count badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '${option.count}',
-                style: TextStyle(
-                  fontSize: countFontSize,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey[500],
+            if (!isToggle)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${option.count}',
+                  style: TextStyle(
+                    fontSize: countFontSize,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[500],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),

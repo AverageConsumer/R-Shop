@@ -15,6 +15,7 @@ import 'widgets/console_setup_hud.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/console_setup_step.dart';
 import 'widgets/pixel_mascot.dart';
+import 'widgets/local_setup_step.dart';
 import 'widgets/romm_setup_step.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -110,6 +111,35 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       }
     }
 
+    // Local setup step — delegate based on phase
+    if (state.currentStep == OnboardingStep.localSetup) {
+      final ls = state.localSetupState;
+      if (ls != null) {
+        if (ls.isScanningPhase) {
+          return KeyEventResult.handled;
+        }
+        if (ls.isResultsPhase) {
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+              event.logicalKey == LogicalKeyboardKey.escape) {
+            controller.localSetupBack();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
+            _handleContinue();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        }
+        // Choice phase
+        if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+            event.logicalKey == LogicalKeyboardKey.escape) {
+          _handleBack();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      }
+    }
+
     // Console setup step — delegate based on sub-state
     if (state.currentStep == OnboardingStep.consoleSetup) {
       // Provider form is open
@@ -202,6 +232,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         }
       }
       return;
+    } else if (state.currentStep == OnboardingStep.localSetup) {
+      final ls = state.localSetupState;
+      if (ls != null && ls.isResultsPhase) {
+        feedback.tick();
+        controller.localSetupConfirm();
+      }
+      return;
     } else if (state.currentStep == OnboardingStep.consoleSetup) {
       // Need at least one console configured to proceed
       if (state.configuredCount == 0) return;
@@ -223,6 +260,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       audioManager.stopTyping();
       feedback.cancel();
       controller.rommSetupBack();
+      return;
+    }
+
+    if (state.currentStep == OnboardingStep.localSetup) {
+      audioManager.stopTyping();
+      feedback.cancel();
+      controller.localSetupBack();
       return;
     }
 
@@ -295,6 +339,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ref.listen(onboardingControllerProvider.select((s) => s.currentStep), (prev, next) {
       if (next == OnboardingStep.consoleSetup) return;
       if (next == OnboardingStep.rommSetup) return;
+      if (next == OnboardingStep.localSetup) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_focusNode.hasFocus) {
           _focusNode.requestFocus();
@@ -385,6 +430,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         return _LegalNoticeStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.rommSetup:
         return RommSetupStep(onComplete: controller.onMessageComplete);
+      case OnboardingStep.localSetup:
+        return LocalSetupStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.consoleSetup:
         return ConsoleSetupStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.complete:
@@ -404,7 +451,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           case RommSetupSubStep.ask:
             return ConsoleHud(
               b: HudAction('Back', onTap: _handleBack),
-              showDownloads: false,
             );
           case RommSetupSubStep.connect:
             final controller =
@@ -417,7 +463,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ? controller.testRommSetupConnection
                     : null,
               ),
-              showDownloads: false,
             );
           case RommSetupSubStep.select:
             final controller =
@@ -433,7 +478,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 onTap: () =>
                     controller.toggleAllRommSystems(!allSelected),
               ),
-              showDownloads: false,
             );
           case RommSetupSubStep.folder:
             final controller =
@@ -442,10 +486,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               start: HudAction('Continue', onTap: _handleContinue,
                   highlight: true),
               b: HudAction('Back', onTap: () => controller.rommSetupBack()),
-              showDownloads: false,
             );
         }
       }
+    }
+
+    if (state.currentStep == OnboardingStep.localSetup) {
+      final ls = state.localSetupState;
+      if (ls != null && ls.isResultsPhase) {
+        return ConsoleHud(
+          start: HudAction('Continue', onTap: _handleContinue, highlight: true),
+          b: HudAction('Back', onTap: _handleBack),
+        );
+      }
+      return ConsoleHud(
+        b: HudAction('Back', onTap: _handleBack),
+      );
     }
 
     if (state.currentStep == OnboardingStep.consoleSetup) {

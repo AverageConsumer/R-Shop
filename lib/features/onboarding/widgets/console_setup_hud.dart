@@ -21,7 +21,6 @@ ConsoleHud? buildConsoleSetupHud({
             ? null
             : controller.testProviderConnection,
       ),
-      showDownloads: false,
     );
   }
 
@@ -29,7 +28,6 @@ ConsoleHud? buildConsoleSetupHud({
     return ConsoleHud(
       b: HudAction('Close', onTap: controller.deselectConsole),
       y: HudAction('Add Source', onTap: controller.startAddProvider),
-      showDownloads: false,
     );
   }
 
