@@ -8,6 +8,7 @@ import '../../../services/database_service.dart';
 import '../../../services/rom_manager.dart';
 import '../../../services/storage_service.dart';
 import '../../../services/unified_game_service.dart';
+import '../../../utils/friendly_error.dart';
 import '../../../utils/game_metadata.dart';
 import 'filter_state.dart';
 
@@ -26,6 +27,7 @@ class GameListState {
   final List<FilterOption> availableRegions;
   final List<FilterOption> availableLanguages;
   final Map<String, List<GameItem>> filteredGroupedGames;
+  final bool isLocalOnly;
 
   const GameListState({
     this.allGames = const [],
@@ -42,6 +44,7 @@ class GameListState {
     this.availableRegions = const [],
     this.availableLanguages = const [],
     this.filteredGroupedGames = const {},
+    this.isLocalOnly = false,
   });
 
   GameListState copyWith({
@@ -59,6 +62,7 @@ class GameListState {
     List<FilterOption>? availableRegions,
     List<FilterOption>? availableLanguages,
     Map<String, List<GameItem>>? filteredGroupedGames,
+    bool? isLocalOnly,
   }) {
     return GameListState(
       allGames: allGames ?? this.allGames,
@@ -75,6 +79,7 @@ class GameListState {
       availableRegions: availableRegions ?? this.availableRegions,
       availableLanguages: availableLanguages ?? this.availableLanguages,
       filteredGroupedGames: filteredGroupedGames ?? this.filteredGroupedGames,
+      isLocalOnly: isLocalOnly ?? this.isLocalOnly,
     );
   }
 }
@@ -86,9 +91,21 @@ class GameListController extends ChangeNotifier {
   final UnifiedGameService _unifiedService;
   final DatabaseService _databaseService;
   final StorageService? _storage;
+  bool _disposed = false;
 
   GameListState _state = const GameListState();
   GameListState get state => _state;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
 
   GameListController({
     required this.system,
@@ -108,13 +125,45 @@ class GameListController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final games = await _unifiedService.fetchGamesForSystem(systemConfig);
-      _state = _state.copyWith(allGames: games);
+      final List<GameItem> games;
+      if (systemConfig.providers.isEmpty) {
+        games = await RomManager.scanLocalGames(system, targetFolder);
+        _state = _state.copyWith(allGames: games, isLocalOnly: true);
+      } else {
+        final remoteGames = await _unifiedService.fetchGamesForSystem(systemConfig);
+        final localGames = await RomManager.scanLocalGames(system, targetFolder);
+
+        // Compute local filenames that remote archives would produce after extraction
+        // (e.g. "Game.zip" → "Game.iso"), so we can skip redundant local entries.
+        final remoteTargetNames = <String>{};
+        for (final game in remoteGames) {
+          final targetName = RomManager.getTargetFilename(game, system);
+          if (targetName != game.filename) {
+            remoteTargetNames.add(targetName);
+          }
+        }
+
+        // Merge: remote wins on filename collision (has URL, cover, provider info)
+        final byFilename = <String, GameItem>{};
+        for (final game in remoteGames) {
+          byFilename[game.filename] = game;
+        }
+        for (final game in localGames) {
+          if (remoteTargetNames.contains(game.filename)) continue;
+          byFilename.putIfAbsent(game.filename, () => game);
+        }
+
+        games = byFilename.values.toList()
+          ..sort((a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
+        _state = _state.copyWith(allGames: games, isLocalOnly: false);
+      }
       _groupGames();
       _restoreFilters();
       await _checkInstalledStatus();
+      // Populate global search database
+      _databaseService.saveGames(system.id, _state.allGames);
     } catch (e) {
-      _state = _state.copyWith(error: e.toString(), isLoading: false);
+      _state = _state.copyWith(error: getUserFriendlyError(e), isLoading: false);
       notifyListeners();
     }
   }

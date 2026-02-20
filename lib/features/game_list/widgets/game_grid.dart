@@ -20,6 +20,10 @@ class GameGrid extends StatefulWidget {
   final void Function(String displayName, List<GameItem> variants) onOpenGame;
   final void Function(int index) onSelectionChanged;
   final void Function(String url, List<GameItem> variants) onCoverFound;
+  final String searchQuery;
+  final bool hasActiveFilters;
+  final bool isLocalOnly;
+  final String targetFolder;
 
   const GameGrid({
     super.key,
@@ -36,6 +40,10 @@ class GameGrid extends StatefulWidget {
     required this.onOpenGame,
     required this.onSelectionChanged,
     required this.onCoverFound,
+    this.searchQuery = '',
+    this.hasActiveFilters = false,
+    this.isLocalOnly = false,
+    this.targetFolder = '',
   });
 
   @override
@@ -48,24 +56,36 @@ class _GameGridState extends State<GameGrid> {
     final rs = context.rs;
 
     if (widget.filteredGroups.isEmpty) {
+      final (icon, message) = _emptyStateContent();
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.games_outlined,
-              size: rs.isSmall ? 48 : 64,
-              color: Colors.grey[600],
+        child: Container(
+          padding: EdgeInsets.all(rs.spacing.xl),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(rs.radius.lg),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.08),
             ),
-            SizedBox(height: rs.spacing.md),
-            Text(
-              'No games found',
-              style: TextStyle(
-                color: Colors.grey[500],
-                fontSize: rs.isSmall ? 14 : 18,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: rs.isSmall ? 48 : 64,
+                color: Colors.white.withValues(alpha: 0.15),
               ),
-            ),
-          ],
+              SizedBox(height: rs.spacing.md),
+              Text(
+                message,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  fontSize: rs.isSmall ? 14 : 18,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -77,6 +97,7 @@ class _GameGridState extends State<GameGrid> {
         onNotification: widget.onScrollNotification,
         child: RepaintBoundary(
           child: GridView.builder(
+            cacheExtent: 500,
             controller: widget.scrollController,
             padding: EdgeInsets.only(
               left: rs.spacing.lg,
@@ -96,6 +117,19 @@ class _GameGridState extends State<GameGrid> {
         ),
       ),
     );
+  }
+
+  (IconData, String) _emptyStateContent() {
+    if (widget.searchQuery.isNotEmpty) {
+      return (Icons.search_off, "No games match '${widget.searchQuery}'");
+    }
+    if (widget.hasActiveFilters) {
+      return (Icons.filter_list_off, 'No games match current filters');
+    }
+    if (widget.isLocalOnly) {
+      return (Icons.folder_open, 'No ROMs found in ${widget.targetFolder}');
+    }
+    return (Icons.cloud_off, 'Could not load games \u2014 check your connection');
   }
 
   Widget _buildItem(BuildContext context, int index) {

@@ -586,6 +586,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     if (provider.auth?.user != null) fields['user'] = provider.auth!.user;
     if (provider.auth?.pass != null) fields['pass'] = provider.auth!.pass;
     if (provider.auth?.apiKey != null) fields['apiKey'] = provider.auth!.apiKey;
+    if (provider.auth?.domain != null) fields['domain'] = provider.auth!.domain;
 
     // Restore RomM platform selection when editing
     RommPlatform? restoredPlatform;
@@ -653,13 +654,16 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     final user = form.fields['user'] as String?;
     final pass = form.fields['pass'] as String?;
     final apiKey = form.fields['apiKey'] as String?;
+    final domain = form.fields['domain'] as String?;
     if ((user != null && user.isNotEmpty) ||
         (pass != null && pass.isNotEmpty) ||
-        (apiKey != null && apiKey.isNotEmpty)) {
+        (apiKey != null && apiKey.isNotEmpty) ||
+        (domain != null && domain.isNotEmpty)) {
       auth = AuthConfig(
         user: user?.isNotEmpty == true ? user : null,
         pass: pass?.isNotEmpty == true ? pass : null,
         apiKey: apiKey?.isNotEmpty == true ? apiKey : null,
+        domain: domain?.isNotEmpty == true ? domain : null,
       );
     }
 

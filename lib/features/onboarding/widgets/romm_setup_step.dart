@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/console_focusable.dart';
 import '../../../models/system_model.dart';
 import '../../../providers/app_providers.dart';
@@ -389,19 +390,40 @@ class _RommConnectViewState extends ConsumerState<_RommConnectView> {
             ),
           ),
           SizedBox(height: rs.spacing.xs),
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
-              borderRadius: BorderRadius.circular(rs.radius.sm),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-            ),
+          ListenableBuilder(
+            listenable: textFocusNode,
+            builder: (context, child) {
+              final hasFocus = textFocusNode.hasFocus;
+              return Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF252525),
+                  borderRadius: BorderRadius.circular(rs.radius.sm),
+                  border: Border.all(
+                    color: hasFocus
+                        ? AppTheme.primaryColor
+                        : AppTheme.primaryColor.withValues(alpha: 0.4),
+                    width: 2,
+                  ),
+                  boxShadow: hasFocus
+                      ? [
+                          BoxShadow(
+                            color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: child,
+              );
+            },
             child: CallbackShortcuts(
               bindings: {
-                const SingleActivator(LogicalKeyboardKey.escape): () =>
+                const SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false): () =>
                     consoleFocusNode.requestFocus(),
-                const SingleActivator(LogicalKeyboardKey.gameButtonB): () =>
+                const SingleActivator(LogicalKeyboardKey.gameButtonB, includeRepeats: false): () =>
                     consoleFocusNode.requestFocus(),
-                const SingleActivator(LogicalKeyboardKey.goBack): () =>
+                const SingleActivator(LogicalKeyboardKey.goBack, includeRepeats: false): () =>
                     consoleFocusNode.requestFocus(),
               },
               child: TextField(
@@ -601,6 +623,7 @@ class _SystemRow extends StatelessWidget {
                 system.iconAssetPath,
                 width: iconSize,
                 height: iconSize,
+                cacheWidth: 128,
                 errorBuilder: (_, __, ___) => Icon(
                   Icons.videogame_asset,
                   color: system.accentColor,
@@ -896,10 +919,11 @@ class _FolderResultsView extends ConsumerWidget {
                 child: ListView(
                   children: [
                     // Matched folders (RomM)
-                    for (final folder in matched)
+                    for (final (i, folder) in matched.indexed)
                       _FolderRow(
                         folder: folder,
                         status: _FolderStatus.matched,
+                        autofocus: i == 0,
                         assignedSystemId: manualAssignments.entries
                                 .where((e) => e.value == folder.name)
                                 .map((e) => e.key)
@@ -1039,11 +1063,13 @@ class _FolderRow extends StatelessWidget {
   final ScannedFolder folder;
   final _FolderStatus status;
   final String? assignedSystemId;
+  final bool autofocus;
 
   const _FolderRow({
     required this.folder,
     required this.status,
     this.assignedSystemId,
+    this.autofocus = false,
   });
 
   @override
@@ -1082,14 +1108,13 @@ class _FolderRow extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.only(bottom: rs.spacing.xs),
-      child: Container(
+      child: ConsoleFocusableListItem(
+        onSelect: () {},
+        autofocus: autofocus,
+        borderRadius: rs.radius.sm,
         padding: EdgeInsets.symmetric(
           horizontal: rs.spacing.md,
           vertical: rs.spacing.sm,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(rs.radius.sm),
         ),
         child: Row(
           children: [

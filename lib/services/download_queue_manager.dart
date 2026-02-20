@@ -78,6 +78,7 @@ class DownloadQueueManager extends ChangeNotifier {
 
   final Map<String, StreamSubscription?> _subscriptions = {};
   final Map<String, DownloadService> _downloadServices = {};
+  final Map<String, Timer> _retryTimers = {};
   final StorageService _storage;
 
   DownloadQueueManager(this._storage) {
@@ -104,7 +105,9 @@ class DownloadQueueManager extends ChangeNotifier {
     const delays = [5, 15, 45];
     final delaySeconds = delays[retryCount.clamp(0, delays.length - 1)];
 
-    Future.delayed(Duration(seconds: delaySeconds), () {
+    _retryTimers[id]?.cancel();
+    _retryTimers[id] = Timer(Duration(seconds: delaySeconds), () {
+      _retryTimers.remove(id);
       final item = _state.getDownloadById(id);
       if (item == null || item.status != DownloadItemStatus.error) return;
 
@@ -136,6 +139,10 @@ class DownloadQueueManager extends ChangeNotifier {
       targetFolder: targetFolder,
     );
 
+    // Cancel any pending retry timer for this item
+    _retryTimers[id]?.cancel();
+    _retryTimers.remove(id);
+
     final newQueue = List<DownloadItem>.from(_state.queue);
 
     if (existing != null) {
@@ -156,6 +163,9 @@ class DownloadQueueManager extends ChangeNotifier {
     final item = _state.getDownloadById(id);
     if (item == null) return;
 
+    _retryTimers[id]?.cancel();
+    _retryTimers.remove(id);
+
     _subscriptions[id]?.cancel();
     _subscriptions.remove(id);
 
@@ -175,6 +185,9 @@ class DownloadQueueManager extends ChangeNotifier {
     if (item.isActive) {
       await cancelDownload(id);
     }
+
+    _retryTimers[id]?.cancel();
+    _retryTimers.remove(id);
 
     final newQueue = List<DownloadItem>.from(_state.queue)
       ..removeWhere((i) => i.id == id);
@@ -417,13 +430,17 @@ class DownloadQueueManager extends ChangeNotifier {
 
     try {
       final List<dynamic> list = jsonDecode(json) as List<dynamic>;
-      final systemMap = {for (final s in systems) s.name: s};
+      final systemMapById = {for (final s in systems) s.id: s};
+      // Legacy fallback: older persisted queues used system.name
+      final systemMapByName = {for (final s in systems) s.name: s};
 
       final restored = <DownloadItem>[];
       for (final item in list) {
         final map = item as Map<String, dynamic>;
+        final systemId = map['systemId'] as String?;
         final systemName = map['systemName'] as String?;
-        final system = systemName != null ? systemMap[systemName] : null;
+        final system = (systemId != null ? systemMapById[systemId] : null)
+            ?? (systemName != null ? systemMapByName[systemName] : null);
         if (system == null) continue;
 
         final downloadItem = DownloadItem.fromJson(map, system);
@@ -452,6 +469,11 @@ class DownloadQueueManager extends ChangeNotifier {
   @override
   void dispose() {
     _notificationThrottle?.cancel();
+
+    for (final timer in _retryTimers.values) {
+      timer.cancel();
+    }
+    _retryTimers.clear();
 
     for (final sub in _subscriptions.values) {
       sub?.cancel();

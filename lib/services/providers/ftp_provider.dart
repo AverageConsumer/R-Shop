@@ -59,7 +59,33 @@ class FtpProvider implements SourceProvider {
 
   @override
   Future<DownloadHandle> resolveDownload(GameItem game) async {
-    return FtpDownloadHandle(downloadToFile: (dest) => downloadToFile(game.url, dest));
+    FTPConnect? activeClient;
+    return FtpDownloadHandle(
+      downloadToFile: (dest, {onProgress}) async {
+        final ftp = _createClient();
+        activeClient = ftp;
+        await ftp.connect();
+        try {
+          final lastSlash = game.url.lastIndexOf('/');
+          if (lastSlash > 0) {
+            await ftp.changeDirectory(game.url.substring(0, lastSlash));
+          }
+          final fileName = game.url.substring(lastSlash + 1);
+          await ftp.downloadFile(fileName, dest, onProgress: onProgress);
+        } finally {
+          activeClient = null;
+          await ftp.disconnect();
+        }
+      },
+      disconnect: () async {
+        final client = activeClient;
+        if (client == null) return;
+        activeClient = null;
+        try {
+          await client.disconnect();
+        } catch (_) {}
+      },
+    );
   }
 
   @override

@@ -40,6 +40,9 @@ class RommRom {
   final String fileName;
   final int platformId;
   final String? urlCover;
+  final String? pathCoverSmall;
+  final String? pathCoverLarge;
+  final List<String> mergedScreenshots;
 
   const RommRom({
     required this.id,
@@ -47,15 +50,24 @@ class RommRom {
     required this.fileName,
     required this.platformId,
     this.urlCover,
+    this.pathCoverSmall,
+    this.pathCoverLarge,
+    this.mergedScreenshots = const [],
   });
 
   factory RommRom.fromJson(Map<String, dynamic> json) {
+    final screenshots = json['merged_screenshots'];
     return RommRom(
       id: json['id'] as int,
       name: json['name'] as String? ?? '',
       fileName: json['file_name'] as String? ?? json['fs_name'] as String? ?? '',
       platformId: json['platform_id'] as int? ?? 0,
       urlCover: json['url_cover'] as String?,
+      pathCoverSmall: json['path_cover_small'] as String?,
+      pathCoverLarge: json['path_cover_large'] as String?,
+      mergedScreenshots: screenshots is List
+          ? screenshots.whereType<String>().toList()
+          : const [],
     );
   }
 }
@@ -63,7 +75,12 @@ class RommRom {
 class RommApiService {
   final Dio _dio;
 
-  RommApiService({Dio? dio}) : _dio = dio ?? Dio();
+  RommApiService({Dio? dio})
+      : _dio = dio ??
+            Dio(BaseOptions(
+              connectTimeout: const Duration(seconds: 15),
+              receiveTimeout: const Duration(seconds: 30),
+            ));
 
   Options? _buildAuthOptions(AuthConfig? auth) {
     if (auth == null) return null;
@@ -153,6 +170,7 @@ class RommApiService {
 
       if (list.length < pageSize) break;
       offset += pageSize;
+      if (offset > 50000) break; // Safety guard against infinite pagination
     }
 
     return allRoms;
@@ -187,10 +205,29 @@ class RommApiService {
   }
 
   String? buildCoverUrl(String baseUrl, RommRom rom) {
-    if (rom.urlCover == null || rom.urlCover!.isEmpty) return null;
     final base = _normalizeBaseUrl(baseUrl);
-    final cover = rom.urlCover!;
-    if (cover.startsWith('http')) return cover;
-    return '$base$cover';
+
+    // 1. External CDN URL (fastest)
+    final cover = rom.urlCover;
+    if (cover != null && cover.isNotEmpty) {
+      if (cover.startsWith('http')) return cover;
+      return '$base$cover';
+    }
+
+    // 2. Local cover from RomM instance
+    final small = rom.pathCoverSmall;
+    if (small != null && small.isNotEmpty) return '$base$small';
+
+    final large = rom.pathCoverLarge;
+    if (large != null && large.isNotEmpty) return '$base$large';
+
+    // 3. First screenshot as fallback cover
+    if (rom.mergedScreenshots.isNotEmpty) {
+      final screenshot = rom.mergedScreenshots.first;
+      if (screenshot.startsWith('http')) return screenshot;
+      return '$base$screenshot';
+    }
+
+    return null;
   }
 }

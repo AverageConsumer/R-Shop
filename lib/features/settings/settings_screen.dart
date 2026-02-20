@@ -9,10 +9,11 @@ import '../../providers/download_providers.dart';
 import '../../services/config_storage_service.dart';
 import '../../services/database_service.dart';
 import '../../services/image_cache_service.dart';
+import '../../widgets/console_hud.dart';
+import '../../widgets/console_notification.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
 import 'config_mode_screen.dart';
-// TODO: re-enable for next release
-// import 'romm_config_screen.dart';
+import 'romm_config_screen.dart';
 import 'widgets/settings_item.dart';
 import 'widgets/volume_slider.dart';
 
@@ -67,7 +68,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     super.dispose();
   }
 
-  void _toggleHaptic() async {
+  Future<void> _toggleHaptic() async {
     final value = !_hapticEnabled;
     final storage = ref.read(storageServiceProvider);
     final haptic = ref.read(hapticServiceProvider);
@@ -77,7 +78,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     if (value) haptic.tick();
   }
 
-  void _toggleSound() async {
+  Future<void> _toggleSound() async {
     final value = !_soundEnabled;
     setState(() => _soundEnabled = value);
     await ref.read(soundSettingsProvider.notifier).setEnabled(value);
@@ -86,25 +87,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     }
   }
 
-  void _adjustBgmVolume(double delta) async {
+  Future<void> _adjustBgmVolume(double delta) async {
     final newVolume = (_bgmVolume + delta).clamp(0.0, 1.0);
     setState(() => _bgmVolume = newVolume);
     await ref.read(soundSettingsProvider.notifier).setBgmVolume(newVolume);
   }
 
-  void _adjustSfxVolume(double delta) async {
+  Future<void> _adjustSfxVolume(double delta) async {
     final newVolume = (_sfxVolume + delta).clamp(0.0, 1.0);
     setState(() => _sfxVolume = newVolume);
     await ref.read(soundSettingsProvider.notifier).setSfxVolume(newVolume);
   }
 
-  void _setBgmVolume(double volume) async {
+  Future<void> _setBgmVolume(double volume) async {
     final clamped = volume.clamp(0.0, 1.0);
     setState(() => _bgmVolume = clamped);
     await ref.read(soundSettingsProvider.notifier).setBgmVolume(clamped);
   }
 
-  void _setSfxVolume(double volume) async {
+  Future<void> _setSfxVolume(double volume) async {
     final clamped = volume.clamp(0.0, 1.0);
     setState(() => _sfxVolume = clamped);
     await ref.read(soundSettingsProvider.notifier).setSfxVolume(clamped);
@@ -117,13 +118,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     ref.read(downloadQueueManagerProvider).setMaxConcurrent(newValue);
   }
 
-  // TODO: re-enable for next release
-  // void _openRommConfig() {
-  //   Navigator.push(
-  //     context,
-  //     MaterialPageRoute(builder: (context) => const RommConfigScreen()),
-  //   );
-  // }
+  void _openRommConfig() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const RommConfigScreen()),
+    );
+  }
 
   void _showResetDialog() {
     setState(() => _showResetConfirm = true);
@@ -133,15 +133,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     setState(() => _showResetConfirm = false);
   }
 
-  void _performReset() async {
-    final storage = ref.read(storageServiceProvider);
-    await storage.resetAll();
-    await ConfigStorageService().deleteConfig();
-    await DatabaseService().clearCache();
-    await GameCoverCacheManager.instance.emptyCache();
-    FailedUrlsCache.instance.clear();
-    _hideResetDialog();
-    widget.onResetOnboarding?.call();
+  Future<void> _performReset() async {
+    try {
+      final storage = ref.read(storageServiceProvider);
+      await storage.resetAll();
+      await ConfigStorageService().deleteConfig();
+      await DatabaseService().clearCache();
+      await GameCoverCacheManager.instance.emptyCache();
+      FailedUrlsCache.instance.clear();
+      _hideResetDialog();
+      widget.onResetOnboarding?.call();
+    } catch (e) {
+      _hideResetDialog();
+      if (mounted) {
+        showConsoleNotification(context, message: 'Reset error: $e');
+      }
+    }
   }
 
   void _exitSettings() {
@@ -307,27 +314,67 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             child: SettingsItem(
                               title: 'Max Concurrent Downloads',
                               subtitle: 'Number of simultaneous downloads',
-                              trailing: Text(
-                                '$_maxDownloads',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              trailingBuilder: (isFocused) => Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      _adjustMaxDownloads(-1);
+                                      ref.read(feedbackServiceProvider).tick();
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8),
+                                      child: Icon(
+                                        Icons.chevron_left,
+                                        color: _maxDownloads > 1
+                                            ? (isFocused ? Colors.white : Colors.white70)
+                                            : Colors.white24,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 24,
+                                    child: Text(
+                                      '$_maxDownloads',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: isFocused ? Colors.white : Colors.white70,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      _adjustMaxDownloads(1);
+                                      ref.read(feedbackServiceProvider).tick();
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8),
+                                      child: Icon(
+                                        Icons.chevron_right,
+                                        color: _maxDownloads < 3
+                                            ? (isFocused ? Colors.white : Colors.white70)
+                                            : Colors.white24,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
 
-                          // TODO: re-enable for next release
-                          // SizedBox(height: rs.spacing.xl),
-                          // _buildSectionHeader('Connections', rs),
-                          //
-                          // SettingsItem(
-                          //   title: 'RomM Server',
-                          //   subtitle: 'Global RomM connection settings',
-                          //   trailing: const Icon(Icons.dns_outlined, color: Colors.white70),
-                          //   onTap: _openRommConfig,
-                          // ),
+                          SizedBox(height: rs.spacing.xl),
+                          _buildSectionHeader('Connections', rs),
+
+                          SettingsItem(
+                            title: 'RomM Server',
+                            subtitle: 'Global RomM connection settings',
+                            trailing: const Icon(Icons.dns_outlined, color: Colors.white70),
+                            onTap: _openRommConfig,
+                          ),
 
                           SizedBox(height: rs.spacing.xl),
                           _buildSectionHeader('System', rs),
@@ -338,19 +385,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             trailing: const Icon(Icons.tune, color: Colors.white70),
                             onTap: _openConfigMode,
                           ),
-                          SizedBox(height: rs.spacing.md),
-                          SettingsItem(
-                            title: 'Reset App',
-                            subtitle: 'Delete config and return to onboarding',
-                            trailing: const Icon(Icons.refresh, color: Colors.white70),
-                            onTap: _showResetDialog,
-                            isDestructive: true,
-                          ),
                         ],
                       ),
                     ),
                   ),
                 ),
+              ),
+              ConsoleHud(
+                b: HudAction('Back', onTap: _exitSettings),
+                x: HudAction('Reset', onTap: _showResetDialog),
+                showDownloads: false,
+                embedded: true,
               ),
             ],
           ),

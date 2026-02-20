@@ -26,6 +26,7 @@ class OverlayFocusScope extends ConsumerStatefulWidget {
 class _OverlayFocusScopeState extends ConsumerState<OverlayFocusScope> {
   final FocusScopeNode _scopeNode = FocusScopeNode(debugLabel: 'OverlayScope');
   late final StateController<OverlayPriority> _priorityController;
+  bool _hasClaimed = false;
 
   @override
   void initState() {
@@ -57,7 +58,8 @@ class _OverlayFocusScopeState extends ConsumerState<OverlayFocusScope> {
 
   @override
   void dispose() {
-    if (widget.isVisible) {
+    if (_hasClaimed) {
+      _hasClaimed = false;
       final controller = _priorityController;
       final priority = widget.priority;
       Future(() {
@@ -75,10 +77,12 @@ class _OverlayFocusScopeState extends ConsumerState<OverlayFocusScope> {
     if (widget.priority.level > currentPriority.level) {
       _priorityController.state = widget.priority;
     }
+    _hasClaimed = true;
     _scopeNode.requestFocus();
   }
 
   void _releasePriority() {
+    _hasClaimed = false;
     final currentPriority = _priorityController.state;
     if (currentPriority == widget.priority) {
       _priorityController.state = OverlayPriority.none;
@@ -120,6 +124,7 @@ class _DialogFocusScopeState extends ConsumerState<DialogFocusScope> {
   final FocusScopeNode _scopeNode = FocusScopeNode(debugLabel: 'DialogScope');
   final FocusNode _rootFocusNode = FocusNode(debugLabel: 'DialogRoot');
   late final StateController<OverlayPriority> _priorityController;
+  bool _hasClaimed = false;
 
   @override
   void initState() {
@@ -153,7 +158,8 @@ class _DialogFocusScopeState extends ConsumerState<DialogFocusScope> {
 
   @override
   void dispose() {
-    if (widget.isVisible) {
+    if (_hasClaimed) {
+      _hasClaimed = false;
       final controller = _priorityController;
       Future(() {
         if (controller.state == OverlayPriority.dialog) {
@@ -171,10 +177,12 @@ class _DialogFocusScopeState extends ConsumerState<DialogFocusScope> {
     if (OverlayPriority.dialog.level > currentPriority.level) {
       _priorityController.state = OverlayPriority.dialog;
     }
+    _hasClaimed = true;
     _rootFocusNode.requestFocus();
   }
 
   void _releasePriority() {
+    _hasClaimed = false;
     final currentPriority = _priorityController.state;
     if (currentPriority == OverlayPriority.dialog) {
       _priorityController.state = OverlayPriority.none;
@@ -221,6 +229,7 @@ class SearchFocusScope extends ConsumerStatefulWidget {
 class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
   final FocusScopeNode _scopeNode = FocusScopeNode(debugLabel: 'SearchScope');
   late final StateController<OverlayPriority> _priorityController;
+  bool _hasClaimed = false;
 
   @override
   void initState() {
@@ -254,7 +263,8 @@ class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
 
   @override
   void dispose() {
-    if (widget.isVisible) {
+    if (_hasClaimed) {
+      _hasClaimed = false;
       final controller = _priorityController;
       Future(() {
         if (controller.state == OverlayPriority.search) {
@@ -271,6 +281,7 @@ class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
     if (OverlayPriority.search.level > currentPriority.level) {
       _priorityController.state = OverlayPriority.search;
     }
+    _hasClaimed = true;
     if (widget.textFieldFocusNode != null) {
       widget.textFieldFocusNode!.requestFocus();
     } else {
@@ -279,6 +290,7 @@ class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
   }
 
   void _releasePriority() {
+    _hasClaimed = false;
     final currentPriority = _priorityController.state;
     if (currentPriority == OverlayPriority.search) {
       _priorityController.state = OverlayPriority.none;

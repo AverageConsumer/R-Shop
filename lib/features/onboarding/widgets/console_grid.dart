@@ -31,11 +31,14 @@ class ConsoleGrid extends ConsumerWidget {
         itemCount: systems.length,
         itemBuilder: (context, index) {
           final system = systems[index];
-          final isConfigured = state.configuredSystems.containsKey(system.id);
+          final systemConfig = state.configuredSystems[system.id];
+          final isConfigured =
+              systemConfig != null && systemConfig.providers.isNotEmpty;
           final hasRommMatch =
               state.rommSelectedSystemIds.contains(system.id);
           final hasLocalMatch =
-              state.localOnlySystemIds.contains(system.id);
+              state.localOnlySystemIds.contains(system.id) ||
+                  (systemConfig != null && systemConfig.providers.isEmpty);
 
           return _ConsoleTile(
             system: system,
@@ -142,6 +145,7 @@ class _ConsoleTileState extends State<_ConsoleTile> {
                         widget.system.iconAssetPath,
                         width: iconSize,
                         height: iconSize,
+                        cacheWidth: 128,
                         errorBuilder: (_, __, ___) => Icon(
                           Icons.videogame_asset,
                           color: widget.system.accentColor,

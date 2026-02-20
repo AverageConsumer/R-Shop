@@ -98,9 +98,6 @@ class NavigateAction extends Action<NavigateIntent> {
   final WidgetRef ref;
   final bool Function(NavigateIntent intent)? onNavigate;
 
-  static int _lastInvokeTime = 0;
-  static const int _navCooldownMs = 100;
-
   NavigateAction(this.ref, {this.onNavigate});
 
   @override
@@ -108,10 +105,6 @@ class NavigateAction extends Action<NavigateIntent> {
 
   @override
   Object? invoke(NavigateIntent intent) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastInvokeTime < _navCooldownMs) return null;
-    _lastInvokeTime = now;
-
     if (onNavigate != null) {
       final handled = onNavigate!(intent);
       if (handled) {
@@ -247,41 +240,41 @@ class TabRightAction extends Action<TabRightIntent> {
 
 class AppShortcuts {
   static Map<ShortcutActivator, Intent> get defaultShortcuts => {
-    // Back
-    const SingleActivator(LogicalKeyboardKey.gameButtonB): const BackIntent(),
-    const SingleActivator(LogicalKeyboardKey.escape): const BackIntent(),
-    const SingleActivator(LogicalKeyboardKey.backspace): const BackIntent(),
-    const SingleActivator(LogicalKeyboardKey.goBack): const BackIntent(),
+    // Back (no repeat)
+    const SingleActivator(LogicalKeyboardKey.gameButtonB, includeRepeats: false): const BackIntent(),
+    const SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false): const BackIntent(),
+    const SingleActivator(LogicalKeyboardKey.backspace, includeRepeats: false): const BackIntent(),
+    const SingleActivator(LogicalKeyboardKey.goBack, includeRepeats: false): const BackIntent(),
 
-    // Confirm
-    const SingleActivator(LogicalKeyboardKey.gameButtonA): const ConfirmIntent(),
-    const SingleActivator(LogicalKeyboardKey.enter): const ConfirmIntent(),
-    const SingleActivator(LogicalKeyboardKey.numpadEnter): const ConfirmIntent(),
-    const SingleActivator(LogicalKeyboardKey.space): const ConfirmIntent(),
-    const SingleActivator(LogicalKeyboardKey.gameButtonSelect): const ConfirmIntent(),
+    // Confirm (no repeat)
+    const SingleActivator(LogicalKeyboardKey.gameButtonA, includeRepeats: false): const ConfirmIntent(),
+    const SingleActivator(LogicalKeyboardKey.enter, includeRepeats: false): const ConfirmIntent(),
+    const SingleActivator(LogicalKeyboardKey.numpadEnter, includeRepeats: false): const ConfirmIntent(),
+    const SingleActivator(LogicalKeyboardKey.space, includeRepeats: false): const ConfirmIntent(),
+    const SingleActivator(LogicalKeyboardKey.gameButtonSelect, includeRepeats: false): const ConfirmIntent(),
 
-    // Search
-    const SingleActivator(LogicalKeyboardKey.gameButtonY): const SearchIntent(),
-    const SingleActivator(LogicalKeyboardKey.keyI): const SearchIntent(),
+    // Search (no repeat)
+    const SingleActivator(LogicalKeyboardKey.gameButtonY, includeRepeats: false): const SearchIntent(),
+    const SingleActivator(LogicalKeyboardKey.keyI, includeRepeats: false): const SearchIntent(),
 
-    // Overlay
-    const SingleActivator(LogicalKeyboardKey.gameButtonStart): const ToggleOverlayIntent(),
+    // Overlay (no repeat)
+    const SingleActivator(LogicalKeyboardKey.gameButtonStart, includeRepeats: false): const ToggleOverlayIntent(),
 
-    // Navigation
+    // Navigation (d-pad keeps repeat for scrolling)
     const SingleActivator(LogicalKeyboardKey.arrowUp): const NavigateIntent(GridDirection.up),
     const SingleActivator(LogicalKeyboardKey.arrowDown): const NavigateIntent(GridDirection.down),
     const SingleActivator(LogicalKeyboardKey.arrowLeft): const NavigateIntent(GridDirection.left),
     const SingleActivator(LogicalKeyboardKey.arrowRight): const NavigateIntent(GridDirection.right),
 
-    // Tabs / L1 R1
-    const SingleActivator(LogicalKeyboardKey.gameButtonLeft1): const TabLeftIntent(),
-    const SingleActivator(LogicalKeyboardKey.gameButtonRight1): const TabRightIntent(),
-    const SingleActivator(LogicalKeyboardKey.pageUp): const TabLeftIntent(),
-    const SingleActivator(LogicalKeyboardKey.pageDown): const TabRightIntent(),
-    const SingleActivator(LogicalKeyboardKey.bracketLeft): const TabLeftIntent(),
-    const SingleActivator(LogicalKeyboardKey.bracketRight): const TabRightIntent(),
+    // Tabs / L1 R1 (no repeat)
+    const SingleActivator(LogicalKeyboardKey.gameButtonLeft1, includeRepeats: false): const TabLeftIntent(),
+    const SingleActivator(LogicalKeyboardKey.gameButtonRight1, includeRepeats: false): const TabRightIntent(),
+    const SingleActivator(LogicalKeyboardKey.pageUp, includeRepeats: false): const TabLeftIntent(),
+    const SingleActivator(LogicalKeyboardKey.pageDown, includeRepeats: false): const TabRightIntent(),
+    const SingleActivator(LogicalKeyboardKey.bracketLeft, includeRepeats: false): const TabLeftIntent(),
+    const SingleActivator(LogicalKeyboardKey.bracketRight, includeRepeats: false): const TabRightIntent(),
 
-    // Info
-    const SingleActivator(LogicalKeyboardKey.gameButtonX): const InfoIntent(),
+    // Info (no repeat)
+    const SingleActivator(LogicalKeyboardKey.gameButtonX, includeRepeats: false): const InfoIntent(),
   };
 }

@@ -38,7 +38,7 @@ class _HomeViewState extends ConsumerState<HomeView>
   late InputDebouncer _debouncer;
 
   /// Filtered list of systems that have a config entry.
-  List<SystemModel> _configuredSystems = SystemModel.supportedSystems;
+  List<SystemModel> _configuredSystems = [];
 
   @override
   String get routeId => 'home';
@@ -60,8 +60,7 @@ class _HomeViewState extends ConsumerState<HomeView>
           return false;
         }),
         ConfirmIntent: ConfirmAction(ref, onConfirm: _navigateToCurrentSystem),
-        // TODO: re-enable for next release
-        // SearchIntent: SearchAction(ref, onSearch: _openGlobalSearch),
+        SearchIntent: SearchAction(ref, onSearch: _openGlobalSearch),
         InfoIntent: InfoAction(ref, onInfo: _openSettings),
         BackIntent: _HomeBackAction(this),
         ToggleOverlayIntent: ToggleOverlayAction(ref),
@@ -76,7 +75,7 @@ class _HomeViewState extends ConsumerState<HomeView>
       viewportFraction: 0.5,
       initialPage: _initialPage,
     );
-    _currentIndex = _initialPage % _configuredSystems.length;
+    _currentIndex = _configuredSystems.isEmpty ? 0 : _initialPage % _configuredSystems.length;
     _lastStablePage = _initialPage;
     _pageController.addListener(_onPageScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -194,12 +193,11 @@ class _HomeViewState extends ConsumerState<HomeView>
     if (!mounted) return;
   }
 
-  // TODO: re-enable for next release
-  // void _openGlobalSearch() {
-  //   if (_showGlobalSearch) return;
-  //   _debouncer.stopHold();
-  //   setState(() => _showGlobalSearch = true);
-  // }
+  void _openGlobalSearch() {
+    if (_showGlobalSearch) return;
+    _debouncer.stopHold();
+    setState(() => _showGlobalSearch = true);
+  }
 
   void _closeGlobalSearch() {
     setState(() => _showGlobalSearch = false);
@@ -226,42 +224,67 @@ class _HomeViewState extends ConsumerState<HomeView>
   Widget build(BuildContext context) {
     final rs = context.rs;
 
-    // Filter systems based on config
-    final configAsync = ref.watch(bootstrappedConfigProvider);
-    configAsync.whenData((config) {
-      final configuredIds = config.systems.map((s) => s.id).toSet();
-      final filtered = SystemModel.supportedSystems
-          .where((s) => configuredIds.contains(s.id))
-          .toList();
-      if (filtered.isNotEmpty && filtered.length != _configuredSystems.length) {
+    // Filter systems: hides local-only consoles with no content
+    final visibleAsync = ref.watch(visibleSystemsProvider);
+    visibleAsync.whenData((filtered) {
+      final oldIds = _configuredSystems.map((s) => s.id).toList();
+      final newIds = filtered.map((s) => s.id).toList();
+      final changed = oldIds.length != newIds.length ||
+          !oldIds.every((id) => newIds.contains(id));
+      if (!changed) return;
+      if (filtered.isEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            setState(() {
-              _configuredSystems = filtered;
-              _currentIndex = _lastStablePage % filtered.length;
-            });
-          }
+          if (mounted) setState(() => _configuredSystems = []);
         });
+        return;
       }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _configuredSystems = filtered;
+            _currentIndex = _lastStablePage % filtered.length;
+          });
+        }
+      });
     });
 
+    // Still loading → black screen, don't flash "No consoles" prematurely
+    if (_configuredSystems.isEmpty && visibleAsync.isLoading) {
+      return buildWithActions(
+        const Scaffold(backgroundColor: Colors.black),
+      );
+    }
+
     if (_configuredSystems.isEmpty) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      return buildWithActions(
+        Scaffold(
+          backgroundColor: Colors.black,
+          body: Column(
             children: [
-              const Icon(Icons.videogame_asset_off, size: 64, color: Colors.white24),
-              const SizedBox(height: 16),
-              Text(
-                'No consoles configured',
-                style: TextStyle(color: Colors.grey[500], fontSize: 18),
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.videogame_asset_off, size: 64, color: Colors.white24),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No consoles configured',
+                        style: TextStyle(color: Colors.grey[500], fontSize: 18),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Press X to open Settings',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Go to Settings to set up your consoles',
-                style: TextStyle(color: Colors.grey[700], fontSize: 14),
+              ConsoleHud(
+                embedded: true,
+                x: HudAction('Settings', onTap: _openSettings),
+                b: HudAction('Exit', onTap: _showExitDialogOverlay),
               ),
             ],
           ),
@@ -436,8 +459,10 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   Widget _buildSystemName(Responsive rs, SystemModel system) {
+    // Clear the HUD bar: lg (HUD bottom margin) + ~44px (HUD height) + md (gap)
+    final bottomOffset = rs.spacing.lg + 44 + rs.spacing.md;
     return Positioned(
-      bottom: rs.isPortrait ? 0 : (rs.isSmall ? 50 : 70),
+      bottom: rs.isPortrait ? 0 : bottomOffset,
       left: 0,
       right: 0,
       child: AnimatedSwitcher(
@@ -500,7 +525,7 @@ class _HomeViewState extends ConsumerState<HomeView>
 
     return ConsoleHud(
       a: HudAction('Select', onTap: _navigateToCurrentSystem),
-      // y: HudAction('Search', onTap: _openGlobalSearch),
+      y: HudAction('Search', onTap: _openGlobalSearch),
       x: HudAction('Settings', onTap: _openSettings),
       b: HudAction('Exit', onTap: _showExitDialogOverlay),
     );

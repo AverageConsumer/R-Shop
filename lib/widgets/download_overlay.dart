@@ -15,20 +15,38 @@ import '../widgets/console_hud.dart';
 
 final downloadOverlayExpandedProvider = StateProvider<bool>((ref) => false);
 
-final downloadOverlayToggleProvider = StateProvider<bool>((ref) => false);
-
 void toggleDownloadOverlay(WidgetRef ref) {
   final current = ref.read(downloadOverlayExpandedProvider);
   ref.read(downloadOverlayExpandedProvider.notifier).state = !current;
 }
 
-class DownloadOverlay extends ConsumerWidget {
+class DownloadOverlay extends ConsumerStatefulWidget {
   const DownloadOverlay({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DownloadOverlay> createState() => _DownloadOverlayState();
+}
+
+class _DownloadOverlayState extends ConsumerState<DownloadOverlay> {
+  @override
+  Widget build(BuildContext context) {
     final isExpanded = ref.watch(downloadOverlayExpandedProvider);
     final queueState = ref.watch(downloadQueueManagerProvider).state;
+
+    // Auto-close modal when queue becomes empty while expanded
+    if (queueState.isEmpty && isExpanded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(downloadOverlayExpandedProvider.notifier).state = false;
+        final priority = ref.read(overlayPriorityProvider);
+        if (priority == OverlayPriority.downloadModal) {
+          ref.read(overlayPriorityProvider.notifier).state =
+              OverlayPriority.none;
+        }
+        restoreMainFocus(ref);
+      });
+      return const SizedBox.shrink();
+    }
 
     if (queueState.isEmpty) {
       return const SizedBox.shrink();
@@ -232,13 +250,39 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late InputDebouncer _debouncer;
-  int _focusedIndex = 0;
-  int? _hoveredIndex;
+  String? _focusedItemId;
+  String? _hoveredItemId;
 
   // Stagger animation
   late AnimationController _staggerController;
 
+  // GlobalKeys for auto-scroll (keyed by item ID)
+  final Map<String, GlobalKey> _itemKeys = {};
+
   final FocusNode _modalFocusNode = FocusNode(debugLabel: 'DownloadModal');
+
+  /// Flat list of all focusable items: active → queued → finished
+  List<DownloadItem> get _allItems {
+    final finished = widget.recentItems.where((i) => i.isFinished).toList();
+    return [...widget.activeDownloads, ...widget.queuedItems, ...finished];
+  }
+
+  /// Returns the index of [id] in [items], or -1 if not found.
+  int _indexOfId(String? id, List<DownloadItem> items) {
+    if (id == null) return -1;
+    return items.indexWhere((item) => item.id == id);
+  }
+
+  /// Returns the effective focused index, resetting to first item if the
+  /// tracked ID is no longer in the list.
+  int _effectiveFocusedIndex(List<DownloadItem> items) {
+    if (items.isEmpty) return 0;
+    final idx = _indexOfId(_focusedItemId, items);
+    if (idx >= 0) return idx;
+    // ID gone (item removed/moved) → reset to first item
+    _focusedItemId = items.first.id;
+    return 0;
+  }
 
   @override
   void initState() {
@@ -269,6 +313,12 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
       ),
       vsync: this,
     );
+
+    // Initialize focused ID to first item
+    final items = _allItems;
+    if (items.isNotEmpty) {
+      _focusedItemId = items.first.id;
+    }
 
     _panelController.forward();
     Future.delayed(const Duration(milliseconds: 150), () {
@@ -304,8 +354,24 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
   @override
   void didUpdateWidget(_DownloadModal oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_focusedIndex >= widget.recentItems.length) {
-      _focusedIndex = (widget.recentItems.length - 1).clamp(0, 999);
+    final items = _allItems;
+    // If focused item was removed, _effectiveFocusedIndex resets it
+    _effectiveFocusedIndex(items);
+    // Clear hovered item if it no longer exists
+    if (_hoveredItemId != null && _indexOfId(_hoveredItemId, items) < 0) {
+      _hoveredItemId = null;
+    }
+  }
+
+  void _scrollToFocused() {
+    final key = _itemKeys[_focusedItemId];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        alignment: 0.3,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+      );
     }
   }
 
@@ -328,9 +394,11 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
         key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.space) {
       if (!_debouncer.canPerformAction()) return KeyEventResult.handled;
-      final targetIndex = _hoveredIndex ?? _focusedIndex;
-      if (targetIndex < widget.recentItems.length) {
-        _performAction(widget.recentItems[targetIndex]);
+      final items = _allItems;
+      final targetId = _hoveredItemId ?? _focusedItemId;
+      final targetIdx = _indexOfId(targetId, items);
+      if (targetIdx >= 0) {
+        _performAction(items[targetIdx]);
       }
       return KeyEventResult.handled;
     }
@@ -341,16 +409,19 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
       return KeyEventResult.handled;
     }
 
-    final itemCount = widget.recentItems.length;
+    final items = _allItems;
+    final focusedIdx = _effectiveFocusedIndex(items);
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (_focusedIndex < itemCount - 1) {
-        setState(() => _focusedIndex++);
+      if (focusedIdx < items.length - 1) {
+        setState(() => _focusedItemId = items[focusedIdx + 1].id);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocused());
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (_focusedIndex > 0) {
-        setState(() => _focusedIndex--);
+      if (focusedIdx > 0) {
+        setState(() => _focusedItemId = items[focusedIdx - 1].id);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocused());
       }
       return KeyEventResult.handled;
     }
@@ -361,6 +432,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+    final items = _allItems;
 
     return OverlayFocusScope(
       priority: OverlayPriority.downloadModal,
@@ -398,7 +470,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
                       child: Column(
                         children: [
                           _buildHeader(rs),
-                          Expanded(child: _buildItemList(rs)),
+                          Expanded(child: _buildSectionedList(rs, items)),
                         ],
                       ),
                     ),
@@ -409,33 +481,30 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
           ),
         ),
       ),
-      _buildControls(
-        widget.activeDownloads.isNotEmpty,
-        widget.recentItems.any((i) => i.isFinished),
-      ),
+      _buildControls(items),
     ]));
   }
 
-  Widget _buildControls(bool hasActive, bool hasFinished) {
-    final targetIndex = _hoveredIndex ?? _focusedIndex;
-    final targetItem = targetIndex < widget.recentItems.length
-        ? widget.recentItems[targetIndex]
-        : null;
-    final label = targetItem?.isActive == true
-        ? 'Cancel'
-        : targetItem?.isFailed == true
-            ? 'Retry'
-            : 'Clear';
+  Widget _buildControls(List<DownloadItem> items) {
+    final targetId = _hoveredItemId ?? _focusedItemId;
+    final targetIdx = _indexOfId(targetId, items);
+    final targetItem = targetIdx >= 0 ? items[targetIdx] : null;
+    final hasFinished = items.any((i) => i.isFinished);
+
+    final HudAction? aAction;
+    if (targetItem != null) {
+      final label = targetItem.isActive
+          ? 'Cancel'
+          : targetItem.isFailed
+              ? 'Retry'
+              : 'Clear';
+      aAction = HudAction(label, onTap: () => _performAction(targetItem));
+    } else {
+      aAction = null;
+    }
 
     return ConsoleHud(
-      a: HudAction(
-        label,
-        onTap: () {
-          if (targetItem != null) {
-            _performAction(targetItem);
-          }
-        },
-      ),
+      a: aAction,
       b: HudAction('Close', onTap: _close),
       y: hasFinished
           ? HudAction('Clear Done', onTap: () {
@@ -443,7 +512,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
             })
           : null,
       showDownloads: false,
-      embedded: true,
+      embedded: false,
     );
   }
 
@@ -523,8 +592,8 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
     );
   }
 
-  Widget _buildItemList(Responsive rs) {
-    if (widget.recentItems.isEmpty) {
+  Widget _buildSectionedList(Responsive rs, List<DownloadItem> allItems) {
+    if (allItems.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -548,50 +617,122 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
       );
     }
 
-    return ListView.builder(
+    // Build flat widget list with section headers
+    final widgets = <Widget>[];
+    final seenIds = <String>{};
+    int itemIndex = 0;
+
+    // Section: DOWNLOADING
+    if (widget.activeDownloads.isNotEmpty) {
+      widgets.add(_buildSectionHeader('Downloading', rs));
+      for (final item in widget.activeDownloads) {
+        _itemKeys.putIfAbsent(item.id, () => GlobalKey());
+        seenIds.add(item.id);
+        widgets.add(_buildCard(item, itemIndex, rs));
+        itemIndex++;
+      }
+    }
+
+    // Section: QUEUED
+    if (widget.queuedItems.isNotEmpty) {
+      widgets.add(_buildSectionHeader('Queued', rs));
+      for (final item in widget.queuedItems) {
+        _itemKeys.putIfAbsent(item.id, () => GlobalKey());
+        seenIds.add(item.id);
+        widgets.add(_buildCard(item, itemIndex, rs));
+        itemIndex++;
+      }
+    }
+
+    // Section: COMPLETE (includes completed, failed, cancelled)
+    final finishedItems = widget.recentItems.where((i) => i.isFinished).toList();
+    if (finishedItems.isNotEmpty) {
+      widgets.add(_buildSectionHeader('Complete', rs));
+      for (final item in finishedItems) {
+        _itemKeys.putIfAbsent(item.id, () => GlobalKey());
+        seenIds.add(item.id);
+        widgets.add(_buildCard(item, itemIndex, rs));
+        itemIndex++;
+      }
+    }
+
+    // Remove stale keys for items that no longer exist
+    _itemKeys.removeWhere((key, _) => !seenIds.contains(key));
+
+    return ListView(
       padding: EdgeInsets.fromLTRB(
         rs.spacing.lg,
-        rs.spacing.md,
+        rs.spacing.sm,
         rs.spacing.lg,
         rs.spacing.xxl,
       ),
-      itemCount: widget.recentItems.length,
-      itemBuilder: (context, index) {
-        final item = widget.recentItems[index];
+      children: widgets,
+    );
+  }
 
-        // Stagger interval for each item
-        final itemDelay = (index / max(widget.recentItems.length, 1)).clamp(0.0, 1.0);
-        final itemEnd = ((index + 1) / max(widget.recentItems.length, 1)).clamp(0.0, 1.0);
-
-        final itemAnimation = CurvedAnimation(
-          parent: _staggerController,
-          curve: Interval(
-            itemDelay * 0.6,
-            0.4 + itemEnd * 0.6,
-            curve: Curves.easeOutCubic,
-          ),
-        );
-
-        return FadeTransition(
-          opacity: itemAnimation,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.15),
-              end: Offset.zero,
-            ).animate(itemAnimation),
-            child: _DownloadItemCard(
-              item: item,
-              index: index,
-              isFocused: index == _focusedIndex,
-              isHovered: index == _hoveredIndex,
-              onTap: () => _performAction(item),
-              onHover: (isHovering) {
-                setState(() => _hoveredIndex = isHovering ? index : null);
-              },
+  Widget _buildSectionHeader(String label, Responsive rs) {
+    return Padding(
+      padding: EdgeInsets.only(
+        top: rs.spacing.lg,
+        bottom: rs.spacing.sm,
+        left: rs.spacing.xs,
+      ),
+      child: Row(
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.35),
+              fontSize: rs.isSmall ? 10 : 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 2,
             ),
           ),
-        );
-      },
+          SizedBox(width: rs.spacing.md),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: Colors.white.withValues(alpha: 0.06),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCard(DownloadItem item, int index, Responsive rs) {
+    final totalItems = _allItems.length;
+    final itemDelay = (index / max(totalItems, 1)).clamp(0.0, 1.0);
+    final itemEnd = ((index + 1) / max(totalItems, 1)).clamp(0.0, 1.0);
+
+    final itemAnimation = CurvedAnimation(
+      parent: _staggerController,
+      curve: Interval(
+        itemDelay * 0.6,
+        0.4 + itemEnd * 0.6,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
+    return FadeTransition(
+      key: _itemKeys[item.id],
+      opacity: itemAnimation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.15),
+          end: Offset.zero,
+        ).animate(itemAnimation),
+        child: _DownloadItemCard(
+          item: item,
+          index: index,
+          isFocused: item.id == _focusedItemId,
+          isHovered: item.id == _hoveredItemId,
+          onTap: () => _performAction(item),
+          onHover: (isHovering) {
+            setState(() => _hoveredItemId = isHovering ? item.id : null);
+          },
+        ),
+      ),
     );
   }
 
@@ -1092,54 +1233,60 @@ class _ProgressBar extends StatelessWidget {
       duration: const Duration(milliseconds: 500),
       curve: Curves.easeInOut,
       builder: (context, value, _) {
-        return Stack(
+        return Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Track
-            Container(
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            // Filled portion
-            FractionallySizedBox(
-              widthFactor: value.clamp(0.0, 1.0),
-              child: Container(
-                height: 4,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(2),
-                  gradient: LinearGradient(
-                    colors: [
-                      accentColor.withValues(alpha: 0.7),
-                      accentColor,
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: accentColor.withValues(alpha: 0.5),
-                      blurRadius: 6,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-              ),
-            ),
             // Percentage text
             if (item.progress > 0.01)
-              Positioned(
-                right: 0,
-                top: -14,
-                child: Text(
-                  '${(value * 100).toStringAsFixed(0)}%',
-                  style: TextStyle(
-                    color: accentColor.withValues(alpha: 0.8),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    '${(value * 100).toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      color: accentColor.withValues(alpha: 0.8),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
                 ),
               ),
+            // Track + filled bar
+            Stack(
+              children: [
+                Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                FractionallySizedBox(
+                  widthFactor: value.clamp(0.0, 1.0),
+                  child: Container(
+                    height: 4,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(2),
+                      gradient: LinearGradient(
+                        colors: [
+                          accentColor.withValues(alpha: 0.7),
+                          accentColor,
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: accentColor.withValues(alpha: 0.5),
+                          blurRadius: 6,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         );
       },

@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/game_item.dart';
 import '../models/system_model.dart';
+import '../utils/friendly_error.dart';
 import 'download_handle.dart';
 import 'provider_factory.dart';
 
@@ -72,6 +74,7 @@ class DownloadService {
   bool _isDownloadInProgress = false;
   StreamSubscription? _downloadSubscription;
   StreamController<DownloadProgress>? _progressController;
+  Future<void> Function()? _activeConnectionCleanup;
 
   static const int _progressIntervalMs = 500;
   static const int _initialDelayMs = 1000;
@@ -96,6 +99,12 @@ class DownloadService {
     _isCancelled = true;
     _downloadSubscription?.cancel();
     _downloadSubscription = null;
+
+    // Close active SMB/FTP connections
+    try {
+      await _activeConnectionCleanup?.call();
+    } catch (_) {}
+    _activeConnectionCleanup = null;
 
     if (_tempFilePath != null) {
       final file = File(_tempFilePath!);
@@ -160,7 +169,9 @@ class DownloadService {
       }
 
       final tempDir = await getTemporaryDirectory();
-      _tempFilePath = '${tempDir.path}/${game.filename}';
+      final safeFilename = p.basename(game.filename);
+      final uniquePrefix = DateTime.now().millisecondsSinceEpoch;
+      _tempFilePath = '${tempDir.path}/${uniquePrefix}_$safeFilename';
       final tempFile = File(_tempFilePath!);
 
       if (await tempFile.exists()) {
@@ -190,7 +201,10 @@ class DownloadService {
           await _downloadFtp(handle, tempFile);
       }
 
-      if (_isCancelled) return;
+      if (_isCancelled) {
+        _emitCancelled();
+        return;
+      }
 
       await _handlePostDownload(game, tempFile, targetFolder, system);
     } catch (e) {
@@ -248,17 +262,35 @@ class DownloadService {
 
     final completer = Completer<void>();
 
+    // Inactivity timer: cancel if no data received for 60s
+    Timer? inactivityTimer;
+    void resetInactivityTimer() {
+      inactivityTimer?.cancel();
+      inactivityTimer = Timer(const Duration(seconds: 60), () {
+        if (!completer.isCompleted) {
+          _downloadSubscription?.cancel();
+          sink.close().catchError((_) {});
+          completer.completeError(
+              Exception('Download stalled — no data received for 60 seconds'));
+        }
+      });
+    }
+
+    resetInactivityTimer();
+
     _downloadSubscription = response.listen(
       (chunk) {
         if (_isCancelled) {
-          try {
-            sink.close();
-          } catch (_) {}
+          inactivityTimer?.cancel();
+          _downloadSubscription?.cancel();
+          sink.close().catchError((_) {});
+          if (!completer.isCompleted) completer.complete();
           return;
         }
 
         sink.add(chunk);
         downloadedBytes += chunk.length;
+        resetInactivityTimer();
 
         final now = DateTime.now().millisecondsSinceEpoch;
         if (now - lastUpdateTime >= _progressIntervalMs) {
@@ -267,6 +299,7 @@ class DownloadService {
         }
       },
       onDone: () async {
+        inactivityTimer?.cancel();
         if (_isCancelled) {
           completer.complete();
           return;
@@ -280,6 +313,7 @@ class DownloadService {
         }
       },
       onError: (e) async {
+        inactivityTimer?.cancel();
         try {
           await sink.close();
         } catch (_) {}
@@ -296,6 +330,7 @@ class DownloadService {
     File tempFile,
   ) async {
     final reader = await handle.openFile();
+    _activeConnectionCleanup = () => reader.close();
     try {
       final sink = tempFile.openWrite();
       int downloadedBytes = 0;
@@ -329,7 +364,11 @@ class DownloadService {
         rethrow;
       }
     } finally {
-      await reader.close();
+      try {
+        await reader.close();
+      } finally {
+        _activeConnectionCleanup = null;
+      }
     }
   }
 
@@ -337,17 +376,33 @@ class DownloadService {
     FtpDownloadHandle handle,
     File tempFile,
   ) async {
-    // FTP library downloads directly to file — no stream progress available
-    if (_progressController?.isClosed == false) {
-      _progressController?.add(DownloadProgress(
-        status: DownloadStatus.downloading,
-        progress: 0,
-        receivedBytes: 0,
-        totalBytes: null,
-      ));
-    }
+    _activeConnectionCleanup = handle.disconnect;
+    try {
+      if (_isCancelled) return;
 
-    await handle.downloadToFile(tempFile);
+      if (_progressController?.isClosed == false) {
+        _progressController?.add(DownloadProgress(
+          status: DownloadStatus.downloading,
+          progress: 0,
+          receivedBytes: 0,
+          totalBytes: null,
+        ));
+      }
+
+      final stopwatch = Stopwatch()..start();
+      int lastUpdateTime = DateTime.now().millisecondsSinceEpoch;
+
+      await handle.downloadToFile(tempFile, onProgress: (percent, received, total) {
+        if (_isCancelled) return;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - lastUpdateTime >= _progressIntervalMs) {
+          lastUpdateTime = now;
+          _emitProgress(received, total, stopwatch);
+        }
+      });
+    } finally {
+      _activeConnectionCleanup = null;
+    }
   }
 
   void _emitProgress(int downloadedBytes, int totalBytes, Stopwatch stopwatch) {
@@ -365,7 +420,7 @@ class DownloadService {
       status: DownloadStatus.downloading,
       progress: progress,
       receivedBytes: downloadedBytes,
-      totalBytes: totalBytes,
+      totalBytes: totalBytes > 0 ? totalBytes : null,
       downloadSpeed: speed,
     ));
   }
@@ -491,8 +546,7 @@ class DownloadService {
       final files = _listFilesRecursively(extractTempDir);
 
       final hasBinFiles = files.any((f) {
-        final ext = '.${f.path.split('.').last.toLowerCase()}';
-        return ext == '.bin';
+        return p.extension(f.path).toLowerCase() == '.bin';
       });
 
       if (hasBinFiles) {
@@ -502,13 +556,13 @@ class DownloadService {
         await subFolder.create(recursive: true);
 
         for (final file in files) {
-          final fileName = file.path.split('/').last;
+          final fileName = p.basename(file.path);
           final targetPath = _safePath(subFolder.path, fileName);
           await file.copy(targetPath);
         }
       } else {
         for (final file in files) {
-          final fileName = file.path.split('/').last;
+          final fileName = p.basename(file.path);
           final targetPath = _safePath(targetFolder, fileName);
           await file.copy(targetPath);
         }
@@ -554,49 +608,20 @@ class DownloadService {
   }
 
   Future<void> _moveToTarget(File file, String targetFolder) async {
-    final targetFile = File('$targetFolder/${file.uri.pathSegments.last}');
+    final targetPath = _safePath(targetFolder, p.basename(file.path));
+    final targetFile = File(targetPath);
     await targetFile.parent.create(recursive: true);
     await file.copy(targetFile.path);
   }
 
-  String _getUserFriendlyError(dynamic e) {
-    final errorString = e.toString().toLowerCase();
-
-    if (errorString.contains('socketexception') ||
-        errorString.contains('connection')) {
-      return 'Connection error - Check your internet connection.';
-    }
-    if (errorString.contains('timeout')) {
-      return 'Timeout - Server responding too slowly.';
-    }
-    if (errorString.contains('handshake') ||
-        errorString.contains('ssl') ||
-        errorString.contains('certificate')) {
-      return 'SSL error - Secure connection failed.';
-    }
-    if (errorString.contains('status 404')) {
-      return 'File not found (404) - Server does not have this file.';
-    }
-    if (errorString.contains('status 403')) {
-      return 'Access denied (403) - Rate limit reached? Wait a moment.';
-    }
-    if (errorString.contains('status 503')) {
-      return 'Server overloaded (503) - Try again in a few minutes.';
-    }
-    if (errorString.contains('status 50')) {
-      return 'Server error - Try again later.';
-    }
-
-    return 'An unexpected error occurred. Please try again.';
-  }
+  String _getUserFriendlyError(dynamic e) => getUserFriendlyError(e);
 
   String _safePath(String baseDir, String filename) {
-    final sanitized = filename.replaceAll(RegExp(r'\.\.[\\/]'), '');
-    final resolved = File('$baseDir/$sanitized').absolute.path;
-    if (!resolved.startsWith(File(baseDir).absolute.path)) {
+    final sanitized = p.basename(filename);
+    if (sanitized.isEmpty || sanitized == '.' || sanitized == '..') {
       throw Exception('Invalid filename: path traversal detected');
     }
-    return resolved;
+    return '$baseDir/$sanitized';
   }
 
   void dispose() {
@@ -605,8 +630,11 @@ class DownloadService {
   }
 
   String _encodeUrl(String url) {
-    final uri = Uri.parse(url);
-    // re-serialize with properly encoded path segments (no double-encoding)
-    return uri.replace(pathSegments: uri.pathSegments).toString();
+    try {
+      final uri = Uri.parse(url);
+      return uri.replace(pathSegments: uri.pathSegments).toString();
+    } catch (_) {
+      return url;
+    }
   }
 }

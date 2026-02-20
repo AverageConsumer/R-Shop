@@ -14,6 +14,7 @@ import '../../services/input_debouncer.dart';
 import '../../utils/game_metadata.dart';
 import '../../utils/image_helper.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/console_notification.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/installed_indicator.dart';
 import '../game_list/widgets/dynamic_background.dart';
@@ -31,6 +32,7 @@ class GameDetailScreen extends ConsumerStatefulWidget {
   final List<GameItem> variants;
   final SystemModel system;
   final String targetFolder;
+  final bool isLocalOnly;
 
   const GameDetailScreen({
     super.key,
@@ -38,6 +40,7 @@ class GameDetailScreen extends ConsumerStatefulWidget {
     required this.variants,
     required this.system,
     required this.targetFolder,
+    this.isLocalOnly = false,
   });
 
   @override
@@ -82,6 +85,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       variants: widget.variants,
       system: widget.system,
       targetFolder: widget.targetFolder,
+      isLocalOnly: widget.isLocalOnly,
       showFullFilename: storage.getShowFullFilename(),
       queueManager: queueManager,
     );
@@ -128,12 +132,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final error = _controller?.state.error;
     if (error != null) {
       ref.read(feedbackServiceProvider).error();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      showConsoleNotification(context, message: 'Error: $error');
     }
   }
 
@@ -192,7 +191,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       } else {
         ref.read(feedbackServiceProvider).cancel();
       }
-      _executeDialogAction(controller);
+      _executeDialogAction(controller).then((_) => requestScreenFocus());
       return;
     }
 
@@ -258,6 +257,10 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     if (widget.variants.length <= 1) return;
 
     if (direction == GridDirection.left) {
+      if (controller.selectedIndex <= 0) {
+        ref.read(feedbackServiceProvider).error();
+        return;
+      }
       if (_debouncer.startHold(() {
         final newIndex = controller.selectedIndex - 1;
         if (newIndex >= 0) {
@@ -268,6 +271,10 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         ref.read(feedbackServiceProvider).tick();
       }
     } else if (direction == GridDirection.right) {
+      if (controller.selectedIndex >= widget.variants.length - 1) {
+        ref.read(feedbackServiceProvider).error();
+        return;
+      }
       if (_debouncer.startHold(() {
         final newIndex = controller.selectedIndex + 1;
         if (newIndex < widget.variants.length) {
@@ -284,8 +291,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final selection = controller.state.dialogSelection;
 
     if (selection == 0) {
-      controller.cancelDialog();
       await controller.deleteRom();
+      controller.cancelDialog();
     } else {
       controller.cancelDialog();
     }
@@ -306,9 +313,33 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   Widget build(BuildContext context) {
     final controller = _controller;
     if (controller == null) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF121212),
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: const Color(0xFF121212),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: widget.system.accentColor),
+              const SizedBox(height: 16),
+              Text(
+                widget.game.displayName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                widget.system.name,
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -354,8 +385,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                 selection: state.dialogSelection,
                 gameTitle: controller.cleanTitle,
                 onPrimary: () async {
-                  controller.cancelDialog();
                   await controller.deleteRom();
+                  controller.cancelDialog();
+                  requestScreenFocus();
                 },
                 onSecondary: controller.cancelDialog,
               ),
@@ -490,13 +522,21 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final controller = _controller;
     if (controller == null) return const SizedBox.shrink();
 
-    final actionLabel = state.isVariantInstalled ? 'Delete' : 'Download';
+    final String actionLabel;
+    final VoidCallback? actionCallback;
+    if (widget.isLocalOnly && !state.isVariantInstalled) {
+      actionLabel = 'Deleted';
+      actionCallback = null;
+    } else {
+      actionLabel = state.isVariantInstalled ? 'Delete' : 'Download';
+      actionCallback = controller.performAction;
+    }
 
     final filenameLabel = state.showFullFilename ? 'Title' : 'Filename';
 
     return ConsoleHud(
       dpad: widget.variants.length > 1 ? (label: '\u2190\u2192', action: 'Navigate') : null,
-      a: HudAction(actionLabel, onTap: controller.performAction),
+      a: HudAction(actionLabel, onTap: actionCallback),
       b: HudAction('Back', onTap: () => Navigator.pop(context)),
       x: HudAction(filenameLabel, onTap: controller.toggleFullFilename),
       y: metadata.allTags.isNotEmpty ? HudAction('Tags', onTap: controller.toggleTagInfo) : null,
@@ -678,6 +718,13 @@ class _DetailConfirmAction extends Action<ConfirmIntent> {
   _DetailConfirmAction(this.screen);
 
   @override
+  bool isEnabled(ConfirmIntent intent) {
+    final priority = screen.ref.read(overlayPriorityProvider);
+    if (priority == OverlayPriority.none) return true;
+    return screen._controller?.state.isDialogOpen == true;
+  }
+
+  @override
   Object? invoke(ConfirmIntent intent) {
     screen._handleConfirm();
     return null;
@@ -688,6 +735,10 @@ class _DetailFilenameToggleAction extends Action<InfoIntent> {
   final _GameDetailScreenState screen;
 
   _DetailFilenameToggleAction(this.screen);
+
+  @override
+  bool isEnabled(InfoIntent intent) =>
+      screen.ref.read(overlayPriorityProvider) == OverlayPriority.none;
 
   @override
   Object? invoke(InfoIntent intent) {
@@ -702,6 +753,10 @@ class _DetailTagInfoAction extends Action<SearchIntent> {
   _DetailTagInfoAction(this.screen);
 
   @override
+  bool isEnabled(SearchIntent intent) =>
+      screen.ref.read(overlayPriorityProvider) == OverlayPriority.none;
+
+  @override
   Object? invoke(SearchIntent intent) {
     screen._handleTagInfo();
     return null;
@@ -712,6 +767,13 @@ class _DetailNavigateAction extends Action<NavigateIntent> {
   final _GameDetailScreenState screen;
 
   _DetailNavigateAction(this.screen);
+
+  @override
+  bool isEnabled(NavigateIntent intent) {
+    final priority = screen.ref.read(overlayPriorityProvider);
+    if (priority == OverlayPriority.none) return true;
+    return screen._controller?.state.isDialogOpen == true;
+  }
 
   @override
   Object? invoke(NavigateIntent intent) {

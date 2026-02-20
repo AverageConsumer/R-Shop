@@ -15,7 +15,12 @@ class WebProvider implements SourceProvider {
 
   final Dio _dio;
 
-  WebProvider(this.config, {Dio? dio}) : _dio = dio ?? Dio();
+  WebProvider(this.config, {Dio? dio})
+      : _dio = dio ??
+            Dio(BaseOptions(
+              connectTimeout: const Duration(seconds: 15),
+              receiveTimeout: const Duration(seconds: 30),
+            ));
 
   String get _baseUrl {
     final url = config.url!;

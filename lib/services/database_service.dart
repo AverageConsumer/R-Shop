@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../models/config/provider_config.dart';
 import '../models/game_item.dart';
 
 class GameSearchResult {
@@ -9,6 +12,7 @@ class GameSearchResult {
   final String displayName;
   final String url;
   final String? coverUrl;
+  final ProviderConfig? providerConfig;
 
   const GameSearchResult({
     required this.systemSlug,
@@ -16,19 +20,16 @@ class GameSearchResult {
     required this.displayName,
     required this.url,
     this.coverUrl,
+    this.providerConfig,
   });
 }
 
 class DatabaseService {
-  static Database? _database;
+  static Future<Database>? _initFuture;
   static const String _tableName = 'games';
-  static const int _dbVersion = 2;
+  static const int _dbVersion = 3;
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
-  }
+  Future<Database> get database => _initFuture ??= _initDatabase();
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
@@ -51,7 +52,8 @@ class DatabaseService {
         displayName TEXT NOT NULL,
         url TEXT NOT NULL,
         region TEXT,
-        cover_url TEXT
+        cover_url TEXT,
+        provider_config TEXT
       )
     ''');
 
@@ -74,6 +76,10 @@ class DatabaseService {
       await db.execute(
           'CREATE INDEX IF NOT EXISTS idx_filename ON $_tableName (filename)');
     }
+    if (oldVersion < 3) {
+      await db.execute(
+          'ALTER TABLE $_tableName ADD COLUMN provider_config TEXT');
+    }
   }
 
   Future<void> saveGames(String systemSlug, List<GameItem> games) async {
@@ -94,6 +100,9 @@ class DatabaseService {
           'url': game.url,
           'region': _extractRegion(game.filename),
           'cover_url': game.cachedCoverUrl,
+          'provider_config': game.providerConfig != null
+              ? jsonEncode(game.providerConfig!.toJson())
+              : null,
         });
       }
       await batch.commit(noResult: true);
@@ -140,6 +149,8 @@ class DatabaseService {
               displayName: map['displayName'] as String,
               url: map['url'] as String,
               cachedCoverUrl: map['cover_url'] as String?,
+              providerConfig: _decodeProviderConfig(
+                  map['provider_config'] as String?),
             ))
         .toList();
   }
@@ -148,11 +159,14 @@ class DatabaseService {
     final db = await database;
     final maps = await db.query(
       _tableName,
-      columns: ['systemSlug', 'filename', 'displayName', 'url', 'cover_url'],
+      columns: [
+        'systemSlug', 'filename', 'displayName', 'url', 'cover_url',
+        'provider_config',
+      ],
       where: 'displayName LIKE ? OR filename LIKE ?',
       whereArgs: ['%$query%', '%$query%'],
       orderBy: 'displayName ASC',
-      limit: 100,
+      limit: 250,
     );
 
     return maps
@@ -162,6 +176,8 @@ class DatabaseService {
               displayName: map['displayName'] as String,
               url: map['url'] as String,
               coverUrl: map['cover_url'] as String?,
+              providerConfig: _decodeProviderConfig(
+                  map['provider_config'] as String?),
             ))
         .toList();
   }
@@ -180,6 +196,16 @@ class DatabaseService {
   Future<void> clearCache() async {
     final db = await database;
     await db.delete(_tableName);
+  }
+
+  static ProviderConfig? _decodeProviderConfig(String? json) {
+    if (json == null) return null;
+    try {
+      return ProviderConfig.fromJson(
+          jsonDecode(json) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
   }
 
   String _extractRegion(String filename) {

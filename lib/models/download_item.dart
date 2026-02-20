@@ -1,3 +1,4 @@
+import '../models/config/provider_config.dart';
 import 'game_item.dart';
 import 'system_model.dart';
 
@@ -18,13 +19,13 @@ class DownloadItem {
   final String targetFolder;
   final DateTime addedAt;
 
-  DownloadItemStatus status;
-  double progress;
-  int receivedBytes;
-  int? totalBytes;
-  double? downloadSpeed;
-  String? error;
-  int retryCount;
+  final DownloadItemStatus status;
+  final double progress;
+  final int receivedBytes;
+  final int? totalBytes;
+  final double? downloadSpeed;
+  final String? error;
+  final int retryCount;
 
   DownloadItem({
     required this.id,
@@ -121,16 +122,23 @@ class DownloadItem {
       'gameUrl': game.url,
       'gameDisplayName': game.displayName,
       'gameCachedCoverUrl': game.cachedCoverUrl,
-      'systemName': system.name,
+      'systemId': system.id,
       'targetFolder': targetFolder,
       'addedAt': addedAt.toIso8601String(),
       'status': status.index,
       'progress': progress,
       'retryCount': retryCount,
+      if (game.providerConfig != null)
+        'providerConfig': game.providerConfig!.toJson(),
     };
   }
 
   factory DownloadItem.fromJson(Map<String, dynamic> json, SystemModel system) {
+    final providerConfigJson = json['providerConfig'] as Map<String, dynamic>?;
+    final providerConfig = providerConfigJson != null
+        ? ProviderConfig.fromJson(providerConfigJson)
+        : null;
+
     return DownloadItem(
       id: json['id'] as String,
       game: GameItem(
@@ -138,6 +146,7 @@ class DownloadItem {
         url: json['gameUrl'] as String,
         displayName: json['gameDisplayName'] as String,
         cachedCoverUrl: json['gameCachedCoverUrl'] as String?,
+        providerConfig: providerConfig,
       ),
       system: system,
       targetFolder: (json['targetFolder'] ?? json['romPath']) as String,

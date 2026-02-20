@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/config/system_config.dart';
@@ -34,7 +36,11 @@ class UnifiedGameService {
     for (final providerConfig in system.providers) {
       try {
         final provider = ProviderFactory.getProvider(providerConfig);
-        return await provider.fetchGames(system);
+        return await provider.fetchGames(system).timeout(
+              const Duration(seconds: 30),
+              onTimeout: () =>
+                  throw TimeoutException('Server not responding'),
+            );
       } catch (e) {
         lastError = e;
         continue;
@@ -51,12 +57,17 @@ class UnifiedGameService {
     for (final providerConfig in system.providers) {
       try {
         final provider = ProviderFactory.getProvider(providerConfig);
-        final games = await provider.fetchGames(system);
+        final games = await provider.fetchGames(system).timeout(
+              const Duration(seconds: 30),
+              onTimeout: () =>
+                  throw TimeoutException('Server not responding'),
+            );
         successes++;
 
         for (final game in games) {
           // Higher-priority (lower number) providers come first in the list,
-          // so only add if not already present.
+          // so only add if not already present. Use filename as key to
+          // preserve region variants (e.g. "Mario (USA).zip" vs "Mario (EUR).zip").
           results.putIfAbsent(game.filename, () => game);
         }
       } catch (e) {

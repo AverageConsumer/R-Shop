@@ -3,6 +3,7 @@ import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../../services/download_queue_manager.dart';
 import '../../services/rom_manager.dart';
+import '../../utils/friendly_error.dart';
 import '../../utils/game_metadata.dart';
 import 'game_detail_state.dart';
 
@@ -11,19 +12,33 @@ class GameDetailController extends ChangeNotifier {
   final List<GameItem> variants;
   final SystemModel system;
   final String targetFolder;
+  final bool isLocalOnly;
   final RomManager _romManager;
   final DownloadQueueManager _queueManager;
 
+  bool _disposed = false;
   GameDetailState _state = const GameDetailState();
   GameDetailState get state => _state;
   GameItem get selectedVariant => variants[_state.selectedIndex];
   int get selectedIndex => _state.selectedIndex;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
 
   GameDetailController({
     required this.game,
     required this.variants,
     required this.system,
     required this.targetFolder,
+    this.isLocalOnly = false,
     bool showFullFilename = false,
     RomManager? romManager,
     required DownloadQueueManager queueManager,
@@ -61,7 +76,7 @@ class GameDetailController extends ChangeNotifier {
       await Future.delayed(const Duration(milliseconds: 300));
       await checkInstallationStatus();
     } catch (e) {
-      _state = _state.copyWith(error: e.toString());
+      _state = _state.copyWith(error: getUserFriendlyError(e));
       notifyListeners();
     } finally {
       _state = _state.copyWith(isAddingToQueue: false);
@@ -78,7 +93,7 @@ class GameDetailController extends ChangeNotifier {
       await Future.delayed(const Duration(milliseconds: 300));
       await checkInstallationStatus();
     } catch (e) {
-      _state = _state.copyWith(error: e.toString());
+      _state = _state.copyWith(error: getUserFriendlyError(e));
     } finally {
       _state = _state.copyWith(isDeleting: false);
       notifyListeners();
@@ -98,7 +113,7 @@ class GameDetailController extends ChangeNotifier {
   void showDeleteDialog() {
     _state = _state.copyWith(
       showDeleteDialog: true,
-      dialogSelection: 0,
+      dialogSelection: 1,
     );
     notifyListeners();
   }
@@ -128,6 +143,7 @@ class GameDetailController extends ChangeNotifier {
     if (_state.isVariantInstalled) {
       showDeleteDialog();
     } else {
+      if (isLocalOnly) return;
       addToQueue();
     }
   }

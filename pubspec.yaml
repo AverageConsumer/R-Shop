@@ -1,7 +1,7 @@
 name: retro_eshop
 description: "R-Shop — A retro game manager for Android with a console-style UI, controller support, and download queue."
 publish_to: 'none'
-version: 0.9.3+4
+version: 0.9.4+5
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

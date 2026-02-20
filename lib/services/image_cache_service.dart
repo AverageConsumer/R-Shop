@@ -7,12 +7,21 @@ class FailedUrlsCache {
   static FailedUrlsCache get instance => _instance;
   FailedUrlsCache._internal();
 
-  final Set<String> _failedUrls = {};
+  static const Duration _ttl = Duration(minutes: 5);
+  final Map<String, DateTime> _failedUrls = {};
 
-  bool hasFailed(String url) => _failedUrls.contains(url);
+  bool hasFailed(String url) {
+    final failedAt = _failedUrls[url];
+    if (failedAt == null) return false;
+    if (DateTime.now().difference(failedAt) > _ttl) {
+      _failedUrls.remove(url);
+      return false;
+    }
+    return true;
+  }
 
   void markFailed(String url) {
-    _failedUrls.add(url);
+    _failedUrls[url] = DateTime.now();
   }
 
   void clear() {

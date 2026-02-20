@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
 import '../models/game_item.dart';
 import '../models/system_model.dart';
 
@@ -7,17 +9,21 @@ class RomManager {
   static const _archiveExtensions = ['.zip', '.rar'];
 
   static String _safePath(String baseDir, String filename) {
-    final sanitized = filename.replaceAll(RegExp(r'\.\.[\\/]'), '');
-    final resolved = File('$baseDir/$sanitized').absolute.path;
-    if (!resolved.startsWith(File(baseDir).absolute.path)) {
+    final sanitized = p.basename(filename);
+    if (sanitized.isEmpty || sanitized == '.' || sanitized == '..') {
       throw Exception('Invalid filename: path traversal detected');
     }
-    return resolved;
+    return '$baseDir/$sanitized';
   }
 
   static String getTargetPath(
       GameItem game, SystemModel system, String targetFolder) {
-    var filename = game.filename;
+    return _safePath(targetFolder, getTargetFilename(game, system));
+  }
+
+  /// Returns the filename a game would have after download (archive → ROM extension).
+  static String getTargetFilename(GameItem game, SystemModel system) {
+    var filename = p.basename(game.filename);
 
     for (final ext in _archiveExtensions) {
       if (filename.toLowerCase().endsWith(ext)) {
@@ -28,7 +34,7 @@ class RomManager {
       }
     }
 
-    return _safePath(targetFolder, filename);
+    return filename;
   }
 
   static String? extractGameName(String filename) {
@@ -51,6 +57,57 @@ class RomManager {
     name = name.replaceAll(RegExp(r'\s+'), ' ').trim();
 
     return name.isEmpty ? null : name;
+  }
+
+  static Future<List<GameItem>> scanLocalGames(
+    SystemModel system,
+    String targetFolder,
+  ) async {
+    final dir = Directory(targetFolder);
+    if (!await dir.exists()) return [];
+
+    final allExtensions = [
+      ...system.romExtensions.map((e) => e.toLowerCase()),
+      ..._archiveExtensions,
+    ];
+    final multiExts = system.multiFileExtensions
+            ?.map((e) => e.toLowerCase())
+            .toList() ??
+        [];
+
+    final games = <GameItem>[];
+    final entities = await dir.list().toList();
+
+    for (final entity in entities) {
+      final name = p.basename(entity.path);
+
+      if (entity is File) {
+        final ext = p.extension(name).toLowerCase();
+        if (allExtensions.contains(ext)) {
+          games.add(GameItem(
+            filename: name,
+            displayName: GameItem.cleanDisplayName(name),
+            url: '',
+          ));
+        }
+      } else if (entity is Directory && multiExts.isNotEmpty) {
+        final subFiles = entity.listSync();
+        final hasMatchingFile = subFiles.any((f) =>
+            f is File &&
+            multiExts.contains(p.extension(f.path).toLowerCase()));
+        if (hasMatchingFile) {
+          games.add(GameItem(
+            filename: name,
+            displayName: GameItem.cleanDisplayName(name),
+            url: '',
+          ));
+        }
+      }
+    }
+
+    games.sort((a, b) =>
+        a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
+    return games;
   }
 
   Future<bool> exists(GameItem game, SystemModel system, String targetFolder) async {

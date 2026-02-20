@@ -8,6 +8,7 @@ import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../services/config_storage_service.dart';
 import '../../widgets/console_hud.dart';
+import '../../widgets/console_notification.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../onboarding/widgets/console_setup_hud.dart';
 import '../onboarding/widgets/console_setup_step.dart';
@@ -55,6 +56,10 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    if (!ref.read(inputDebouncerProvider).canPerformAction()) {
+      return KeyEventResult.handled;
+    }
 
     final state = ref.read(onboardingControllerProvider);
     final controller = ref.read(onboardingControllerProvider.notifier);
@@ -126,12 +131,7 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
       await controller.exportConfig();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Export failed: $e'),
-          backgroundColor: Colors.red.shade800,
-        ),
-      );
+      showConsoleNotification(context, message: 'Export failed: $e');
     }
   }
 
@@ -140,21 +140,11 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     if (!mounted) return;
     if (result.cancelled) return;
     if (result.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Invalid config: ${result.error}'),
-          backgroundColor: Colors.red.shade800,
-        ),
-      );
+      showConsoleNotification(context, message: 'Invalid config: ${result.error}');
     } else {
       // Reload controller from freshly imported config
       ref.read(onboardingControllerProvider.notifier).loadFromConfig(result.config!);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Config imported successfully!'),
-          backgroundColor: Color(0xFF2E7D32),
-        ),
-      );
+      showConsoleNotification(context, message: 'Config imported!', isError: false);
     }
   }
 

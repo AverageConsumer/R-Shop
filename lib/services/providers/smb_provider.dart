@@ -25,7 +25,7 @@ class SmbProvider implements SourceProvider {
       host: config.host!,
       username: config.auth?.user ?? 'guest',
       password: config.auth?.pass ?? '',
-      domain: '',
+      domain: config.auth?.domain ?? '',
     );
   }
 

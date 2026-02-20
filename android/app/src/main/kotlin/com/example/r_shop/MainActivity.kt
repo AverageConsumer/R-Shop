@@ -62,7 +62,7 @@ class MainActivity : FlutterActivity() {
             val zis = ZipInputStream(BufferedInputStream(fis))
             var entry = zis.nextEntry
             while (entry != null) {
-                totalBytes += entry.size
+                if (entry.size > 0) totalBytes += entry.size
                 entry = zis.nextEntry
             }
             zis.close()
@@ -73,8 +73,17 @@ class MainActivity : FlutterActivity() {
             val zis = ZipInputStream(BufferedInputStream(fis))
             var entry = zis.nextEntry
 
+            val canonicalTarget = File(targetPath).canonicalPath
+
             while (entry != null) {
                 val file = File(targetPath, entry.name)
+
+                // Zip Slip protection: reject entries that escape the target directory
+                if (!file.canonicalPath.startsWith(canonicalTarget + File.separator) &&
+                    file.canonicalPath != canonicalTarget) {
+                    entry = zis.nextEntry
+                    continue
+                }
 
                 if (entry.isDirectory) {
                     file.mkdirs()

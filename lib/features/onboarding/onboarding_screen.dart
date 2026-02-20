@@ -8,6 +8,7 @@ import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../services/config_storage_service.dart';
 import '../../widgets/console_hud.dart';
+import '../../widgets/console_notification.dart';
 import '../../widgets/download_overlay.dart';
 import 'onboarding_controller.dart';
 import 'widgets/console_setup_hud.dart';
@@ -238,9 +239,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       await controller.exportConfig();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export failed: $e'), backgroundColor: Colors.red.shade800),
-      );
+      showConsoleNotification(context, message: 'Export failed: $e');
     }
   }
 
@@ -249,14 +248,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (!mounted) return;
     if (result.cancelled) return;
     if (result.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Invalid config: ${result.error}'), backgroundColor: Colors.red.shade800),
-      );
+      showConsoleNotification(context, message: 'Invalid config: ${result.error}');
     } else {
       ref.read(onboardingControllerProvider.notifier).loadFromConfig(result.config!);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Config imported successfully!'), backgroundColor: Color(0xFF2E7D32)),
-      );
+      showConsoleNotification(context, message: 'Config imported!', isError: false);
     }
   }
 
@@ -273,18 +268,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
-  void _finishOnboarding() async {
+  Future<void> _finishOnboarding() async {
     final controller = ref.read(onboardingControllerProvider.notifier);
     final audioManager = ref.read(audioManagerProvider);
     audioManager.stopTyping();
     final storage = ref.read(storageServiceProvider);
 
-    // Build and persist config
-    final config = controller.buildFinalConfig();
-    final jsonString = const JsonEncoder.withIndent('  ').convert(config.toJson());
-    await ConfigStorageService().saveConfig(jsonString);
-
-    await storage.setOnboardingCompleted(true);
+    try {
+      final config = controller.buildFinalConfig();
+      final jsonString = const JsonEncoder.withIndent('  ').convert(config.toJson());
+      await ConfigStorageService().saveConfig(jsonString);
+      await storage.setOnboardingCompleted(true);
+    } catch (e) {
+      if (!mounted) return;
+      showConsoleNotification(context, message: 'Failed to save: $e');
+      return;
+    }
     if (!mounted) return;
     Navigator.of(context).pushReplacementNamed('/home');
   }

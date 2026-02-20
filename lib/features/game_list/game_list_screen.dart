@@ -169,6 +169,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   }
 
   void _onControllerChanged() {
+    if (!mounted) return;
     setState(() {});
     _updateItemKeys();
   }
@@ -388,6 +389,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       String displayName, List<GameItem> variants) async {
     _searchFocusNode.unfocus();
     ref.read(feedbackServiceProvider).confirm();
+    final isLocalOnly = _controller.state.isLocalOnly;
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -396,10 +398,15 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
           variants: variants,
           system: widget.system,
           targetFolder: widget.targetFolder,
+          isLocalOnly: isLocalOnly,
         ),
       ),
     );
-    await _controller.updateInstalledStatus(displayName);
+    if (isLocalOnly) {
+      await _controller.loadGames();
+    } else {
+      await _controller.updateInstalledStatus(displayName);
+    }
     if (_isSearching && mounted) {
       requestScreenFocus();
     }
@@ -430,9 +437,11 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final rs = context.rs;
     final state = _controller.state;
     final baseTopPadding = rs.safeAreaTop + (rs.isSmall ? 60 : 80);
+    final folderExtraPadding = widget.targetFolder.isNotEmpty ? (rs.isSmall ? 14.0 : 16.0) : 0.0;
+    final localOnlyExtraPadding = state.isLocalOnly ? (rs.isSmall ? 24.0 : 28.0) : 0.0;
     final searchExtraPadding = rs.isSmall ? 16.0 : 20.0;
     final topPadding =
-        _isSearching ? baseTopPadding + searchExtraPadding : baseTopPadding;
+        baseTopPadding + folderExtraPadding + localOnlyExtraPadding + (_isSearching ? searchExtraPadding : 0.0);
 
     _focusManager.validateState(_columns);
 
@@ -530,6 +539,8 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
           system: widget.system,
           gameCount: state.filteredGroups.length,
           hasActiveFilters: state.activeFilters.isNotEmpty,
+          isLocalOnly: state.isLocalOnly,
+          targetFolder: widget.targetFolder,
         ),
       ],
     );
@@ -570,6 +581,10 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
           await _controller.updateCoverUrl(v.filename, url);
         }
       },
+      searchQuery: state.searchQuery,
+      hasActiveFilters: state.activeFilters.isNotEmpty,
+      isLocalOnly: state.isLocalOnly,
+      targetFolder: widget.targetFolder,
     );
   }
 

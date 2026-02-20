@@ -102,6 +102,7 @@ class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
               system.iconAssetPath,
               width: iconSize,
               height: iconSize,
+              cacheWidth: 128,
               errorBuilder: (_, __, ___) => Icon(
                 Icons.videogame_asset,
                 color: system.accentColor,

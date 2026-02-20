@@ -37,6 +37,7 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
   late Animation<double> _fadeAnimation;
   int _selectedIndex = 0; // 0 = Stay (Default), 1 = Exit
   StateController<OverlayPriority>? _overlayNotifier;
+  bool _hasClaimed = false;
 
   @override
   void initState() {
@@ -63,6 +64,7 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
       if (mounted) {
         _overlayNotifier = ref.read(overlayPriorityProvider.notifier);
         _overlayNotifier!.state = OverlayPriority.dialog;
+        _hasClaimed = true;
         FocusScope.of(context).requestFocus(_focusNode);
       }
     });
@@ -72,14 +74,16 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
 
   @override
   void dispose() {
-    // Reset overlay priority using cached notifier (ref is invalid during unmount)
-    final notifier = _overlayNotifier;
-    if (notifier != null) {
-      Future(() {
-        if (notifier.state == OverlayPriority.dialog) {
-          notifier.state = OverlayPriority.none;
-        }
-      });
+    if (_hasClaimed) {
+      _hasClaimed = false;
+      final notifier = _overlayNotifier;
+      if (notifier != null) {
+        Future(() {
+          if (notifier.state == OverlayPriority.dialog) {
+            notifier.state = OverlayPriority.none;
+          }
+        });
+      }
     }
     _focusNode.dispose();
     _controller.dispose();
@@ -103,7 +107,13 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
   }
 
   void _close() {
+    _hasClaimed = false;
+    final notifier = _overlayNotifier;
+    if (notifier != null && notifier.state == OverlayPriority.dialog) {
+      notifier.state = OverlayPriority.none;
+    }
     _controller.reverse().then((_) {
+      if (!mounted) return;
       restoreMainFocus(ref);
       widget.onCancel();
     });
@@ -115,13 +125,13 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
 
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.arrowRight): () => _handleNavigate(true),
-        const SingleActivator(LogicalKeyboardKey.arrowLeft): () => _handleNavigate(false),
-        const SingleActivator(LogicalKeyboardKey.enter): _handleConfirm, // A / Enter
-        const SingleActivator(LogicalKeyboardKey.gameButtonA): _handleConfirm,
-        const SingleActivator(LogicalKeyboardKey.escape): _close, // B / Esc
-        const SingleActivator(LogicalKeyboardKey.gameButtonB): _close,
-        const SingleActivator(LogicalKeyboardKey.goBack): _close,
+        const SingleActivator(LogicalKeyboardKey.arrowRight, includeRepeats: false): () => _handleNavigate(true),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft, includeRepeats: false): () => _handleNavigate(false),
+        const SingleActivator(LogicalKeyboardKey.enter, includeRepeats: false): _handleConfirm, // A / Enter
+        const SingleActivator(LogicalKeyboardKey.gameButtonA, includeRepeats: false): _handleConfirm,
+        const SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false): _close, // B / Esc
+        const SingleActivator(LogicalKeyboardKey.gameButtonB, includeRepeats: false): _close,
+        const SingleActivator(LogicalKeyboardKey.goBack, includeRepeats: false): _close,
       },
       child: Focus(
         focusNode: _focusNode,

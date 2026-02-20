@@ -23,6 +23,7 @@ class NoGlowScrollBehavior extends ScrollBehavior {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installGamepadKeyFix();
   final storageService = StorageService();
   await storageService.init();
 

@@ -110,6 +110,27 @@ class VersionCard extends StatelessWidget {
                   _buildTags(metadata, rs),
                 ],
               ),
+              if (variant.providerConfig != null)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Text(
+                      variant.providerConfig!.shortLabel,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        fontSize: 7,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
               if (isInstalled)
                 const Positioned(
                   bottom: 0,

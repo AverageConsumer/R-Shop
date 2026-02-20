@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'providers/smb_provider.dart';
 
+typedef FtpProgressCallback = void Function(double percent, int received, int total);
+
 sealed class DownloadHandle {
   const DownloadHandle();
 }
@@ -20,7 +22,8 @@ final class SmbDownloadHandle extends DownloadHandle {
 }
 
 final class FtpDownloadHandle extends DownloadHandle {
-  final Future<void> Function(File destination) downloadToFile;
+  final Future<void> Function(File destination, {FtpProgressCallback? onProgress}) downloadToFile;
+  final Future<void> Function()? disconnect;
 
-  const FtpDownloadHandle({required this.downloadToFile});
+  const FtpDownloadHandle({required this.downloadToFile, this.disconnect});
 }

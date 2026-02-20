@@ -125,7 +125,7 @@ class SystemModel {
       releaseYear: 1998,
       isZipped: true,
       libretroId: 'Nintendo_-_Game_Boy_Color',
-      romExtensions: ['.gbc'],
+      romExtensions: ['.gbc', '.gb'],
       iconName: 'Game_Boy_Color.png',
       accentColor: Color(0xFF7C3AED),
     ),

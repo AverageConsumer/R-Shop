@@ -34,8 +34,8 @@ class RepoManager {
       );
     }
 
+    final dio = Dio();
     try {
-      final dio = Dio();
       dio.options.connectTimeout = const Duration(seconds: 10);
       dio.options.receiveTimeout = const Duration(seconds: 10);
 
@@ -86,6 +86,8 @@ class RepoManager {
         success: false,
         error: 'Connection failed: $e',
       );
+    } finally {
+      dio.close();
     }
   }
 }

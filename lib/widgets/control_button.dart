@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import '../core/responsive/responsive.dart';
 
 class ControlButton extends StatelessWidget {
-  static int _lastTapTime = 0;
-  static const int _tapCooldownMs = 300;
-
   final String label;
   final String action;
   final VoidCallback? onTap;
@@ -39,11 +36,11 @@ class ControlButton extends StatelessWidget {
             shape: BoxShape.circle,
             color: highlight
                 ? Colors.redAccent.withValues(alpha: 0.3)
-                : Colors.white.withValues(alpha: 0.08),
+                : Colors.white.withValues(alpha: 0.12),
             border: Border.all(
               color: highlight
                   ? Colors.redAccent.withValues(alpha: 0.5)
-                  : Colors.white.withValues(alpha: 0.2),
+                  : Colors.white.withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -51,13 +48,13 @@ class ControlButton extends StatelessWidget {
             child: icon != null
                 ? Icon(icon,
                     size: iconSize,
-                    color: highlight ? Colors.redAccent : Colors.white70)
+                    color: highlight ? Colors.redAccent : Colors.white)
                 : Text(
                     label,
                     style: TextStyle(
                       fontSize: fontSize,
                       fontWeight: FontWeight.bold,
-                      color: highlight ? Colors.redAccent : Colors.white70,
+                      color: highlight ? Colors.redAccent : Colors.white,
                     ),
                   ),
           ),
@@ -69,7 +66,7 @@ class ControlButton extends StatelessWidget {
             fontSize: actionFontSize,
             color: highlight
                 ? Colors.redAccent.withValues(alpha: 0.7)
-                : Colors.white.withValues(alpha: 0.5),
+                : Colors.white.withValues(alpha: 0.7),
             letterSpacing: 0.5,
           ),
         ),
@@ -82,12 +79,7 @@ class ControlButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         canRequestFocus: false,
-        onTap: onTap == null ? null : () {
-          final now = DateTime.now().millisecondsSinceEpoch;
-          if (now - _lastTapTime < _tapCooldownMs) return;
-          _lastTapTime = now;
-          onTap!();
-        },
+        onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         splashColor: Colors.white.withValues(alpha: 0.1),
         highlightColor: Colors.white.withValues(alpha: 0.05),

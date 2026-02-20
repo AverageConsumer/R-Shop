@@ -107,7 +107,6 @@ class _SmartCoverImageState extends State<SmartCoverImage> {
       }
     } else if (is404) {
       FailedUrlsCache.instance.markFailed(url);
-    } else {
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -136,7 +135,7 @@ class _SmartCoverImageState extends State<SmartCoverImage> {
         height: widget.height,
         fit: widget.fit,
         memCacheWidth: 300,
-        fadeInDuration: Duration.zero,
+        fadeInDuration: const Duration(milliseconds: 150),
         fadeOutDuration: Duration.zero,
         placeholder: (context, url) =>
             widget.placeholder ?? _buildDefaultPlaceholder(),
@@ -185,7 +184,7 @@ class _SmartCoverImageState extends State<SmartCoverImage> {
       height: widget.height,
       fit: widget.fit,
       memCacheWidth: 300,
-      fadeInDuration: Duration.zero,
+      fadeInDuration: const Duration(milliseconds: 150),
       fadeOutDuration: Duration.zero,
       placeholder: (context, url) =>
           widget.placeholder ?? _buildDefaultPlaceholder(),

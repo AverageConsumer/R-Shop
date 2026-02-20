@@ -78,32 +78,34 @@ class SearchOverlay extends StatelessWidget {
               ),
               child: CallbackShortcuts(
                 bindings: {
-                  const SingleActivator(LogicalKeyboardKey.escape): () {
+                  const SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false): () {
                     if (searchFocusNode.hasFocus) {
                       onUnfocus();
                     } else {
                       onClose();
                     }
                   },
-                  const SingleActivator(LogicalKeyboardKey.gameButtonB): () {
+                  const SingleActivator(LogicalKeyboardKey.gameButtonB, includeRepeats: false): () {
                     if (searchFocusNode.hasFocus) {
                       onUnfocus();
                     } else {
                       onClose();
                     }
                   },
-                  const SingleActivator(LogicalKeyboardKey.goBack): () {
+                  const SingleActivator(LogicalKeyboardKey.goBack, includeRepeats: false): () {
                     if (searchFocusNode.hasFocus) {
                       onUnfocus();
                     } else {
                       onClose();
                     }
                   },
-                  const SingleActivator(LogicalKeyboardKey.arrowDown): () {
+                  const SingleActivator(LogicalKeyboardKey.arrowDown, includeRepeats: false): () {
                     if (searchFocusNode.hasFocus) {
                       onUnfocus();
                     }
                   },
+                  const SingleActivator(LogicalKeyboardKey.arrowLeft): () {},
+                  const SingleActivator(LogicalKeyboardKey.arrowRight): () {},
                 },
                 child: Container(
                   decoration: BoxDecoration(

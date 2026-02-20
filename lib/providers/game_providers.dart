@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/config/app_config.dart';
 import '../models/config/system_config.dart';
 import '../models/game_item.dart';
+import '../models/system_model.dart';
 import '../services/config_parser.dart';
 import '../services/config_storage_service.dart';
 import '../services/unified_game_service.dart';
@@ -26,6 +27,51 @@ final gamesProvider =
     FutureProvider.family<List<GameItem>, SystemConfig>((ref, system) {
   final service = ref.read(unifiedGameServiceProvider);
   return service.fetchGamesForSystem(system, merge: system.mergeMode);
+});
+
+/// Systems visible on the home screen.
+///
+/// Hides consoles that have no providers (local-only) AND no local files in
+/// their target folder. They reappear once a provider is added or a file is
+/// placed in the folder.
+final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
+  final config = await ref.watch(bootstrappedConfigProvider.future);
+  final configuredIds = config.systems.map((s) => s.id).toSet();
+  final configured = SystemModel.supportedSystems
+      .where((s) => configuredIds.contains(s.id))
+      .toList();
+
+  final visible = <SystemModel>[];
+  for (final system in configured) {
+    final sysConfig = config.systemById(system.id);
+    if (sysConfig == null) continue;
+
+    // Has remote providers → always visible
+    if (sysConfig.providers.isNotEmpty) {
+      visible.add(system);
+      continue;
+    }
+
+    // Local-only: visible only if targetFolder contains ROM files
+    final dir = Directory(sysConfig.targetFolder);
+    if (await dir.exists()) {
+      final romExts = {
+        ...system.romExtensions.map((e) => e.toLowerCase()),
+        '.zip',
+        '.rar',
+      };
+      final hasRoms = await dir.list().any((entity) {
+        if (entity is! File) return false;
+        final name = entity.path.toLowerCase();
+        return romExts.any((ext) => name.endsWith(ext));
+      });
+      if (hasRoms) {
+        visible.add(system);
+      }
+    }
+  }
+
+  return visible;
 });
 
 // ---------------------------------------------------------------------------

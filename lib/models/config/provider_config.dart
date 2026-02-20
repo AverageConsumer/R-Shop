@@ -4,14 +4,16 @@ class AuthConfig {
   final String? user;
   final String? pass;
   final String? apiKey;
+  final String? domain;
 
-  const AuthConfig({this.user, this.pass, this.apiKey});
+  const AuthConfig({this.user, this.pass, this.apiKey, this.domain});
 
   factory AuthConfig.fromJson(Map<String, dynamic> json) {
     return AuthConfig(
       user: json['user'] as String?,
       pass: json['pass'] as String?,
       apiKey: json['api_key'] as String?,
+      domain: json['domain'] as String?,
     );
   }
 
@@ -20,6 +22,7 @@ class AuthConfig {
       if (user != null) 'user': user,
       if (pass != null) 'pass': pass,
       if (apiKey != null) 'api_key': apiKey,
+      if (domain != null) 'domain': domain,
     };
   }
 }
@@ -79,6 +82,45 @@ class ProviderConfig {
       if (platformId != null) 'platform_id': platformId,
       if (platformName != null) 'platform_name': platformName,
     };
+  }
+
+  String get shortLabel {
+    switch (type) {
+      case ProviderType.web:
+        return 'WEB';
+      case ProviderType.smb:
+        return 'SMB';
+      case ProviderType.ftp:
+        return 'FTP';
+      case ProviderType.romm:
+        return 'RomM';
+    }
+  }
+
+  /// Validates this config. Returns null if valid, or an error message.
+  String? validate() {
+    switch (type) {
+      case ProviderType.web:
+        if (url == null || url!.isEmpty) return 'URL is required for web provider';
+        final uri = Uri.tryParse(url!);
+        if (uri == null || !uri.hasScheme) return 'Invalid URL';
+        break;
+      case ProviderType.smb:
+        if (host == null || host!.isEmpty) return 'Host is required for SMB provider';
+        if (share == null || share!.isEmpty) return 'Share is required for SMB provider';
+        if (port != null && (port! < 1 || port! > 65535)) return 'Port must be 1–65535';
+        break;
+      case ProviderType.ftp:
+        if (host == null || host!.isEmpty) return 'Host is required for FTP provider';
+        if (port != null && (port! < 1 || port! > 65535)) return 'Port must be 1–65535';
+        break;
+      case ProviderType.romm:
+        if (url == null || url!.isEmpty) return 'URL is required for RomM provider';
+        final uri = Uri.tryParse(url!);
+        if (uri == null || !uri.hasScheme) return 'Invalid URL';
+        break;
+    }
+    return null;
   }
 
   ProviderConfig copyWith({

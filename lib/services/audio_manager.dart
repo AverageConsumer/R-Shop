@@ -23,6 +23,7 @@ class AudioManager {
   bool _isInitializing = false;
   bool _bgmStarted = false;
   bool _bgmStarting = false;
+  bool _hasAttemptedReinit = false;
 
   bool get isInitialized => _isInitialized;
   SoundSettings get settings => _settings;
@@ -154,12 +155,14 @@ class AudioManager {
     } catch (_) {
       _bgmStarting = false;
       _bgmStarted = false;
-      await _reinitializeAndRetryBgm();
+      if (!_hasAttemptedReinit) {
+        await _reinitializeAndRetryBgm();
+      }
     }
   }
 
   Future<void> _reinitializeAndRetryBgm() async {
-
+    _hasAttemptedReinit = true;
     _isInitialized = false;
     _soundSources.clear();
 

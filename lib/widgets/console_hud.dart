@@ -114,7 +114,15 @@ class ConsoleHud extends ConsumerWidget {
     final rs = context.rs;
     final content = _buildContent(rs, buttons);
 
-    if (embedded) return Center(child: content);
+    if (embedded) {
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: rs.spacing.lg, vertical: rs.spacing.sm),
+        child: Align(
+          alignment: rs.isPortrait ? Alignment.center : Alignment.centerRight,
+          child: content,
+        ),
+      );
+    }
 
     if (rs.isPortrait) {
       return Positioned(
@@ -141,10 +149,10 @@ class ConsoleHud extends ConsumerWidget {
           vertical: rs.spacing.sm,
         ),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.6),
+          color: Colors.black.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(rs.radius.round),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.08),
+            color: Colors.white.withValues(alpha: 0.12),
           ),
         ),
         child: Row(

@@ -256,27 +256,27 @@ class _FilterOverlayState extends State<FilterOverlay>
                         () => _moveFocus(-1),
                     const SingleActivator(LogicalKeyboardKey.arrowDown):
                         () => _moveFocus(1),
-                    const SingleActivator(LogicalKeyboardKey.enter):
+                    const SingleActivator(LogicalKeyboardKey.enter, includeRepeats: false):
                         _toggleCurrent,
-                    const SingleActivator(LogicalKeyboardKey.space):
+                    const SingleActivator(LogicalKeyboardKey.space, includeRepeats: false):
                         _toggleCurrent,
-                    const SingleActivator(LogicalKeyboardKey.gameButtonA):
+                    const SingleActivator(LogicalKeyboardKey.gameButtonA, includeRepeats: false):
                         _toggleCurrent,
-                    const SingleActivator(LogicalKeyboardKey.escape):
+                    const SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false):
                         widget.onClose,
-                    const SingleActivator(LogicalKeyboardKey.gameButtonB):
+                    const SingleActivator(LogicalKeyboardKey.gameButtonB, includeRepeats: false):
                         widget.onClose,
-                    const SingleActivator(LogicalKeyboardKey.goBack):
+                    const SingleActivator(LogicalKeyboardKey.goBack, includeRepeats: false):
                         widget.onClose,
-                    const SingleActivator(LogicalKeyboardKey.gameButtonX):
+                    const SingleActivator(LogicalKeyboardKey.gameButtonX, includeRepeats: false):
                         widget.onClearAll,
-                    const SingleActivator(LogicalKeyboardKey.gameButtonLeft1):
+                    const SingleActivator(LogicalKeyboardKey.gameButtonLeft1, includeRepeats: false):
                         () => _jumpToSection(_FilterCategory.region),
-                    const SingleActivator(LogicalKeyboardKey.gameButtonRight1):
+                    const SingleActivator(LogicalKeyboardKey.gameButtonRight1, includeRepeats: false):
                         () => _jumpToSection(_FilterCategory.language),
-                    const SingleActivator(LogicalKeyboardKey.pageUp):
+                    const SingleActivator(LogicalKeyboardKey.pageUp, includeRepeats: false):
                         () => _jumpToSection(_FilterCategory.region),
-                    const SingleActivator(LogicalKeyboardKey.pageDown):
+                    const SingleActivator(LogicalKeyboardKey.pageDown, includeRepeats: false):
                         () => _jumpToSection(_FilterCategory.language),
                   },
                   child: Focus(

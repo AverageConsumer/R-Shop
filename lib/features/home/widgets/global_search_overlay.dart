@@ -9,6 +9,7 @@ import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
+import '../../../utils/game_metadata.dart';
 import '../../../providers/game_providers.dart';
 import '../../../services/config_bootstrap.dart';
 import '../../../services/database_service.dart';
@@ -39,6 +40,7 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
 
   // Grouped results for display
   List<_GroupedResult> _grouped = [];
+  final Map<int, GlobalKey> _resultKeys = {};
 
   @override
   void initState() {
@@ -70,6 +72,7 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
         _results = [];
         _grouped = [];
         _focusedIndex = 0;
+        _resultKeys.clear();
       });
       return;
     }
@@ -80,8 +83,21 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
         _results = results;
         _grouped = _groupResults(results);
         _focusedIndex = 0;
+        _resultKeys.clear();
       });
     });
+  }
+
+  void _scrollToFocused() {
+    final key = _resultKeys[_focusedIndex];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        alignment: 0.3,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   List<_GroupedResult> _groupResults(List<GameSearchResult> results) {
@@ -134,6 +150,7 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
       displayName: result.displayName,
       url: result.url,
       cachedCoverUrl: result.coverUrl,
+      providerConfig: result.providerConfig,
     );
 
     widget.onClose();
@@ -161,12 +178,14 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
     if (key == LogicalKeyboardKey.arrowDown) {
       if (_focusedIndex < flat.length - 1) {
         setState(() => _focusedIndex++);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocused());
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (_focusedIndex > 0) {
         setState(() => _focusedIndex--);
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocused());
       } else {
         _searchFocusNode.requestFocus();
       }
@@ -231,9 +250,29 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
       padding: EdgeInsets.symmetric(horizontal: rs.spacing.lg),
       child: CallbackShortcuts(
         bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): widget.onClose,
-          const SingleActivator(LogicalKeyboardKey.gameButtonB): widget.onClose,
-          const SingleActivator(LogicalKeyboardKey.arrowDown): () {
+          const SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false): () {
+            if (_searchFocusNode.hasFocus) {
+              if (_flatResults.isNotEmpty) {
+                _listFocusNode.requestFocus();
+              } else {
+                widget.onClose();
+              }
+            } else {
+              widget.onClose();
+            }
+          },
+          const SingleActivator(LogicalKeyboardKey.gameButtonB, includeRepeats: false): () {
+            if (_searchFocusNode.hasFocus) {
+              if (_flatResults.isNotEmpty) {
+                _listFocusNode.requestFocus();
+              } else {
+                widget.onClose();
+              }
+            } else {
+              widget.onClose();
+            }
+          },
+          const SingleActivator(LogicalKeyboardKey.arrowDown, includeRepeats: false): () {
             if (_flatResults.isNotEmpty) {
               _listFocusNode.requestFocus();
             }
@@ -339,12 +378,20 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
 
     if (_results.isEmpty) {
       return Center(
-        child: Text(
-          'No results found',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.3),
-            fontSize: rs.isSmall ? 14 : 16,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off, size: 48,
+                color: Colors.white.withValues(alpha: 0.15)),
+            SizedBox(height: rs.spacing.md),
+            Text(
+              'No results found',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.3),
+                fontSize: rs.isSmall ? 14 : 16,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -391,7 +438,9 @@ class _GlobalSearchOverlayState extends ConsumerState<GlobalSearchOverlay> {
                 final isFocused = itemFlatIndex == _focusedIndex &&
                     _listFocusNode.hasFocus;
 
+                _resultKeys.putIfAbsent(itemFlatIndex, () => GlobalKey());
                 return _SearchResultTile(
+                  key: _resultKeys[itemFlatIndex],
                   result: result,
                   system: group.system,
                   isFocused: isFocused,
@@ -443,6 +492,7 @@ class _SearchResultTile extends StatelessWidget {
   final VoidCallback onTap;
 
   const _SearchResultTile({
+    super.key,
     required this.result,
     this.system,
     this.isFocused = false,
@@ -505,19 +555,93 @@ class _SearchResultTile extends StatelessWidget {
             ),
             SizedBox(width: rs.spacing.md),
             Expanded(
-              child: Text(
-                result.displayName,
-                style: TextStyle(
-                  color: isFocused ? Colors.white : Colors.white70,
-                  fontSize: rs.isSmall ? 13 : 15,
-                  fontWeight: isFocused ? FontWeight.w600 : FontWeight.w400,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    result.displayName,
+                    style: TextStyle(
+                      color: isFocused ? Colors.white : Colors.white70,
+                      fontSize: rs.isSmall ? 13 : 15,
+                      fontWeight: isFocused ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  _buildTags(rs),
+                ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTags(Responsive rs) {
+    final region = GameMetadata.extractRegion(result.filename);
+    final tags = GameMetadata.extractAllTags(result.filename)
+        .where((t) => t.type != TagType.hidden)
+        .toList();
+
+    if (tags.isEmpty && region.name == 'Unknown') {
+      return const SizedBox.shrink();
+    }
+
+    const maxTags = 3;
+    final visibleTags = tags.take(maxTags).toList();
+    final remaining = tags.length - maxTags;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        children: [
+          if (region.name != 'Unknown')
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: Text(region.flag, style: const TextStyle(fontSize: 12)),
+            ),
+          Expanded(
+            child: Wrap(
+              spacing: 4,
+              runSpacing: 2,
+              children: [
+                ...visibleTags.map((tag) {
+                  final color = tag.getColor();
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(
+                        color: color.withValues(alpha: 0.35),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: Text(
+                      tag.raw,
+                      style: TextStyle(
+                        color: color.withValues(alpha: 0.9),
+                        fontSize: rs.isSmall ? 8 : 9,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                }),
+                if (remaining > 0)
+                  Text(
+                    '+$remaining',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.4),
+                      fontSize: rs.isSmall ? 8 : 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
