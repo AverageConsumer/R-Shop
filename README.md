@@ -1,52 +1,42 @@
-# R-Shop
+# 🎮 R-Shop
 
-**Your retro game collection, one tap away.**
-A premium console-style game manager for Android — built for handhelds, controllers, and anyone who loves retro gaming.
+**The eShop your Retro Handheld was missing.**
+A premium, console-native game manager for Android. Built for handhelds, perfected for controllers, and designed for the retro community.
 
 <p align="center">
   <img src="screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
 </p>
 
-![Version](https://img.shields.io/badge/version-0.9.4_Beta-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Platform](https://img.shields.io/badge/platform-Android-brightgreen)
-![Status](https://img.shields.io/badge/status-Public_Beta-orange)
+![Version](https://img.shields.io/badge/version-0.9.4_Beta-blue?style=for-the-badge)
+![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
+![Platform](https://img.shields.io/badge/platform-Android-brightgreen?style=for-the-badge)
+![Status](https://img.shields.io/badge/status-Public_Beta-orange?style=for-the-badge)
 
 ---
 
 ## What is R-Shop?
 
-R-Shop is a Flutter-based Android app that gives you a **console-like experience** for browsing, downloading, and organizing retro game ROMs from your own sources. Think of it as your personal eShop — but for every retro system you love.
+R-Shop is a Flutter-based Android application that provides a **seamless, console-like experience** for browsing, downloading, and organizing your retro game library. 
 
-It's built with love for **Android gaming handhelds** (Retroid, Odin, AYN, Anbernic…) but works beautifully on any Android device with touch or controller input.
+It bridges the gap between your self-hosted storage (RomM, SMB, FTP) and your handheld device, providing a native UI that feels like it was built by a major console manufacturer.
 
-> **Important:** R-Shop is a neutral browser. It does **not** host, distribute, or link to any copyrighted content. Users must provide their own source URLs.
-
----
-
-## Features
-
-**Controller-first UI** — Full D-pad and analog stick navigation with auto-scroll, haptic feedback, and click sounds. Every interaction feels like a real console interface, not a phone app. Touch and gamepad input work side by side; both feel native.
-
-**Multi-source providers** — Each console can pull from Web directories, SMB shares, FTP servers, or a RomM instance. Mix and match per system, configure once globally or per console.
-
-**RomM integration** — Connect to your RomM server and let R-Shop automatically match platforms via IGDB. Configure the connection once in settings and auto-fill credentials for every console.
-
-**Smart download queue** — Queue up your entire library. Downloads run with live progress, auto-extraction (ZIP/7z), and the queue persists across app restarts. Adjust concurrent downloads (1–3) in settings.
-
-**Automatic box art** — Every game gets its cover art fetched and cached automatically via [libretro-thumbnails](https://github.com/libretro-thumbnails). An installed indicator (glowing LED strip) on each game card tells you at a glance what you've already downloaded.
-
-**Aggressive caching** — Optimized for huge libraries (5000+ items). After the first load, the app feels instant even without internet.
-
-**Global search** — Find any game across all cached systems instantly from the home screen.
-
-**Region and language filters** — Filter game lists by region or language, with per-system persistence.
-
-**Config import/export** — Save your entire setup as JSON and restore it on any device.
+> **🛡️ Neutrality Policy:** R-Shop is a technical tool and directory browser. It does **not** host, distribute, or provide links to copyrighted content. You provide the sources; R-Shop provides the experience.
 
 ---
 
-## Screenshots
+## ✨ Key Features
+
+* **🎮 Console-Native UI** – 100% D-pad and analog navigation. Features auto-scroll, haptic feedback, and mechanical click sounds. Built for the AYN Thor, Retroid, Odin, and Anbernic devices.
+* **🌐 Multi-Protocol Mastery** – Connect to **RomM, SMB, FTP, or Web** directories. Mix and match different providers for every single console in your library.
+* **🖥️ RomM Command Center** – Advanced RomM integration with a centralized management screen. Bulk-sync credentials across all systems or use per-console overrides.
+* **🔍 Global Search (Y-Button)** – Instantly find any game across all your cached systems directly from the home screen.
+* **📥 Hardened Download Engine** – Background-ready downloads via Android Foreground Service. Features auto-extraction (ZIP/7z), stall detection, and queue persistence across restarts.
+* **🖼️ Automatic Box Art** – Metadata and covers are fetched automatically via [libretro-thumbnails](https://github.com/libretro-thumbnails).
+* **🔒 Rock-Solid Stability** – Features atomic configuration saves, Zip-Slip protection, and aggressive caching for massive libraries (5000+ items).
+
+---
+
+## 📸 Screenshots
 
 <p align="center">
   <img src="screenshots/console_list.png" width="250" alt="Console Overview" />
@@ -56,90 +46,45 @@ It's built with love for **Android gaming handhelds** (Retroid, Odin, AYN, Anber
 
 ---
 
-## Supported Systems (27)
+## 🗂️ Supported Systems (27+)
 
 | Nintendo | Sony | SEGA | Other |
 |----------|------|------|-------|
-| NES | PlayStation | Master System | Neo Geo Pocket Color |
-| Super Nintendo | PlayStation 2 | Mega Drive | Arcade |
-| Nintendo 64 | PlayStation 3 | Game Gear | Xbox |
-| GameCube | PlayStation 4 | Saturn | Xbox 360 |
-| Wii | PSP | Dreamcast | |
-| Wii U | PS Vita | | |
-| Switch | | | |
-| Game Boy | | | |
-| Game Boy Color | | | |
-| Game Boy Advance | | | |
-| Nintendo DS | | | |
-| Nintendo 3DS | | | |
+| NES, SNES, N64 | PlayStation (1-4) | Master System | Neo Geo Pocket Color |
+| GameCube, Wii, Wii U | PSP | Mega Drive | Arcade (MAME) |
+| Switch | PS Vita | Game Gear | Xbox & Xbox 360 |
+| GB, GBC, GBA | | Saturn, Dreamcast | |
+| DS, 3DS | | | |
 
 ---
 
-## Installation & Updates
+## 📲 Installation
 
-### Recommended: Obtainium
-The best way to install and keep R-Shop updated is via **[Obtainium](https://github.com/ImranR98/Obtainium)**.
-1. Install Obtainium.
-2. Add this repository URL.
-3. Enjoy automatic updates for every new Beta release.
+### 🚀 The Best Way: Obtainium
+Keep R-Shop updated automatically using **[Obtainium](https://github.com/ImranR98/Obtainium)**. Just add this repository URL and never miss a Beta update.
 
-### Manual APK
-1. Go to the [**Releases**](../../releases) page.
-2. Download the latest `.apk` file.
-3. Install it on your Android device.
+### 📦 Manual APK
+Download the latest `.apk` from the [**Releases**](../../releases) page and install it manually.
 
 ---
 
-## Getting Started
+## 🛠️ Getting Started
 
-1. **Launch R-Shop.** On first start, the onboarding wizard walks you through setup.
-2. **Configure your consoles.** For each system you want, pick a source type (Web directory, SMB share, FTP server, or RomM) and enter the connection details.
-3. **Choose a download folder.** Select where games should be stored per console (e.g., your ROMs folder).
-4. **Browse and download.** The app handles the rest — box art, caching, and organization are automatic.
+1. **Onboarding:** The setup wizard will guide you through your first RomM or local folder configuration.
+2. **Library Sync:** Browse your remote sources and watch R-Shop build your local metadata cache.
+3. **Download & Play:** Hit 'A' to queue a game. R-Shop handles the download, extraction, and organization.
 
-You can edit your console configuration at any time in **Settings > Config Editor**.
-
----
-
-## Building from Source
-
-```bash
-git clone https://github.com/AverageConsumer/R-Shop.git
-cd R-Shop
-flutter pub get
-flutter build apk --release
-```
-
-The built APK will be at `build/app/outputs/flutter-apk/app-release.apk`.
+*Need to tweak things? Head to **Settings > Config Editor** for full JSON control over your setup.*
 
 ---
 
-## Known Issues (Beta)
+## 🤝 Contributing & License
 
-* **Initial cache:** Scrolling through a list of 2000+ games for the very first time might show placeholders briefly while the cache builds up.
-
----
-
-## Contributing
-
-Contributions are welcome! See **[CONTRIBUTING.md](CONTRIBUTING.md)** for details.
+Contributions make the community thrive! Check out **[CONTRIBUTING.md](CONTRIBUTING.md)**.
+This project is licensed under the **MIT License**.
 
 ---
 
-## License
+## ⚠️ Disclaimer
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-
----
-
-## Acknowledgments
-
-- **[libretro-thumbnails](https://github.com/libretro-thumbnails)** — Game cover database
-- **viik4 / iisu** — Platform icons
-- **The SBCGaming Community** — Inspiration
-
----
-
-## Disclaimer
-
-R-Shop is a tool for managing your personal game library. It does **not** include, distribute, or endorse piracy of any kind. Users are solely responsible for the content they access. Always respect copyright laws in your jurisdiction.
+R-Shop is a library management tool. It does not provide ROMs. Users must legally own the content they access through their own private servers or directories.
