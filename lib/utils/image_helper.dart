@@ -1,6 +1,7 @@
 import '../models/system_model.dart';
 
 class ImageHelper {
+  static final _gameExtensions = SystemModel.allGameExtensions;
   static const String _baseUrl =
       'https://raw.githubusercontent.com/libretro-thumbnails/';
 
@@ -39,16 +40,6 @@ class ImageHelper {
     }
 
     return urls;
-  }
-
-  static String? getCoverUrl(SystemModel system, String gameFilename) {
-    if (system.libretroId.isEmpty) return null;
-
-    final cleanedName = _removeExtension(gameFilename);
-    if (cleanedName.isEmpty) return null;
-
-    final encodedName = Uri.encodeComponent(cleanedName);
-    return '$_baseUrl${system.libretroId}/master/Named_Boxarts/$encodedName.png';
   }
 
   static List<String> getCoverUrlsForSingle(
@@ -121,36 +112,9 @@ class ImageHelper {
   }
 
   static String _removeExtension(String filename) {
-    final extensions = [
-      '.zip',
-      '.7z',
-      '.rvz',
-      '.3ds',
-      '.cia',
-      '.iso',
-      '.rar',
-      '.chd',
-      '.gdi',
-      '.cue',
-      '.pbp',
-      '.cso',
-      '.z64',
-      '.n64',
-      '.nds',
-      '.gba',
-      '.gbc',
-      '.gb',
-      '.sfc',
-      '.nes',
-      '.sms',
-      '.md',
-      '.gen',
-      '.gg',
-      '.pce'
-    ];
     var name = filename;
 
-    for (final ext in extensions) {
+    for (final ext in _gameExtensions) {
       if (name.toLowerCase().endsWith(ext)) {
         name = name.substring(0, name.length - ext.length);
         break;

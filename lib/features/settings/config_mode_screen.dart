@@ -73,7 +73,7 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
       }
       if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
         if (state.canTest && !state.isTestingConnection) {
-          controller.testProviderConnection();
+          controller.testAndSaveProvider();
         }
         return KeyEventResult.handled;
       }

@@ -74,6 +74,9 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
           _goBack();
           return null;
         }),
+        SearchIntent: SearchAction(ref, onSearch: _testConnection),
+        InfoIntent: InfoAction(ref, onInfo: _clear),
+        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _save),
       };
 
   @override

@@ -32,17 +32,17 @@ class ConsoleGrid extends ConsumerWidget {
         itemBuilder: (context, index) {
           final system = systems[index];
           final systemConfig = state.configuredSystems[system.id];
-          final isConfigured =
-              systemConfig != null && systemConfig.providers.isNotEmpty;
+          final isConfigured = systemConfig != null;
+          final isLocalOnly = systemConfig != null && systemConfig.providers.isEmpty;
           final hasRommMatch =
               state.rommSelectedSystemIds.contains(system.id);
           final hasLocalMatch =
-              state.localOnlySystemIds.contains(system.id) ||
-                  (systemConfig != null && systemConfig.providers.isEmpty);
+              state.localOnlySystemIds.contains(system.id) || isLocalOnly;
 
           return _ConsoleTile(
             system: system,
             isConfigured: isConfigured,
+            isLocalOnly: isLocalOnly,
             hasRommMatch: hasRommMatch,
             hasLocalMatch: hasLocalMatch,
             onTap: () => controller.selectConsole(system.id),
@@ -57,6 +57,7 @@ class ConsoleGrid extends ConsumerWidget {
 class _ConsoleTile extends StatefulWidget {
   final SystemModel system;
   final bool isConfigured;
+  final bool isLocalOnly;
   final bool hasRommMatch;
   final bool hasLocalMatch;
   final VoidCallback onTap;
@@ -65,6 +66,7 @@ class _ConsoleTile extends StatefulWidget {
   const _ConsoleTile({
     required this.system,
     required this.isConfigured,
+    this.isLocalOnly = false,
     this.hasRommMatch = false,
     this.hasLocalMatch = false,
     required this.onTap,
@@ -118,9 +120,11 @@ class _ConsoleTileState extends State<_ConsoleTile> {
             border: Border.all(
               color: _focused
                   ? widget.system.accentColor.withValues(alpha: 0.8)
-                  : widget.isConfigured
+                  : widget.isConfigured && !widget.isLocalOnly
                       ? Colors.green.withValues(alpha: 0.4)
-                      : Colors.white.withValues(alpha: 0.08),
+                      : widget.isLocalOnly
+                          ? Colors.blue.withValues(alpha: 0.4)
+                          : Colors.white.withValues(alpha: 0.08),
               width: _focused ? 2 : 1,
             ),
             boxShadow: _focused
@@ -202,7 +206,7 @@ class _ConsoleTileState extends State<_ConsoleTile> {
                     ),
                   ),
                 ),
-              if (widget.isConfigured)
+              if (widget.isConfigured && !widget.isLocalOnly)
                 Positioned(
                   top: rs.spacing.xs,
                   right: rs.spacing.xs,
@@ -214,6 +218,23 @@ class _ConsoleTileState extends State<_ConsoleTile> {
                     ),
                     child: Icon(
                       Icons.check,
+                      color: Colors.white,
+                      size: rs.isSmall ? 10.0 : 12.0,
+                    ),
+                  ),
+                ),
+              if (widget.isLocalOnly)
+                Positioned(
+                  top: rs.spacing.xs,
+                  right: rs.spacing.xs,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.folder_rounded,
                       color: Colors.white,
                       size: rs.isSmall ? 10.0 : 12.0,
                     ),

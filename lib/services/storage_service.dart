@@ -11,7 +11,6 @@ class StorageService {
   static const _hapticEnabledKey = 'haptic_enabled';
   static const _onboardingCompletedKey = 'onboarding_completed';
   static const _soundSettingsKey = 'sound_settings';
-  static const _repoUrlKey = 'repo_url';
   static const _gridColumnsPrefix = 'grid_columns_';
   static const _showFullFilenameKey = 'show_full_filename';
   static const _maxConcurrentDownloadsKey = 'max_concurrent_downloads';
@@ -37,14 +36,6 @@ class StorageService {
     await _prefs?.setString(_romPathKey, path);
   }
 
-  String? getRepoUrl() {
-    return _prefs?.getString(_repoUrlKey);
-  }
-
-  Future<void> setRepoUrl(String url) async {
-    await _prefs?.setString(_repoUrlKey, url);
-  }
-
   bool getHapticEnabled() {
     return _prefs?.getBool(_hapticEnabledKey) ?? true;
   }
@@ -64,7 +55,6 @@ class StorageService {
   Future<void> resetOnboarding() async {
     await _prefs?.remove(_onboardingCompletedKey);
     await _prefs?.remove(_romPathKey);
-    await _prefs?.remove(_repoUrlKey);
   }
 
   Future<void> resetAll() async {

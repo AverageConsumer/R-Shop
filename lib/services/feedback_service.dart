@@ -7,10 +7,6 @@ class FeedbackService {
 
   FeedbackService(this._audio, this._haptic);
 
-  void setEnabled(bool enabled) {
-    _haptic.setEnabled(enabled);
-  }
-
   void tick() {
     _haptic.tick();
     _audio.playNavigation();

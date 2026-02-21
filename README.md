@@ -7,7 +7,7 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
   <img src="screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
 </p>
 
-![Version](https://img.shields.io/badge/version-0.9.5_Beta-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.9.6_Beta-blue?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Android-brightgreen?style=for-the-badge)
 ![Status](https://img.shields.io/badge/status-Public_Beta-orange?style=for-the-badge)
@@ -31,13 +31,19 @@ It bridges the gap between your self-hosted storage (RomM, SMB, FTP) and your ha
 * **🏠 Home Grid Layout** – Toggle between carousel and grid view on the home screen; grid columns adjustable with LB/RB.
 * **⭐ Favorites System** – Quick-favorite any game from the detail screen with the Select button.
 * **🔄 Background Sync** – Automatic provider sync on launch with live progress badge on the home screen.
-* **🎮 Console-Native UI** – 100% D-pad and analog navigation. Features auto-scroll, haptic feedback, and mechanical click sounds. Built for the AYN Thor, Retroid, Odin, and Anbernic devices.
-* **🌐 Multi-Protocol Mastery** – Connect to **RomM, SMB, FTP, or Web** directories. Mix and match different providers for every single console in your library.
+* **🎮 Console-Native UI** – 100% D-pad and analog navigation. Features auto-scroll, haptic feedback, mechanical click sounds, and PlayStation/Xbox-correct Start/Select icons. Built for the AYN Thor, Retroid, Odin, and Anbernic devices.
+* **🌐 Multi-Protocol Mastery** – Connect to **RomM, SMB, FTP, or Web** directories — or go fully local with no remote provider at all. Mix and match sources for every single console in your library.
 * **🖥️ RomM Command Center** – Advanced RomM integration with a centralized management screen. Bulk-sync credentials across all systems or use per-console overrides.
-* **🔍 Global Search (Y-Button)** – Instantly find any game across all your cached systems directly from the home screen.
+* **🔍 Library Search (Y-Button)** – Press Y on the home screen to jump straight into the Library with the search field open — find any game across all systems instantly.
 * **📥 Hardened Download Engine** – Background-ready downloads via Android Foreground Service. Features auto-extraction (ZIP/7z), stall detection, and queue persistence across restarts.
 * **🖼️ Automatic Box Art** – Metadata and covers are fetched automatically via [libretro-thumbnails](https://github.com/libretro-thumbnails).
 * **🔒 Rock-Solid Stability** – Features atomic configuration saves, Zip-Slip protection, and aggressive caching for massive libraries (5000+ items).
+* **🔬 Scan Library** – Settings > Scan Library: animated full-library scan across all consoles with per-system progress.
+* **🧭 Smart Onboarding** – Auto-detection of existing ROM folders plus a "Create standard folders" flow with system picker.
+* **💨 Cache-First Loading** – Game lists load instantly from cache while background refresh fetches updates silently.
+* **📡 Offline Indicator** – Amber "Offline — cached data" toast on failed sync, auto-dismissing after 3 seconds.
+* **🔀 Provider Reordering** – Adjust provider priority via D-pad or tap-arrows in the console configuration.
+* **✅ Test & Save** – Test a provider connection and auto-save on success — one button press instead of two.
 
 ---
 
@@ -51,7 +57,7 @@ It bridges the gap between your self-hosted storage (RomM, SMB, FTP) and your ha
 
 ---
 
-## 🗂️ Supported Systems (27+)
+## 🗂️ Supported Systems (27 systems · 200+ file formats)
 
 | Nintendo | Sony | SEGA | Other |
 |----------|------|------|-------|
@@ -75,12 +81,12 @@ Download the latest `.apk` from the [**Releases**](../../releases) page and inst
 
 ## 🛠️ Getting Started
 
-1. **Onboarding:** The setup wizard will guide you through your first RomM or local folder configuration.
+1. **Onboarding:** The setup wizard auto-detects existing ROM folders on your device and offers to create a standard folder structure — or connect to RomM, SMB, FTP, and Web sources.
 2. **Library Sync:** Browse your remote sources and watch R-Shop build your local metadata cache automatically on launch.
 3. **Download & Play:** Hit 'A' to queue a game. R-Shop handles the download, extraction, and organization.
 4. **Quick Menu & Favorites:** Press Start for instant shortcuts; press Select on any game detail to favorite it.
 
-*Need to tweak things? Head to **Settings > Config Editor** for full JSON control over your setup.*
+*For the full walkthrough, see the **[User Guide](docs/USER_GUIDE.md)**. Need to tweak things? Head to **Settings > Config Editor** for full JSON control over your setup.*
 
 ---
 

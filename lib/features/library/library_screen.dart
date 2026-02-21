@@ -31,7 +31,8 @@ import 'widgets/library_tabs.dart';
 enum LibrarySortMode { alphabetical, bySystem }
 
 class LibraryScreen extends ConsumerStatefulWidget {
-  const LibraryScreen({super.key});
+  final bool openSearch;
+  const LibraryScreen({super.key, this.openSearch = false});
 
   @override
   ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
@@ -215,6 +216,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         _scrollToSelected();
       });
     }
+
+    if (widget.openSearch) {
+      _openSearch();
+    }
   }
 
   void _applyFilters() {
@@ -224,7 +229,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     switch (_selectedTab) {
       case 1: // Installed
         games = games
-            .where((g) => _isGameInstalled(g.filename))
+            .where((g) => _isGameInstalled(g))
             .toList();
       case 2: // Favorites
         games =
@@ -696,14 +701,25 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   // --- Count helpers ---
 
-  bool _isGameInstalled(String filename) {
+  bool _isGameInstalled(_LibraryEntry entry) {
+    final filename = entry.filename;
     if (_installedFiles.contains(filename)) return true;
-    // Strip archive extension for multi-file folder match
-    const archiveExts = ['.zip', '.7z', '.rar'];
-    for (final ext in archiveExts) {
+    // Strip archive extension for extracted ROM match
+    for (final ext in SystemModel.archiveExtensions) {
       if (filename.toLowerCase().endsWith(ext)) {
         final stripped = filename.substring(0, filename.length - ext.length);
-        return _installedFiles.contains(stripped);
+        // Folder match (multi-file games)
+        if (_installedFiles.contains(stripped)) return true;
+        // ROM extension replacement (like RomManager.getTargetFilename)
+        final system = SystemModel.supportedSystems
+            .where((s) => s.id == entry.systemSlug)
+            .firstOrNull;
+        if (system != null) {
+          for (final romExt in system.romExtensions) {
+            if (_installedFiles.contains('$stripped$romExt')) return true;
+          }
+        }
+        return false;
       }
     }
     return false;
@@ -712,7 +728,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   int get _allCount => _allGames.length;
 
   int get _installedCount =>
-      _allGames.where((g) => _isGameInstalled(g.filename)).length;
+      _allGames.where((g) => _isGameInstalled(g)).length;
 
   int get _favoritesCount =>
       _allGames.where((g) => _favoriteIds.contains(g.displayName)).length;
@@ -1016,7 +1032,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         itemBuilder: (context, index) {
         final entry = _filteredGames[index];
         final isSelected = index == _currentIndex;
-        final isInstalled = _isGameInstalled(entry.filename);
+        final isInstalled = _isGameInstalled(entry);
         final isFavorite = _favoriteIds.contains(entry.displayName);
 
         final systemModel = SystemModel.supportedSystems
@@ -1071,8 +1087,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         dpad: !_isSearchFocused
             ? (label: '\u2191', action: 'Search')
             : null,
-        lt: HudAction('Prev Tab', onTap: _prevTab),
-        rt: HudAction('Next Tab', onTap: _nextTab),
         a: HudAction('Select', onTap: _openSelectedGame),
         b: HudAction(
           _isSearchFocused ? 'Keyboard' : 'Close',
@@ -1083,8 +1097,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     }
 
     return ConsoleHud(
-      lt: HudAction('Prev Tab', onTap: _prevTab),
-      rt: HudAction('Next Tab', onTap: _nextTab),
       a: HudAction('Select', onTap: _openSelectedGame),
       b: HudAction('Back', onTap: () => Navigator.pop(context)),
       start: HudAction('Menu', onTap: _toggleQuickMenu),

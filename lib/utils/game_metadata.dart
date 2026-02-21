@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/system_model.dart';
+
 enum TagType { version, build, disc, quality, other, secondary, hidden }
 
 class TagInfo {
@@ -56,24 +58,7 @@ class GameMetadata {
   static String cleanTitle(String filename) {
     var name = filename;
 
-    final extensions = [
-      '.zip',
-      '.7z',
-      '.rvz',
-      '.3ds',
-      '.iso',
-      '.rar',
-      '.chd',
-      '.z64',
-      '.gba',
-      '.gbc',
-      '.gb',
-      '.sfc',
-      '.nds',
-      '.nsp',
-      '.xci',
-      '.cso'
-    ];
+    final extensions = SystemModel.allGameExtensions;
     for (final ext in extensions) {
       if (name.toLowerCase().endsWith(ext)) {
         name = name.substring(0, name.length - ext.length);

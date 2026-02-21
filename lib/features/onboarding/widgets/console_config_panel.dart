@@ -1,9 +1,11 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/widgets/console_focusable.dart';
 import '../../../models/system_model.dart';
+import '../../../providers/app_providers.dart';
 import '../onboarding_controller.dart';
 import 'provider_form.dart';
 import 'provider_list_item.dart';
@@ -203,11 +205,49 @@ class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
         ),
         SizedBox(height: rs.spacing.sm),
         ...List.generate(sub.providers.length, (i) {
-          return ProviderListItem(
-            provider: sub.providers[i],
-            index: i,
-            onEdit: () => controller.startEditProvider(i),
-            onDelete: () => controller.removeProvider(i),
+          final p = sub.providers[i];
+          return Focus(
+            key: ValueKey(
+              'prov_${p.type.name}_${p.url ?? ''}_${p.host ?? ''}'
+              '_${p.port ?? ''}_${p.share ?? ''}_${p.path ?? ''}',
+            ),
+            canRequestFocus: false,
+            skipTraversal: true,
+            onKeyEvent: (node, event) {
+              if (event is KeyUpEvent) return KeyEventResult.ignored;
+              if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                if (i > 0) {
+                  controller.moveProvider(i, i - 1);
+                  ref.read(feedbackServiceProvider).tick();
+                }
+                return KeyEventResult.handled;
+              }
+              if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                if (i < sub.providers.length - 1) {
+                  controller.moveProvider(i, i + 1);
+                  ref.read(feedbackServiceProvider).tick();
+                }
+                return KeyEventResult.handled;
+              }
+              if (event.logicalKey == LogicalKeyboardKey.gameButtonX) {
+                controller.removeProvider(i);
+                ref.read(feedbackServiceProvider).tick();
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: ProviderListItem(
+              provider: p,
+              index: i,
+              onEdit: () => controller.startEditProvider(i),
+              onDelete: () => controller.removeProvider(i),
+              onMoveUp: i > 0
+                  ? () => controller.moveProvider(i, i - 1)
+                  : null,
+              onMoveDown: i < sub.providers.length - 1
+                  ? () => controller.moveProvider(i, i + 1)
+                  : null,
+            ),
           );
         }),
         SizedBox(height: rs.spacing.sm),

@@ -3,6 +3,7 @@ import 'package:smb_connect/smb_connect.dart';
 import '../../models/config/provider_config.dart';
 import '../../models/config/system_config.dart';
 import '../../models/game_item.dart';
+import '../../models/system_model.dart';
 import '../download_handle.dart';
 import '../source_provider.dart';
 
@@ -13,7 +14,10 @@ class SmbProvider implements SourceProvider {
   SmbProvider(this.config);
 
   String get _smbRoot {
-    final share = config.share!;
+    final share = config.share;
+    if (share == null || share.isEmpty) {
+      throw StateError('SMB provider requires a share name');
+    }
     final path = config.path;
     if (path == null || path.isEmpty) return '/$share';
     final cleanPath = path.startsWith('/') ? path : '/$path';
@@ -21,8 +25,12 @@ class SmbProvider implements SourceProvider {
   }
 
   Future<SmbConnect> _connect() async {
+    final host = config.host;
+    if (host == null || host.isEmpty) {
+      throw StateError('SMB provider requires a host');
+    }
     return SmbConnect.connectAuth(
-      host: config.host!,
+      host: host,
       username: config.auth?.user ?? 'guest',
       password: config.auth?.pass ?? '',
       domain: config.auth?.domain ?? '',
@@ -40,7 +48,7 @@ class SmbProvider implements SourceProvider {
       for (final file in files) {
         if (!file.isFile()) continue;
         final name = file.name;
-        if (!_isGameFile(name.toLowerCase())) continue;
+        if (!SystemModel.isGameFile(name.toLowerCase())) continue;
 
         games.add(GameItem(
           filename: name,
@@ -106,17 +114,6 @@ class SmbProvider implements SourceProvider {
     }
   }
 
-  static bool _isGameFile(String name) {
-    return _gameExtensions.any((ext) => name.endsWith(ext));
-  }
-
-  static const _gameExtensions = [
-    '.zip', '.7z', '.rar',
-    '.nes', '.sfc', '.z64', '.n64', '.v64',
-    '.gb', '.gbc', '.gba', '.nds', '.3ds', '.cia',
-    '.iso', '.cso', '.chd', '.pbp', '.cue', '.rvz',
-    '.sms', '.md', '.gen', '.gg',
-  ];
 }
 
 /// Handle returned by [SmbProvider.openFile] for streaming downloads.

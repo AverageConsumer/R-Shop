@@ -16,7 +16,13 @@ class RommProvider implements SourceProvider {
   RommProvider(this.config, {RommApiService? api})
       : _api = api ?? RommApiService();
 
-  String get _baseUrl => config.url!;
+  String get _baseUrl {
+    final url = config.url;
+    if (url == null || url.isEmpty) {
+      throw StateError('RomM provider requires a URL');
+    }
+    return url;
+  }
 
   AuthConfig? get _auth => config.auth;
 

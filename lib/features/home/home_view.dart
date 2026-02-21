@@ -11,6 +11,7 @@ import '../../providers/game_providers.dart';
 import '../../widgets/quick_menu.dart';
 import '../../providers/library_providers.dart';
 import '../../services/config_bootstrap.dart';
+import '../../services/library_sync_service.dart';
 import '../../services/input_debouncer.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
 import '../../widgets/console_hud.dart';
@@ -20,7 +21,6 @@ import '../library/library_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../settings/settings_screen.dart';
 import '../game_list/game_list_screen.dart';
-import 'widgets/global_search_overlay.dart';
 import 'widgets/hero_carousel_item.dart';
 import 'widgets/home_grid_view.dart';
 
@@ -38,7 +38,6 @@ class _HomeViewState extends ConsumerState<HomeView>
   bool _isUserScrolling = false;
   int _lastStablePage = _initialPage;
   bool _showExitDialog = false;
-  bool _showGlobalSearch = false;
   bool _showQuickMenu = false;
   bool _wasGrid = false;
 
@@ -92,7 +91,7 @@ class _HomeViewState extends ConsumerState<HomeView>
           return false;
         }),
         ConfirmIntent: ConfirmAction(ref, onConfirm: _navigateToCurrentSystem),
-        SearchIntent: SearchAction(ref, onSearch: _openGlobalSearch),
+        SearchIntent: SearchAction(ref, onSearch: _openLibrarySearch),
         InfoIntent: InfoAction(ref, onInfo: _openSettings),
         AdjustColumnsIntent: _HomeAdjustColumnsAction(this),
         BackIntent: _HomeBackAction(this),
@@ -125,13 +124,12 @@ class _HomeViewState extends ConsumerState<HomeView>
     });
   }
 
-  void _triggerLibrarySync() {
-    final configAsync = ref.read(bootstrappedConfigProvider);
-    configAsync.whenData((config) {
-      if (config.systems.isNotEmpty) {
-        ref.read(librarySyncServiceProvider.notifier).syncAll(config);
-      }
-    });
+  Future<void> _triggerLibrarySync() async {
+    final config = await ref.read(bootstrappedConfigProvider.future);
+    if (!mounted) return;
+    if (config.systems.isNotEmpty) {
+      ref.read(librarySyncServiceProvider.notifier).syncAll(config);
+    }
   }
 
   @override
@@ -346,20 +344,25 @@ class _HomeViewState extends ConsumerState<HomeView>
       ),
     );
     if (!mounted) return;
+    // Config may have changed — reload and re-sync
+    ref.invalidate(bootstrappedConfigProvider);
+    LibrarySyncService.clearFreshness();
+    final config = await ref.read(bootstrappedConfigProvider.future);
+    if (!mounted) return;
+    if (config.systems.isNotEmpty) {
+      ref.read(librarySyncServiceProvider.notifier).syncAll(config);
+    }
   }
 
-  void _openGlobalSearch() {
-    if (_showGlobalSearch) return;
+  void _openLibrarySearch() {
     ref.read(feedbackServiceProvider).tick();
     _debouncer.stopHold();
-    setState(() => _showGlobalSearch = true);
-  }
-
-  void _closeGlobalSearch() {
-    setState(() => _showGlobalSearch = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) screenFocusNode.requestFocus();
-    });
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const LibraryScreen(openSearch: true),
+      ),
+    );
   }
 
   void _showExitDialogOverlay() {
@@ -397,7 +400,7 @@ class _HomeViewState extends ConsumerState<HomeView>
         label: 'Search',
         icon: Icons.search_rounded,
         shortcutHint: 'Y',
-        onSelect: _openGlobalSearch,
+        onSelect: _openLibrarySearch,
       ),
       QuickMenuItem(
         label: 'Settings',
@@ -578,8 +581,6 @@ class _HomeViewState extends ConsumerState<HomeView>
                   items: _buildQuickMenuItems(),
                   onClose: _closeQuickMenu,
                 ),
-              if (_showGlobalSearch)
-                GlobalSearchOverlay(onClose: _closeGlobalSearch),
               if (_showExitDialog)
                 ExitConfirmationOverlay(
                   onConfirm: _exitApp,
@@ -893,7 +894,7 @@ class _HomeViewState extends ConsumerState<HomeView>
 
     // Only hide controls if the overlay is expanded AND there is content to show.
     if (isOverlayExpanded && hasAnyDownloads) return const SizedBox.shrink();
-    if (_showGlobalSearch || _showExitDialog || _showQuickMenu) {
+    if (_showExitDialog || _showQuickMenu) {
       return const SizedBox.shrink();
     }
 

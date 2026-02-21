@@ -13,21 +13,23 @@ ConsoleHud? buildConsoleSetupHud({
   final controller = ref.read(onboardingControllerProvider.notifier);
 
   if (state.hasProviderForm) {
+    final canAct = state.canTest && !state.isTestingConnection;
     return ConsoleHud(
       b: HudAction('Cancel', onTap: controller.cancelProviderForm),
       y: HudAction(
-        'Test',
-        onTap: state.isTestingConnection || !state.canTest
-            ? null
-            : controller.testProviderConnection,
+        'Test & Save',
+        onTap: canAct ? controller.testAndSaveProvider : null,
       ),
     );
   }
 
   if (state.hasConsoleSelected) {
+    final hasSources = state.consoleSubState?.providers.isNotEmpty ?? false;
     return ConsoleHud(
       b: HudAction('Close', onTap: controller.deselectConsole),
       y: HudAction('Add Source', onTap: controller.startAddProvider),
+      dpad: hasSources ? (label: '◄►', action: 'Reorder') : null,
+      x: hasSources ? const HudAction('Delete') : null,
     );
   }
 

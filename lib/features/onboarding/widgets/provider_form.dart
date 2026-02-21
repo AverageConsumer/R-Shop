@@ -157,8 +157,6 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
             SizedBox(height: rs.spacing.md),
             _buildRommPlatformSection(rs, state, controller),
           ],
-          SizedBox(height: rs.spacing.lg),
-          _buildSaveButton(rs, state, controller),
         ],
       ),
     );
@@ -447,76 +445,6 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
             final platform = platforms.firstWhere((p) => p.id == id);
             controller.selectRommPlatform(platform);
           },
-        ),
-      ),
-    );
-  }
-
-  bool _canSave(ProviderFormState form, OnboardingState state) {
-    final fields = form.fields;
-    bool hasField(String key) =>
-        (fields[key]?.toString() ?? '').trim().isNotEmpty;
-
-    switch (form.type) {
-      case ProviderType.web:
-        return hasField('url');
-      case ProviderType.ftp:
-        return hasField('host') && hasField('port') && hasField('path');
-      case ProviderType.smb:
-        return hasField('host') && hasField('port') &&
-               hasField('share') && hasField('path');
-      case ProviderType.romm:
-        return hasField('url') && state.hasRommPlatformSelected;
-    }
-  }
-
-  Widget _buildSaveButton(
-    Responsive rs,
-    OnboardingState state,
-    OnboardingController controller,
-  ) {
-    final fontSize = rs.isSmall ? 12.0 : 14.0;
-    final form = state.providerForm;
-    final canSave = form != null && _canSave(form, state);
-
-    return ConsoleFocusable(
-      onSelect: canSave ? controller.saveProvider : null,
-      borderRadius: rs.radius.sm,
-      child: GestureDetector(
-        onTap: canSave ? controller.saveProvider : null,
-        child: Container(
-          width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: EdgeInsets.symmetric(vertical: rs.spacing.md),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: canSave
-                  ? [
-                      Colors.green.withValues(alpha: 0.3),
-                      Colors.green.withValues(alpha: 0.15),
-                    ]
-                  : [
-                      Colors.grey.withValues(alpha: 0.1),
-                      Colors.grey.withValues(alpha: 0.05),
-                    ],
-            ),
-            borderRadius: BorderRadius.circular(rs.radius.sm),
-            border: Border.all(
-              color: canSave
-                  ? Colors.green.withValues(alpha: 0.5)
-                  : Colors.grey.withValues(alpha: 0.2),
-            ),
-          ),
-          child: Center(
-            child: Text(
-              'Save',
-              style: TextStyle(
-                color: canSave ? Colors.white : Colors.white38,
-                fontSize: fontSize,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
         ),
       ),
     );

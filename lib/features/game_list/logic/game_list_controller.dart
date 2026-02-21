@@ -5,10 +5,12 @@ import '../../../models/config/system_config.dart';
 import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../services/database_service.dart';
+import '../../../services/library_sync_service.dart';
 import '../../../services/rom_manager.dart';
 import '../../../services/storage_service.dart';
 import '../../../services/unified_game_service.dart';
 import '../../../utils/friendly_error.dart';
+import '../../../utils/game_merge_helper.dart';
 import '../../../utils/game_metadata.dart';
 import 'filter_state.dart';
 
@@ -125,54 +127,70 @@ class GameListController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final List<GameItem> games;
+      // Local-only systems always scan filesystem (it IS the source of truth)
       if (systemConfig.providers.isEmpty) {
-        games = await RomManager.scanLocalGames(system, targetFolder);
+        final games = await RomManager.scanLocalGames(system, targetFolder);
         _state = _state.copyWith(allGames: games, isLocalOnly: true);
-      } else {
-        final remoteGames = await _unifiedService.fetchGamesForSystem(systemConfig);
-        final localGames = await RomManager.scanLocalGames(system, targetFolder);
-
-        // Compute local filenames that remote archives would produce after extraction
-        // (e.g. "Game.zip" → "Game.iso"), so we can skip redundant local entries.
-        final remoteTargetNames = <String>{};
-        for (final game in remoteGames) {
-          final targetName = RomManager.getTargetFilename(game, system);
-          if (targetName != game.filename) {
-            remoteTargetNames.add(targetName);
-          }
-          // Multi-file archives extract to a folder with the stripped archive name
-          if (system.multiFileExtensions != null &&
-              system.multiFileExtensions!.isNotEmpty) {
-            final folderName = RomManager.extractGameName(game.filename);
-            if (folderName != null && folderName != game.filename) {
-              remoteTargetNames.add(folderName);
-            }
-          }
-        }
-
-        // Merge: remote wins on filename collision (has URL, cover, provider info)
-        final byFilename = <String, GameItem>{};
-        for (final game in remoteGames) {
-          byFilename[game.filename] = game;
-        }
-        for (final game in localGames) {
-          if (remoteTargetNames.contains(game.filename)) continue;
-          byFilename.putIfAbsent(game.filename, () => game);
-        }
-
-        games = byFilename.values.toList()
-          ..sort((a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
-        _state = _state.copyWith(allGames: games, isLocalOnly: false);
+        _groupGames();
+        _restoreFilters();
+        await _checkInstalledStatus();
+        _databaseService.saveGames(system.id, _state.allGames);
+        return;
       }
-      _groupGames();
-      _restoreFilters();
-      await _checkInstalledStatus();
-      // Populate global search database
-      _databaseService.saveGames(system.id, _state.allGames);
+
+      // Cache-first: show cached games immediately if available
+      if (!forceRefresh && await _databaseService.hasCache(system.id)) {
+        final cached = await _databaseService.getGames(system.id);
+        if (cached.isNotEmpty) {
+          _state = _state.copyWith(allGames: cached, isLocalOnly: false);
+          _groupGames();
+          _restoreFilters();
+          await _checkInstalledStatus();
+          // Refresh from source in background
+          _backgroundRefresh();
+          return;
+        }
+      }
+
+      // No cache or forced refresh — fetch from source
+      await _fetchFromSource();
     } catch (e) {
       _state = _state.copyWith(error: getUserFriendlyError(e), isLoading: false);
       notifyListeners();
+    }
+  }
+
+  Future<void> _fetchFromSource() async {
+    final remoteGames = await _unifiedService.fetchGamesForSystem(systemConfig);
+    final localGames = await RomManager.scanLocalGames(system, targetFolder);
+    final games = GameMergeHelper.merge(remoteGames, localGames, system);
+    _state = _state.copyWith(allGames: games, isLocalOnly: false);
+    _groupGames();
+    _restoreFilters();
+    await _checkInstalledStatus();
+    _databaseService.saveGames(system.id, _state.allGames);
+  }
+
+  Future<void> _backgroundRefresh() async {
+    if (LibrarySyncService.isFresh(system.id)) return;
+    try {
+      final remoteGames = await _unifiedService.fetchGamesForSystem(systemConfig);
+      final localGames = await RomManager.scanLocalGames(system, targetFolder);
+      final games = GameMergeHelper.merge(remoteGames, localGames, system);
+
+      // Only update UI if game list actually changed
+      final oldFilenames = _state.allGames.map((g) => g.filename).toSet();
+      final newFilenames = games.map((g) => g.filename).toSet();
+      if (oldFilenames.length != newFilenames.length ||
+          !oldFilenames.containsAll(newFilenames)) {
+        _state = _state.copyWith(allGames: games, isLocalOnly: false);
+        _groupGames();
+        _restoreFilters();
+        await _checkInstalledStatus();
+      }
+      _databaseService.saveGames(system.id, games);
+    } catch (e) {
+      debugPrint('Background refresh failed for ${system.id}: $e');
     }
   }
 
@@ -250,9 +268,19 @@ class GameListController extends ChangeNotifier {
 
   Future<void> _checkInstalledStatus() async {
     final installedCache = <String, bool>{};
-    for (final entry in _state.groupedGames.entries) {
-      installedCache[entry.key] = await _isAnyVariantInstalled(entry.value);
+    final entries = _state.groupedGames.entries.toList();
+
+    // Process in batches of 20 for parallelism
+    for (var i = 0; i < entries.length; i += 20) {
+      final batch = entries.skip(i).take(20);
+      final results = await Future.wait(
+        batch.map((e) async => MapEntry(e.key, await _isAnyVariantInstalled(e.value))),
+      );
+      for (final result in results) {
+        installedCache[result.key] = result.value;
+      }
     }
+
     _state = _state.copyWith(
       installedCache: installedCache,
       isLoading: false,
@@ -344,18 +372,18 @@ class GameListController extends ChangeNotifier {
   bool _matchesFilters(GameItem game) {
     final filters = _state.activeFilters;
 
-    // Region check: OR within regions
+    // Region check: OR within regions (null = no metadata → pass through)
     if (filters.selectedRegions.isNotEmpty) {
       final region = _state.regionCache[game.filename];
-      if (region == null || !filters.selectedRegions.contains(region.name)) {
+      if (region != null && !filters.selectedRegions.contains(region.name)) {
         return false;
       }
     }
 
-    // Language check: OR within languages
+    // Language check: OR within languages (null/empty = no metadata → pass through)
     if (filters.selectedLanguages.isNotEmpty) {
       final languages = _state.languageCache[game.filename];
-      if (languages == null ||
+      if (languages != null && languages.isNotEmpty &&
           !languages.any((l) => filters.selectedLanguages.contains(l.code))) {
         return false;
       }

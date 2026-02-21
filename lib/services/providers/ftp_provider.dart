@@ -5,6 +5,7 @@ import 'package:ftpconnect/ftpconnect.dart';
 import '../../models/config/provider_config.dart';
 import '../../models/config/system_config.dart';
 import '../../models/game_item.dart';
+import '../../models/system_model.dart';
 import '../download_handle.dart';
 import '../source_provider.dart';
 
@@ -17,8 +18,12 @@ class FtpProvider implements SourceProvider {
   String get _remotePath => config.path ?? '/';
 
   FTPConnect _createClient() {
+    final host = config.host;
+    if (host == null || host.isEmpty) {
+      throw StateError('FTP provider requires a host');
+    }
     return FTPConnect(
-      config.host!,
+      host,
       port: config.port ?? 21,
       user: config.auth?.user ?? 'anonymous',
       pass: config.auth?.pass ?? '',
@@ -38,7 +43,7 @@ class FtpProvider implements SourceProvider {
       for (final entry in entries) {
         if (entry.type != FTPEntryType.file) continue;
         final name = entry.name;
-        if (!_isGameFile(name.toLowerCase())) continue;
+        if (!SystemModel.isGameFile(name.toLowerCase())) continue;
 
         final filePath =
             _remotePath.endsWith('/') ? '$_remotePath$name' : '$_remotePath/$name';
@@ -66,11 +71,10 @@ class FtpProvider implements SourceProvider {
         activeClient = ftp;
         await ftp.connect();
         try {
-          final lastSlash = game.url.lastIndexOf('/');
-          if (lastSlash > 0) {
-            await ftp.changeDirectory(game.url.substring(0, lastSlash));
+          final (dir, fileName) = _splitPath(game.url);
+          if (dir.isNotEmpty) {
+            await ftp.changeDirectory(dir);
           }
-          final fileName = game.url.substring(lastSlash + 1);
           await ftp.downloadFile(fileName, dest, onProgress: onProgress);
         } finally {
           activeClient = null;
@@ -116,27 +120,22 @@ class FtpProvider implements SourceProvider {
     final ftp = _createClient();
     await ftp.connect();
     try {
-      // Navigate to the parent directory
-      final lastSlash = remotePath.lastIndexOf('/');
-      if (lastSlash > 0) {
-        await ftp.changeDirectory(remotePath.substring(0, lastSlash));
+      final (dir, fileName) = _splitPath(remotePath);
+      if (dir.isNotEmpty) {
+        await ftp.changeDirectory(dir);
       }
-      final fileName = remotePath.substring(lastSlash + 1);
       await ftp.downloadFile(fileName, destination);
     } finally {
       await ftp.disconnect();
     }
   }
 
-  static bool _isGameFile(String name) {
-    return _gameExtensions.any((ext) => name.endsWith(ext));
+  /// Splits a remote path into (directory, filename).
+  /// Returns an empty directory string when the path has no `/`.
+  static (String dir, String name) _splitPath(String remotePath) {
+    final lastSlash = remotePath.lastIndexOf('/');
+    if (lastSlash < 0) return ('', remotePath);
+    return (remotePath.substring(0, lastSlash), remotePath.substring(lastSlash + 1));
   }
 
-  static const _gameExtensions = [
-    '.zip', '.7z', '.rar',
-    '.nes', '.sfc', '.z64', '.n64', '.v64',
-    '.gb', '.gbc', '.gba', '.nds', '.3ds', '.cia',
-    '.iso', '.cso', '.chd', '.pbp', '.cue', '.rvz',
-    '.sms', '.md', '.gen', '.gg',
-  ];
 }

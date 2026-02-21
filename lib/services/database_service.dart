@@ -7,24 +7,6 @@ import 'package:sqflite/sqflite.dart';
 import '../models/config/provider_config.dart';
 import '../models/game_item.dart';
 
-class GameSearchResult {
-  final String systemSlug;
-  final String filename;
-  final String displayName;
-  final String url;
-  final String? coverUrl;
-  final ProviderConfig? providerConfig;
-
-  const GameSearchResult({
-    required this.systemSlug,
-    required this.filename,
-    required this.displayName,
-    required this.url,
-    this.coverUrl,
-    this.providerConfig,
-  });
-}
-
 class DatabaseService {
   static Future<Database>? _initFuture;
   static const String _tableName = 'games';
@@ -120,21 +102,6 @@ class DatabaseService {
     );
   }
 
-  Future<void> updateGameCovers(Map<String, String> coverMap) async {
-    final db = await database;
-    final batch = db.batch();
-
-    for (final entry in coverMap.entries) {
-      batch.update(
-        _tableName,
-        {'cover_url': entry.value},
-        where: 'filename = ?',
-        whereArgs: [entry.key],
-      );
-    }
-    await batch.commit(noResult: true);
-  }
-
   Future<List<GameItem>> getGames(String systemSlug) async {
     final db = await database;
     final maps = await db.query(
@@ -156,32 +123,8 @@ class DatabaseService {
         .toList();
   }
 
-  Future<List<GameSearchResult>> searchGames(String query) async {
-    final db = await database;
-    final maps = await db.query(
-      _tableName,
-      columns: [
-        'systemSlug', 'filename', 'displayName', 'url', 'cover_url',
-        'provider_config',
-      ],
-      where: 'displayName LIKE ? OR filename LIKE ?',
-      whereArgs: ['%$query%', '%$query%'],
-      orderBy: 'displayName ASC',
-      limit: 250,
-    );
-
-    return maps
-        .map((map) => GameSearchResult(
-              systemSlug: map['systemSlug'] as String,
-              filename: map['filename'] as String,
-              displayName: map['displayName'] as String,
-              url: map['url'] as String,
-              coverUrl: map['cover_url'] as String?,
-              providerConfig: _decodeProviderConfig(
-                  map['provider_config'] as String?),
-            ))
-        .toList();
-  }
+  static String _escapeLike(String input) =>
+      input.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
 
   Future<List<Map<String, dynamic>>> getAllGames({
     String? orderBy,
@@ -196,8 +139,9 @@ class DatabaseService {
     final args = <dynamic>[];
 
     if (searchQuery != null && searchQuery.isNotEmpty) {
-      conditions.add('displayName LIKE ?');
-      args.add('%$searchQuery%');
+      final escaped = _escapeLike(searchQuery);
+      conditions.add("displayName LIKE ? ESCAPE '\\'");
+      args.add('%$escaped%');
     }
     if (systemSlugs != null && systemSlugs.isNotEmpty) {
       final placeholders = List.filled(systemSlugs.length, '?').join(', ');
@@ -216,21 +160,6 @@ class DatabaseService {
       whereArgs: whereArgs,
       orderBy: orderBy ?? 'displayName ASC',
     );
-  }
-
-  Future<Set<String>> getAllSystemSlugs() async {
-    final db = await database;
-    final result = await db.query(
-      _tableName,
-      columns: ['DISTINCT systemSlug'],
-    );
-    return result.map((r) => r['systemSlug'] as String).toSet();
-  }
-
-  Future<int> getGameCount() async {
-    final db = await database;
-    final result = await db.rawQuery('SELECT COUNT(*) as count FROM $_tableName');
-    return result.first['count'] as int;
   }
 
   Future<bool> hasCache(String systemSlug) async {

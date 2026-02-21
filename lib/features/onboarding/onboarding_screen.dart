@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/responsive/responsive.dart';
+import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../services/config_storage_service.dart';
@@ -115,7 +116,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (state.currentStep == OnboardingStep.localSetup) {
       final ls = state.localSetupState;
       if (ls != null) {
-        if (ls.isScanningPhase) {
+        if (ls.isAutoDetecting || ls.isScanningPhase) {
           return KeyEventResult.handled;
         }
         if (ls.isResultsPhase) {
@@ -126,6 +127,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           }
           if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
             _handleContinue();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        }
+        if (ls.isCreatePhase) {
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+              event.logicalKey == LogicalKeyboardKey.escape) {
+            controller.localSetupBack();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
+            _handleContinue();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
+            final allSelected = ls.createSystemIds!.length ==
+                SystemModel.supportedSystems.length;
+            controller.toggleAllCreateSystems(!allSelected);
             return KeyEventResult.handled;
           }
           return KeyEventResult.ignored;
@@ -151,7 +170,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         }
         if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
           if (state.canTest && !state.isTestingConnection) {
-            controller.testProviderConnection();
+            controller.testAndSaveProvider();
           }
           return KeyEventResult.handled;
         }
@@ -237,6 +256,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       if (ls != null && ls.isResultsPhase) {
         feedback.tick();
         controller.localSetupConfirm();
+      } else if (ls != null && ls.isCreatePhase && ls.createSystemIds!.isNotEmpty) {
+        feedback.tick();
+        controller.confirmCreateFolders().then((error) {
+          if (error != null && mounted) {
+            showConsoleNotification(context, message: error);
+          }
+        });
       }
       return;
     } else if (state.currentStep == OnboardingStep.consoleSetup) {
@@ -498,6 +524,25 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           start: HudAction('Continue', onTap: _handleContinue, highlight: true),
           b: HudAction('Back', onTap: _handleBack),
         );
+      }
+      if (ls != null && ls.isCreatePhase) {
+        final controller = ref.read(onboardingControllerProvider.notifier);
+        final allSelected = ls.createSystemIds!.length ==
+            SystemModel.supportedSystems.length;
+        return ConsoleHud(
+          start: ls.createSystemIds!.isNotEmpty
+              ? HudAction('Create', onTap: _handleContinue, highlight: true)
+              : null,
+          b: HudAction('Back', onTap: _handleBack),
+          y: HudAction(
+            allSelected ? 'Deselect All' : 'Select All',
+            onTap: () => controller.toggleAllCreateSystems(!allSelected),
+          ),
+        );
+      }
+      // Hide Back during auto-detect to prevent race condition
+      if (ls != null && ls.isAutoDetecting) {
+        return const ConsoleHud();
       }
       return ConsoleHud(
         b: HudAction('Back', onTap: _handleBack),

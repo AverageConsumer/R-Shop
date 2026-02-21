@@ -19,7 +19,8 @@ class GameDetailController extends ChangeNotifier {
   bool _disposed = false;
   GameDetailState _state = const GameDetailState();
   GameDetailState get state => _state;
-  GameItem get selectedVariant => variants[_state.selectedIndex];
+  GameItem get selectedVariant =>
+      variants[_state.selectedIndex.clamp(0, variants.length - 1)];
   int get selectedIndex => _state.selectedIndex;
 
   @override

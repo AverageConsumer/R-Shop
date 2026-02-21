@@ -6,6 +6,7 @@ import 'package:html/parser.dart';
 import '../../models/config/provider_config.dart';
 import '../../models/config/system_config.dart';
 import '../../models/game_item.dart';
+import '../../models/system_model.dart';
 import '../download_handle.dart';
 import '../source_provider.dart';
 
@@ -23,13 +24,17 @@ class WebProvider implements SourceProvider {
             ));
 
   String get _baseUrl {
-    final url = config.url!;
+    final url = config.url;
+    if (url == null || url.isEmpty) {
+      throw StateError('Web provider requires a URL');
+    }
     return url.endsWith('/') ? url : '$url/';
   }
 
   @override
   Future<List<GameItem>> fetchGames(SystemConfig system) async {
-    final url = config.path != null ? '$_baseUrl${_trimSlashes(config.path!)}/' : _baseUrl;
+    final configPath = config.path;
+    final url = configPath != null ? '$_baseUrl${_trimSlashes(configPath)}/' : _baseUrl;
 
     final response = await _dio.get<String>(
       url,
@@ -56,9 +61,10 @@ class WebProvider implements SourceProvider {
       );
       return const SourceConnectionResult.ok();
     } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
       return SourceConnectionResult.failed(
-        e.response?.statusCode != null
-            ? 'HTTP ${e.response!.statusCode}'
+        statusCode != null
+            ? 'HTTP $statusCode'
             : e.message ?? 'Connection failed',
       );
     } catch (e) {
@@ -101,7 +107,7 @@ class WebProvider implements SourceProvider {
       }
 
       final hrefLower = href.toLowerCase();
-      if (_isGameFile(hrefLower)) {
+      if (SystemModel.isGameFile(hrefLower)) {
         final decodedFilename = Uri.decodeFull(href);
         games.add(GameItem(
           filename: decodedFilename,
@@ -115,10 +121,6 @@ class WebProvider implements SourceProvider {
     return games;
   }
 
-  static bool _isGameFile(String name) {
-    return _gameExtensions.any((ext) => name.endsWith(ext));
-  }
-
   static String _trimSlashes(String path) {
     var result = path;
     while (result.startsWith('/')) {
@@ -130,18 +132,6 @@ class WebProvider implements SourceProvider {
     return result;
   }
 
-  static const _gameExtensions = [
-    '.zip', '.7z', '.rar',
-    '.nes', '.sfc', '.z64', '.n64', '.v64',
-    '.gb', '.gbc', '.gba', '.nds', '.3ds', '.cia',
-    '.iso', '.cso', '.chd', '.pbp', '.cue', '.rvz',
-    '.sms', '.md', '.gen', '.gg',
-    '.nsp', '.xci',
-    '.wua', '.wud', '.wux', '.rpx',
-    '.vpk', '.pkg',
-    '.ngc', '.ngp',
-    '.xex',
-  ];
 }
 
 class HeaderValue {

@@ -18,21 +18,30 @@ class LocalSetupStep extends ConsumerWidget {
     final ls = state.localSetupState;
     if (ls == null) return const SizedBox.shrink();
 
-    if (ls.isScanningPhase) {
-      return _LocalScanningView(onComplete: onComplete);
+    if (ls.isAutoDetecting || ls.isScanningPhase) {
+      return _LocalScanningView(
+        message: ls.isAutoDetecting
+            ? "Checking for ROM folders..."
+            : "Scanning your ROM folder...",
+        onComplete: onComplete,
+      );
     }
     if (ls.isResultsPhase) {
       return _LocalResultsView(localSetup: ls, onComplete: onComplete);
     }
-    return _LocalChoiceView(onComplete: onComplete);
+    if (ls.isCreatePhase) {
+      return _LocalCreateView(localSetup: ls, onComplete: onComplete);
+    }
+    return _LocalChoiceView(localSetup: ls, onComplete: onComplete);
   }
 }
 
 // --- Choice View ---
 
 class _LocalChoiceView extends ConsumerWidget {
+  final LocalSetupState localSetup;
   final VoidCallback onComplete;
-  const _LocalChoiceView({required this.onComplete});
+  const _LocalChoiceView({required this.localSetup, required this.onComplete});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -41,6 +50,45 @@ class _LocalChoiceView extends ConsumerWidget {
     final labelFontSize = rs.isSmall ? 10.0 : 12.0;
     final iconSize = rs.isSmall ? 14.0 : 18.0;
     final hintFontSize = rs.isSmall ? 10.0 : 12.0;
+    final detected = localSetup.detectedPath;
+
+    final String chatMessage;
+    final String primaryLabel;
+    final IconData primaryIcon;
+    final Color primaryColor;
+    final VoidCallback primaryAction;
+    final String secondaryLabel;
+    final IconData secondaryIcon;
+    final Color secondaryColor;
+    final VoidCallback secondaryAction;
+
+    if (detected != null) {
+      chatMessage =
+          "I found a ROM folder at $detected! Scan it, or set up fresh?";
+      primaryLabel = 'Scan found folder';
+      primaryIcon = Icons.search_rounded;
+      primaryColor = Colors.blue;
+      primaryAction =
+          () => controller.localSetupChoice(LocalSetupAction.scanDetected);
+      secondaryLabel = 'Pick different folder';
+      secondaryIcon = Icons.folder_open_rounded;
+      secondaryColor = Colors.grey;
+      secondaryAction =
+          () => controller.localSetupChoice(LocalSetupAction.pickFolder);
+    } else {
+      chatMessage =
+          "No ROM folder found. Want me to create one, or do you have ROMs somewhere else?";
+      primaryLabel = 'Create standard folders';
+      primaryIcon = Icons.create_new_folder_rounded;
+      primaryColor = Colors.green;
+      primaryAction =
+          () => controller.localSetupChoice(LocalSetupAction.createFolders);
+      secondaryLabel = 'Pick existing folder';
+      secondaryIcon = Icons.folder_open_rounded;
+      secondaryColor = Colors.blue;
+      secondaryAction =
+          () => controller.localSetupChoice(LocalSetupAction.pickFolder);
+    }
 
     return FocusScope(
       child: Column(
@@ -48,8 +96,8 @@ class _LocalChoiceView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ChatBubble(
-            message:
-                "Do you have a ROM folder on your device? I can scan it and auto-detect your consoles!",
+            key: ValueKey('bubble_localChoice_${detected != null}'),
+            message: chatMessage,
             onComplete: onComplete,
           ),
           SizedBox(height: rs.spacing.lg),
@@ -77,32 +125,43 @@ class _LocalChoiceView extends ConsumerWidget {
                   ),
                 ),
                 FocusTraversalGroup(
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: _ActionButton(
-                          label: 'Yes, pick folder',
-                          icon: Icons.folder_open_rounded,
-                          color: Colors.blue,
-                          autofocus: true,
-                          onTap: () => controller.localSetupChoice(true),
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _ActionButton(
+                              label: primaryLabel,
+                              icon: primaryIcon,
+                              color: primaryColor,
+                              autofocus: true,
+                              onTap: primaryAction,
+                            ),
+                          ),
+                          SizedBox(width: rs.spacing.md),
+                          Expanded(
+                            child: _ActionButton(
+                              label: secondaryLabel,
+                              icon: secondaryIcon,
+                              color: secondaryColor,
+                              onTap: secondaryAction,
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(width: rs.spacing.md),
-                      Expanded(
-                        child: _ActionButton(
-                          label: 'No, skip',
-                          icon: Icons.skip_next_rounded,
-                          color: Colors.grey,
-                          onTap: () => controller.localSetupChoice(false),
-                        ),
+                      SizedBox(height: rs.spacing.md),
+                      _TextLink(
+                        label: 'Skip \u2014 set up manually',
+                        onTap: () => controller
+                            .localSetupChoice(LocalSetupAction.skip),
                       ),
                     ],
                   ),
                 ),
                 SizedBox(height: rs.spacing.md),
                 Text(
-                  'You can always set up folders per-console later.',
+                  'You can always change folders per-console later.',
                   style: TextStyle(
                     color: Colors.grey.shade600,
                     fontSize: hintFontSize,
@@ -117,11 +176,217 @@ class _LocalChoiceView extends ConsumerWidget {
   }
 }
 
+// --- Create View ---
+
+class _LocalCreateView extends ConsumerWidget {
+  final LocalSetupState localSetup;
+  final VoidCallback onComplete;
+
+  const _LocalCreateView({
+    required this.localSetup,
+    required this.onComplete,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(onboardingControllerProvider.notifier);
+    final rs = context.rs;
+    final selectedIds = localSetup.createSystemIds ?? const {};
+    final basePath = localSetup.createBasePath ?? '/storage/emulated/0/ROMs';
+    const allSystems = SystemModel.supportedSystems;
+    final total = allSystems.length;
+    final labelFontSize = rs.isSmall ? 10.0 : 12.0;
+    final hintFontSize = rs.isSmall ? 10.0 : 12.0;
+
+    return FocusScope(
+      child: Column(
+        key: const ValueKey('localCreate'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ChatBubble(
+            message:
+                "Pick the consoles you want! I'll create a folder for each one.",
+            onComplete: onComplete,
+          ),
+          SizedBox(height: rs.spacing.md),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: rs.isSmall ? 40 : 60,
+                bottom: 64,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header row
+                  Padding(
+                    padding: EdgeInsets.only(bottom: rs.spacing.sm),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${selectedIds.length} / $total selected',
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: labelFontSize,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        _TextLink(
+                          label: selectedIds.length == total
+                              ? 'Deselect All'
+                              : 'Select All',
+                          onTap: () => controller.toggleAllCreateSystems(
+                            selectedIds.length != total,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // System list
+                  Expanded(
+                    child: FocusTraversalGroup(
+                      child: ListView.builder(
+                        itemCount: allSystems.length,
+                        itemBuilder: (context, index) {
+                          final system = allSystems[index];
+                          final isSelected = selectedIds.contains(system.id);
+                          return _CreateSystemRow(
+                            system: system,
+                            isSelected: isSelected,
+                            autofocus: index == 0,
+                            onToggle: () =>
+                                controller.toggleCreateSystem(system.id),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  // Base path display
+                  SizedBox(height: rs.spacing.sm),
+                  FocusTraversalGroup(
+                    child: Row(
+                      children: [
+                        Icon(Icons.folder_rounded,
+                            color: Colors.grey.shade500, size: 14),
+                        SizedBox(width: rs.spacing.xs),
+                        Expanded(
+                          child: Text(
+                            '$basePath/',
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: hintFontSize,
+                              fontFamily: 'monospace',
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        SizedBox(width: rs.spacing.sm),
+                        _TextLink(
+                          label: 'Change',
+                          onTap: controller.pickCreateBasePath,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Create System Row ---
+
+class _CreateSystemRow extends StatelessWidget {
+  final SystemModel system;
+  final bool isSelected;
+  final bool autofocus;
+  final VoidCallback onToggle;
+
+  const _CreateSystemRow({
+    required this.system,
+    required this.isSelected,
+    required this.onToggle,
+    this.autofocus = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final rs = context.rs;
+    final nameFontSize = rs.isSmall ? 11.0 : 13.0;
+    final checkSize = rs.isSmall ? 18.0 : 22.0;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: rs.spacing.xs),
+      child: ConsoleFocusableListItem(
+        autofocus: autofocus,
+        onSelect: onToggle,
+        borderRadius: rs.radius.sm,
+        padding: EdgeInsets.symmetric(
+          horizontal: rs.spacing.md,
+          vertical: rs.spacing.sm,
+        ),
+        child: Row(
+          children: [
+            Image.asset(
+              system.iconAssetPath,
+              width: 20,
+              height: 20,
+              errorBuilder: (_, __, ___) => Icon(
+                Icons.videogame_asset_rounded,
+                color: system.accentColor,
+                size: 20,
+              ),
+            ),
+            SizedBox(width: rs.spacing.sm),
+            Expanded(
+              child: Text(
+                system.name,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey.shade500,
+                  fontSize: nameFontSize,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Container(
+              width: checkSize,
+              height: checkSize,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.green.withValues(alpha: 0.3)
+                    : Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: isSelected
+                      ? Colors.green.withValues(alpha: 0.7)
+                      : Colors.white.withValues(alpha: 0.2),
+                ),
+              ),
+              child: isSelected
+                  ? Icon(Icons.check, color: Colors.green, size: checkSize - 6)
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // --- Scanning View ---
 
 class _LocalScanningView extends StatelessWidget {
+  final String message;
   final VoidCallback onComplete;
-  const _LocalScanningView({required this.onComplete});
+  const _LocalScanningView({
+    required this.message,
+    required this.onComplete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +398,7 @@ class _LocalScanningView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ChatBubble(
-            message: "Scanning your ROM folder...",
+            message: message,
             onComplete: onComplete,
           ),
           SizedBox(height: rs.spacing.lg),
@@ -543,7 +808,7 @@ class _IgnoredFolderRow extends StatelessWidget {
   }
 }
 
-// --- Shared widgets (duplicated from romm_setup_step.dart since private) ---
+// --- Shared widgets ---
 
 class _ActionButton extends StatelessWidget {
   final String label;
@@ -600,6 +865,42 @@ class _ActionButton extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TextLink extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _TextLink({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final rs = context.rs;
+    final fontSize = rs.isSmall ? 10.0 : 12.0;
+
+    return ConsoleFocusable(
+      onSelect: onTap,
+      borderRadius: rs.radius.sm,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            vertical: rs.spacing.xs,
+            horizontal: rs.spacing.sm,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: fontSize,
+              decoration: TextDecoration.underline,
+              decorationColor: Colors.grey.shade600,
+            ),
           ),
         ),
       ),

@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 import '../models/sound_settings.dart';
 
@@ -37,7 +38,8 @@ class AudioManager {
     try {
       await _initSoLoud();
       _isInitialized = true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('AudioManager: init failed: $e');
       _soLoud = null;
       _isInitialized = false;
     } finally {
@@ -63,7 +65,8 @@ class AudioManager {
       _soundSources[SoundType.typing] =
           await _soLoud!.loadAsset('assets/sounds/rapid_text.wav');
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('AudioManager: preload sounds failed: $e');
       return false;
     }
   }
@@ -152,7 +155,8 @@ class AudioManager {
         _soLoud!.fadeVolume(
             _bgmHandle!, _settings.bgmVolume, const Duration(seconds: 2));
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('AudioManager: startBgm failed: $e');
       _bgmStarting = false;
       _bgmStarted = false;
       if (!_hasAttemptedReinit) {
@@ -174,7 +178,8 @@ class AudioManager {
         _isInitialized = true;
         await startBgm();
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('AudioManager: reinit failed: $e');
     }
   }
 
@@ -268,7 +273,8 @@ class AudioManager {
           _soLoud!.disposeSource(_bgmSource!);
         }
         _soLoud!.deinit();
-      } catch (_) {
+      } catch (e) {
+        debugPrint('AudioManager: dispose cleanup failed: $e');
       }
     }
 

@@ -48,7 +48,7 @@ class SystemModel {
       releaseYear: 1990,
       isZipped: true,
       libretroId: 'Nintendo_-_Super_Nintendo_Entertainment_System',
-      romExtensions: ['.sfc'],
+      romExtensions: ['.sfc', '.smc'],
       iconName: 'SNES.png',
       accentColor: Color(0xFF9333EA),
     ),
@@ -59,7 +59,7 @@ class SystemModel {
       releaseYear: 1996,
       isZipped: true,
       libretroId: 'Nintendo_-_Nintendo_64',
-      romExtensions: ['.z64', '.n64'],
+      romExtensions: ['.z64', '.n64', '.v64'],
       iconName: 'N64.png',
       accentColor: Color(0xFFF97316),
     ),
@@ -70,7 +70,7 @@ class SystemModel {
       releaseYear: 2001,
       isZipped: false,
       libretroId: 'Nintendo_-_GameCube',
-      romExtensions: ['.rvz'],
+      romExtensions: ['.rvz', '.iso', '.gcm', '.ciso'],
       iconName: 'GAMECUBE.png',
       accentColor: Color(0xFF7C3AED),
     ),
@@ -81,7 +81,7 @@ class SystemModel {
       releaseYear: 2006,
       isZipped: false,
       libretroId: 'Nintendo_-_Wii',
-      romExtensions: ['.rvz'],
+      romExtensions: ['.rvz', '.wbfs', '.iso', '.wia', '.ciso'],
       iconName: 'Wii.png',
       accentColor: Color(0xFF0EA5E9),
     ),
@@ -170,7 +170,7 @@ class SystemModel {
       releaseYear: 1994,
       isZipped: false,
       libretroId: 'Sony_-_PlayStation',
-      romExtensions: ['.chd', '.pbp', '.cue'],
+      romExtensions: ['.chd', '.pbp', '.cue', '.iso', '.img'],
       iconName: 'PS1.png',
       accentColor: Color(0xFF5B21B6),
       multiFileExtensions: ['.bin', '.cue'],
@@ -182,7 +182,7 @@ class SystemModel {
       releaseYear: 2000,
       isZipped: false,
       libretroId: 'Sony_-_PlayStation_2',
-      romExtensions: ['.iso', '.chd'],
+      romExtensions: ['.iso', '.chd', '.cso'],
       iconName: 'PS2.png',
       accentColor: Color(0xFF1E3A8A),
       multiFileExtensions: ['.bin', '.cue'],
@@ -194,7 +194,7 @@ class SystemModel {
       releaseYear: 2006,
       isZipped: false,
       libretroId: 'Sony_-_PlayStation_3',
-      romExtensions: ['.iso'],
+      romExtensions: ['.iso', '.pkg'],
       iconName: 'PS3.png',
       accentColor: Color(0xFF1E293B),
     ),
@@ -216,7 +216,7 @@ class SystemModel {
       releaseYear: 2004,
       isZipped: false,
       libretroId: 'Sony_-_PlayStation_Portable',
-      romExtensions: ['.iso', '.cso'],
+      romExtensions: ['.iso', '.cso', '.pbp'],
       iconName: 'PSP.png',
       accentColor: Color(0xFF111827),
     ),
@@ -250,7 +250,7 @@ class SystemModel {
       releaseYear: 1988,
       isZipped: true,
       libretroId: 'Sega_-_Mega_Drive_-_Genesis',
-      romExtensions: ['.md', '.gen'],
+      romExtensions: ['.md', '.gen', '.bin', '.smd'],
       iconName: 'GENESIS.png',
       accentColor: Color(0xFF111827),
     ),
@@ -272,7 +272,7 @@ class SystemModel {
       releaseYear: 1998,
       isZipped: false,
       libretroId: 'Sega_-_Dreamcast',
-      romExtensions: ['.chd'],
+      romExtensions: ['.chd', '.cdi', '.gdi'],
       iconName: 'Dreamcast.png',
       accentColor: Color(0xFFDC2626),
     ),
@@ -283,7 +283,7 @@ class SystemModel {
       releaseYear: 1994,
       isZipped: false,
       libretroId: 'Sega_-_Saturn',
-      romExtensions: ['.chd', '.cue'],
+      romExtensions: ['.chd', '.cue', '.iso'],
       iconName: 'SATURN.png',
       accentColor: Color(0xFF7C3AED),
       multiFileExtensions: ['.bin', '.cue'],
@@ -308,7 +308,7 @@ class SystemModel {
       releaseYear: 1978,
       isZipped: false,
       libretroId: 'MAME',
-      romExtensions: ['.zip'],
+      romExtensions: ['.zip', '.7z'],
       iconName: 'Arcade.png',
       accentColor: Color(0xFFD97706),
     ),
@@ -336,4 +336,25 @@ class SystemModel {
       accentColor: Color(0xFF65A30D),
     ),
   ];
+
+  /// Archive formats that may wrap ROM files.
+  static const archiveExtensions = ['.zip', '.7z', '.rar'];
+
+  /// Union of all romExtensions across every supported system.
+  static final Set<String> allRomExtensions = {
+    for (final s in supportedSystems) ...s.romExtensions,
+  };
+
+  /// All file extensions that represent game files (ROMs + archives + multi-file parts).
+  static final Set<String> allGameExtensions = {
+    ...archiveExtensions,
+    ...allRomExtensions,
+    for (final s in supportedSystems)
+      if (s.multiFileExtensions != null) ...s.multiFileExtensions!,
+  };
+
+  /// Whether [name] ends with a known game file extension.
+  static bool isGameFile(String name) {
+    return allGameExtensions.any((ext) => name.endsWith(ext));
+  }
 }

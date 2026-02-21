@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/storage_service.dart';
 export '../services/storage_service.dart' show ControllerLayout;
-import '../services/repo_manager.dart';
 import '../services/haptic_service.dart';
 import '../services/audio_manager.dart';
 import '../services/feedback_service.dart';
@@ -39,10 +38,6 @@ final feedbackServiceProvider = Provider<FeedbackService>((ref) {
     ref.read(audioManagerProvider),
     ref.read(hapticServiceProvider),
   );
-});
-
-final repoManagerProvider = Provider<RepoManager>((ref) {
-  return RepoManager(ref.read(storageServiceProvider));
 });
 
 class SoundSettingsNotifier extends StateNotifier<SoundSettings> {

@@ -8,6 +8,8 @@ class ProviderListItem extends StatelessWidget {
   final int index;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
 
   const ProviderListItem({
     super.key,
@@ -15,6 +17,8 @@ class ProviderListItem extends StatelessWidget {
     required this.index,
     required this.onEdit,
     required this.onDelete,
+    this.onMoveUp,
+    this.onMoveDown,
   });
 
   IconData get _typeIcon {
@@ -87,6 +91,30 @@ class ProviderListItem extends StatelessWidget {
               ],
             ),
           ),
+          if (onMoveUp != null)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onMoveUp,
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: Center(
+                  child: Icon(Icons.arrow_upward, color: Colors.white38, size: iconSize),
+                ),
+              ),
+            ),
+          if (onMoveDown != null)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onMoveDown,
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: Center(
+                  child: Icon(Icons.arrow_downward, color: Colors.white38, size: iconSize),
+                ),
+              ),
+            ),
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onEdit,

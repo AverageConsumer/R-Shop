@@ -20,7 +20,7 @@ class ConfigStorageService {
   /// Saves raw JSON content to the persistent config file atomically.
   Future<File> saveConfig(String jsonContent) async {
     final file = await _configFile();
-    final tmpFile = File('${file.path}.tmp');
+    final tmpFile = File('${file.path}.${DateTime.now().millisecondsSinceEpoch}.tmp');
     await tmpFile.writeAsString(jsonContent);
     await tmpFile.rename(file.path);
     return file;

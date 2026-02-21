@@ -63,6 +63,20 @@ class ConsoleHud extends ConsumerWidget {
       ControllerLayout.playstation => ('L1', 'R1', 'L2', 'R2'),
     };
 
+    final iconStart = switch (layout) {
+      ControllerLayout.nintendo => null,
+      ControllerLayout.playstation => Icons.menu_rounded,
+      ControllerLayout.xbox => Icons.menu_rounded,
+    };
+    final labelStart = layout == ControllerLayout.nintendo ? '+' : '';
+
+    final iconSelect = switch (layout) {
+      ControllerLayout.nintendo => null,
+      ControllerLayout.playstation => Icons.share_rounded,
+      ControllerLayout.xbox => Icons.filter_none,
+    };
+    final labelSelect = layout == ControllerLayout.nintendo ? '\u2212' : '';
+
     // Fixed order: dpad, LB, RB, select(−), start(+), Y, X, B, A
     if (dpad != null) {
       buttons.add(ControlButton(
@@ -104,7 +118,8 @@ class ConsoleHud extends ConsumerWidget {
     }
     if (select != null) {
       buttons.add(ControlButton(
-        label: '\u2212',
+        label: labelSelect,
+        icon: iconSelect,
         action: select!.action,
         onTap: select!.onTap,
         highlight: select!.highlight,
@@ -112,7 +127,8 @@ class ConsoleHud extends ConsumerWidget {
     }
     if (start != null) {
       buttons.add(ControlButton(
-        label: '+',
+        label: labelStart,
+        icon: iconStart,
         action: start!.action,
         onTap: start!.onTap,
         highlight: start!.highlight,

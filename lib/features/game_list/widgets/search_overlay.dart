@@ -132,6 +132,8 @@ class SearchOverlay extends StatelessWidget {
                     focusNode: searchFocusNode,
                     autofocus: false,
                     autocorrect: false,
+                    maxLength: 100,
+                    buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
                     onTapOutside: (_) {},
                     textInputAction: TextInputAction.search,
                     style: TextStyle(

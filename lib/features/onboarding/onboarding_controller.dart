@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,6 +29,8 @@ enum ConsoleSubStep {
   providers,
 }
 
+enum LocalSetupAction { scanDetected, pickFolder, createFolders, skip }
+
 enum RommSetupSubStep { ask, connect, select, folder }
 
 class ScannedFolder {
@@ -49,6 +53,10 @@ class LocalSetupState {
   final Map<String, String> folderAssignments; // systemId → folderName
   final Set<String> enabledSystemIds; // matched systems (default: all on)
   final bool isScanning;
+  final String? detectedPath; // auto-detected ROM folder
+  final Set<String>? createSystemIds; // systems selected for folder creation
+  final String? createBasePath; // base path for folder creation
+  final bool isAutoDetecting; // true while checking known paths
 
   const LocalSetupState({
     this.romBasePath,
@@ -56,6 +64,10 @@ class LocalSetupState {
     this.folderAssignments = const {},
     this.enabledSystemIds = const {},
     this.isScanning = false,
+    this.detectedPath,
+    this.createSystemIds,
+    this.createBasePath,
+    this.isAutoDetecting = false,
   });
 
   LocalSetupState copyWith({
@@ -64,8 +76,15 @@ class LocalSetupState {
     Map<String, String>? folderAssignments,
     Set<String>? enabledSystemIds,
     bool? isScanning,
+    String? detectedPath,
+    Set<String>? createSystemIds,
+    String? createBasePath,
+    bool? isAutoDetecting,
     bool clearRomBasePath = false,
     bool clearScannedFolders = false,
+    bool clearDetectedPath = false,
+    bool clearCreateSystemIds = false,
+    bool clearCreateBasePath = false,
   }) {
     return LocalSetupState(
       romBasePath: clearRomBasePath ? null : (romBasePath ?? this.romBasePath),
@@ -74,12 +93,17 @@ class LocalSetupState {
       folderAssignments: folderAssignments ?? this.folderAssignments,
       enabledSystemIds: enabledSystemIds ?? this.enabledSystemIds,
       isScanning: isScanning ?? this.isScanning,
+      detectedPath: clearDetectedPath ? null : (detectedPath ?? this.detectedPath),
+      createSystemIds: clearCreateSystemIds ? null : (createSystemIds ?? this.createSystemIds),
+      createBasePath: clearCreateBasePath ? null : (createBasePath ?? this.createBasePath),
+      isAutoDetecting: isAutoDetecting ?? this.isAutoDetecting,
     );
   }
 
-  bool get isChoicePhase => scannedFolders == null && !isScanning;
+  bool get isChoicePhase => scannedFolders == null && !isScanning && createSystemIds == null && !isAutoDetecting;
   bool get isScanningPhase => isScanning;
   bool get isResultsPhase => scannedFolders != null && !isScanning;
+  bool get isCreatePhase => createSystemIds != null && !isScanning;
 }
 
 class RommSetupState {
@@ -411,9 +435,10 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       if (nextStepValue == OnboardingStep.localSetup) {
         state = state.copyWith(
           currentStep: nextStepValue,
-          localSetupState: state.localSetupState ?? const LocalSetupState(),
-          canProceed: true,
+          localSetupState: state.localSetupState ?? const LocalSetupState(isAutoDetecting: true),
+          canProceed: false,
         );
+        _autoDetectRomFolder();
         return;
       }
 
@@ -433,7 +458,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     }
   }
 
-  static const _defaultRomBasePath = '/storage/emulated/0/Roms';
+  static const _defaultRomBasePath = '/storage/emulated/0/ROMs';
 
   void _autoConfigureRommSystems() {
     final rommSetup = state.rommSetupState;
@@ -1181,20 +1206,168 @@ class OnboardingController extends StateNotifier<OnboardingState> {
 
   // --- Local setup step methods ---
 
-  void localSetupChoice(bool pick) {
-    if (pick) {
-      pickLocalFolder();
-    } else {
-      nextStep();
+  Future<void> _autoDetectRomFolder() async {
+    final ls = state.localSetupState;
+    if (ls == null) return;
+
+    const knownPaths = [
+      '/storage/emulated/0/ROMs',
+      '/storage/emulated/0/Roms',
+      '/storage/emulated/0/roms',
+    ];
+
+    String? found;
+    for (final path in knownPaths) {
+      if (await Directory(path).exists()) {
+        found = path;
+        break;
+      }
+    }
+
+    if (!mounted) return;
+    // Guard against step change during async gap
+    if (state.currentStep != OnboardingStep.localSetup) return;
+
+    state = state.copyWith(
+      localSetupState: state.localSetupState?.copyWith(
+        detectedPath: found,
+        isAutoDetecting: false,
+        clearDetectedPath: found == null,
+      ),
+      canProceed: true,
+    );
+  }
+
+  void localSetupChoice(LocalSetupAction action) {
+    switch (action) {
+      case LocalSetupAction.scanDetected:
+        final ls = state.localSetupState;
+        if (ls?.detectedPath == null) return;
+        _scanLocalFolder(ls!.detectedPath!);
+      case LocalSetupAction.pickFolder:
+        pickLocalFolder();
+      case LocalSetupAction.createFolders:
+        final ls = state.localSetupState ?? const LocalSetupState();
+        state = state.copyWith(
+          localSetupState: ls.copyWith(
+            createSystemIds: <String>{},
+            createBasePath: _defaultRomBasePath,
+          ),
+        );
+      case LocalSetupAction.skip:
+        nextStep();
     }
   }
 
-  Future<void> pickLocalFolder() async {
-    final ls = state.localSetupState ?? const LocalSetupState();
+  void toggleCreateSystem(String systemId) {
+    final ls = state.localSetupState;
+    if (ls == null || ls.createSystemIds == null) return;
+
+    final updated = Set<String>.from(ls.createSystemIds!);
+    if (updated.contains(systemId)) {
+      updated.remove(systemId);
+    } else {
+      updated.add(systemId);
+    }
+    state = state.copyWith(
+      localSetupState: ls.copyWith(createSystemIds: updated),
+    );
+  }
+
+  void toggleAllCreateSystems(bool selectAll) {
+    final ls = state.localSetupState;
+    if (ls == null || ls.createSystemIds == null) return;
+
+    final updated = selectAll
+        ? Set<String>.from(SystemModel.supportedSystems.map((s) => s.id))
+        : <String>{};
+    state = state.copyWith(
+      localSetupState: ls.copyWith(createSystemIds: updated),
+    );
+  }
+
+  Future<void> pickCreateBasePath() async {
+    final ls = state.localSetupState;
+    if (ls == null) return;
 
     final path = await FilePicker.platform.getDirectoryPath();
     if (path == null) return;
     if (!mounted) return;
+
+    state = state.copyWith(
+      localSetupState: ls.copyWith(createBasePath: path),
+    );
+  }
+
+  /// Returns null on success, or an error message on partial/total failure.
+  Future<String?> confirmCreateFolders() async {
+    final ls = state.localSetupState;
+    if (ls == null || ls.createSystemIds == null || ls.createSystemIds!.isEmpty) return null;
+
+    final basePath = ls.createBasePath ?? _defaultRomBasePath;
+    final requested = ls.createSystemIds!.length;
+
+    state = state.copyWith(
+      localSetupState: ls.copyWith(isScanning: true),
+    );
+
+    final updated = Map<String, SystemConfig>.from(state.configuredSystems);
+    var failedCount = 0;
+
+    for (final systemId in ls.createSystemIds!) {
+      if (updated.containsKey(systemId)) continue;
+
+      final system = SystemModel.supportedSystems
+          .where((s) => s.id == systemId)
+          .firstOrNull;
+      if (system == null) continue;
+
+      final dirPath = '$basePath/$systemId';
+      try {
+        await Directory(dirPath).create(recursive: true);
+      } catch (_) {
+        failedCount++;
+        continue;
+      }
+
+      updated[systemId] = SystemConfig(
+        id: systemId,
+        name: system.name,
+        targetFolder: dirPath,
+        providers: const [],
+        autoExtract: system.isZipped,
+        mergeMode: false,
+      );
+    }
+
+    if (!mounted) return null;
+
+    // All failed — stay on create phase, show error
+    if (failedCount == requested) {
+      state = state.copyWith(
+        localSetupState: state.localSetupState?.copyWith(isScanning: false),
+      );
+      return 'Could not create folders at $basePath — check permissions.';
+    }
+
+    state = state.copyWith(
+      configuredSystems: updated,
+      localSetupState: state.localSetupState?.copyWith(
+        isScanning: false,
+        clearCreateSystemIds: true,
+      ),
+    );
+
+    nextStep();
+
+    if (failedCount > 0) {
+      return '$failedCount folder${failedCount == 1 ? '' : 's'} could not be created.';
+    }
+    return null;
+  }
+
+  Future<void> _scanLocalFolder(String path) async {
+    final ls = state.localSetupState ?? const LocalSetupState();
 
     state = state.copyWith(
       localSetupState: ls.copyWith(
@@ -1218,7 +1391,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         final matchedId = LocalFolderMatcher.matchFolder(
           f.name,
           allSystems,
-          const [], // no RomM platforms
+          const [],
         );
 
         if (matchedId != null && f.fileCount > 0) {
@@ -1249,6 +1422,13 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         ),
       );
     }
+  }
+
+  Future<void> pickLocalFolder() async {
+    final path = await FilePicker.platform.getDirectoryPath();
+    if (path == null) return;
+    if (!mounted) return;
+    _scanLocalFolder(path);
   }
 
   void assignLocalFolder(String folderName, String? systemId) {
@@ -1292,10 +1472,22 @@ class OnboardingController extends StateNotifier<OnboardingState> {
 
   void localSetupBack() {
     final ls = state.localSetupState;
-    if (ls != null && ls.isResultsPhase) {
-      // Results → Choice (reset state)
+    if (ls != null && ls.isCreatePhase) {
+      // Create → Choice (clear createSystemIds)
       state = state.copyWith(
-        localSetupState: const LocalSetupState(),
+        localSetupState: ls.copyWith(
+          clearCreateSystemIds: true,
+          clearCreateBasePath: true,
+        ),
+      );
+      return;
+    }
+    if (ls != null && ls.isResultsPhase) {
+      // Results → Choice (reset scan state, preserve detectedPath)
+      state = state.copyWith(
+        localSetupState: LocalSetupState(
+          detectedPath: ls.detectedPath,
+        ),
       );
       return;
     }
@@ -1369,6 +1561,30 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     return systemId;
   }
 
+  Future<void> testAndSaveProvider() async {
+    if (state.connectionTestSuccess) {
+      if (state.providerForm?.type == ProviderType.romm &&
+          !state.hasRommPlatformSelected) {
+        return;
+      }
+      saveProvider();
+      return;
+    }
+
+    await testProviderConnection();
+
+    if (state.connectionTestSuccess) {
+      if (state.providerForm?.type == ProviderType.romm &&
+          !state.hasRommPlatformSelected) {
+        return; // platform dropdown now visible, user picks, presses again
+      }
+      // Brief delay so the user sees the success indicator before closing
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (!mounted) return;
+      saveProvider();
+    }
+  }
+
   void saveProvider() {
     final form = state.providerForm;
     final sub = state.consoleSubState;
@@ -1406,6 +1622,27 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       for (var i = 0; i < providers.length; i++) {
         providers[i] = providers[i].copyWith(priority: i);
       }
+    }
+
+    state = state.copyWith(
+      consoleSubState: sub.copyWith(providers: providers),
+    );
+  }
+
+  void moveProvider(int fromIndex, int toIndex) {
+    final sub = state.consoleSubState;
+    if (sub == null) return;
+
+    final providers = List<ProviderConfig>.from(sub.providers);
+    if (fromIndex < 0 || fromIndex >= providers.length) return;
+    if (toIndex < 0 || toIndex >= providers.length) return;
+
+    final item = providers.removeAt(fromIndex);
+    providers.insert(toIndex, item);
+
+    // Re-index priorities
+    for (var i = 0; i < providers.length; i++) {
+      providers[i] = providers[i].copyWith(priority: i);
     }
 
     state = state.copyWith(

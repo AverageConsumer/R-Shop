@@ -15,6 +15,7 @@ import '../../widgets/console_notification.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
 import '../../widgets/quick_menu.dart';
 import 'config_mode_screen.dart';
+import 'library_scan_screen.dart';
 import 'romm_config_screen.dart';
 import 'widgets/settings_item.dart';
 import 'widgets/volume_slider.dart';
@@ -202,6 +203,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ConfigModeScreen()),
+    );
+  }
+
+  void _openLibraryScan() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const LibraryScanScreen()),
     );
   }
 
@@ -477,6 +485,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             subtitle: 'Add, remove or reconfigure consoles',
                             trailing: const Icon(Icons.tune, color: Colors.white70),
                             onTap: _openConfigMode,
+                          ),
+                          SizedBox(height: rs.spacing.md),
+                          SettingsItem(
+                            title: 'Scan Library',
+                            subtitle: 'Discover all games across all consoles',
+                            trailing: const Icon(Icons.radar_rounded, color: Colors.white70),
+                            onTap: _openLibraryScan,
                           ),
                         ],
                       ),

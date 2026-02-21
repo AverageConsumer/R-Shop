@@ -2,8 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/config/app_config.dart';
+import '../models/game_item.dart';
 import '../models/system_model.dart';
+import '../utils/game_merge_helper.dart';
 import 'database_service.dart';
+import 'rom_manager.dart';
 import 'unified_game_service.dart';
 
 class LibrarySyncState {
@@ -12,6 +15,10 @@ class LibrarySyncState {
   final int completedSystems;
   final String? currentSystem;
   final String? error;
+  final Map<String, int> gamesPerSystem;
+  final int totalGamesFound;
+  final bool isUserTriggered;
+  final bool hadFailures;
 
   const LibrarySyncState({
     this.isSyncing = false,
@@ -19,6 +26,10 @@ class LibrarySyncState {
     this.completedSystems = 0,
     this.currentSystem,
     this.error,
+    this.gamesPerSystem = const {},
+    this.totalGamesFound = 0,
+    this.isUserTriggered = false,
+    this.hadFailures = false,
   });
 
   LibrarySyncState copyWith({
@@ -27,6 +38,10 @@ class LibrarySyncState {
     int? completedSystems,
     String? currentSystem,
     String? error,
+    Map<String, int>? gamesPerSystem,
+    int? totalGamesFound,
+    bool? isUserTriggered,
+    bool? hadFailures,
   }) {
     return LibrarySyncState(
       isSyncing: isSyncing ?? this.isSyncing,
@@ -34,6 +49,10 @@ class LibrarySyncState {
       completedSystems: completedSystems ?? this.completedSystems,
       currentSystem: currentSystem ?? this.currentSystem,
       error: error ?? this.error,
+      gamesPerSystem: gamesPerSystem ?? this.gamesPerSystem,
+      totalGamesFound: totalGamesFound ?? this.totalGamesFound,
+      isUserTriggered: isUserTriggered ?? this.isUserTriggered,
+      hadFailures: hadFailures ?? this.hadFailures,
     );
   }
 }
@@ -41,33 +60,37 @@ class LibrarySyncState {
 class LibrarySyncService extends StateNotifier<LibrarySyncState> {
   bool _isCancelled = false;
 
+  static final Map<String, DateTime> _lastSyncTimes = {};
+  static const _freshnessDuration = Duration(minutes: 5);
+
+  static bool isFresh(String systemId) {
+    final t = _lastSyncTimes[systemId];
+    return t != null && DateTime.now().difference(t) < _freshnessDuration;
+  }
+
+  static void clearFreshness() => _lastSyncTimes.clear();
+
   LibrarySyncService() : super(const LibrarySyncState());
 
   Future<void> syncAll(AppConfig config) async {
     if (state.isSyncing) return;
-
-    // Only sync systems that have remote providers configured
-    final syncableSystems = config.systems
-        .where((s) => s.providers.isNotEmpty)
-        .toList();
-
-    if (syncableSystems.isEmpty) return;
+    if (config.systems.isEmpty) return;
 
     _isCancelled = false;
     state = LibrarySyncState(
       isSyncing: true,
-      totalSystems: syncableSystems.length,
+      totalSystems: config.systems.length,
       completedSystems: 0,
     );
 
     final db = DatabaseService();
     final gameService = UnifiedGameService();
     var completed = 0;
+    var anyFailed = false;
 
-    for (final systemConfig in syncableSystems) {
+    for (final systemConfig in config.systems) {
       if (_isCancelled) break;
 
-      // Resolve display name from SystemModel
       final systemModel = SystemModel.supportedSystems
           .where((s) => s.id == systemConfig.id)
           .firstOrNull;
@@ -76,21 +99,122 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       state = state.copyWith(currentSystem: displayName);
 
       try {
-        final games = await gameService.fetchGamesForSystem(
-          systemConfig,
-          merge: systemConfig.mergeMode,
-        );
-        await db.saveGames(systemConfig.id, games);
+        if (systemConfig.providers.isEmpty) {
+          // Local-only: scan filesystem
+          if (systemModel != null) {
+            final games = await RomManager.scanLocalGamesIsolate(
+              systemModel, systemConfig.targetFolder);
+            await db.saveGames(systemConfig.id, games);
+          }
+        } else {
+          // Remote + local merge (same quality as discoverAll)
+          final remoteGames = await gameService.fetchGamesForSystem(
+            systemConfig, merge: systemConfig.mergeMode);
+          final List<GameItem> games;
+          if (systemModel != null) {
+            final localGames = await RomManager.scanLocalGamesIsolate(
+              systemModel, systemConfig.targetFolder);
+            games = GameMergeHelper.merge(remoteGames, localGames, systemModel);
+          } else {
+            games = remoteGames;
+          }
+          await db.saveGames(systemConfig.id, games);
+        }
+        _lastSyncTimes[systemConfig.id] = DateTime.now();
       } catch (e) {
         debugPrint('Library sync failed for ${systemConfig.id}: $e');
         state = state.copyWith(error: 'Sync failed: ${systemConfig.id}');
+        anyFailed = true;
       }
 
       completed++;
       state = state.copyWith(completedSystems: completed);
     }
 
-    state = const LibrarySyncState(isSyncing: false);
+    state = state.copyWith(isSyncing: false, currentSystem: null, hadFailures: anyFailed);
+  }
+
+  /// Discovers all games across ALL configured systems (including local-only).
+  /// Used by the "Scan Library" feature in Settings.
+  Future<void> discoverAll(AppConfig config) async {
+    if (state.isSyncing) return;
+    if (config.systems.isEmpty) return;
+
+    _isCancelled = false;
+    state = LibrarySyncState(
+      isSyncing: true,
+      totalSystems: config.systems.length,
+      completedSystems: 0,
+      isUserTriggered: true,
+    );
+
+    final db = DatabaseService();
+    final gameService = UnifiedGameService();
+    var completed = 0;
+    var totalGames = 0;
+    var anyFailed = false;
+    final perSystem = <String, int>{};
+
+    for (final systemConfig in config.systems) {
+      if (_isCancelled) break;
+
+      final systemModel = SystemModel.supportedSystems
+          .where((s) => s.id == systemConfig.id)
+          .firstOrNull;
+      if (systemModel == null) {
+        completed++;
+        state = state.copyWith(completedSystems: completed);
+        continue;
+      }
+
+      final displayName = systemModel.name;
+      state = state.copyWith(currentSystem: displayName);
+
+      try {
+        final List<GameItem> games;
+        if (systemConfig.providers.isEmpty) {
+          // Local-only: scan filesystem via isolate
+          games = await RomManager.scanLocalGamesIsolate(
+            systemModel,
+            systemConfig.targetFolder,
+          );
+        } else {
+          // Remote + local merge
+          final remoteGames = await gameService.fetchGamesForSystem(
+            systemConfig,
+            merge: systemConfig.mergeMode,
+          );
+          final localGames = await RomManager.scanLocalGamesIsolate(
+            systemModel,
+            systemConfig.targetFolder,
+          );
+          games = GameMergeHelper.merge(remoteGames, localGames, systemModel);
+        }
+
+        await db.saveGames(systemConfig.id, games);
+        perSystem[systemConfig.id] = games.length;
+        totalGames += games.length;
+        _lastSyncTimes[systemConfig.id] = DateTime.now();
+      } catch (e) {
+        debugPrint('Library discover failed for ${systemConfig.id}: $e');
+        perSystem[systemConfig.id] = 0;
+        anyFailed = true;
+      }
+
+      completed++;
+      state = state.copyWith(
+        completedSystems: completed,
+        gamesPerSystem: Map.of(perSystem),
+        totalGamesFound: totalGames,
+      );
+    }
+
+    // Keep final summary visible (don't reset like syncAll does)
+    state = state.copyWith(
+      isSyncing: false,
+      currentSystem: null,
+      hadFailures: anyFailed,
+    );
   }
 
   void cancel() {

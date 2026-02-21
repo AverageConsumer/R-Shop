@@ -44,8 +44,7 @@ class ConsoleSetupStep extends ConsumerWidget {
         }
       } else if (sub != null && sub.providers.isNotEmpty && sub.targetFolder != null) {
         message = "Looking good! Add more sources or tap Done when you're ready.";
-      } else if (sub != null && sub.targetFolder != null && sub.providers.isEmpty &&
-          state.localOnlySystemIds.contains(state.selectedConsoleId)) {
+      } else if (sub != null && sub.targetFolder != null && sub.providers.isEmpty) {
         message = "This is a local collection. Add a source to download more, or just hit Done!";
         accentColor = Colors.cyanAccent;
       } else if (sub != null && sub.targetFolder != null) {
@@ -103,7 +102,7 @@ class ConsoleSetupStep extends ConsumerWidget {
       message = "Let's set up your consoles! Tap any system to get started.";
     } else {
       message =
-          "Nice! $configuredCount ${configuredCount == 1 ? 'console' : 'consoles'} configured. Tap another to add more, or press A to continue.";
+          "Nice! $configuredCount ${configuredCount == 1 ? 'console' : 'consoles'} configured. Tap another to add more, or press Start to continue.";
     }
 
     return FocusScope(

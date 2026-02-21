@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../models/download_item.dart';
 import '../models/game_item.dart';
@@ -72,6 +73,7 @@ class DownloadQueueState {
 
 class DownloadQueueManager extends ChangeNotifier {
   static const int _maxRetries = 3;
+  static final Random _jitterRandom = Random();
 
   DownloadQueueState _state = const DownloadQueueState();
   DownloadQueueState get state => _state;
@@ -101,12 +103,14 @@ class DownloadQueueManager extends ChangeNotifier {
   }
 
   void _scheduleRetry(String id, int retryCount) {
-    // Exponential backoff: 5s, 15s, 45s
+    // Exponential backoff: 5s, 15s, 45s + random jitter to prevent thundering herd
     const delays = [5, 15, 45];
-    final delaySeconds = delays[retryCount.clamp(0, delays.length - 1)];
+    final baseDelaySeconds = delays[retryCount.clamp(0, delays.length - 1)];
+    final jitterMs = _jitterRandom.nextInt(3000); // 0–3s jitter
+    final delay = Duration(seconds: baseDelaySeconds, milliseconds: jitterMs);
 
     _retryTimers[id]?.cancel();
-    _retryTimers[id] = Timer(Duration(seconds: delaySeconds), () {
+    _retryTimers[id] = Timer(delay, () {
       _retryTimers.remove(id);
       final item = _state.getDownloadById(id);
       if (item == null || item.status != DownloadItemStatus.error) return;
@@ -441,7 +445,11 @@ class DownloadQueueManager extends ChangeNotifier {
         final systemName = map['systemName'] as String?;
         final system = (systemId != null ? systemMapById[systemId] : null)
             ?? (systemName != null ? systemMapByName[systemName] : null);
-        if (system == null) continue;
+        if (system == null) {
+          debugPrint('DownloadQueue: skipping restore item with unknown system '
+              '(id=$systemId, name=$systemName)');
+          continue;
+        }
 
         final downloadItem = DownloadItem.fromJson(map, system);
         // Reset to queued so they can be restarted
@@ -460,8 +468,8 @@ class DownloadQueueManager extends ChangeNotifier {
         notifyListeners();
         _processQueue();
       }
-    } catch (_) {
-      // Corrupted data — just clear it
+    } catch (e) {
+      debugPrint('DownloadQueue: failed to restore queue (clearing): $e');
       _storage.clearDownloadQueue();
     }
   }

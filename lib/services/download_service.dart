@@ -8,6 +8,7 @@ import '../models/system_model.dart';
 import '../utils/friendly_error.dart';
 import 'download_handle.dart';
 import 'provider_factory.dart';
+import 'rom_manager.dart';
 
 enum DownloadStatus {
   idle,
@@ -126,12 +127,19 @@ class DownloadService {
     String targetFolder,
     SystemModel system,
   ) {
-    _progressController?.close();
-    _progressController = StreamController<DownloadProgress>();
+    final oldController = _progressController;
+    final controller = StreamController<DownloadProgress>();
+    _progressController = controller;
+
+    // Close old controller after replacing the reference to avoid
+    // emitting to a stale listener.
+    if (oldController?.isClosed == false) {
+      oldController!.close();
+    }
 
     _startDownload(game, targetFolder, system);
 
-    return _progressController!.stream;
+    return controller.stream;
   }
 
   Future<void> _startDownload(
@@ -170,7 +178,7 @@ class DownloadService {
 
       final tempDir = await getTemporaryDirectory();
       final safeFilename = p.basename(game.filename);
-      final uniquePrefix = DateTime.now().millisecondsSinceEpoch;
+      final uniquePrefix = '${DateTime.now().millisecondsSinceEpoch}_${identityHashCode(this)}';
       _tempFilePath = '${tempDir.path}/${uniquePrefix}_$safeFilename';
       final tempFile = File(_tempFilePath!);
 
@@ -436,6 +444,12 @@ class DownloadService {
     _isDownloadInProgress = false;
   }
 
+  Future<void> _cleanupTempFile(File tempFile) async {
+    try {
+      if (await tempFile.exists()) await tempFile.delete();
+    } catch (_) {}
+  }
+
   void _emitCancelled() {
     if (_progressController?.isClosed == false) {
       _progressController?.add(DownloadProgress(
@@ -477,6 +491,7 @@ class DownloadService {
       } else {
         await _extractZipNative(tempFile, targetFolder);
       }
+      if (_isCancelled) { _cleanupTempFile(tempFile); _emitCancelled(); return; }
       if (await tempFile.exists()) {
         await tempFile.delete();
       }
@@ -488,6 +503,7 @@ class DownloadService {
         ));
       }
       await _moveToTarget(tempFile, targetFolder);
+      if (_isCancelled) { _cleanupTempFile(tempFile); _emitCancelled(); return; }
       if (await tempFile.exists()) {
         await tempFile.delete();
       }
@@ -498,16 +514,19 @@ class DownloadService {
           progress: 1.0,
         ));
       }
-      final targetPath = _safePath(targetFolder, game.filename);
+      final targetPath = RomManager.safePath(targetFolder, game.filename);
       final targetFile = File(targetPath);
       if (await targetFile.exists()) {
         await targetFile.delete();
       }
       await tempFile.copy(targetFile.path);
+      if (_isCancelled) { _cleanupTempFile(tempFile); _emitCancelled(); return; }
       if (await tempFile.exists()) {
         await tempFile.delete();
       }
     }
+
+    if (_isCancelled) { _emitCancelled(); return; }
 
     if (_progressController?.isClosed == false) {
       _progressController?.add(DownloadProgress(
@@ -550,20 +569,20 @@ class DownloadService {
       });
 
       if (hasBinFiles) {
-        final gameName = _extractGameName(game.filename);
-        final subFolderPath = _safePath(targetFolder, gameName);
+        final gameName = RomManager.extractGameName(game.filename) ?? game.filename;
+        final subFolderPath = RomManager.safePath(targetFolder, gameName);
         final subFolder = Directory(subFolderPath);
         await subFolder.create(recursive: true);
 
         for (final file in files) {
           final fileName = p.basename(file.path);
-          final targetPath = _safePath(subFolder.path, fileName);
+          final targetPath = RomManager.safePath(subFolder.path, fileName);
           await file.copy(targetPath);
         }
       } else {
         for (final file in files) {
           final fileName = p.basename(file.path);
-          final targetPath = _safePath(targetFolder, fileName);
+          final targetPath = RomManager.safePath(targetFolder, fileName);
           await file.copy(targetPath);
         }
       }
@@ -574,50 +593,17 @@ class DownloadService {
     }
   }
 
-  List<File> _listFilesRecursively(Directory dir) {
-    final files = <File>[];
-    final entities = dir.listSync(recursive: true);
-    for (final entity in entities) {
-      if (entity is File) {
-        files.add(entity);
-      }
-    }
-    return files;
-  }
-
-  String _extractGameName(String filename) {
-    var name = filename;
-
-    final archiveExts = ['.zip', '.7z', '.rar'];
-    for (final ext in archiveExts) {
-      if (name.toLowerCase().endsWith(ext)) {
-        name = name.substring(0, name.length - ext.length);
-        break;
-      }
-    }
-
-    name = name.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
-    name = name.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-    return name;
-  }
+  List<File> _listFilesRecursively(Directory dir) =>
+      dir.listSync(recursive: true).whereType<File>().toList();
 
   Future<void> _moveToTarget(File file, String targetFolder) async {
-    final targetPath = _safePath(targetFolder, p.basename(file.path));
+    final targetPath = RomManager.safePath(targetFolder, p.basename(file.path));
     final targetFile = File(targetPath);
     await targetFile.parent.create(recursive: true);
     await file.copy(targetFile.path);
   }
 
   String _getUserFriendlyError(dynamic e) => getUserFriendlyError(e);
-
-  String _safePath(String baseDir, String filename) {
-    final sanitized = p.basename(filename);
-    if (sanitized.isEmpty || sanitized == '.' || sanitized == '..') {
-      throw Exception('Invalid filename: path traversal detected');
-    }
-    return '$baseDir/$sanitized';
-  }
 
   void dispose() {
     _httpClient?.close(force: true);
