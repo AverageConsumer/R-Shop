@@ -6,6 +6,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.9.6] Beta — 2026-02-21
+
+### Added
+- **Scan Library** screen — Settings entry opens animated console grid with per-system scan progress, game count badges, and completion summary
+- **Smart onboarding auto-detection** — detects existing ROM folders at common paths (`/storage/emulated/0/ROMs`, `/Roms`, `/roms`) with scan, create, pick, or skip options
+- **Cache-first game list loading** — lists load instantly from SQLite cache, then silently refresh from remote providers; UI only updates if the list actually changed (filename-diffed)
+- **Offline indicator** — amber "Offline — cached data" toast on failed sync; sync badge shows failure state
+- **Provider reordering** — D-pad or arrow buttons to change provider priority in console configuration panel
+- **Test & Save** — single button tests provider connection and auto-saves on success (replaces separate Save button)
+- **User Guide** (`docs/USER_GUIDE.md`) — comprehensive guide covering all features, controls, supported systems, and troubleshooting
+
+### Improved
+- **ROM format coverage** expanded across 10+ systems — GameCube (ISO/GCM/CISO), Wii (WBFS/WIA/CISO), PS2 (CSO), PS3 (PKG), PSP (PBP), Mega Drive (BIN/SMD), Dreamcast (CDI/GDI), Saturn (ISO), Arcade (7z), N64 (V64), SNES (SMC)
+- **Isolate-based local scanning** — filesystem scanning offloaded to a Dart isolate via `compute()` for smoother UI
+- **Library sync freshness** — 5-minute cache prevents redundant re-syncs; `clearFreshness()` forces refresh after config changes
+- **Sync covers local-only systems** — `syncAll()` now includes systems without remote providers
+- **Batched install-status checks** — processes in parallel batches of 20
+- **Filter passthrough** — games with no region/language metadata now pass through filters instead of being excluded
+- **Console grid badges** — local-only systems show blue folder badge instead of green provider checkmark
+- **Post-settings re-sync** — config reloaded and freshness cleared after returning from settings
+- **Library installed detection** — correctly matches extracted ROM files (e.g., `Game.zip` → `Game.iso`)
+- **Library-based search** — Y button on home navigates to Library with search open, replacing standalone global search overlay
+
+### Fixed
+- **GameDetail variant index** clamped to valid range (prevents crash on variant list changes)
+- **Search overlay** focus handling improved
+
+### Internal
+- `GlobalSearchOverlay` removed (675 lines) — replaced by Library with `openSearch: true`
+- `RepoManager` and `RomHeaderParser` removed
+- `archive` dependency removed from `pubspec.yaml`
+- `GameMergeHelper` extracted for dedup logic (remote-vs-local merge, archive expansion, multi-file detection)
+- `SystemModel` gains `archiveExtensions`, `allRomExtensions`, `allGameExtensions`, and `isGameFile()`
+- Unused providers cleaned up from `app_providers`, `config_providers`, `download_providers`
+- `LibrarySyncService` extended with `discoverAll()`, `isFresh()`, `hadFailures` state
+
+---
+
 ## [0.9.5] Beta — 2026-02-20
 
 ### Added
