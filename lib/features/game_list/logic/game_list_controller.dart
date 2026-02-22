@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
@@ -94,12 +95,14 @@ class GameListController extends ChangeNotifier {
   final DatabaseService _databaseService;
   final StorageService? _storage;
   bool _disposed = false;
+  Timer? _thumbnailDebounce;
 
   GameListState _state = const GameListState();
   GameListState get state => _state;
 
   @override
   void dispose() {
+    _thumbnailDebounce?.cancel();
     _disposed = true;
     super.dispose();
   }
@@ -109,16 +112,20 @@ class GameListController extends ChangeNotifier {
     if (!_disposed) super.notifyListeners();
   }
 
+  Set<String>? _pendingInstalledFilenames;
+
   GameListController({
     required this.system,
     required this.targetFolder,
     required this.systemConfig,
+    Set<String>? installedFilenames,
     UnifiedGameService? unifiedService,
     DatabaseService? databaseService,
     StorageService? storage,
   })  : _unifiedService = unifiedService ?? UnifiedGameService(),
         _databaseService = databaseService ?? DatabaseService(),
         _storage = storage {
+    _pendingInstalledFilenames = installedFilenames;
     loadGames();
   }
 
@@ -133,7 +140,7 @@ class GameListController extends ChangeNotifier {
         _state = _state.copyWith(allGames: games, isLocalOnly: true);
         _groupGames();
         _restoreFilters();
-        await _checkInstalledStatus();
+        _resolveInstalledStatus();
         _databaseService.saveGames(system.id, _state.allGames);
         return;
       }
@@ -145,7 +152,7 @@ class GameListController extends ChangeNotifier {
           _state = _state.copyWith(allGames: cached, isLocalOnly: false);
           _groupGames();
           _restoreFilters();
-          await _checkInstalledStatus();
+          _resolveInstalledStatus();
           // Refresh from source in background
           _backgroundRefresh();
           return;
@@ -167,7 +174,7 @@ class GameListController extends ChangeNotifier {
     _state = _state.copyWith(allGames: games, isLocalOnly: false);
     _groupGames();
     _restoreFilters();
-    await _checkInstalledStatus();
+    _resolveInstalledStatus();
     _databaseService.saveGames(system.id, _state.allGames);
   }
 
@@ -186,7 +193,7 @@ class GameListController extends ChangeNotifier {
         _state = _state.copyWith(allGames: games, isLocalOnly: false);
         _groupGames();
         _restoreFilters();
-        await _checkInstalledStatus();
+        _resolveInstalledStatus();
       }
       _databaseService.saveGames(system.id, games);
     } catch (e) {
@@ -266,31 +273,16 @@ class GameListController extends ChangeNotifier {
     }
   }
 
-  Future<void> _checkInstalledStatus() async {
-    final installedCache = <String, bool>{};
-    final entries = _state.groupedGames.entries.toList();
-
-    // Process in batches of 20 for parallelism
-    for (var i = 0; i < entries.length; i += 20) {
-      final batch = entries.skip(i).take(20);
-      final results = await Future.wait(
-        batch.map((e) async => MapEntry(e.key, await _isAnyVariantInstalled(e.value))),
-      );
-      for (final result in results) {
-        installedCache[result.key] = result.value;
-      }
+  /// Uses pre-provided filenames (from [installedFilesProvider]) if available,
+  /// otherwise just clears the loading flag and lets the provider listener
+  /// call [applyInstalledFilenames] when data arrives.
+  void _resolveInstalledStatus() {
+    if (_pendingInstalledFilenames != null) {
+      applyInstalledFilenames(_pendingInstalledFilenames!);
+    } else {
+      _state = _state.copyWith(isLoading: false);
+      notifyListeners();
     }
-
-    _state = _state.copyWith(
-      installedCache: installedCache,
-      isLoading: false,
-    );
-    notifyListeners();
-  }
-
-  Future<bool> _isAnyVariantInstalled(List<GameItem> variants) async {
-    final romManager = RomManager();
-    return romManager.isAnyVariantInstalled(variants, system, targetFolder);
   }
 
   void filterGames(String query) {
@@ -403,6 +395,40 @@ class GameListController extends ChangeNotifier {
     return true;
   }
 
+  /// Fast path: apply pre-scanned filenames from the central index.
+  void applyInstalledFilenames(Set<String> installedFilenames) {
+    _pendingInstalledFilenames = installedFilenames;
+    final installedCache = <String, bool>{};
+    for (final entry in _state.groupedGames.entries) {
+      installedCache[entry.key] = _isAnyVariantInSet(entry.value, installedFilenames);
+    }
+    _state = _state.copyWith(installedCache: installedCache, isLoading: false);
+    notifyListeners();
+  }
+
+  bool _isAnyVariantInSet(List<GameItem> variants, Set<String> filenames) {
+    for (final variant in variants) {
+      final fn = variant.filename;
+      if (filenames.contains(fn)) return true;
+      // Check archive→extracted match
+      for (final ext in SystemModel.archiveExtensions) {
+        if (fn.toLowerCase().endsWith(ext)) {
+          final stripped = fn.substring(0, fn.length - ext.length);
+          if (filenames.contains(stripped)) return true;
+          for (final romExt in system.romExtensions) {
+            if (filenames.contains('$stripped$romExt')) return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  Future<bool> _isAnyVariantInstalled(List<GameItem> variants) async {
+    final romManager = RomManager();
+    return romManager.isAnyVariantInstalled(variants, system, targetFolder);
+  }
+
   Future<void> updateInstalledStatus(String displayName) async {
     final variants = _state.groupedGames[displayName];
     if (variants == null) return;
@@ -412,10 +438,59 @@ class GameListController extends ChangeNotifier {
     newCache[displayName] = isInstalled;
 
     _state = _state.copyWith(installedCache: newCache);
-    notifyListeners();
+    _applyFilters();
   }
 
-  Future<void> updateCoverUrl(String filename, String url) async {
-    await _databaseService.updateGameCover(filename, url);
+  Future<void> updateCoverUrls(List<GameItem> variants, String url) async {
+    final filenames = variants.map((v) => v.filename).toList();
+    await _databaseService.batchUpdateCoverUrl(filenames, url);
+    // Silent update — cover URL is persistence-only, image is already displayed
+    _updateInMemorySilent(filenames, (g) => g.copyWith(cachedCoverUrl: url));
+  }
+
+  Future<void> updateThumbnailData(List<GameItem> variants) async {
+    final filenames = variants.map((v) => v.filename).toList();
+    await _databaseService.batchUpdateThumbnailData(
+      filenames,
+      hasThumbnail: true,
+    );
+    _updateInMemorySilent(
+        filenames, (g) => g.copyWith(hasThumbnail: true));
+    _scheduleThumbnailNotify();
+  }
+
+  void _scheduleThumbnailNotify() {
+    _thumbnailDebounce?.cancel();
+    _thumbnailDebounce = Timer(const Duration(milliseconds: 100), () {
+      notifyListeners();
+    });
+  }
+
+  void _updateInMemorySilent(
+      List<String> filenames, GameItem Function(GameItem) updater) {
+    final filenameSet = filenames.toSet();
+    final newAllGames = _state.allGames.map((g) {
+      return filenameSet.contains(g.filename) ? updater(g) : g;
+    }).toList();
+
+    final newGrouped = <String, List<GameItem>>{};
+    for (final entry in _state.groupedGames.entries) {
+      newGrouped[entry.key] = entry.value.map((g) {
+        return filenameSet.contains(g.filename) ? updater(g) : g;
+      }).toList();
+    }
+
+    final newFilteredGrouped = <String, List<GameItem>>{};
+    for (final entry in _state.filteredGroupedGames.entries) {
+      newFilteredGrouped[entry.key] = entry.value.map((g) {
+        return filenameSet.contains(g.filename) ? updater(g) : g;
+      }).toList();
+    }
+
+    _state = _state.copyWith(
+      allGames: newAllGames,
+      groupedGames: newGrouped,
+      filteredGroupedGames: newFilteredGrouped,
+    );
   }
 }

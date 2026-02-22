@@ -54,7 +54,42 @@ class ConsoleHud extends ConsumerWidget {
     final (labelA, labelB, labelX, labelY) = switch (layout) {
       ControllerLayout.nintendo => ('A', 'B', 'X', 'Y'),
       ControllerLayout.xbox => ('B', 'A', 'Y', 'X'),
-      ControllerLayout.playstation => ('○', '✕', '△', '□'),
+      ControllerLayout.playstation => ('', '', '', ''),
+    };
+
+    // Xbox face button colors
+    const xbGreen = Color(0xFF6DC849);
+    const xbRed = Color(0xFFE24C3A);
+    const xbBlue = Color(0xFF4C87CB);
+    const xbYellow = Color(0xFFF3B735);
+
+    // Per-layout button styling: (colorA, colorB, colorX, colorY, painterA, painterB, painterX, painterY)
+    final (Color? colorA, Color? colorB, Color? colorX, Color? colorY,
+           CustomPainter? painterA, CustomPainter? painterB,
+           CustomPainter? painterX, CustomPainter? painterY) = switch (layout) {
+      ControllerLayout.nintendo => (null, null, null, null, null, null, null, null),
+      ControllerLayout.xbox => (xbGreen, xbRed, xbBlue, xbYellow, null, null, null, null),
+      ControllerLayout.playstation => (
+        const Color(0xFFE8707A), const Color(0xFF6E9FD6),
+        const Color(0xFF7BC8A4), const Color(0xFFA88BC7),
+        const PSCirclePainter(), const PSCrossPainter(),
+        const PSTrianglePainter(), const PSSquarePainter(),
+      ),
+    };
+
+    // Start/Select styling
+    final (IconData? iconStart, String labelStart,
+           CustomPainter? painterStart) = switch (layout) {
+      ControllerLayout.nintendo => (null, '', const NintendoPlusPainter()),
+      ControllerLayout.playstation => (Icons.menu_rounded, '', null),
+      ControllerLayout.xbox => (Icons.menu_rounded, '', null),
+    };
+
+    final (IconData? iconSelect, String labelSelect,
+           CustomPainter? painterSelect) = switch (layout) {
+      ControllerLayout.nintendo => (null, '', const NintendoMinusPainter()),
+      ControllerLayout.playstation => (Icons.share_rounded, '', null),
+      ControllerLayout.xbox => (Icons.filter_none, '', null),
     };
 
     final (labelLB, labelRB, labelLT, labelRT) = switch (layout) {
@@ -62,20 +97,6 @@ class ConsoleHud extends ConsumerWidget {
       ControllerLayout.xbox => ('LB', 'RB', 'LT', 'RT'),
       ControllerLayout.playstation => ('L1', 'R1', 'L2', 'R2'),
     };
-
-    final iconStart = switch (layout) {
-      ControllerLayout.nintendo => null,
-      ControllerLayout.playstation => Icons.menu_rounded,
-      ControllerLayout.xbox => Icons.menu_rounded,
-    };
-    final labelStart = layout == ControllerLayout.nintendo ? '+' : '';
-
-    final iconSelect = switch (layout) {
-      ControllerLayout.nintendo => null,
-      ControllerLayout.playstation => Icons.share_rounded,
-      ControllerLayout.xbox => Icons.filter_none,
-    };
-    final labelSelect = layout == ControllerLayout.nintendo ? '\u2212' : '';
 
     // Fixed order: dpad, LB, RB, select(−), start(+), Y, X, B, A
     if (dpad != null) {
@@ -120,6 +141,7 @@ class ConsoleHud extends ConsumerWidget {
       buttons.add(ControlButton(
         label: labelSelect,
         icon: iconSelect,
+        shapePainter: painterSelect,
         action: select!.action,
         onTap: select!.onTap,
         highlight: select!.highlight,
@@ -129,6 +151,7 @@ class ConsoleHud extends ConsumerWidget {
       buttons.add(ControlButton(
         label: labelStart,
         icon: iconStart,
+        shapePainter: painterStart,
         action: start!.action,
         onTap: start!.onTap,
         highlight: start!.highlight,
@@ -140,6 +163,8 @@ class ConsoleHud extends ConsumerWidget {
         action: displayY.action,
         onTap: displayY.onTap,
         highlight: displayY.highlight,
+        buttonColor: colorY,
+        shapePainter: painterY,
       ));
     }
     if (displayX != null) {
@@ -148,6 +173,8 @@ class ConsoleHud extends ConsumerWidget {
         action: displayX.action,
         onTap: displayX.onTap,
         highlight: displayX.highlight,
+        buttonColor: colorX,
+        shapePainter: painterX,
       ));
     }
     if (displayB != null) {
@@ -156,6 +183,8 @@ class ConsoleHud extends ConsumerWidget {
         action: displayB.action,
         onTap: displayB.onTap,
         highlight: displayB.highlight,
+        buttonColor: colorB,
+        shapePainter: painterB,
       ));
     }
     if (displayA != null) {
@@ -164,6 +193,8 @@ class ConsoleHud extends ConsumerWidget {
         action: displayA.action,
         onTap: displayA.onTap,
         highlight: displayA.highlight,
+        buttonColor: colorA,
+        shapePainter: painterA,
       ));
     }
 

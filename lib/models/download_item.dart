@@ -129,7 +129,7 @@ class DownloadItem {
       'progress': progress,
       'retryCount': retryCount,
       if (game.providerConfig != null)
-        'providerConfig': game.providerConfig!.toJson(),
+        'providerConfig': game.providerConfig!.toJsonWithoutAuth(),
     };
   }
 

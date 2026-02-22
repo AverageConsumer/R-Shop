@@ -1,7 +1,7 @@
 name: retro_eshop
 description: "R-Shop — A retro game manager for Android with a console-style UI, controller support, and download queue."
 publish_to: 'none'
-version: 0.9.6+1
+version: 0.9.7+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -27,6 +27,8 @@ dependencies:
   ftpconnect: ^2.0.10
   share_plus: ^10.1.4
   flutter_foreground_task: ^9.2.0
+  image: ^4.3.0
+  crypto: ^3.0.6
 
 
 dev_dependencies:

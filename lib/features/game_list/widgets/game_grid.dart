@@ -5,6 +5,7 @@ import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../utils/image_helper.dart';
 import '../../../widgets/base_game_card.dart';
+import '../../../widgets/selection_aware_item.dart';
 
 class GameGrid extends StatefulWidget {
   final SystemModel system;
@@ -14,17 +15,19 @@ class GameGrid extends StatefulWidget {
   final Set<String> favorites;
   final Map<int, GlobalKey> itemKeys;
   final Map<int, FocusNode> focusNodes;
-  final int selectedIndex;
+  final ValueNotifier<int> selectedIndexNotifier;
   final int crossAxisCount;
   final ScrollController scrollController;
   final bool Function(ScrollNotification) onScrollNotification;
   final void Function(String displayName, List<GameItem> variants) onOpenGame;
   final void Function(int index) onSelectionChanged;
   final void Function(String url, List<GameItem> variants) onCoverFound;
+  final void Function(String url, List<GameItem> variants) onThumbnailNeeded;
   final String searchQuery;
   final bool hasActiveFilters;
   final bool isLocalOnly;
   final String targetFolder;
+  final ValueNotifier<bool>? scrollSuppression;
 
   const GameGrid({
     super.key,
@@ -35,17 +38,19 @@ class GameGrid extends StatefulWidget {
     this.favorites = const {},
     required this.itemKeys,
     required this.focusNodes,
-    required this.selectedIndex,
+    required this.selectedIndexNotifier,
     required this.crossAxisCount,
     required this.scrollController,
     required this.onScrollNotification,
     required this.onOpenGame,
     required this.onSelectionChanged,
     required this.onCoverFound,
+    required this.onThumbnailNeeded,
     this.searchQuery = '',
     this.hasActiveFilters = false,
     this.isLocalOnly = false,
     this.targetFolder = '',
+    this.scrollSuppression,
   });
 
   @override
@@ -53,6 +58,54 @@ class GameGrid extends StatefulWidget {
 }
 
 class _GameGridState extends State<GameGrid> {
+  int _optimalCacheWidth = 500;
+  Map<String, List<String>> _coverUrlCache = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _rebuildCoverUrlCache();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _optimalCacheWidth = _computeOptimalCacheWidth(context);
+  }
+
+  @override
+  void didUpdateWidget(GameGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.filteredGroups, widget.filteredGroups) ||
+        !identical(oldWidget.groupedGames, widget.groupedGames)) {
+      _rebuildCoverUrlCache();
+    }
+    if (oldWidget.crossAxisCount != widget.crossAxisCount) {
+      _optimalCacheWidth = _computeOptimalCacheWidth(context);
+    }
+  }
+
+  void _rebuildCoverUrlCache() {
+    _coverUrlCache = {
+      for (final name in widget.filteredGroups)
+        if (widget.groupedGames[name] case final variants?)
+          name: ImageHelper.getCoverUrls(
+            widget.system,
+            variants.map((v) => v.filename).toList(),
+          ),
+    };
+  }
+
+  int _computeOptimalCacheWidth(BuildContext context) {
+    final rs = context.rs;
+    final gridPadding = rs.spacing.lg * 2;
+    final spacing = rs.isSmall ? 10.0 : 16.0;
+    final gridWidth = MediaQuery.of(context).size.width - gridPadding;
+    final itemWidth = (gridWidth - (widget.crossAxisCount - 1) * spacing) / widget.crossAxisCount;
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    return (itemWidth * dpr).round().clamp(150, 500);
+  }
+
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
@@ -99,7 +152,7 @@ class _GameGridState extends State<GameGrid> {
         onNotification: widget.onScrollNotification,
         child: RepaintBoundary(
           child: GridView.builder(
-            cacheExtent: 500,
+            cacheExtent: 400,
             controller: widget.scrollController,
             padding: EdgeInsets.only(
               left: rs.spacing.lg,
@@ -137,32 +190,37 @@ class _GameGridState extends State<GameGrid> {
   Widget _buildItem(BuildContext context, int index) {
     final displayName = widget.filteredGroups[index];
     final variants = widget.groupedGames[displayName]!;
-    final coverUrls = ImageHelper.getCoverUrls(
-      widget.system,
-      variants.map((v) => v.filename).toList(),
-    );
-    final cachedUrl = variants.first.cachedCoverUrl;
+    final coverUrls = _coverUrlCache[displayName] ?? const [];
+    final first = variants.first;
+    final cachedUrl = first.cachedCoverUrl;
     final isInstalled = widget.installedCache[displayName] ?? false;
-    final isSelected = index == widget.selectedIndex;
     final isFavorite = widget.favorites.contains(displayName);
-    final providerLabel = variants.first.providerConfig?.shortLabel;
+    final providerLabel = first.providerConfig?.shortLabel;
 
     return RepaintBoundary(
       key: widget.itemKeys[index],
-      child: BaseGameCard(
-        displayName: displayName,
-        coverUrls: coverUrls,
-        cachedUrl: cachedUrl,
-        variantCount: variants.length,
-        isInstalled: isInstalled,
-        isSelected: isSelected,
-        isFavorite: isFavorite,
-        accentColor: widget.system.accentColor,
-        providerLabel: providerLabel,
-        focusNode: widget.focusNodes[index],
-        onTap: () => widget.onOpenGame(displayName, variants),
-        onTapSelect: () => widget.onSelectionChanged(index),
-        onCoverFound: (url) => widget.onCoverFound(url, variants),
+      child: SelectionAwareItem(
+        selectedIndexNotifier: widget.selectedIndexNotifier,
+        index: index,
+        builder: (isSelected) => BaseGameCard(
+          displayName: displayName,
+          coverUrls: coverUrls,
+          cachedUrl: cachedUrl,
+          variantCount: variants.length,
+          isInstalled: isInstalled,
+          isSelected: isSelected,
+          isFavorite: isFavorite,
+          accentColor: widget.system.accentColor,
+          providerLabel: providerLabel,
+          hasThumbnail: first.hasThumbnail,
+          memCacheWidth: _optimalCacheWidth,
+          scrollSuppression: widget.scrollSuppression,
+          focusNode: widget.focusNodes[index],
+          onTap: () => widget.onOpenGame(displayName, variants),
+          onTapSelect: () => widget.onSelectionChanged(index),
+          onCoverFound: (url) => widget.onCoverFound(url, variants),
+          onThumbnailNeeded: (url) => widget.onThumbnailNeeded(url, variants),
+        ),
       ),
     );
   }

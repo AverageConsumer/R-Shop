@@ -19,6 +19,14 @@ class BaseGameCard extends StatelessWidget {
   final int variantCount;
   final String? providerLabel;
 
+  // Thumbnail pipeline
+  final bool hasThumbnail;
+  final void Function(String url)? onThumbnailNeeded;
+
+  // Performance
+  final int memCacheWidth;
+  final ValueNotifier<bool>? scrollSuppression;
+
   // Optional behavior
   final FocusNode? focusNode;
   final VoidCallback? onTapSelect;
@@ -37,6 +45,10 @@ class BaseGameCard extends StatelessWidget {
     this.systemLabel,
     this.variantCount = 0,
     this.providerLabel,
+    this.hasThumbnail = false,
+    this.onThumbnailNeeded,
+    this.memCacheWidth = 500,
+    this.scrollSuppression,
     this.focusNode,
     this.onTapSelect,
     this.onCoverFound,
@@ -57,43 +69,15 @@ class BaseGameCard extends StatelessWidget {
     Widget card = GestureDetector(
       onTapDown: (_) => onTapSelect?.call(),
       onTap: onTap,
-      child: AnimatedScale(
+      child: Transform.scale(
         scale: isSelected ? selectedScale : 1.0,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+        child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(borderRadius),
             border: isSelected
                 ? Border.all(color: Colors.white, width: borderSelected)
                 : Border.all(
                     color: Colors.white.withValues(alpha: 0.08), width: 1),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                    BoxShadow(
-                      color: accentColor.withValues(alpha: 0.3),
-                      blurRadius: 30,
-                      spreadRadius: 5,
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.7),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
-                    ),
-                  ]
-                : [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 6,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(innerBorderRadius),
@@ -107,6 +91,10 @@ class BaseGameCard extends StatelessWidget {
                     cachedUrl: cachedUrl,
                     fit: BoxFit.contain,
                     onUrlFound: onCoverFound,
+                    hasThumbnail: hasThumbnail,
+                    onThumbnailNeeded: onThumbnailNeeded,
+                    memCacheWidth: memCacheWidth,
+                    scrollSuppression: scrollSuppression,
                   ),
                 ),
                 // Top-left badges (system + installed)
@@ -126,12 +114,6 @@ class BaseGameCard extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: accentColor.withValues(alpha: 0.85),
                               borderRadius: BorderRadius.circular(3),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.5),
-                                  blurRadius: 4,
-                                ),
-                              ],
                             ),
                             child: Text(
                               systemLabel!.toUpperCase(),
@@ -151,13 +133,6 @@ class BaseGameCard extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.6),
                               shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color:
-                                      Colors.greenAccent.withValues(alpha: 0.5),
-                                  blurRadius: 8,
-                                ),
-                              ],
                             ),
                             child: Icon(
                               Icons.check_circle,
@@ -179,12 +154,6 @@ class BaseGameCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.6),
                         shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.redAccent.withValues(alpha: 0.5),
-                            blurRadius: 8,
-                          ),
-                        ],
                       ),
                       child: Icon(
                         Icons.favorite,

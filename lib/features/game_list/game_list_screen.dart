@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,20 +14,17 @@ import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../services/config_bootstrap.dart';
 import '../../services/input_debouncer.dart';
-import '../../utils/image_helper.dart';
+import '../../services/thumbnail_service.dart';
 import '../game_detail/game_detail_screen.dart';
-import 'logic/focus_sync_manager.dart';
 import 'logic/game_list_controller.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/download_overlay.dart';
 import '../../widgets/quick_menu.dart';
 import '../../providers/download_providers.dart';
-import 'widgets/dynamic_background.dart';
+import '../../providers/installed_files_provider.dart';
 import 'widgets/game_grid.dart';
 import 'widgets/game_list_header.dart';
 import 'widgets/filter_overlay.dart';
-import 'widgets/search_overlay.dart';
-import 'widgets/tinted_overlay.dart';
 
 class GameListScreen extends ConsumerStatefulWidget {
   final SystemModel system;
@@ -42,20 +41,15 @@ class GameListScreen extends ConsumerStatefulWidget {
 }
 
 class _GameListScreenState extends ConsumerState<GameListScreen>
-    with ConsoleScreenMixin {
+    with ConsoleScreenMixin, SearchableScreenMixin {
   late final GameListController _controller;
   late final FocusSyncManager _focusManager;
-  final FocusNode _searchFocusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
-  final TextEditingController _searchController = TextEditingController();
-  final ValueNotifier<String?> _backgroundNotifier = ValueNotifier(null);
+  final ValueNotifier<int> _selectedIndexNotifier = ValueNotifier(0);
+  final ValueNotifier<bool> _scrollSuppression = ValueNotifier(false);
   final Map<int, GlobalKey> _itemKeys = {};
 
-  bool _isSearching = false;
-  bool _isSearchFocused = false;
-  bool _isClosingSearch = false;
   bool _isFiltering = false;
-  bool _showQuickMenu = false;
 
   late int _columns;
   double _lastPinchScale = 1.0;
@@ -63,6 +57,51 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
   @override
   String get routeId => 'game_list_${widget.system.name}';
+
+  @override
+  Color get searchAccentColor => widget.system.accentColor;
+
+  @override
+  String get searchHintText => 'Search ${widget.system.name}...';
+
+  @override
+  void onSearchQueryChanged(String query) {
+    final prevCount = _controller.state.filteredGroups.length;
+    _controller.filterGames(query);
+    final newCount = _controller.state.filteredGroups.length;
+
+    if (newCount == 0) {
+      _focusManager.reset(0);
+    } else if (_focusManager.selectedIndex >= newCount) {
+      _focusManager.reset(newCount - 1);
+    }
+
+    if (newCount != prevCount) {
+      _updateItemKeys();
+    }
+
+    _selectedIndexNotifier.value = _focusManager.selectedIndex;
+    setState(() {});
+  }
+
+  @override
+  void onSearchReset() {
+    _controller.resetFilter();
+    _focusManager.reset(0);
+    _selectedIndexNotifier.value = 0;
+    _updateItemKeys();
+  }
+
+  @override
+  void onSearchSelectionReset() {
+    _focusManager.reset(0);
+    _selectedIndexNotifier.value = 0;
+  }
+
+  @override
+  void onBeforeSearchOpen() {
+    if (_isFiltering) setState(() => _isFiltering = false);
+  }
 
   @override
   Map<ShortcutActivator, Intent>? get additionalShortcuts => {
@@ -82,19 +121,29 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       };
 
   @override
-  Map<Type, Action<Intent>> get screenActions => {
-        NavigateIntent: _GridNavigateAction(this),
-        AdjustColumnsIntent: _AdjustColumnsAction(this),
+  Map<Type, Action<Intent>> get screenActions {
+    return {
+        NavigateIntent: OverlayGuardedAction<NavigateIntent>(ref,
+          onInvoke: (intent) { _navigateGrid(intent.direction); return null; },
+          isEnabledOverride: searchOrNone,
+        ),
+        AdjustColumnsIntent: OverlayGuardedAction<AdjustColumnsIntent>(ref,
+          onInvoke: (intent) { _adjustColumns(intent.increase); return null; },
+          isEnabledOverride: searchOrNone,
+        ),
         ConfirmIntent: CallbackAction<ConfirmIntent>(
           onInvoke: (_) {
             _openSelectedGame();
             return null;
           },
         ),
-        BackIntent: _BackAction(this),
+        BackIntent: OverlayGuardedAction<BackIntent>(ref,
+          onInvoke: (_) { _handleBack(); return null; },
+          isEnabledOverride: searchOrNone,
+        ),
         SearchIntent: CallbackAction<SearchIntent>(
           onInvoke: (_) {
-            if (!_isFiltering) _openSearch();
+            if (!_isFiltering) toggleSearch();
             return null;
           },
         ),
@@ -104,8 +153,9 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
             return null;
           },
         ),
-        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _toggleQuickMenu),
+        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: toggleQuickMenu),
       };
+  }
 
   @override
   void initState() {
@@ -118,10 +168,13 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final systemConfig =
         ConfigBootstrap.configForSystem(appConfig, widget.system);
 
+    final installedData = ref.read(installedFilesProvider).valueOrNull;
+
     _controller = GameListController(
       system: widget.system,
       targetFolder: widget.targetFolder,
       systemConfig: systemConfig ?? SystemConfig(id: widget.system.id, name: widget.system.name, targetFolder: widget.targetFolder, providers: []),
+      installedFilenames: installedData?.bySystem[widget.system.id],
       storage: ref.read(storageServiceProvider),
     )..addListener(_onControllerChanged);
 
@@ -130,15 +183,22 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       getCrossAxisCount: () => _columns,
       getItemCount: () => _controller.state.filteredGroups.length,
       getGridRatio: () => 1.0,
-      onSelectionChanged: (_) => setState(() {}),
-      onBackgroundUpdate: _updateBackground,
+      onSelectionChanged: (index) => _selectedIndexNotifier.value = index,
+      scrollSuppression: _scrollSuppression,
     );
 
-    _searchFocusNode.addListener(_onSearchFocusChange);
+    initSearch();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(mainFocusRequestProvider.notifier).state = screenFocusNode;
       _restoreSavedIndex();
+      ref.listenManual(installedFilesProvider, (prev, next) {
+        final data = next.valueOrNull;
+        if (data != null) {
+          _controller.applyInstalledFilenames(
+            data.bySystem[widget.system.id] ?? {},
+          );
+        }
+      });
     });
   }
 
@@ -146,28 +206,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final saved = getSavedFocusState();
     if (saved?.selectedIndex != null && saved!.selectedIndex! > 0) {
       _focusManager.setSelectedIndex(saved.selectedIndex!);
-      _updateBackground();
-      setState(() {});
-    }
-  }
-
-  void _onSearchFocusChange() {
-    if (!mounted) return;
-
-    final hasFocus = _searchFocusNode.hasFocus;
-    setState(() {
-      _isSearchFocused = hasFocus;
-    });
-
-    // If search lost focus but is still active, redirect focus to screenFocusNode
-    if (!hasFocus && _isSearching && !_isClosingSearch) {
-      if (!screenFocusNode.hasFocus) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _isSearching && !_isClosingSearch && !_searchFocusNode.hasFocus) {
-            requestScreenFocus();
-          }
-        });
-      }
+      _selectedIndexNotifier.value = saved.selectedIndex!;
     }
   }
 
@@ -184,9 +223,9 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     _controller.dispose();
     _focusManager.dispose();
     _scrollController.dispose();
-    _backgroundNotifier.dispose();
-    _searchController.dispose();
-    _searchFocusNode.dispose();
+    _selectedIndexNotifier.dispose();
+    _scrollSuppression.dispose();
+    disposeSearch();
     super.dispose();
   }
 
@@ -197,70 +236,13 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   }
 
   void _updateItemKeys() {
-    _itemKeys.clear();
     final count = _controller.state.filteredGroups.length;
+    if (_itemKeys.length == count) return;
+    _itemKeys.clear();
     for (int i = 0; i < count; i++) {
       _itemKeys[i] = GlobalKey();
     }
     _focusManager.ensureFocusNodes(count);
-  }
-
-  void _updateBackground() {
-    final state = _controller.state;
-    final selectedIndex = _focusManager.selectedIndex;
-    if (selectedIndex >= 0 && selectedIndex < state.filteredGroups.length) {
-      final displayName = state.filteredGroups[selectedIndex];
-      final variants = state.filteredGroupedGames[displayName];
-      if (variants == null || variants.isEmpty) return;
-      final coverUrls = ImageHelper.getCoverUrls(
-        widget.system,
-        variants.map((v) => v.filename).toList(),
-      );
-      final imageUrl = variants.first.cachedCoverUrl ??
-          (coverUrls.isNotEmpty ? coverUrls.first : null);
-      if (imageUrl != null && imageUrl != _backgroundNotifier.value) {
-        _backgroundNotifier.value = imageUrl;
-      }
-    }
-  }
-
-  void _openSearch() {
-    ref.read(feedbackServiceProvider).tick();
-    if (_isFiltering) setState(() => _isFiltering = false);
-    _searchController.clear();
-    _controller.resetFilter();
-    _focusManager.reset(0);
-    _isClosingSearch = false;
-    setState(() => _isSearching = true);
-    _updateItemKeys();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _isSearching) {
-        _searchFocusNode.requestFocus();
-      }
-    });
-  }
-
-  void _closeSearch() {
-    _isClosingSearch = true;
-    FocusManager.instance.primaryFocus?.unfocus();
-    FocusScope.of(context).unfocus();
-
-    _searchController.clear();
-    _controller.resetFilter();
-    _focusManager.reset(0);
-
-    setState(() {
-      _isSearching = false;
-      _isSearchFocused = false;
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        requestScreenFocus();
-      }
-      _isClosingSearch = false;
-    });
   }
 
   void _toggleFilter() {
@@ -268,7 +250,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     if (_isFiltering) {
       _closeFilter();
     } else {
-      if (_isSearching) _closeSearch();
+      if (isSearchActive) closeSearch();
       _openFilter();
     }
   }
@@ -292,95 +274,48 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     } else if (_focusManager.selectedIndex >= count) {
       _focusManager.reset(count - 1);
     }
+    _selectedIndexNotifier.value = _focusManager.selectedIndex;
     _updateItemKeys();
   }
 
-  void _onSearchChanged(String query) {
-    final prevCount = _controller.state.filteredGroups.length;
-    _controller.filterGames(query);
-    final newCount = _controller.state.filteredGroups.length;
-
-    if (newCount == 0) {
-      _focusManager.reset(0);
-    } else if (_focusManager.selectedIndex >= newCount) {
-      _focusManager.reset(newCount - 1);
-    }
-
-    if (newCount != prevCount) {
-      _updateItemKeys();
-    }
-
-    setState(() {});
-  }
-
-  void _onSearchSubmitted() {
-    _searchFocusNode.unfocus();
-    setState(() {
-      _isSearchFocused = false;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _controller.state.filteredGroups.isNotEmpty) {
-        requestScreenFocus();
-      }
-    });
-  }
-
-  void _unfocusSearch() {
-    _searchFocusNode.unfocus();
-    setState(() {
-      _isSearchFocused = false;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        requestScreenFocus();
-      }
-    });
-  }
-
   void _adjustColumns(bool increase) {
-    if (increase) {
-      _moreColumns();
-    } else {
-      _lessColumns();
-    }
+    final next = adjustColumnCount(
+      current: _columns,
+      increase: increase,
+      providerKey: widget.system.name,
+      ref: ref,
+    );
+    if (next == _columns) return;
+    setState(() => _columns = next);
+    _scrollToSelectedAfterColumnChange();
   }
 
-  void _lessColumns() {
-    if (_columns <= 3) return;
-    setState(() {
-      _columns--;
-      ref
-          .read(gridColumnsProvider(widget.system.name).notifier)
-          .setColumns(_columns);
-    });
+  void _scrollToSelectedAfterColumnChange() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusManager.scrollToSelected(_itemKeys[_focusManager.selectedIndex]);
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollToSelected();
     });
   }
 
-  void _moreColumns() {
-    if (_columns >= 8) return;
-    setState(() {
-      _columns++;
-      ref
-          .read(gridColumnsProvider(widget.system.name).notifier)
-          .setColumns(_columns);
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusManager.scrollToSelected(_itemKeys[_focusManager.selectedIndex]);
-    });
+  void _scrollToSelected({bool instant = false}) {
+    _focusManager.scrollToSelectedWithFallback(
+      itemKey: _itemKeys[_focusManager.selectedIndex],
+      crossAxisCount: _columns,
+      instant: instant,
+      isMounted: () => mounted,
+      retryCallback: () => _scrollToSelected(instant: true),
+    );
   }
 
   void _navigateGrid(GridDirection direction) {
     if (_debouncer.startHold(() {
       if (_focusManager.moveFocus(direction)) {
-        setState(() {});
+        // moveFocus updates _selectedIndexNotifier via onSelectionChanged.
+        // No setState needed — only 2 affected Cards rebuild.
         _focusManager.scrollToSelected(
           _itemKeys[_focusManager.selectedIndex],
           instant: _debouncer.isHolding,
         );
-      } else if (direction == GridDirection.up && _isSearching) {
-        _searchFocusNode.requestFocus();
       }
     })) {
       ref.read(feedbackServiceProvider).tick();
@@ -391,25 +326,11 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     ref.read(feedbackServiceProvider).cancel();
     if (_isFiltering) {
       _closeFilter();
-    } else if (_isSearching && !_searchFocusNode.hasFocus) {
-      _closeSearch();
+    } else if (isSearchActive) {
+      handleSearchBack();
     } else {
       Navigator.pop(context);
     }
-  }
-
-  void _toggleQuickMenu() {
-    if (_showQuickMenu) return;
-    if (ref.read(overlayPriorityProvider) != OverlayPriority.none) return;
-    ref.read(feedbackServiceProvider).tick();
-    setState(() => _showQuickMenu = true);
-  }
-
-  void _closeQuickMenu() {
-    setState(() => _showQuickMenu = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) requestScreenFocus();
-    });
   }
 
   List<QuickMenuItem> _buildQuickMenuItems() {
@@ -420,7 +341,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         label: 'Search',
         icon: Icons.search_rounded,
         shortcutHint: 'Y',
-        onSelect: _openSearch,
+        onSelect: openSearch,
       ),
       QuickMenuItem(
         label: state.activeFilters.isNotEmpty ? 'Filter (active)' : 'Filter',
@@ -463,7 +384,8 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
   Future<void> _openGameDetail(
       String displayName, List<GameItem> variants) async {
-    _searchFocusNode.unfocus();
+    searchFieldNode.unfocus();
+    suspendSearchOverlay();
     ref.read(feedbackServiceProvider).confirm();
     final isLocalOnly = _controller.state.isLocalOnly;
     await Navigator.push(
@@ -478,32 +400,25 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         ),
       ),
     );
+    if (mounted) resumeSearchOverlay();
     if (isLocalOnly) {
       await _controller.loadGames();
     } else {
       await _controller.updateInstalledStatus(displayName);
     }
-    if (_isSearching && mounted) {
+    if (isSearchActive && mounted) {
       requestScreenFocus();
     }
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    // When search field is focused, stop key events from reaching
-    // the Shortcuts widget above, but let them through to text input.
-    if (_isSearching && _searchFocusNode.hasFocus) {
-      return KeyEventResult.skipRemainingHandlers;
-    }
+    final searchResult = handleSearchKeyEvent(event);
+    if (searchResult != null) return searchResult;
 
-    final isDown = event is KeyDownEvent;
-    final isUp = event is KeyUpEvent;
-
-    if (isUp) {
+    if (event is KeyUpEvent) {
       _debouncer.stopHold();
       return KeyEventResult.ignored;
     }
-
-    if (!isDown) return KeyEventResult.ignored;
 
     return KeyEventResult.ignored;
   }
@@ -517,7 +432,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final localOnlyExtraPadding = state.isLocalOnly ? (rs.isSmall ? 24.0 : 28.0) : 0.0;
     final searchExtraPadding = rs.isSmall ? 16.0 : 20.0;
     final topPadding =
-        baseTopPadding + folderExtraPadding + localOnlyExtraPadding + (_isSearching ? searchExtraPadding : 0.0);
+        baseTopPadding + folderExtraPadding + localOnlyExtraPadding + (isSearchActive ? searchExtraPadding : 0.0);
 
     _focusManager.validateState(_columns);
 
@@ -547,22 +462,17 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
               if (pinchDelta.abs() > 0.15) {
                 _lastPinchScale = details.scale;
                 if (pinchDelta > 0) {
-                  _lessColumns();
+                  _adjustColumns(false);
                 } else {
-                  _moreColumns();
+                  _adjustColumns(true);
                 }
               }
             }
           },
           child: Stack(
             children: [
-              DynamicBackground(
-                backgroundNotifier: _backgroundNotifier,
-                accentColor: widget.system.accentColor,
-              ),
-              TintedOverlay(accentColor: widget.system.accentColor),
               _buildNormalContent(state, topPadding),
-              if (_isSearching) _buildSearchContent(state),
+              if (isSearchActive) _buildSearchContent(state),
               if (_isFiltering) _buildFilterContent(state),
               if (_isFiltering)
                 ConsoleHud(
@@ -574,26 +484,20 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
                     setState(() {});
                   }),
                 )
-              else if (_isSearching)
-                ConsoleHud(
-                  dpad: !_isSearchFocused ? (label: '\u2191', action: 'Search') : null,
-                  a: HudAction('Select', onTap: _openSelectedGame),
-                  b: HudAction(
-                    _isSearchFocused ? 'Keyboard' : 'Close',
-                    highlight: _isSearchFocused,
-                    onTap: () => Navigator.pop(context),
-                  ),
+              else if (isSearchActive)
+                buildSearchHud(
+                  aAction: HudAction('Select', onTap: _openSelectedGame),
                 )
-              else if (!_showQuickMenu)
+              else if (!showQuickMenu)
                 ConsoleHud(
                   a: HudAction('Select', onTap: _openSelectedGame),
                   b: HudAction('Back', onTap: () => Navigator.pop(context)),
-                  start: HudAction('Menu', onTap: _toggleQuickMenu),
+                  start: HudAction('Menu', onTap: toggleQuickMenu),
                 ),
-              if (_showQuickMenu)
+              if (showQuickMenu)
                 QuickMenuOverlay(
                   items: _buildQuickMenuItems(),
-                  onClose: _closeQuickMenu,
+                  onClose: closeQuickMenu,
                 ),
             ],
           ),
@@ -635,7 +539,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     }
     final favorites = ref.watch(favoriteGamesProvider).toSet();
     return GameGrid(
-      key: ValueKey('grid_$_columns'),
+      key: const ValueKey('game_grid'),
       system: widget.system,
       filteredGroups: state.filteredGroups,
       groupedGames: state.filteredGroupedGames,
@@ -643,20 +547,27 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       favorites: favorites,
       itemKeys: _itemKeys,
       focusNodes: _focusManager.focusNodes,
-      selectedIndex: _focusManager.selectedIndex,
+      selectedIndexNotifier: _selectedIndexNotifier,
       crossAxisCount: _columns,
       scrollController: _scrollController,
-      onScrollNotification: (n) =>
-          _focusManager.handleScrollNotification(n, context),
+      onScrollNotification: (n) {
+        _focusManager.updateScrollVelocity(n);
+        return _focusManager.handleScrollNotification(n, context);
+      },
+      scrollSuppression: _scrollSuppression,
       onOpenGame: _openGameDetail,
       onSelectionChanged: (index) {
         _focusManager.setSelectedIndex(index);
-        setState(() {});
-        _updateBackground();
+        _selectedIndexNotifier.value = index;
       },
       onCoverFound: (url, variants) async {
-        for (final v in variants) {
-          await _controller.updateCoverUrl(v.filename, url);
+        await _controller.updateCoverUrls(variants, url);
+      },
+      onThumbnailNeeded: (url, variants) async {
+        if (variants.first.hasThumbnail) return;
+        final result = await ThumbnailService.generateThumbnail(url);
+        if (result.success) {
+          await _controller.updateThumbnailData(variants);
         }
       },
       searchQuery: state.searchQuery,
@@ -667,23 +578,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   }
 
   Widget _buildSearchContent(GameListState state) {
-    return SearchFocusScope(
-      isVisible: _isSearching,
-      textFieldFocusNode: _searchFocusNode,
-      onClose: _closeSearch,
-      child: SearchOverlay(
-        system: widget.system,
-        searchController: _searchController,
-        searchFocusNode: _searchFocusNode,
-        isSearching: _isSearching,
-        isSearchFocused: _isSearchFocused,
-        searchQuery: state.searchQuery,
-        onSearchChanged: _onSearchChanged,
-        onClose: _closeSearch,
-        onUnfocus: _unfocusSearch,
-        onSubmitted: _onSearchSubmitted,
-      ),
-    );
+    return buildSearchWidget(searchQuery: state.searchQuery);
   }
 
   Widget _buildFilterContent(GameListState state) {
@@ -730,38 +625,3 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   }
 }
 
-class _GridNavigateAction extends Action<NavigateIntent> {
-  final _GameListScreenState screen;
-
-  _GridNavigateAction(this.screen);
-
-  @override
-  Object? invoke(NavigateIntent intent) {
-    screen._navigateGrid(intent.direction);
-    return null;
-  }
-}
-
-class _AdjustColumnsAction extends Action<AdjustColumnsIntent> {
-  final _GameListScreenState screen;
-
-  _AdjustColumnsAction(this.screen);
-
-  @override
-  Object? invoke(AdjustColumnsIntent intent) {
-    screen._adjustColumns(intent.increase);
-    return null;
-  }
-}
-
-class _BackAction extends Action<BackIntent> {
-  final _GameListScreenState screen;
-
-  _BackAction(this.screen);
-
-  @override
-  Object? invoke(BackIntent intent) {
-    screen._handleBack();
-    return null;
-  }
-}

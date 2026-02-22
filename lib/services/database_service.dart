@@ -10,7 +10,7 @@ import '../models/game_item.dart';
 class DatabaseService {
   static Future<Database>? _initFuture;
   static const String _tableName = 'games';
-  static const int _dbVersion = 3;
+  static const int _dbVersion = 4;
 
   Future<Database> get database => _initFuture ??= _initDatabase();
 
@@ -36,7 +36,9 @@ class DatabaseService {
         url TEXT NOT NULL,
         region TEXT,
         cover_url TEXT,
-        provider_config TEXT
+        provider_config TEXT,
+        thumb_hash TEXT,
+        has_thumbnail INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -63,11 +65,29 @@ class DatabaseService {
       await db.execute(
           'ALTER TABLE $_tableName ADD COLUMN provider_config TEXT');
     }
+    if (oldVersion < 4) {
+      await db.execute(
+          'ALTER TABLE $_tableName ADD COLUMN thumb_hash TEXT');
+      await db.execute(
+          'ALTER TABLE $_tableName ADD COLUMN has_thumbnail INTEGER NOT NULL DEFAULT 0');
+    }
   }
 
   Future<void> saveGames(String systemSlug, List<GameItem> games) async {
     final db = await database;
     await db.transaction((txn) async {
+      // Preserve existing thumbnail data before delete
+      final existing = await txn.query(
+        _tableName,
+        columns: ['filename', 'has_thumbnail'],
+        where: 'systemSlug = ?',
+        whereArgs: [systemSlug],
+      );
+      final thumbData = <String, Map<String, dynamic>>{};
+      for (final row in existing) {
+        thumbData[row['filename'] as String] = row;
+      }
+
       await txn.delete(
         _tableName,
         where: 'systemSlug = ?',
@@ -76,6 +96,7 @@ class DatabaseService {
 
       final batch = txn.batch();
       for (final game in games) {
+        final prev = thumbData[game.filename];
         batch.insert(_tableName, {
           'systemSlug': systemSlug,
           'filename': game.filename,
@@ -86,6 +107,8 @@ class DatabaseService {
           'provider_config': game.providerConfig != null
               ? jsonEncode(game.providerConfig!.toJson())
               : null,
+          'has_thumbnail':
+              game.hasThumbnail ? 1 : (prev?['has_thumbnail'] ?? 0),
         });
       }
       await batch.commit(noResult: true);
@@ -99,6 +122,82 @@ class DatabaseService {
       {'cover_url': coverUrl},
       where: 'filename = ?',
       whereArgs: [filename],
+    );
+  }
+
+  Future<void> updateGameThumbnailData(
+    String filename, {
+    bool? hasThumbnail,
+  }) async {
+    if (hasThumbnail == null) return;
+    final db = await database;
+    await db.update(
+      _tableName,
+      {'has_thumbnail': hasThumbnail ? 1 : 0},
+      where: 'filename = ?',
+      whereArgs: [filename],
+    );
+  }
+
+  Future<void> batchUpdateThumbnailData(
+    List<String> filenames, {
+    bool? hasThumbnail,
+  }) async {
+    if (hasThumbnail == null || filenames.isEmpty) return;
+    final db = await database;
+    final values = {'has_thumbnail': hasThumbnail ? 1 : 0};
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (final filename in filenames) {
+        batch.update(
+          _tableName,
+          values,
+          where: 'filename = ?',
+          whereArgs: [filename],
+        );
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
+  Future<void> batchUpdateCoverUrl(
+      List<String> filenames, String coverUrl) async {
+    if (filenames.isEmpty) return;
+    final db = await database;
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (final filename in filenames) {
+        batch.update(
+          _tableName,
+          {'cover_url': coverUrl},
+          where: 'filename = ?',
+          whereArgs: [filename],
+        );
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
+  Future<void> clearThumbnailData() async {
+    final db = await database;
+    await db.update(_tableName, {'thumb_hash': null, 'has_thumbnail': 0});
+  }
+
+  Future<List<Map<String, dynamic>>> getGamesNeedingThumbnails() async {
+    final db = await database;
+    return db.query(
+      _tableName,
+      columns: ['filename', 'cover_url'],
+      where: 'cover_url IS NOT NULL AND has_thumbnail = 0',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getGamesNeedingCovers() async {
+    final db = await database;
+    return db.query(
+      _tableName,
+      columns: ['filename', 'systemSlug', 'cover_url'],
+      where: 'has_thumbnail = 0',
     );
   }
 
@@ -119,6 +218,7 @@ class DatabaseService {
               cachedCoverUrl: map['cover_url'] as String?,
               providerConfig: _decodeProviderConfig(
                   map['provider_config'] as String?),
+              hasThumbnail: (map['has_thumbnail'] as int?) == 1,
             ))
         .toList();
   }

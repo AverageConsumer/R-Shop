@@ -106,6 +106,13 @@ class WebProvider implements SourceProvider {
         continue;
       }
 
+      // Skip absolute URLs and path traversal attempts
+      if (href.startsWith('http://') ||
+          href.startsWith('https://') ||
+          href.contains('../')) {
+        continue;
+      }
+
       final hrefLower = href.toLowerCase();
       if (SystemModel.isGameFile(hrefLower)) {
         final decodedFilename = Uri.decodeFull(href);

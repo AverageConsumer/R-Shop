@@ -62,10 +62,12 @@ class _OverlayFocusScopeState extends ConsumerState<OverlayFocusScope> {
       _hasClaimed = false;
       final controller = _priorityController;
       final priority = widget.priority;
-      Future(() {
-        if (controller.state == priority) {
-          controller.state = OverlayPriority.none;
-        }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          if (controller.state == priority) {
+            controller.state = OverlayPriority.none;
+          }
+        } catch (_) {}
       });
     }
     _scopeNode.dispose();
@@ -161,10 +163,12 @@ class _DialogFocusScopeState extends ConsumerState<DialogFocusScope> {
     if (_hasClaimed) {
       _hasClaimed = false;
       final controller = _priorityController;
-      Future(() {
-        if (controller.state == OverlayPriority.dialog) {
-          controller.state = OverlayPriority.none;
-        }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          if (controller.state == OverlayPriority.dialog) {
+            controller.state = OverlayPriority.none;
+          }
+        } catch (_) {}
       });
     }
     _scopeNode.dispose();
@@ -266,10 +270,12 @@ class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
     if (_hasClaimed) {
       _hasClaimed = false;
       final controller = _priorityController;
-      Future(() {
-        if (controller.state == OverlayPriority.search) {
-          controller.state = OverlayPriority.none;
-        }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        try {
+          if (controller.state == OverlayPriority.search) {
+            controller.state = OverlayPriority.none;
+          }
+        } catch (_) {}
       });
     }
     _scopeNode.dispose();

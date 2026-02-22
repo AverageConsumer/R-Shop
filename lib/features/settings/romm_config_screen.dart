@@ -98,7 +98,6 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(mainFocusRequestProvider.notifier).state = screenFocusNode;
       _urlConsoleFocus.requestFocus();
     });
   }
@@ -307,6 +306,18 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
       final auth = _buildAuth();
       if (auth != null) {
         await storage.setRommAuth(jsonEncode(auth.toJson()));
+
+        // Warn when sending credentials over plain HTTP
+        if (mounted &&
+            url.startsWith('http://') &&
+            !url.startsWith('http://localhost') &&
+            !url.startsWith('http://127.0.0.1')) {
+          showConsoleNotification(
+            context,
+            message: 'Warning: credentials sent unencrypted over HTTP',
+            isError: true,
+          );
+        }
       } else {
         await storage.setRommAuth(null);
       }

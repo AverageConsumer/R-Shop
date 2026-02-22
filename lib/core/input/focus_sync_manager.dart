@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
-import '../../../../core/input/input.dart';
+import 'input.dart';
 
 class FocusSyncManager {
   final ScrollController scrollController;
@@ -9,7 +9,7 @@ class FocusSyncManager {
   final int Function() getItemCount;
   final double Function() getGridRatio;
   final void Function(int newIndex) onSelectionChanged;
-  final void Function() onBackgroundUpdate;
+  final ValueNotifier<bool>? scrollSuppression;
 
   bool _isProgrammaticScroll = false;
   double _lastScrollOffset = 0;
@@ -21,9 +21,14 @@ class FocusSyncManager {
   bool _isScrolling = false;
   bool _isHardwareInput = false;
   Timer? _hardwareInputTimer;
+  Timer? _velocityResetTimer;
 
   int get selectedIndex => _selectedIndex;
   bool get isProgrammaticScroll => _isProgrammaticScroll;
+  set isProgrammaticScroll(bool value) {
+    _isProgrammaticScroll = value;
+    if (value) _isScrolling = true;
+  }
   bool get isScrolling => _isScrolling;
   bool get isHardwareInput => _isHardwareInput;
   Map<int, FocusNode> get focusNodes => _focusNodes;
@@ -34,7 +39,7 @@ class FocusSyncManager {
     required this.getItemCount,
     required this.getGridRatio,
     required this.onSelectionChanged,
-    required this.onBackgroundUpdate,
+    this.scrollSuppression,
   });
 
   void ensureFocusNodes(int count) {
@@ -70,7 +75,6 @@ class FocusSyncManager {
     if (wasClamped) {
       _targetColumn = null;
       onSelectionChanged(_selectedIndex);
-      onBackgroundUpdate();
     }
   }
 
@@ -130,28 +134,44 @@ class FocusSyncManager {
       _selectedIndex = targetIndex;
       _targetColumn = null;
       onSelectionChanged(targetIndex);
-      onBackgroundUpdate();
     }
+  }
+
+  void scrollToSelectedWithFallback({
+    required GlobalKey? itemKey,
+    required int crossAxisCount,
+    bool instant = false,
+    required bool Function() isMounted,
+    required VoidCallback retryCallback,
+  }) {
+    if (itemKey?.currentContext != null) {
+      scrollToSelected(itemKey, instant: instant);
+      return;
+    }
+    final totalItems = getItemCount();
+    if (totalItems == 0) return;
+    final row = _selectedIndex ~/ crossAxisCount;
+    final totalRows = (totalItems + crossAxisCount - 1) ~/ crossAxisCount;
+    if (totalRows <= 1) return;
+    final maxExtent = scrollController.position.maxScrollExtent;
+    final estimatedOffset =
+        (maxExtent * row / (totalRows - 1)).clamp(0.0, maxExtent);
+    _isProgrammaticScroll = true;
+    scrollController.jumpTo(estimatedOffset);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (isMounted()) retryCallback();
+    });
   }
 
   void scrollToSelected(GlobalKey? itemKey, {bool instant = false}) {
     if (itemKey?.currentContext == null) return;
-
-    if (instant) {
-      Scrollable.ensureVisible(
-        itemKey!.currentContext!,
-        alignment: 0.5,
-        duration: Duration.zero,
-      );
-      return;
-    }
 
     _isProgrammaticScroll = true;
     _isScrolling = true;
     Scrollable.ensureVisible(
       itemKey!.currentContext!,
       alignment: 0.5,
-      duration: const Duration(milliseconds: 200),
+      duration: instant ? Duration.zero : const Duration(milliseconds: 200),
       curve: Curves.easeOut,
     ).then((_) {
       Future.delayed(const Duration(milliseconds: 100), () {
@@ -264,7 +284,6 @@ class FocusSyncManager {
     _selectedIndex = targetIndex;
     _enforceFocus(targetIndex);
     onSelectionChanged(_selectedIndex);
-    onBackgroundUpdate();
     return true;
   }
 
@@ -275,6 +294,25 @@ class FocusSyncManager {
   bool moveUp() => moveFocus(GridDirection.up);
 
   bool moveDown() => moveFocus(GridDirection.down);
+
+  void updateScrollVelocity(ScrollNotification notification) {
+    if (scrollSuppression == null) return;
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta?.abs() ?? 0;
+      if (delta > 20) {
+        if (!scrollSuppression!.value) scrollSuppression!.value = true;
+        _velocityResetTimer?.cancel();
+        _velocityResetTimer = Timer(const Duration(milliseconds: 150), () {
+          scrollSuppression!.value = false;
+        });
+      }
+    } else if (notification is ScrollEndNotification) {
+      _velocityResetTimer?.cancel();
+      _velocityResetTimer = Timer(const Duration(milliseconds: 100), () {
+        scrollSuppression!.value = false;
+      });
+    }
+  }
 
   void reset(int newIndex) {
     _selectedIndex = newIndex;
@@ -288,6 +326,7 @@ class FocusSyncManager {
 
   void dispose() {
     _hardwareInputTimer?.cancel();
+    _velocityResetTimer?.cancel();
     for (final node in _focusNodes.values) {
       node.dispose();
     }

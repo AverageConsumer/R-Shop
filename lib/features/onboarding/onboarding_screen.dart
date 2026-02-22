@@ -349,6 +349,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       final jsonString = const JsonEncoder.withIndent('  ').convert(config.toJson());
       await ConfigStorageService().saveConfig(jsonString);
       await storage.setOnboardingCompleted(true);
+      ref.invalidate(bootstrappedConfigProvider);
     } catch (e) {
       if (!mounted) return;
       showConsoleNotification(context, message: 'Failed to save: $e');

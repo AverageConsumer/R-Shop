@@ -8,8 +8,10 @@ import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
 import '../../widgets/download_overlay.dart';
 import '../../services/config_storage_service.dart';
+import '../../services/cover_preload_service.dart';
 import '../../services/database_service.dart';
 import '../../services/image_cache_service.dart';
+import '../../services/thumbnail_service.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
@@ -35,7 +37,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   late double _sfxVolume;
   late int _maxDownloads;
   bool _showResetConfirm = false;
-  bool _showQuickMenu = false;
   final FocusNode _hapticFocusNode = FocusNode();
   final FocusNode _layoutFocusNode = FocusNode();
   final FocusNode _homeLayoutFocusNode = FocusNode();
@@ -50,7 +51,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           return null;
         }),
         InfoIntent: InfoAction(ref, onInfo: _showResetDialog),
-        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _toggleQuickMenu),
+        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: toggleQuickMenu),
       };
 
   @override
@@ -65,7 +66,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     _sfxVolume = soundSettings.sfxVolume;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(mainFocusRequestProvider.notifier).state = screenFocusNode;
       _homeLayoutFocusNode.requestFocus();
     });
   }
@@ -149,7 +149,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       final storage = ref.read(storageServiceProvider);
       await storage.resetAll();
       await ConfigStorageService().deleteConfig();
-      await DatabaseService().clearCache();
+      final db = DatabaseService();
+      await db.clearThumbnailData();
+      await db.clearCache();
+      await ThumbnailService.clearAll();
       await GameCoverCacheManager.instance.emptyCache();
       FailedUrlsCache.instance.clear();
       _hideResetDialog();
@@ -164,20 +167,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   void _exitSettings() {
     Navigator.pop(context);
-  }
-
-  void _toggleQuickMenu() {
-    if (_showQuickMenu) return;
-    if (ref.read(overlayPriorityProvider) != OverlayPriority.none) return;
-    ref.read(feedbackServiceProvider).tick();
-    setState(() => _showQuickMenu = true);
-  }
-
-  void _closeQuickMenu() {
-    setState(() => _showQuickMenu = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) requestScreenFocus();
-    });
   }
 
   List<QuickMenuItem> _buildQuickMenuItems() {
@@ -211,6 +200,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       context,
       MaterialPageRoute(builder: (context) => const LibraryScanScreen()),
     );
+  }
+
+  void _startCoverPreload() {
+    final preloadState = ref.read(coverPreloadServiceProvider);
+    if (preloadState.isRunning) {
+      ref.read(coverPreloadServiceProvider.notifier).cancel();
+      return;
+    }
+
+    showConsoleNotification(context, message: 'Fetching covers...', isError: false);
+
+    // One-shot listener for completion
+    ProviderSubscription<CoverPreloadState>? sub;
+    sub = ref.listenManual(coverPreloadServiceProvider, (prev, next) {
+      if (prev != null && prev.isRunning && !next.isRunning) {
+        sub?.close();
+        if (!mounted) return;
+        if (next.failed > 0) {
+          showConsoleNotification(
+            context,
+            message: 'Covers: ${next.succeeded} ok, ${next.failed} failed',
+            isError: true,
+          );
+        } else {
+          showConsoleNotification(
+            context,
+            message: '${next.succeeded} covers loaded!',
+            isError: false,
+          );
+        }
+      }
+    });
+
+    ref
+        .read(coverPreloadServiceProvider.notifier)
+        .preloadAll(DatabaseService());
   }
 
   void _cycleLayout() {
@@ -493,25 +518,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             trailing: const Icon(Icons.radar_rounded, color: Colors.white70),
                             onTap: _openLibraryScan,
                           ),
+                          SizedBox(height: rs.spacing.md),
+                          _buildCoverPreloadTile(),
                         ],
                       ),
                     ),
                   ),
                 ),
               ),
-              if (!_showQuickMenu)
+              if (!showQuickMenu)
                 ConsoleHud(
                   b: HudAction('Back', onTap: _exitSettings),
-                  start: HudAction('Menu', onTap: _toggleQuickMenu),
+                  start: HudAction('Menu', onTap: toggleQuickMenu),
                   embedded: true,
                 ),
             ],
           ),
 
-          if (_showQuickMenu)
+          if (showQuickMenu)
             QuickMenuOverlay(
               items: _buildQuickMenuItems(),
-              onClose: _closeQuickMenu,
+              onClose: closeQuickMenu,
             ),
 
           if (_showResetConfirm)
@@ -529,6 +556,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       ),
     ),
     ),
+    );
+  }
+
+  Widget _buildCoverPreloadTile() {
+    final preload = ref.watch(coverPreloadServiceProvider);
+    if (preload.isRunning) {
+      final pct = (preload.progress * 100).round();
+      return SettingsItem(
+        title: 'Fetching Covers...',
+        subtitle: '${preload.completed} / ${preload.total} games',
+        trailingBuilder: (isFocused) => SizedBox(
+          width: 48,
+          height: 48,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              CircularProgressIndicator(
+                value: preload.progress,
+                strokeWidth: 3,
+                color: AppTheme.primaryColor,
+                backgroundColor: Colors.white12,
+              ),
+              Text(
+                '$pct%',
+                style: TextStyle(
+                  color: isFocused ? Colors.white : Colors.white70,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        onTap: _startCoverPreload,
+      );
+    }
+    return SettingsItem(
+      title: 'Fetch All Covers',
+      subtitle: 'Download cover art for all games',
+      trailing: const Icon(Icons.image_outlined, color: Colors.white70),
+      onTap: _startCoverPreload,
     );
   }
 

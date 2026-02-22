@@ -8,6 +8,25 @@ import '../../providers/app_providers.dart';
 bool _noOverlayActive(WidgetRef ref) =>
     ref.read(overlayPriorityProvider) == OverlayPriority.none;
 
+/// Generic guarded action that checks overlay priority before invoking.
+/// Use [isEnabledOverride] for screens that need custom guard logic (e.g.
+/// allowing actions when a dialog is open).
+class OverlayGuardedAction<T extends Intent> extends Action<T> {
+  final WidgetRef ref;
+  final Object? Function(T intent) onInvoke;
+  final bool Function(T intent)? isEnabledOverride;
+
+  OverlayGuardedAction(this.ref, {required this.onInvoke, this.isEnabledOverride});
+
+  @override
+  bool isEnabled(T intent) =>
+      isEnabledOverride?.call(intent) ??
+      ref.read(overlayPriorityProvider) == OverlayPriority.none;
+
+  @override
+  Object? invoke(T intent) => onInvoke(intent);
+}
+
 class BackAction extends Action<BackIntent> {
   final BuildContext context;
   final WidgetRef ref;

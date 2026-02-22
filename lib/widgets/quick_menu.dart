@@ -163,6 +163,33 @@ class _QuickMenuOverlayState extends ConsumerState<QuickMenuOverlay>
     };
   }
 
+  /// Returns a tint color for the hint badge based on controller layout.
+  /// The original hint (before swap) is the Nintendo label.
+  Color? _hintColor(String? originalHint) {
+    if (originalHint == null) return null;
+    final layout = ref.watch(controllerLayoutProvider);
+
+    if (layout == ControllerLayout.xbox) {
+      return switch (originalHint) {
+        'A' => const Color(0xFF6DC849),  // green
+        'B' => const Color(0xFFE24C3A),  // red
+        'X' => const Color(0xFF4C87CB),  // blue
+        'Y' => const Color(0xFFF3B735),  // yellow
+        _ => null,
+      };
+    }
+    if (layout == ControllerLayout.playstation) {
+      return switch (originalHint) {
+        'A' => const Color(0xFF6E9FD6),  // ✕ blue
+        'B' => const Color(0xFFE8707A),  // ○ pink
+        'X' => const Color(0xFFA88BC7),  // □ purple
+        'Y' => const Color(0xFF7BC8A4),  // △ green
+        _ => null,
+      };
+    }
+    return null; // Nintendo: no special colors
+  }
+
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
@@ -255,10 +282,78 @@ class _QuickMenuOverlayState extends ConsumerState<QuickMenuOverlay>
     return widgets;
   }
 
+  Widget _buildHintBadge(String hint, Color? tint, bool isFocused, Responsive rs) {
+    // Face buttons get circles, everything else gets pill shape
+    const faceButtons = {'A', 'B', 'X', 'Y', '✕', '○', '△', '□'};
+    final isCircle = faceButtons.contains(hint);
+    final size = rs.isSmall ? 20.0 : 22.0;
+    final fontSize = rs.isSmall ? 10.0 : 11.0;
+
+    final bgColor = tint != null
+        ? tint.withValues(alpha: isFocused ? 0.25 : 0.12)
+        : Colors.white.withValues(alpha: isFocused ? 0.12 : 0.06);
+    final borderColor = tint != null
+        ? tint.withValues(alpha: isFocused ? 0.5 : 0.25)
+        : Colors.white.withValues(alpha: isFocused ? 0.2 : 0.08);
+    final textColor = tint != null
+        ? tint.withValues(alpha: isFocused ? 0.9 : 0.6)
+        : Colors.white.withValues(alpha: isFocused ? 0.7 : 0.4);
+
+    if (isCircle) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: bgColor,
+          border: Border.all(color: borderColor),
+          boxShadow: tint != null
+              ? [BoxShadow(color: tint.withValues(alpha: 0.15), blurRadius: 4)]
+              : null,
+        ),
+        child: Center(
+          child: Text(
+            hint,
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+              height: 1.0,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Pill shape for multi-char hints (LB, ZL, L1, etc.)
+    return Container(
+      height: size,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(size * 0.35),
+        color: bgColor,
+        border: Border.all(color: borderColor),
+      ),
+      child: Center(
+        child: Text(
+          hint,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+            letterSpacing: 0.5,
+            height: 1.0,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildItem(int index, Responsive rs) {
     final item = widget.items[index];
     final isFocused = _focusedIndex == index;
     final hint = _swapHint(item.shortcutHint);
+    final hintTint = _hintColor(item.shortcutHint);
     final accentColor = item.highlight ? Colors.greenAccent : Colors.cyanAccent;
 
     return GestureDetector(
@@ -319,28 +414,7 @@ class _QuickMenuOverlayState extends ConsumerState<QuickMenuOverlay>
               ),
               // Shortcut hint
               if (hint != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: isFocused ? 0.12 : 0.06),
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: isFocused ? 0.2 : 0.08),
-                    ),
-                  ),
-                  child: Text(
-                    hint,
-                    style: TextStyle(
-                      fontSize: rs.isSmall ? 10 : 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: isFocused ? 0.7 : 0.4),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
+                _buildHintBadge(hint, hintTint, isFocused, rs),
             ],
           ),
         ),

@@ -6,3 +6,5 @@ export 'global_input_wrapper.dart';
 export 'overlay_scope.dart';
 export 'focus_scope_observer.dart';
 export 'console_screen_mixin.dart';
+export 'searchable_screen_mixin.dart';
+export 'focus_sync_manager.dart';

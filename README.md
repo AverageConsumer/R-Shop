@@ -7,7 +7,7 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
   <img src="screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
 </p>
 
-![Version](https://img.shields.io/badge/version-0.9.6_Beta-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.9.7_Beta-blue?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/platform-Android-brightgreen?style=for-the-badge)
 ![Status](https://img.shields.io/badge/status-Public_Beta-orange?style=for-the-badge)

@@ -38,7 +38,6 @@ class _HomeViewState extends ConsumerState<HomeView>
   bool _isUserScrolling = false;
   int _lastStablePage = _initialPage;
   bool _showExitDialog = false;
-  bool _showQuickMenu = false;
   bool _wasGrid = false;
 
   final ScrollController _gridScrollController = ScrollController();
@@ -93,9 +92,20 @@ class _HomeViewState extends ConsumerState<HomeView>
         ConfirmIntent: ConfirmAction(ref, onConfirm: _navigateToCurrentSystem),
         SearchIntent: SearchAction(ref, onSearch: _openLibrarySearch),
         InfoIntent: InfoAction(ref, onInfo: _openSettings),
-        AdjustColumnsIntent: _HomeAdjustColumnsAction(this),
-        BackIntent: _HomeBackAction(this),
-        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _toggleQuickMenu),
+        AdjustColumnsIntent: CallbackAction<AdjustColumnsIntent>(
+          onInvoke: (intent) {
+            if (intent.increase) { _zoomOut(); } else { _zoomIn(); }
+            return null;
+          },
+        ),
+        BackIntent: OverlayGuardedAction<BackIntent>(ref,
+          onInvoke: (_) {
+            if (!_debouncer.canPerformAction()) return null;
+            _showExitDialogOverlay();
+            return null;
+          },
+        ),
+        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: toggleQuickMenu),
       };
 
   @override
@@ -112,7 +122,6 @@ class _HomeViewState extends ConsumerState<HomeView>
     _lastStablePage = _initialPage;
     _pageController.addListener(_onPageScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(mainFocusRequestProvider.notifier).state = screenFocusNode;
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
           screenFocusNode.requestFocus();
@@ -375,23 +384,6 @@ class _HomeViewState extends ConsumerState<HomeView>
     setState(() => _showExitDialog = false);
   }
 
-  void _toggleQuickMenu() {
-    if (_showQuickMenu) {
-      return; // Closing is handled by the overlay itself
-    }
-    // Only open if no other overlay is active
-    if (ref.read(overlayPriorityProvider) != OverlayPriority.none) return;
-    ref.read(feedbackServiceProvider).tick();
-    setState(() => _showQuickMenu = true);
-  }
-
-  void _closeQuickMenu() {
-    setState(() => _showQuickMenu = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) screenFocusNode.requestFocus();
-    });
-  }
-
   List<QuickMenuItem> _buildQuickMenuItems() {
     final isGrid = ref.read(homeLayoutProvider);
     final hasDownloads = ref.read(hasQueueItemsProvider);
@@ -517,7 +509,7 @@ class _HomeViewState extends ConsumerState<HomeView>
               ConsoleHud(
                 embedded: true,
                 b: HudAction('Exit', onTap: _showExitDialogOverlay),
-                start: HudAction('Menu', onTap: _toggleQuickMenu),
+                start: HudAction('Menu', onTap: toggleQuickMenu),
               ),
             ],
           ),
@@ -576,10 +568,10 @@ class _HomeViewState extends ConsumerState<HomeView>
                 _buildLandscapeLayout(rs, currentSystem, isLibrary),
               if (isGrid) _buildControls(rs),
               const SyncBadge(),
-              if (_showQuickMenu)
+              if (showQuickMenu)
                 QuickMenuOverlay(
                   items: _buildQuickMenuItems(),
-                  onClose: _closeQuickMenu,
+                  onClose: closeQuickMenu,
                 ),
               if (_showExitDialog)
                 ExitConfirmationOverlay(
@@ -894,47 +886,15 @@ class _HomeViewState extends ConsumerState<HomeView>
 
     // Only hide controls if the overlay is expanded AND there is content to show.
     if (isOverlayExpanded && hasAnyDownloads) return const SizedBox.shrink();
-    if (_showExitDialog || _showQuickMenu) {
+    if (_showExitDialog || showQuickMenu) {
       return const SizedBox.shrink();
     }
 
     return ConsoleHud(
       a: HudAction('Select', onTap: _navigateToCurrentSystem),
       b: HudAction('Exit', onTap: _showExitDialogOverlay),
-      start: HudAction('Menu', onTap: _toggleQuickMenu),
+      start: HudAction('Menu', onTap: toggleQuickMenu),
     );
   }
 }
 
-class _HomeAdjustColumnsAction extends Action<AdjustColumnsIntent> {
-  final _HomeViewState screen;
-
-  _HomeAdjustColumnsAction(this.screen);
-
-  @override
-  Object? invoke(AdjustColumnsIntent intent) {
-    if (intent.increase) {
-      screen._zoomOut();
-    } else {
-      screen._zoomIn();
-    }
-    return null;
-  }
-}
-
-class _HomeBackAction extends Action<BackIntent> {
-  final _HomeViewState screen;
-
-  _HomeBackAction(this.screen);
-
-  @override
-  bool isEnabled(BackIntent intent) =>
-      screen.ref.read(overlayPriorityProvider) == OverlayPriority.none;
-
-  @override
-  Object? invoke(BackIntent intent) {
-    if (!screen._debouncer.canPerformAction()) return null;
-    screen._showExitDialogOverlay();
-    return null;
-  }
-}

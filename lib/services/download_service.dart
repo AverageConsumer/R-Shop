@@ -548,6 +548,9 @@ class DownloadService {
     }
   }
 
+  /// Maximum total size of extracted files (2 GB). Protects against zip bombs.
+  static const int _maxExtractedBytes = 2 * 1024 * 1024 * 1024;
+
   Future<void> _extractZipWithMultiFileSupport(
     File zipFile,
     String targetFolder,
@@ -563,6 +566,17 @@ class DownloadService {
       await _extractZipNative(zipFile, extractTempDir.path);
 
       final files = _listFilesRecursively(extractTempDir);
+
+      // Guard against zip bombs: check total extracted size
+      int totalSize = 0;
+      for (final file in files) {
+        totalSize += file.lengthSync();
+        if (totalSize > _maxExtractedBytes) {
+          throw Exception(
+            'Extracted archive exceeds 2 GB safety limit — aborting',
+          );
+        }
+      }
 
       final hasBinFiles = files.any((f) {
         return p.extension(f.path).toLowerCase() == '.bin';

@@ -84,6 +84,22 @@ class ProviderConfig {
     };
   }
 
+  /// Like [toJson] but omits auth credentials.
+  /// Used for download queue persistence to avoid storing secrets.
+  Map<String, dynamic> toJsonWithoutAuth() {
+    return {
+      'type': type.name,
+      'priority': priority,
+      if (url != null) 'url': url,
+      if (host != null) 'host': host,
+      if (port != null) 'port': port,
+      if (share != null) 'share': share,
+      if (path != null) 'path': path,
+      if (platformId != null) 'platform_id': platformId,
+      if (platformName != null) 'platform_name': platformName,
+    };
+  }
+
   String get shortLabel {
     switch (type) {
       case ProviderType.web:

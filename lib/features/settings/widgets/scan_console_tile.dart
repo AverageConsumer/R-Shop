@@ -8,12 +8,14 @@ class ScanConsoleTile extends StatelessWidget {
   final SystemModel system;
   final ScanTileState scanState;
   final int gameCount;
+  final bool isFocused;
 
   const ScanConsoleTile({
     super.key,
     required this.system,
     required this.scanState,
     this.gameCount = 0,
+    this.isFocused = false,
   });
 
   @override
@@ -26,33 +28,43 @@ class ScanConsoleTile extends StatelessWidget {
     final isScanning = scanState == ScanTileState.scanning;
     final isPending = scanState == ScanTileState.pending;
 
+    final double bgAlpha = isPending
+        ? 0.03
+        : isScanning
+            ? 0.08
+            : 0.15;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeOut,
       decoration: BoxDecoration(
         color: isPending
-            ? Colors.white.withValues(alpha: 0.03)
-            : isScanning
-                ? system.accentColor.withValues(alpha: 0.08)
-                : system.accentColor.withValues(alpha: 0.15),
+            ? Colors.white.withValues(alpha: bgAlpha + (isFocused ? 0.05 : 0))
+            : system.accentColor.withValues(alpha: bgAlpha + (isFocused ? 0.05 : 0)),
         borderRadius: BorderRadius.circular(rs.radius.md),
         border: Border.all(
-          color: isPending
-              ? Colors.white.withValues(alpha: 0.06)
-              : isScanning
-                  ? system.accentColor.withValues(alpha: 0.6)
-                  : system.accentColor.withValues(alpha: 0.8),
-          width: isScanning ? 2 : 1,
+          color: isFocused
+              ? system.accentColor.withValues(alpha: 0.9)
+              : isPending
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : isScanning
+                      ? system.accentColor.withValues(alpha: 0.6)
+                      : system.accentColor.withValues(alpha: 0.8),
+          width: isFocused || isScanning ? 2 : 1,
         ),
-        boxShadow: isComplete
-            ? [
-                BoxShadow(
-                  color: system.accentColor.withValues(alpha: 0.25),
-                  blurRadius: 12,
-                  spreadRadius: 1,
-                ),
-              ]
-            : null,
+        boxShadow: [
+          if (isFocused)
+            BoxShadow(
+              color: system.accentColor.withValues(alpha: 0.3),
+              blurRadius: 16,
+            ),
+          if (isComplete)
+            BoxShadow(
+              color: system.accentColor.withValues(alpha: 0.25),
+              blurRadius: 12,
+              spreadRadius: 1,
+            ),
+        ],
       ),
       child: Stack(
         children: [

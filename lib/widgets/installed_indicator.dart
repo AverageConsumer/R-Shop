@@ -24,13 +24,6 @@ class InstalledLedStrip extends StatelessWidget {
             Colors.transparent,
           ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.greenAccent.withValues(alpha: 0.6),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
       ),
     );
   }

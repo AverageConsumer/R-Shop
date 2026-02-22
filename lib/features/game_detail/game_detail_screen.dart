@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
-import '../../models/download_item.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
+import '../../providers/rom_status_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../services/download_queue_manager.dart';
 import '../../services/input_debouncer.dart';
@@ -53,33 +53,49 @@ class GameDetailScreen extends ConsumerStatefulWidget {
 class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     with ConsoleScreenMixin {
   GameDetailController? _controller;
-  late final ValueNotifier<String?> _backgroundNotifier;
   late InputDebouncer _debouncer;
-  bool _showQuickMenu = false;
   bool _variantNavHeld = false;
 
   @override
   String get routeId => 'game_detail_${widget.game.filename}';
 
+  bool _dialogOrNoOverlay(dynamic _) {
+    final priority = ref.read(overlayPriorityProvider);
+    if (priority == OverlayPriority.none) return true;
+    return _controller?.state.isDialogOpen == true;
+  }
+
   @override
   Map<Type, Action<Intent>> get screenActions => {
-        BackIntent: _DetailBackAction(this),
-        ConfirmIntent: _DetailConfirmAction(this),
-        InfoIntent: _DetailFilenameToggleAction(this),
-        SearchIntent: _DetailTagInfoAction(this),
-        NavigateIntent: _DetailNavigateAction(this),
-        FavoriteIntent: _DetailFavoriteAction(this),
-        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _toggleQuickMenu),
+        BackIntent: CallbackAction<BackIntent>(
+          onInvoke: (_) { _handleBack(); return null; },
+        ),
+        ConfirmIntent: OverlayGuardedAction<ConfirmIntent>(ref,
+          onInvoke: (_) { _handleConfirm(); return null; },
+          isEnabledOverride: _dialogOrNoOverlay,
+        ),
+        InfoIntent: OverlayGuardedAction<InfoIntent>(ref,
+          onInvoke: (_) { _handleFilenameToggle(); return null; },
+        ),
+        SearchIntent: OverlayGuardedAction<SearchIntent>(ref,
+          onInvoke: (_) { _handleTagInfo(); return null; },
+        ),
+        NavigateIntent: OverlayGuardedAction<NavigateIntent>(ref,
+          onInvoke: (intent) { _handleNavigate(intent.direction); return null; },
+          isEnabledOverride: _dialogOrNoOverlay,
+        ),
+        FavoriteIntent: OverlayGuardedAction<FavoriteIntent>(ref,
+          onInvoke: (_) { _handleFavorite(); return null; },
+        ),
+        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: toggleQuickMenu),
       };
 
   @override
   void initState() {
     super.initState();
-    _backgroundNotifier = ValueNotifier(null);
     _debouncer = ref.read(inputDebouncerProvider);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(mainFocusRequestProvider.notifier).state = screenFocusNode;
       final queueManager = ref.read(downloadQueueManagerProvider);
       _initController(queueManager);
     });
@@ -98,43 +114,22 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     );
     _controller!.addListener(_onControllerChanged);
 
-    _updateBackground();
     setState(() {});
-    _listenForDownloadCompletions();
+    ref.listenManual(romChangeSignalProvider, (prev, next) {
+      if (prev != null && prev != next) {
+        _controller?.checkInstallationStatus();
+      }
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       requestScreenFocus();
     });
   }
 
-  void _listenForDownloadCompletions() {
-    final expectedIds = <String>{
-      for (final variant in widget.variants)
-        '${widget.system.name}_${variant.filename}',
-    };
-
-    ref.listenManual<DownloadQueueManager>(
-      downloadQueueManagerProvider,
-      (previous, next) {
-        if (previous == null) return;
-        for (final item in next.state.queue) {
-          if (!expectedIds.contains(item.id)) continue;
-          if (item.status != DownloadItemStatus.completed) continue;
-          final prev = previous.state.getDownloadById(item.id);
-          if (prev != null && prev.status != DownloadItemStatus.completed) {
-            _controller?.checkInstallationStatus();
-            return;
-          }
-        }
-      },
-    );
-  }
-
   void _onControllerChanged() {
     if (!mounted) return;
 
     setState(() {});
-    _updateBackground();
 
     final error = _controller?.state.error;
     if (error != null) {
@@ -143,27 +138,11 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     }
   }
 
-  void _updateBackground() {
-    final controller = _controller;
-    if (controller == null) return;
-
-    final selectedVariant = controller.selectedVariant;
-    final coverUrls = ImageHelper.getCoverUrlsForSingle(
-        widget.system, selectedVariant.filename);
-    final imageUrl = selectedVariant.cachedCoverUrl ??
-        (coverUrls.isNotEmpty ? coverUrls.first : null);
-
-    if (imageUrl != null && imageUrl != _backgroundNotifier.value) {
-      _backgroundNotifier.value = imageUrl;
-    }
-  }
-
   @override
   void dispose() {
     _debouncer.stopHold();
     _controller?.removeListener(_onControllerChanged);
     _controller?.dispose();
-    _backgroundNotifier.dispose();
     super.dispose();
   }
 
@@ -250,23 +229,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     if (controller.state.isOverlayOpen) return;
 
     ref.read(feedbackServiceProvider).tick();
-    final wasFavorite = ref.read(favoriteGamesProvider).contains(widget.game.displayName);
     ref.read(favoriteGamesProvider.notifier).toggleFavorite(widget.game.displayName);
-    showConsoleNotification(context, message: wasFavorite ? 'Removed from favorites' : 'Added to favorites');
-  }
-
-  void _toggleQuickMenu() {
-    if (_showQuickMenu) return;
-    if (ref.read(overlayPriorityProvider) != OverlayPriority.none) return;
-    ref.read(feedbackServiceProvider).tick();
-    setState(() => _showQuickMenu = true);
-  }
-
-  void _closeQuickMenu() {
-    setState(() => _showQuickMenu = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) requestScreenFocus();
-    });
   }
 
   List<QuickMenuItem> _buildQuickMenuItems() {
@@ -334,7 +297,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       }
       ref.read(feedbackServiceProvider).tick();
       controller.selectVariant(controller.selectedIndex - 1);
-      _updateBackground();
     } else if (direction == GridDirection.down) {
       if (_variantNavHeld) return;
       _variantNavHeld = true;
@@ -344,7 +306,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       }
       ref.read(feedbackServiceProvider).tick();
       controller.selectVariant(controller.selectedIndex + 1);
-      _updateBackground();
     }
   }
 
@@ -353,6 +314,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
     if (selection == 0) {
       await controller.deleteRom();
+      ref.read(romChangeSignalProvider.notifier).state++;
       ref.invalidate(visibleSystemsProvider);
       controller.cancelDialog();
     } else {
@@ -427,9 +389,10 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           backgroundColor: Colors.black,
         body: Stack(
           children: [
-            DynamicBackground(
-              backgroundNotifier: _backgroundNotifier,
-              accentColor: widget.system.accentColor,
+            Positioned.fill(
+              child: DynamicBackground(
+                accentColor: widget.system.accentColor,
+              ),
             ),
             TintedOverlay(accentColor: widget.system.accentColor),
             SafeArea(
@@ -441,10 +404,10 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                       isMultiRom, coverUrls, selectedVariant, isFavorite),
             ),
             _buildControls(state, metadata),
-            if (_showQuickMenu)
+            if (showQuickMenu)
               QuickMenuOverlay(
                 items: _buildQuickMenuItems(),
-                onClose: _closeQuickMenu,
+                onClose: closeQuickMenu,
               ),
             DialogFocusScope(
               isVisible: state.isDialogOpen,
@@ -455,6 +418,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                 gameTitle: controller.cleanTitle,
                 onPrimary: () async {
                   await controller.deleteRom();
+                  ref.read(romChangeSignalProvider.notifier).state++;
                   ref.invalidate(visibleSystemsProvider);
                   controller.cancelDialog();
                   requestScreenFocus();
@@ -509,6 +473,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               cachedUrl: selectedVariant.cachedCoverUrl,
               metadata: metadata,
               isFavorite: isFavorite,
+              hasThumbnail: selectedVariant.hasThumbnail,
             ),
           ),
           SizedBox(width: rs.spacing.lg),
@@ -547,6 +512,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               cachedUrl: selectedVariant.cachedCoverUrl,
               metadata: metadata,
               isFavorite: isFavorite,
+              hasThumbnail: selectedVariant.hasThumbnail,
             ),
           ),
           SizedBox(height: rs.spacing.md),
@@ -562,7 +528,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               installedStatus: state.installedStatus,
               onSelectionChanged: (index) {
                 controller.selectVariant(index);
-                _updateBackground();
               },
             )
           else ...[
@@ -603,13 +568,13 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       actionCallback = controller.performAction;
     }
 
-    if (_showQuickMenu) return const SizedBox.shrink();
+    if (showQuickMenu) return const SizedBox.shrink();
 
     return ConsoleHud(
       dpad: widget.variants.length > 1 ? (label: '\u2191\u2193', action: 'Navigate') : null,
       a: HudAction(actionLabel, onTap: actionCallback),
       b: HudAction('Back', onTap: () => Navigator.pop(context)),
-      start: HudAction('Menu', onTap: _toggleQuickMenu),
+      start: HudAction('Menu', onTap: toggleQuickMenu),
     );
   }
 
@@ -637,7 +602,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                 installedStatus: state.installedStatus,
                 onSelectionChanged: (index) {
                   controller.selectVariant(index);
-                  _updateBackground();
                 },
                 ),
             ),
@@ -769,100 +733,3 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   }
 }
 
-class _DetailBackAction extends Action<BackIntent> {
-  final _GameDetailScreenState screen;
-
-  _DetailBackAction(this.screen);
-
-  @override
-  Object? invoke(BackIntent intent) {
-    screen._handleBack();
-    return null;
-  }
-}
-
-class _DetailConfirmAction extends Action<ConfirmIntent> {
-  final _GameDetailScreenState screen;
-
-  _DetailConfirmAction(this.screen);
-
-  @override
-  bool isEnabled(ConfirmIntent intent) {
-    final priority = screen.ref.read(overlayPriorityProvider);
-    if (priority == OverlayPriority.none) return true;
-    return screen._controller?.state.isDialogOpen == true;
-  }
-
-  @override
-  Object? invoke(ConfirmIntent intent) {
-    screen._handleConfirm();
-    return null;
-  }
-}
-
-class _DetailFilenameToggleAction extends Action<InfoIntent> {
-  final _GameDetailScreenState screen;
-
-  _DetailFilenameToggleAction(this.screen);
-
-  @override
-  bool isEnabled(InfoIntent intent) =>
-      screen.ref.read(overlayPriorityProvider) == OverlayPriority.none;
-
-  @override
-  Object? invoke(InfoIntent intent) {
-    screen._handleFilenameToggle();
-    return null;
-  }
-}
-
-class _DetailTagInfoAction extends Action<SearchIntent> {
-  final _GameDetailScreenState screen;
-
-  _DetailTagInfoAction(this.screen);
-
-  @override
-  bool isEnabled(SearchIntent intent) =>
-      screen.ref.read(overlayPriorityProvider) == OverlayPriority.none;
-
-  @override
-  Object? invoke(SearchIntent intent) {
-    screen._handleTagInfo();
-    return null;
-  }
-}
-
-class _DetailNavigateAction extends Action<NavigateIntent> {
-  final _GameDetailScreenState screen;
-
-  _DetailNavigateAction(this.screen);
-
-  @override
-  bool isEnabled(NavigateIntent intent) {
-    final priority = screen.ref.read(overlayPriorityProvider);
-    if (priority == OverlayPriority.none) return true;
-    return screen._controller?.state.isDialogOpen == true;
-  }
-
-  @override
-  Object? invoke(NavigateIntent intent) {
-    screen._handleNavigate(intent.direction);
-    return null;
-  }
-}
-
-class _DetailFavoriteAction extends Action<FavoriteIntent> {
-  final _GameDetailScreenState screen;
-
-  _DetailFavoriteAction(this.screen);
-
-  @override
-  bool isEnabled(FavoriteIntent intent) =>
-      screen.ref.read(overlayPriorityProvider) == OverlayPriority.none;
-
-  @override
-  Object? invoke(FavoriteIntent intent) {
-    screen._handleFavorite();
-    return null;
-  }
-}

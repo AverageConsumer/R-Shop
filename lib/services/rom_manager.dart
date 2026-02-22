@@ -20,11 +20,15 @@ class RomManager {
     return safePath(targetFolder, getTargetFilename(game, system));
   }
 
+  /// Archive formats the app can extract. `.7z` is excluded because it is
+  /// downloaded as-is (not extracted), so its extension must be preserved.
+  static const _extractableExtensions = ['.zip', '.rar'];
+
   /// Returns the filename a game would have after download (archive → ROM extension).
   static String getTargetFilename(GameItem game, SystemModel system) {
     var filename = p.basename(game.filename);
 
-    for (final ext in SystemModel.archiveExtensions) {
+    for (final ext in _extractableExtensions) {
       if (filename.toLowerCase().endsWith(ext)) {
         filename = filename.substring(0, filename.length - ext.length);
         filename =

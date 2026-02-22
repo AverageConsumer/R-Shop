@@ -15,6 +15,7 @@ import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
+import '../../providers/installed_files_provider.dart';
 import '../../providers/game_providers.dart';
 import '../../services/config_bootstrap.dart';
 import '../../services/database_service.dart';
@@ -26,6 +27,7 @@ import '../../widgets/base_game_card.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/download_overlay.dart';
 import '../../widgets/quick_menu.dart';
+import '../../widgets/selection_aware_item.dart';
 import 'widgets/library_tabs.dart';
 
 enum LibrarySortMode { alphabetical, bySystem }
@@ -39,28 +41,25 @@ class LibraryScreen extends ConsumerStatefulWidget {
 }
 
 class _LibraryScreenState extends ConsumerState<LibraryScreen>
-    with ConsoleScreenMixin {
+    with ConsoleScreenMixin, SearchableScreenMixin {
   int _selectedTab = 0; // 0=All, 1=Installed, 2=Favorites
   LibrarySortMode _sortMode = LibrarySortMode.alphabetical;
-  int _currentIndex = 0;
+  final ValueNotifier<int> _selectedIndexNotifier = ValueNotifier(0);
+  int get _currentIndex => _selectedIndexNotifier.value;
+  set _currentIndex(int v) {
+    _selectedIndexNotifier.value = v;
+    _focusManager.setSelectedIndex(v);
+  }
   late int _columns;
   String _searchQuery = '';
-  bool _isSearching = false;
-  bool _isSearchFocused = false;
-  bool _isClosingSearch = false;
   bool _isLoading = true;
-  bool _showQuickMenu = false;
 
   final ScrollController _scrollController = ScrollController();
-  final FocusNode _searchFocusNode = FocusNode();
-  final TextEditingController _searchController = TextEditingController();
+  final ValueNotifier<bool> _scrollSuppression = ValueNotifier(false);
   final Map<int, GlobalKey> _itemKeys = {};
 
   late InputDebouncer _debouncer;
-
-  bool _isProgrammaticScroll = false;
-  bool _isHardwareInput = false;
-  Timer? _hardwareInputTimer;
+  late final FocusSyncManager _focusManager;
 
   // Raw data from DB
   List<_LibraryEntry> _allGames = [];
@@ -71,6 +70,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   @override
   String get routeId => 'library';
+
+  @override
+  Color get searchAccentColor => Colors.cyanAccent;
+
+  @override
+  String get searchHintText => 'Search library...';
+
+  @override
+  void onSearchQueryChanged(String query) {
+    _searchQuery = query;
+    _currentIndex = 0;
+    _applyFilters();
+  }
+
+  @override
+  void onSearchReset() {
+    _searchQuery = '';
+    _applyFilters();
+  }
+
+  @override
+  void onSearchSelectionReset() => _currentIndex = 0;
 
   @override
   Map<ShortcutActivator, Intent>? get additionalShortcuts => {
@@ -91,19 +112,29 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       };
 
   @override
-  Map<Type, Action<Intent>> get screenActions => {
-        NavigateIntent: _LibraryNavigateAction(this),
-        AdjustColumnsIntent: _LibraryAdjustColumnsAction(this),
+  Map<Type, Action<Intent>> get screenActions {
+    return {
+        NavigateIntent: OverlayGuardedAction<NavigateIntent>(ref,
+          onInvoke: (intent) { _navigateGrid(intent.direction); return null; },
+          isEnabledOverride: searchOrNone,
+        ),
+        AdjustColumnsIntent: OverlayGuardedAction<AdjustColumnsIntent>(ref,
+          onInvoke: (intent) { _adjustColumns(intent.increase); return null; },
+          isEnabledOverride: searchOrNone,
+        ),
         ConfirmIntent: CallbackAction<ConfirmIntent>(
           onInvoke: (_) {
             _openSelectedGame();
             return null;
           },
         ),
-        BackIntent: _LibraryBackAction(this),
+        BackIntent: OverlayGuardedAction<BackIntent>(ref,
+          onInvoke: (_) { _handleBack(); return null; },
+          isEnabledOverride: searchOrNone,
+        ),
         SearchIntent: CallbackAction<SearchIntent>(
           onInvoke: (_) {
-            _toggleSearch();
+            toggleSearch();
             return null;
           },
         ),
@@ -115,19 +146,36 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
             return null;
           },
         ),
-        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _toggleQuickMenu),
+        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: toggleQuickMenu),
       };
+  }
 
   @override
   void initState() {
     super.initState();
     _columns = ref.read(gridColumnsProvider('library'));
     _debouncer = ref.read(inputDebouncerProvider);
-    _searchFocusNode.addListener(_onSearchFocusChange);
+
+    _focusManager = FocusSyncManager(
+      scrollController: _scrollController,
+      getCrossAxisCount: () => _columns,
+      getItemCount: () => _filteredGames.length,
+      getGridRatio: () => 1.0,
+      onSelectionChanged: (index) => _selectedIndexNotifier.value = index,
+      scrollSuppression: _scrollSuppression,
+    );
+
+    initSearch();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(mainFocusRequestProvider.notifier).state = screenFocusNode;
       _loadData();
+      ref.listenManual(installedFilesProvider, (prev, next) {
+        final data = next.valueOrNull;
+        if (data != null && mounted) {
+          setState(() => _installedFiles = data.all);
+          _applyFilters();
+        }
+      });
     });
   }
 
@@ -137,26 +185,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     Future.delayed(Duration.zero, () {
       focusStateManager.saveFocusState(routeId, selectedIndex: selectedIndex);
     });
-    _hardwareInputTimer?.cancel();
     _debouncer.stopHold();
+    _focusManager.dispose();
     _scrollController.dispose();
-    _searchController.dispose();
-    _searchFocusNode.dispose();
+    disposeSearch();
+    _scrollSuppression.dispose();
+    _selectedIndexNotifier.dispose();
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-
-    final db = DatabaseService();
+  Future<void> _refreshInstalledFiles() async {
     final appConfig =
         ref.read(bootstrappedConfigProvider).value ?? AppConfig.empty;
-
-    // Load all games from DB
-    final rawGames = await db.getAllGames();
-    final favorites = ref.read(favoriteGamesProvider).toSet();
-
-    // Scan installed files for all configured systems
     final installed = <String>{};
     for (final sysConfig in appConfig.systems) {
       if (sysConfig.targetFolder.isEmpty) continue;
@@ -170,6 +210,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           }
         } catch (_) {}
       }
+    }
+    if (mounted) {
+      setState(() => _installedFiles = installed);
+    }
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+
+    final db = DatabaseService();
+    final favorites = ref.read(favoriteGamesProvider).toSet();
+
+    // Load all games from DB
+    final rawGames = await db.getAllGames();
+
+    // Use centralized installed-files index (provider-driven)
+    final installedData = ref.read(installedFilesProvider).valueOrNull;
+    if (installedData != null) {
+      _installedFiles = installedData.all;
+    } else {
+      // Provider not ready yet — fall back to direct scan
+      await _refreshInstalledFiles();
     }
 
     final entries = <_LibraryEntry>[];
@@ -192,6 +254,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         coverUrl: row['cover_url'] as String?,
         systemSlug: systemSlug,
         providerConfig: providerConfig,
+        hasThumbnail: (row['has_thumbnail'] as int?) == 1,
       ));
     }
 
@@ -199,7 +262,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
     setState(() {
       _allGames = entries;
-      _installedFiles = installed;
       _favoriteIds = favorites;
       _isLoading = false;
     });
@@ -218,7 +280,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     }
 
     if (widget.openSearch) {
-      _openSearch();
+      openSearch();
     }
   }
 
@@ -325,125 +387,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     }
   }
 
-  // --- Search ---
-
-  void _toggleSearch() {
-    ref.read(feedbackServiceProvider).tick();
-    if (_isSearching) {
-      _closeSearch();
-    } else {
-      _openSearch();
-    }
-  }
-
-  void _openSearch() {
-    _searchController.clear();
-    _searchQuery = '';
-    _isClosingSearch = false;
-    setState(() => _isSearching = true);
-    _applyFilters();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _isSearching) {
-        _searchFocusNode.requestFocus();
-      }
-    });
-  }
-
-  void _closeSearch() {
-    _isClosingSearch = true;
-    FocusManager.instance.primaryFocus?.unfocus();
-    FocusScope.of(context).unfocus();
-
-    _searchController.clear();
-    _searchQuery = '';
-    _applyFilters();
-
-    setState(() {
-      _isSearching = false;
-      _isSearchFocused = false;
-      _currentIndex = 0;
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) requestScreenFocus();
-      _isClosingSearch = false;
-    });
-  }
-
-  void _onSearchChanged(String query) {
-    _searchQuery = query;
-    _currentIndex = 0;
-    _applyFilters();
-  }
-
-  void _unfocusSearch() {
-    _searchFocusNode.unfocus();
-    setState(() => _isSearchFocused = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) requestScreenFocus();
-    });
-  }
-
-  void _onSearchSubmitted() {
-    _unfocusSearch();
-  }
-
-  void _onSearchFocusChange() {
-    if (!mounted) return;
-    final hasFocus = _searchFocusNode.hasFocus;
-    setState(() => _isSearchFocused = hasFocus);
-
-    if (!hasFocus && _isSearching && !_isClosingSearch) {
-      if (!screenFocusNode.hasFocus) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _isSearching && !_isClosingSearch &&
-              !_searchFocusNode.hasFocus) {
-            requestScreenFocus();
-          }
-        });
-      }
-    }
-  }
-
   // --- Grid Navigation ---
-
-  void _setHardwareInputActive() {
-    _isHardwareInput = true;
-    _hardwareInputTimer?.cancel();
-    _hardwareInputTimer = Timer(const Duration(milliseconds: 500), () {
-      _isHardwareInput = false;
-    });
-  }
 
   void _navigateGrid(GridDirection direction) {
     if (_filteredGames.isEmpty) return;
 
     if (_debouncer.startHold(() {
-      _setHardwareInputActive();
-      int newIndex = _currentIndex;
-      switch (direction) {
-        case GridDirection.left:
-          if (_currentIndex % _columns > 0) newIndex--;
-        case GridDirection.right:
-          if ((_currentIndex + 1) % _columns > 0 &&
-              _currentIndex + 1 < _filteredGames.length) {
-            newIndex++;
-          }
-        case GridDirection.up:
-          if (_currentIndex - _columns >= 0) {
-            newIndex -= _columns;
-          } else if (_isSearching) {
-            _searchFocusNode.requestFocus();
-            return;
-          }
-        case GridDirection.down:
-          if (_currentIndex + _columns < _filteredGames.length) {
-            newIndex += _columns;
-          }
-      }
-      if (newIndex != _currentIndex) {
-        setState(() => _currentIndex = newIndex);
+      if (_focusManager.moveFocus(direction)) {
         _scrollToSelected(instant: _debouncer.isHolding);
       }
     })) {
@@ -452,99 +402,33 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   void _scrollToSelected({bool instant = false}) {
-    final key = _itemKeys[_currentIndex];
-    if (key?.currentContext != null) {
-      _isProgrammaticScroll = true;
-      Scrollable.ensureVisible(
-        key!.currentContext!,
-        alignment: 0.5,
-        duration: instant ? Duration.zero : const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      ).then((_) {
-        Future.delayed(const Duration(milliseconds: 100), () {
-          _isProgrammaticScroll = false;
-        });
-      });
-      return;
-    }
-
-    if (!_scrollController.hasClients) return;
-    final row = _currentIndex ~/ _columns;
-    final totalRows =
-        (_filteredGames.length + _columns - 1) ~/ _columns;
-    if (totalRows <= 1) return;
-    final maxExtent = _scrollController.position.maxScrollExtent;
-    final estimatedOffset =
-        (maxExtent * row / (totalRows - 1)).clamp(0.0, maxExtent);
-    _isProgrammaticScroll = true;
-    _scrollController.jumpTo(estimatedOffset);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _scrollToSelected(instant: true);
-    });
+    _focusManager.scrollToSelectedWithFallback(
+      itemKey: _itemKeys[_focusManager.selectedIndex],
+      crossAxisCount: _columns,
+      instant: instant,
+      isMounted: () => mounted,
+      retryCallback: () => _scrollToSelected(instant: true),
+    );
   }
 
   // --- Scroll Sync ---
 
   bool _handleScrollNotification(ScrollNotification notification) {
-    if (_isProgrammaticScroll) return false;
-    if (notification is ScrollEndNotification && !_isHardwareInput) {
-      _syncFocusToVisibleArea();
-    }
-    return false;
-  }
-
-  void _syncFocusToVisibleArea() {
-    if (!_scrollController.hasClients ||
-        _isHardwareInput ||
-        _filteredGames.isEmpty) {
-      return;
-    }
-
-    final screenHeight = MediaQuery.of(context).size.height;
-    final gridWidth = MediaQuery.of(context).size.width -
-        (context.rs.isSmall ? 32.0 : 48.0);
-    final spacing = context.rs.isSmall ? 12.0 : 16.0;
-    final itemWidth = (gridWidth - (_columns - 1) * spacing) / _columns;
-    final itemHeight = itemWidth / 0.75;
-    final rowHeight = itemHeight + spacing;
-
-    final viewportCenter = _scrollController.offset + (screenHeight / 2);
-    final targetRow = (viewportCenter / rowHeight).floor();
-    final targetIndex =
-        (targetRow * _columns).clamp(0, _filteredGames.length - 1);
-
-    if (targetIndex != _currentIndex) {
-      setState(() => _currentIndex = targetIndex);
-    }
+    _focusManager.updateScrollVelocity(notification);
+    return _focusManager.handleScrollNotification(notification, context);
   }
 
   // --- Columns ---
 
   void _adjustColumns(bool increase) {
-    if (increase) {
-      _moreColumns();
-    } else {
-      _lessColumns();
-    }
-  }
-
-  void _lessColumns() {
-    if (_columns <= 3) return;
-    setState(() {
-      _columns--;
-      ref.read(gridColumnsProvider('library').notifier).setColumns(_columns);
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToSelected();
-    });
-  }
-
-  void _moreColumns() {
-    if (_columns >= 8) return;
-    setState(() {
-      _columns++;
-      ref.read(gridColumnsProvider('library').notifier).setColumns(_columns);
-    });
+    final next = adjustColumnCount(
+      current: _columns,
+      increase: increase,
+      providerKey: 'library',
+      ref: ref,
+    );
+    if (next == _columns) return;
+    setState(() => _columns = next);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToSelected();
     });
@@ -559,7 +443,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   Future<void> _openGameDetail(_LibraryEntry entry) async {
-    _searchFocusNode.unfocus();
+    searchFieldNode.unfocus();
+    suspendSearchOverlay();
     ref.read(feedbackServiceProvider).confirm();
 
     final appConfig =
@@ -597,10 +482,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     );
 
     if (mounted) {
+      resumeSearchOverlay();
       // Reload to pick up install/favorite changes
       _favoriteIds = ref.read(favoriteGamesProvider).toSet();
+      final data = ref.read(installedFilesProvider).valueOrNull;
+      if (data != null) {
+        _installedFiles = data.all;
+      }
       _applyFilters();
-      if (_isSearching) {
+      if (isSearchActive) {
         requestScreenFocus();
       }
     }
@@ -608,31 +498,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   void _handleBack() {
     ref.read(feedbackServiceProvider).cancel();
-    if (_isSearching) {
-      if (_searchFocusNode.hasFocus) {
-        _unfocusSearch();
-      } else {
-        _closeSearch();
-      }
+    if (isSearchActive) {
+      handleSearchBack();
     } else {
       Navigator.pop(context);
     }
-  }
-
-  // --- Quick Menu ---
-
-  void _toggleQuickMenu() {
-    if (_showQuickMenu) return;
-    if (ref.read(overlayPriorityProvider) != OverlayPriority.none) return;
-    ref.read(feedbackServiceProvider).tick();
-    setState(() => _showQuickMenu = true);
-  }
-
-  void _closeQuickMenu() {
-    setState(() => _showQuickMenu = false);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) requestScreenFocus();
-    });
   }
 
   List<QuickMenuItem> _buildQuickMenuItems() {
@@ -644,7 +514,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         label: 'Search',
         icon: Icons.search_rounded,
         shortcutHint: 'Y',
-        onSelect: _openSearch,
+        onSelect: openSearch,
       ),
       QuickMenuItem(
         label: sortLabel,
@@ -689,9 +559,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   // --- Key Events ---
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (_isSearching && _searchFocusNode.hasFocus) {
-      return KeyEventResult.skipRemainingHandlers;
-    }
+    final searchResult = handleSearchKeyEvent(event);
+    if (searchResult != null) return searchResult;
     if (event is KeyUpEvent) {
       _debouncer.stopHold();
       return KeyEventResult.ignored;
@@ -739,7 +608,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   Widget build(BuildContext context) {
     final rs = context.rs;
     final baseTopPadding = rs.safeAreaTop + (rs.isSmall ? 72 : 96);
-    final searchExtraPadding = _isSearching ? (rs.isSmall ? 50.0 : 56.0) : 0.0;
+    final searchExtraPadding = isSearchActive ? (rs.isSmall ? 16.0 : 20.0) : 0.0;
     final topPadding = baseTopPadding + searchExtraPadding;
 
     return buildWithActions(
@@ -760,14 +629,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
               // Header (over grid, with gradient fade)
               _buildHeader(rs),
               // Search bar
-              if (_isSearching) _buildSearchBar(rs),
+              if (isSearchActive) _buildSearchBar(),
               // HUD
-              if (!_showQuickMenu) _buildHud(),
+              if (!showQuickMenu) _buildHud(),
               // Quick Menu
-              if (_showQuickMenu)
+              if (showQuickMenu)
                 QuickMenuOverlay(
                   items: _buildQuickMenuItems(),
-                  onClose: _closeQuickMenu,
+                  onClose: closeQuickMenu,
                 ),
             ],
           ),
@@ -867,110 +736,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     );
   }
 
-  Widget _buildSearchBar(Responsive rs) {
-    final topOffset = rs.safeAreaTop + (rs.isSmall ? 52 : 68);
-    final textFieldFontSize = rs.isSmall ? 15.0 : 18.0;
-    final borderRadius = rs.isSmall ? 22.0 : 30.0;
-    final contentPadding = rs.isSmall ? 12.0 : 16.0;
-
-    return Positioned(
-      top: topOffset,
-      left: rs.isSmall ? 16.0 : 24.0,
-      right: rs.isSmall ? 16.0 : 24.0,
-      child: CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false): () {
-            if (_searchFocusNode.hasFocus) {
-              _unfocusSearch();
-            } else {
-              _closeSearch();
-            }
-          },
-          const SingleActivator(LogicalKeyboardKey.gameButtonB, includeRepeats: false): () {
-            if (_searchFocusNode.hasFocus) {
-              _unfocusSearch();
-            } else {
-              _closeSearch();
-            }
-          },
-          const SingleActivator(LogicalKeyboardKey.goBack, includeRepeats: false): () {
-            if (_searchFocusNode.hasFocus) {
-              _unfocusSearch();
-            } else {
-              _closeSearch();
-            }
-          },
-          const SingleActivator(LogicalKeyboardKey.arrowDown, includeRepeats: false): () {
-            if (_searchFocusNode.hasFocus) {
-              _unfocusSearch();
-            }
-          },
-          const SingleActivator(LogicalKeyboardKey.arrowLeft): () {},
-          const SingleActivator(LogicalKeyboardKey.arrowRight): () {},
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF252525),
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(
-              color: _isSearchFocused
-                  ? Colors.cyanAccent
-                  : Colors.cyanAccent.withValues(alpha: 0.4),
-              width: 2,
-            ),
-            boxShadow: _isSearchFocused
-                ? [
-                    BoxShadow(
-                      color: Colors.cyanAccent.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      spreadRadius: 2,
-                    ),
-                  ]
-                : null,
-          ),
-          child: TextField(
-            controller: _searchController,
-            focusNode: _searchFocusNode,
-            autocorrect: false,
-            textInputAction: TextInputAction.search,
-            onTapOutside: (_) {},
-            onChanged: _onSearchChanged,
-            onSubmitted: (_) => _onSearchSubmitted(),
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: textFieldFontSize,
-              fontWeight: FontWeight.w500,
-            ),
-            decoration: InputDecoration(
-              hintText: 'Search library...',
-              hintStyle: TextStyle(
-                color: Colors.grey[500],
-                fontSize: textFieldFontSize,
-              ),
-              prefixIcon: Icon(
-                Icons.search,
-                color: Colors.cyanAccent,
-                size: rs.isSmall ? 20 : 24,
-              ),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, color: Colors.grey),
-                      onPressed: () {
-                        _searchController.clear();
-                        _onSearchChanged('');
-                      },
-                    )
-                  : null,
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: contentPadding,
-                vertical: contentPadding,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  Widget _buildSearchBar() {
+    return buildSearchWidget(searchQuery: _searchQuery);
   }
 
   Widget _buildContent(Responsive rs) {
@@ -1010,11 +777,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       );
     }
 
+    final gridPadding = rs.spacing.lg * 2;
+    final spacing = rs.isSmall ? 10.0 : 16.0;
+    final gridWidth = MediaQuery.of(context).size.width - gridPadding;
+    final itemWidth = (gridWidth - (_columns - 1) * spacing) / _columns;
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final optimalCacheWidth = (itemWidth * dpr).round().clamp(150, 500);
+
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
       child: RepaintBoundary(
         child: GridView.builder(
-        cacheExtent: 500,
+        cacheExtent: 600,
         controller: _scrollController,
         padding: EdgeInsets.only(
           left: rs.spacing.lg,
@@ -1031,7 +805,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         itemCount: _filteredGames.length,
         itemBuilder: (context, index) {
         final entry = _filteredGames[index];
-        final isSelected = index == _currentIndex;
         final isInstalled = _isGameInstalled(entry);
         final isFavorite = _favoriteIds.contains(entry.displayName);
 
@@ -1050,29 +823,36 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
         return RepaintBoundary(
           key: _itemKeys[index],
-          child: BaseGameCard(
-            displayName: entry.displayName,
-            systemLabel: systemLabel,
-            accentColor: systemColor,
-            coverUrls: coverUrls,
-            cachedUrl: entry.coverUrl,
-            isInstalled: isInstalled,
-            isSelected: isSelected,
-            isFavorite: isFavorite,
-            onTap: () {
-              if (isSelected) {
-                _openGameDetail(entry);
-              } else {
-                setState(() => _currentIndex = index);
-                ref.read(feedbackServiceProvider).tick();
-              }
-            },
-            onTapSelect: () {
-              if (!isSelected) {
-                setState(() => _currentIndex = index);
-                ref.read(feedbackServiceProvider).tick();
-              }
-            },
+          child: SelectionAwareItem(
+            selectedIndexNotifier: _selectedIndexNotifier,
+            index: index,
+            builder: (isSelected) => BaseGameCard(
+              displayName: entry.displayName,
+              systemLabel: systemLabel,
+              accentColor: systemColor,
+              coverUrls: coverUrls,
+              cachedUrl: entry.coverUrl,
+              hasThumbnail: entry.hasThumbnail,
+              memCacheWidth: optimalCacheWidth,
+              scrollSuppression: _scrollSuppression,
+              isInstalled: isInstalled,
+              isSelected: isSelected,
+              isFavorite: isFavorite,
+              onTap: () {
+                if (_currentIndex == index) {
+                  _openGameDetail(entry);
+                } else {
+                  _currentIndex = index;
+                  ref.read(feedbackServiceProvider).tick();
+                }
+              },
+              onTapSelect: () {
+                if (_currentIndex != index) {
+                  _currentIndex = index;
+                  ref.read(feedbackServiceProvider).tick();
+                }
+              },
+            ),
           ),
         );
       },
@@ -1082,24 +862,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   Widget _buildHud() {
-    if (_isSearching) {
-      return ConsoleHud(
-        dpad: !_isSearchFocused
-            ? (label: '\u2191', action: 'Search')
-            : null,
-        a: HudAction('Select', onTap: _openSelectedGame),
-        b: HudAction(
-          _isSearchFocused ? 'Keyboard' : 'Close',
-          highlight: _isSearchFocused,
-          onTap: () => _handleBack(),
-        ),
+    if (isSearchActive) {
+      return buildSearchHud(
+        aAction: HudAction('Select', onTap: _openSelectedGame),
       );
     }
 
     return ConsoleHud(
       a: HudAction('Select', onTap: _openSelectedGame),
       b: HudAction('Back', onTap: () => Navigator.pop(context)),
-      start: HudAction('Menu', onTap: _toggleQuickMenu),
+      start: HudAction('Menu', onTap: toggleQuickMenu),
     );
   }
 
@@ -1144,6 +916,7 @@ class _LibraryEntry {
   final String? coverUrl;
   final String systemSlug;
   final ProviderConfig? providerConfig;
+  final bool hasThumbnail;
 
   const _LibraryEntry({
     required this.filename,
@@ -1152,41 +925,7 @@ class _LibraryEntry {
     this.coverUrl,
     required this.systemSlug,
     this.providerConfig,
+    this.hasThumbnail = false,
   });
 }
 
-class _LibraryNavigateAction extends Action<NavigateIntent> {
-  final _LibraryScreenState screen;
-
-  _LibraryNavigateAction(this.screen);
-
-  @override
-  Object? invoke(NavigateIntent intent) {
-    screen._navigateGrid(intent.direction);
-    return null;
-  }
-}
-
-class _LibraryAdjustColumnsAction extends Action<AdjustColumnsIntent> {
-  final _LibraryScreenState screen;
-
-  _LibraryAdjustColumnsAction(this.screen);
-
-  @override
-  Object? invoke(AdjustColumnsIntent intent) {
-    screen._adjustColumns(intent.increase);
-    return null;
-  }
-}
-
-class _LibraryBackAction extends Action<BackIntent> {
-  final _LibraryScreenState screen;
-
-  _LibraryBackAction(this.screen);
-
-  @override
-  Object? invoke(BackIntent intent) {
-    screen._handleBack();
-    return null;
-  }
-}

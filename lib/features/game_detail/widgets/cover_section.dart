@@ -13,6 +13,7 @@ class CoverSection extends StatelessWidget {
   final String? cachedUrl;
   final GameMetadataFull metadata;
   final bool isFavorite;
+  final bool hasThumbnail;
 
   const CoverSection({
     super.key,
@@ -22,6 +23,7 @@ class CoverSection extends StatelessWidget {
     this.cachedUrl,
     required this.metadata,
     this.isFavorite = false,
+    this.hasThumbnail = false,
   });
 
   @override
@@ -64,6 +66,7 @@ class CoverSection extends StatelessWidget {
                           urls: coverUrls,
                           cachedUrl: cachedUrl,
                           fit: BoxFit.contain,
+                          hasThumbnail: hasThumbnail,
                         ),
                       ),
                     ),

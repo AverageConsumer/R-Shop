@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../providers/app_providers.dart';
 import 'app_intents.dart';
 import 'global_input_wrapper.dart';
-import 'input_providers.dart';
 
 mixin ConsoleScreenMixin<T extends ConsumerStatefulWidget> on ConsumerState<T> {
   late final FocusNode screenFocusNode;
@@ -25,6 +25,7 @@ mixin ConsoleScreenMixin<T extends ConsumerStatefulWidget> on ConsumerState<T> {
     _focusStateManager = ref.read(focusStateManagerProvider.notifier);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(mainFocusRequestProvider.notifier).state = screenFocusNode;
       _restoreFocus();
     });
   }
@@ -42,6 +43,25 @@ mixin ConsoleScreenMixin<T extends ConsumerStatefulWidget> on ConsumerState<T> {
     if (screenFocusNode.canRequestFocus) {
       screenFocusNode.requestFocus();
     }
+  }
+
+  // --- Quick Menu ---
+
+  bool _showQuickMenu = false;
+  bool get showQuickMenu => _showQuickMenu;
+
+  void toggleQuickMenu() {
+    if (_showQuickMenu) return;
+    if (ref.read(overlayPriorityProvider) != OverlayPriority.none) return;
+    ref.read(feedbackServiceProvider).tick();
+    setState(() => _showQuickMenu = true);
+  }
+
+  void closeQuickMenu() {
+    setState(() => _showQuickMenu = false);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) requestScreenFocus();
+    });
   }
 
   @override
@@ -92,6 +112,23 @@ mixin ConsoleScreenMixin<T extends ConsumerStatefulWidget> on ConsumerState<T> {
       ),
     );
   }
+}
+
+/// Adjusts column count within [minColumns]..[maxColumns] and persists via
+/// [gridColumnsProvider]. Returns the new column count, or [current] if the
+/// adjustment would go out of bounds.
+int adjustColumnCount({
+  required int current,
+  required bool increase,
+  int minColumns = 3,
+  int maxColumns = 8,
+  required String providerKey,
+  required WidgetRef ref,
+}) {
+  final next = increase ? current + 1 : current - 1;
+  if (next < minColumns || next > maxColumns) return current;
+  ref.read(gridColumnsProvider(providerKey).notifier).setColumns(next);
+  return next;
 }
 
 mixin ConsoleGridScreenMixin<T extends ConsumerStatefulWidget>
@@ -151,7 +188,7 @@ mixin ConsoleGridScreenMixin<T extends ConsumerStatefulWidget>
   }
 
   Map<Type, Action<Intent>> get gridActions => {
-        NavigateIntent: _GridNavigateAction(this),
+        NavigateIntent: _GridNavigateAction(this, ref),
         ConfirmIntent: CallbackAction<ConfirmIntent>(
           onInvoke: (_) {
             onConfirm();
@@ -175,8 +212,13 @@ mixin ConsoleGridScreenMixin<T extends ConsumerStatefulWidget>
 
 class _GridNavigateAction extends Action<NavigateIntent> {
   final ConsoleGridScreenMixin<dynamic> screen;
+  final WidgetRef ref;
 
-  _GridNavigateAction(this.screen);
+  _GridNavigateAction(this.screen, this.ref);
+
+  @override
+  bool isEnabled(NavigateIntent intent) =>
+      ref.read(overlayPriorityProvider) == OverlayPriority.none;
 
   @override
   Object? invoke(NavigateIntent intent) {

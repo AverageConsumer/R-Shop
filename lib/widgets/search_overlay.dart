@@ -1,0 +1,194 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../core/responsive/responsive.dart';
+
+class SearchOverlay extends StatelessWidget {
+  final Color accentColor;
+  final String hintText;
+  final TextEditingController searchController;
+  final FocusNode searchFocusNode;
+  final bool isSearching;
+  final bool isSearchFocused;
+  final String searchQuery;
+  final void Function(String) onSearchChanged;
+  final VoidCallback onClose;
+  final VoidCallback onUnfocus;
+  final VoidCallback onSubmitted;
+  final bool showBackdrop;
+
+  const SearchOverlay({
+    super.key,
+    required this.accentColor,
+    this.hintText = 'Search...',
+    required this.searchController,
+    required this.searchFocusNode,
+    required this.isSearching,
+    required this.isSearchFocused,
+    required this.searchQuery,
+    required this.onSearchChanged,
+    required this.onClose,
+    required this.onUnfocus,
+    required this.onSubmitted,
+    this.showBackdrop = true,
+  });
+
+  bool get _showBlur => isSearchFocused;
+
+  Widget _buildSearchField(Responsive rs) {
+    final textFieldFontSize = rs.isSmall ? 15.0 : 18.0;
+    final borderRadius = rs.isSmall ? 22.0 : 30.0;
+    final iconSize = rs.isSmall ? 20.0 : 24.0;
+    final contentPadding = rs.isSmall ? 12.0 : 16.0;
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false): () {
+          if (searchFocusNode.hasFocus) {
+            onUnfocus();
+          } else {
+            onClose();
+          }
+        },
+        const SingleActivator(LogicalKeyboardKey.gameButtonB, includeRepeats: false): () {
+          if (searchFocusNode.hasFocus) {
+            onUnfocus();
+          } else {
+            onClose();
+          }
+        },
+        const SingleActivator(LogicalKeyboardKey.goBack, includeRepeats: false): () {
+          if (searchFocusNode.hasFocus) {
+            onUnfocus();
+          } else {
+            onClose();
+          }
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowDown, includeRepeats: false): () {
+          if (searchFocusNode.hasFocus) {
+            onUnfocus();
+          }
+        },
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () {},
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () {},
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF252525),
+          borderRadius: BorderRadius.circular(borderRadius),
+          border: Border.all(
+            color: isSearchFocused
+                ? accentColor
+                : accentColor.withValues(alpha: 0.4),
+            width: 2,
+          ),
+          boxShadow: isSearchFocused
+              ? [
+                  BoxShadow(
+                    color: accentColor.withValues(alpha: 0.4),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                  ),
+                ]
+              : null,
+        ),
+        child: TextField(
+          controller: searchController,
+          focusNode: searchFocusNode,
+          autofocus: false,
+          autocorrect: false,
+          maxLength: 100,
+          buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
+          onTapOutside: (_) {},
+          textInputAction: TextInputAction.search,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: textFieldFontSize,
+            fontWeight: FontWeight.w500,
+          ),
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: TextStyle(
+              color: Colors.grey[500],
+              fontSize: textFieldFontSize,
+            ),
+            prefixIcon: Icon(
+              Icons.search,
+              color: accentColor,
+              size: iconSize,
+            ),
+            suffixIcon: searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear, color: Colors.grey),
+                    onPressed: () {
+                      searchController.clear();
+                      onSearchChanged('');
+                    },
+                  )
+                : null,
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: contentPadding,
+              vertical: contentPadding,
+            ),
+          ),
+          onChanged: onSearchChanged,
+          onSubmitted: (_) => onSubmitted(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rs = context.rs;
+
+    if (!showBackdrop) {
+      return _buildSearchField(rs);
+    }
+
+    final topPadding = rs.safeAreaTop + (rs.isSmall ? 10.0 : 16.0);
+    final horizontalPadding = rs.isSmall ? rs.spacing.md : rs.spacing.lg;
+    final bottomPadding = rs.isSmall ? 10.0 : 16.0;
+
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(
+        children: [
+          if (_showBlur)
+            GestureDetector(
+              onTap: onSubmitted,
+              child: Container(
+                color: Colors.black.withValues(alpha: 0.7),
+              ),
+            ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(
+                top: topPadding,
+                left: horizontalPadding,
+                right: horizontalPadding,
+                bottom: bottomPadding,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                boxShadow: [
+                  BoxShadow(
+                    color: accentColor.withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    spreadRadius: -5,
+                  ),
+                ],
+              ),
+              child: _buildSearchField(rs),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

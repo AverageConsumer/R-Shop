@@ -5,12 +5,16 @@ import 'core/theme/app_theme.dart';
 import 'models/system_model.dart';
 import 'providers/app_providers.dart';
 import 'providers/download_providers.dart';
+import 'providers/rom_status_providers.dart';
 import 'features/home/home_view.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'services/storage_service.dart';
 import 'services/haptic_service.dart';
 import 'services/audio_manager.dart';
+import 'services/database_service.dart';
 import 'services/download_foreground_service.dart';
+import 'services/thumbnail_migration_service.dart';
+import 'services/thumbnail_service.dart';
 import 'widgets/download_overlay.dart';
 
 class NoGlowScrollBehavior extends ScrollBehavior {
@@ -35,6 +39,8 @@ void main() async {
   audioManager.updateSettings(storageService.getSoundSettings());
 
   DownloadForegroundService.init();
+
+  await ThumbnailService.init();
 
   runApp(
     ProviderScope(
@@ -66,6 +72,10 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
       ref
           .read(downloadQueueManagerProvider)
           .restoreQueue(SystemModel.supportedSystems);
+      // Defer thumbnail migration to avoid DB contention at startup
+      Future.delayed(const Duration(seconds: 3), () {
+        ThumbnailMigrationService.migrateIfNeeded(DatabaseService());
+      });
     });
   }
 
@@ -99,6 +109,7 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(romWatcherProvider);
     final storage = ref.read(storageServiceProvider);
     final onboardingCompleted = storage.getOnboardingCompleted();
 

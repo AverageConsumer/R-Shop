@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,12 +23,21 @@ class LibraryScanScreen extends ConsumerStatefulWidget {
 }
 
 class _LibraryScanScreenState extends ConsumerState<LibraryScanScreen>
-    with ConsoleScreenMixin {
+    with ConsoleGridScreenMixin {
   bool _scanStarted = false;
   bool _scanComplete = false;
+  int _selectedIndex = 0;
+  int _crossAxisCount = 3;
+  final Map<int, GlobalKey> _itemKeys = {};
 
   @override
   String get routeId => 'library_scan';
+
+  @override
+  int get currentSelectedIndex => _selectedIndex;
+
+  @override
+  set currentSelectedIndex(int value) => _selectedIndex = value;
 
   @override
   Map<Type, Action<Intent>> get screenActions => {
@@ -34,11 +45,54 @@ class _LibraryScanScreenState extends ConsumerState<LibraryScanScreen>
           _onBack();
           return null;
         }),
-        ConfirmIntent: CallbackAction<ConfirmIntent>(onInvoke: (_) {
-          if (_scanComplete) _onBack();
-          return null;
-        }),
       };
+
+  @override
+  void onNavigate(GridDirection direction) {
+    final itemCount = _itemKeys.length;
+    if (itemCount == 0) return;
+
+    final row = _selectedIndex ~/ _crossAxisCount;
+    final col = _selectedIndex % _crossAxisCount;
+    final lastRow = (itemCount - 1) ~/ _crossAxisCount;
+
+    int newIndex = _selectedIndex;
+
+    switch (direction) {
+      case GridDirection.up:
+        if (row > 0) newIndex = (row - 1) * _crossAxisCount + col;
+      case GridDirection.down:
+        if (row < lastRow) {
+          newIndex = math.min((row + 1) * _crossAxisCount + col, itemCount - 1);
+        }
+      case GridDirection.left:
+        if (col > 0) newIndex = row * _crossAxisCount + (col - 1);
+      case GridDirection.right:
+        final rowEnd = math.min((row + 1) * _crossAxisCount - 1, itemCount - 1);
+        if (_selectedIndex < rowEnd) newIndex = _selectedIndex + 1;
+    }
+
+    if (newIndex != _selectedIndex) {
+      setState(() => _selectedIndex = newIndex);
+      _scrollToSelected();
+    }
+  }
+
+  @override
+  void onConfirm() {
+    if (_scanComplete) _onBack();
+  }
+
+  void _scrollToSelected() {
+    final key = _itemKeys[_selectedIndex];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 200),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -79,11 +133,24 @@ class _LibraryScanScreenState extends ConsumerState<LibraryScanScreen>
         .where((s) => configuredIds.contains(s.id))
         .toList();
 
-    final crossAxisCount = rs.isSmall
+    _crossAxisCount = rs.isSmall
         ? (rs.isPortrait ? 3 : 5)
         : (rs.isPortrait ? 4 : 6);
 
-    return buildWithActions(
+    // Rebuild item keys when count changes
+    if (_itemKeys.length != systems.length) {
+      _itemKeys.clear();
+      for (var i = 0; i < systems.length; i++) {
+        _itemKeys[i] = GlobalKey();
+      }
+    }
+
+    // Clamp selection to valid range
+    if (systems.isNotEmpty && _selectedIndex >= systems.length) {
+      _selectedIndex = systems.length - 1;
+    }
+
+    return buildWithGridActions(
       PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
@@ -116,7 +183,7 @@ class _LibraryScanScreenState extends ConsumerState<LibraryScanScreen>
                       child: GridView.builder(
                         padding: EdgeInsets.only(bottom: rs.spacing.xl * 2),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
+                          crossAxisCount: _crossAxisCount,
                           childAspectRatio: 0.85,
                           crossAxisSpacing: rs.spacing.md,
                           mainAxisSpacing: rs.spacing.md,
@@ -125,15 +192,18 @@ class _LibraryScanScreenState extends ConsumerState<LibraryScanScreen>
                         itemBuilder: (context, index) {
                           final system = systems[index];
                           return ScanConsoleTile(
+                            key: _itemKeys[index],
                             system: system,
                             scanState: _getTileState(system.id, syncState, config),
                             gameCount: syncState.gamesPerSystem[system.id] ?? 0,
+                            isFocused: index == _selectedIndex,
                           );
                         },
                       ),
                     ),
                   ),
                   ConsoleHud(
+                    dpad: (label: '✦', action: 'Navigate'),
                     b: HudAction('Back', onTap: _onBack),
                     a: _scanComplete
                         ? HudAction('Done', onTap: _onBack)
