@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.9.7] Beta — 2026-02-22
+
+### Added
+- **Thumbnail pipeline** — persistent isolate-based thumbnail generator (400px JPEG) with background migration on startup and proactive cover preloading during library scans
+- **ROM status providers** — real-time ROM installation tracking via filesystem watchers and download-completion listeners, replacing manual polling
+- **Installed files provider** — central isolate-scanned index of all installed ROM files across every system
+- **Cover preload** — new Settings entry to batch-generate thumbnails for all games
+
+### Improved
+- **Smart cover loading** — thumbnail-first display with magic-byte validation, JPEG re-encoding for corrupt cache entries, and scroll-suppressed loading to reduce jank during fast scrolling
+- **Controller button styling** — pill-shaped shoulder/trigger buttons, per-layout face button colors (Xbox green/red/blue/yellow, PlayStation palette), and shape painters for Nintendo +/− buttons
+- **Quick menu hints** — face button hints now show layout-correct color palettes
+- **Game card performance** — replaced `AnimatedScale`/`AnimatedContainer` with static `Transform.scale`/`Container` for smoother grid scrolling; `SelectionAwareItem` uses `ValueNotifier` to rebuild only affected cards on selection change
+- **Search overlay** — extracted `SearchableScreenMixin` (shared by GameListScreen and LibraryScreen) and moved `SearchOverlay` widget from `features/game_list/widgets/` to `widgets/` for cross-screen reuse
+- **FocusSyncManager** moved from `features/game_list/logic/` to `core/input/` for use by Library and Scan screens
+- **Library screen** — now uses `SearchableScreenMixin`, `SelectionAwareItem`, `FocusSyncManager`, and scroll suppression for consistent behavior with GameListScreen
+- **Image cache rate limiter** — cancellable pending requests, increased concurrent fetch limit (50), and host-level rate-limit detection
+- **Database schema v4** — adds `thumb_hash` and `has_thumbnail` columns; thumbnail flags preserved across game list refreshes
+- **`OverlayGuardedAction`** — generic reusable guarded action replaces per-screen private action classes
+
+### Fixed
+- **Zip bomb protection** — extracted archive size capped at 2 GB; extraction aborts with clear error if limit exceeded
+- **Web provider path traversal** — directory listing parser rejects absolute URLs and `../` href values
+- **Overlay priority teardown** — `OverlayFocusScope`, `DialogFocusScope`, and `SearchFocusScope` use `addPostFrameCallback` with try/catch instead of raw `Future()`, preventing "disposed notifier" crashes on fast screen transitions
+- **Android backup disabled** — `android:allowBackup="false"` prevents unintended data restore from breaking app state
+- **Grid navigation guard** — `_GridNavigateAction` now checks `overlayPriorityProvider` in `isEnabled`, preventing D-pad navigation while an overlay is open
+- **Focus restoration** — `mainFocusRequestProvider` now set centrally in `ConsoleScreenMixin.initState`
+
+### Internal
+- New dependencies: `image: ^4.3.0`, `crypto: ^3.0.6`
+- `GameItem.hasThumbnail` field added; `copyWith` extended accordingly
+- `adjustColumnCount()` helper extracted to `ConsoleScreenMixin`
+- Deleted 4 obsolete files: `animated_background.dart`, `radial_glow.dart`, `folder_analysis_view.dart`, `search_overlay.dart` (game_list copy)
+
+---
+
 ## [0.9.6] Beta — 2026-02-21
 
 ### Added
