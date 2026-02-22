@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **ROM status providers** — real-time ROM installation tracking via filesystem watchers and download-completion listeners, replacing manual polling
 - **Installed files provider** — central isolate-scanned index of all installed ROM files across every system
 - **Cover preload** — new Settings entry to batch-generate thumbnails for all games
+- **About section** — app version, GitHub/Issues links, and Easter Egg tagline in Settings
+- **Zip extraction limit** — increased from 2 GB to 8 GB
 
 ### Improved
 - **Smart cover loading** — thumbnail-first display with magic-byte validation, JPEG re-encoding for corrupt cache entries, and scroll-suppressed loading to reduce jank during fast scrolling

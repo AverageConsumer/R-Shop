@@ -1,6 +1,10 @@
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/input/input.dart';
+import '../../core/widgets/console_focusable.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/screen_layout.dart';
@@ -40,6 +44,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   final FocusNode _hapticFocusNode = FocusNode();
   final FocusNode _layoutFocusNode = FocusNode();
   final FocusNode _homeLayoutFocusNode = FocusNode();
+  late final ConfettiController _confettiController;
+  int _taglineTapCount = 0;
+  String _appVersion = '';
 
   @override
   String get routeId => 'settings';
@@ -65,6 +72,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     _bgmVolume = soundSettings.bgmVolume;
     _sfxVolume = soundSettings.sfxVolume;
 
+    _confettiController = ConfettiController(duration: const Duration(seconds: 2));
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) setState(() => _appVersion = info.version);
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _homeLayoutFocusNode.requestFocus();
     });
@@ -72,6 +84,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   @override
   void dispose() {
+    _confettiController.dispose();
     _hapticFocusNode.dispose();
     _layoutFocusNode.dispose();
     _homeLayoutFocusNode.dispose();
@@ -520,6 +533,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                           ),
                           SizedBox(height: rs.spacing.md),
                           _buildCoverPreloadTile(),
+
+                          SizedBox(height: rs.spacing.xl),
+                          _buildSectionHeader('About', rs),
+                          _buildAboutSection(rs),
+                          SizedBox(height: rs.spacing.md),
+                          SettingsItem(
+                            title: 'GitHub',
+                            subtitle: 'View source code on GitHub',
+                            trailing: const Icon(Icons.open_in_new_rounded, color: Colors.white70),
+                            onTap: () => launchUrl(Uri.parse('https://github.com/AverageConsumer/R-Shop')),
+                          ),
+                          SizedBox(height: rs.spacing.md),
+                          SettingsItem(
+                            title: 'Issues',
+                            subtitle: 'Report bugs or request features',
+                            trailing: const Icon(Icons.bug_report_outlined, color: Colors.white70),
+                            onTap: () => launchUrl(Uri.parse('https://github.com/AverageConsumer/R-Shop/issues')),
+                          ),
+                          SizedBox(height: rs.spacing.xl),
                         ],
                       ),
                     ),
@@ -533,6 +565,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   embedded: true,
                 ),
             ],
+          ),
+
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirectionality: BlastDirectionality.explosive,
+              colors: const [Colors.blue, Colors.lightBlue, Colors.white, Color(0xFF1565C0)],
+              numberOfParticles: 30,
+              gravity: 0.2,
+            ),
           ),
 
           if (showQuickMenu)
@@ -691,6 +734,56 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAboutSection(Responsive rs) {
+    return Column(
+      children: [
+        SizedBox(height: rs.spacing.md),
+        const Icon(Icons.sports_esports_rounded, size: 32, color: Colors.white24),
+        SizedBox(height: rs.spacing.sm),
+        Text(
+          'R-SHOP',
+          style: AppTheme.headlineLarge.copyWith(
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 3,
+          ),
+        ),
+        SizedBox(height: rs.spacing.xs),
+        Text(
+          _appVersion.isNotEmpty ? 'v$_appVersion' : '',
+          style: AppTheme.bodySmall.copyWith(color: Colors.white38),
+        ),
+        SizedBox(height: rs.spacing.md),
+        ConsoleFocusableListItem(
+          onSelect: () {
+            _taglineTapCount++;
+            if (_taglineTapCount >= 5) {
+              _confettiController.play();
+              _taglineTapCount = 0;
+              ref.read(feedbackServiceProvider).confirm();
+            } else {
+              ref.read(feedbackServiceProvider).tick();
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Center(
+              child: Text(
+                'INTENSIV, AGGRESSIV, MUTIG',
+                style: AppTheme.titleMedium.copyWith(
+                  color: Colors.white54,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: rs.spacing.md),
+      ],
     );
   }
 

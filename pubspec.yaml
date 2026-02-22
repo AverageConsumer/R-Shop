@@ -29,6 +29,9 @@ dependencies:
   flutter_foreground_task: ^9.2.0
   image: ^4.3.0
   crypto: ^3.0.6
+  url_launcher: ^6.2.5
+  confetti: ^0.8.0
+  package_info_plus: ^8.0.0
 
 
 dev_dependencies:

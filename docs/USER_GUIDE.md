@@ -370,6 +370,13 @@ Adjust audio sliders with left/right on the D-pad (steps of 5%).
 | Scan Library | Rescan all console folders to discover games |
 | Reset Application | Factory reset: clears all settings, database, and cache |
 
+### About
+
+| Element | Description |
+|---------|-------------|
+| GitHub | Opens the R-Shop GitHub repository in the browser |
+| Issues | Opens the GitHub issues page to report bugs or request features |
+
 ---
 
 ## Controls Reference

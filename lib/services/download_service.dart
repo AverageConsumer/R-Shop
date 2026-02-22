@@ -548,8 +548,8 @@ class DownloadService {
     }
   }
 
-  /// Maximum total size of extracted files (2 GB). Protects against zip bombs.
-  static const int _maxExtractedBytes = 2 * 1024 * 1024 * 1024;
+  /// Maximum total size of extracted files (8 GB). Protects against zip bombs.
+  static const int _maxExtractedBytes = 8 * 1024 * 1024 * 1024;
 
   Future<void> _extractZipWithMultiFileSupport(
     File zipFile,
@@ -573,7 +573,7 @@ class DownloadService {
         totalSize += file.lengthSync();
         if (totalSize > _maxExtractedBytes) {
           throw Exception(
-            'Extracted archive exceeds 2 GB safety limit — aborting',
+            'Extracted archive exceeds 8 GB safety limit — aborting',
           );
         }
       }
