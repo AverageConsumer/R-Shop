@@ -13,6 +13,9 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
   <a href="https://averageconsumer.github.io/R-Shop/">
     <img src="https://img.shields.io/badge/Website-Visit_R--Shop-blueviolet?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website" />
   </a>
+  <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/averageconsumer/r-shop">
+    <img src="https://img.shields.io/badge/Get_it_on-Obtainium-blue?style=for-the-badge" alt="Obtainium" />
+  </a>
   <a href="https://github.com/averageconsumer/r-shop/releases">
     <img src="https://img.shields.io/badge/Download-Latest_APK-brightgreen?style=for-the-badge&logo=android&logoColor=white" alt="Download" />
   </a>
@@ -22,7 +25,7 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
   <img src="https://img.shields.io/badge/version-0.9.8_Beta-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
   <img src="https://img.shields.io/badge/platform-Android-brightgreen?style=flat-square" alt="Platform" />
-  <img src="https://img.shields.io/github/stars/averageconsumer/r-shop?style=flat-square&color=yellow" alt="Stars" />
+  <img src="https://img.shields.io/github/stars/averageconsumer/R-Shop?style=flat-square&color=yellow" alt="Stars" />
 </p>
 
 ---
@@ -77,7 +80,9 @@ It bridges the gap between your self-hosted storage (**RomM, SMB, FTP, Web**) an
 ## 📲 Installation
 
 ### 🚀 The Best Way: Obtainium
-Keep R-Shop updated automatically using **[Obtainium](https://github.com/ImranR98/Obtainium)**. Just add this repository URL and never miss a Beta update.
+Keep R-Shop updated automatically and never miss a Beta release. Click the button below on your Android device to add R-Shop directly to Obtainium:
+
+[![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/averageconsumer/r-shop)
 
 ### 📦 Manual APK
 Download the latest `.apk` from the [**Releases**](../../releases) page and install it manually.
