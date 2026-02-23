@@ -5,7 +5,7 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
 
 <p align="center">
   <a href="https://averageconsumer.github.io/R-Shop/">
-    <img src="docs/screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
+    <img src="screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
   </a>
 </p>
 
@@ -53,12 +53,12 @@ It bridges the gap between your self-hosted storage (**RomM, SMB, FTP, Web**) an
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/console_list.png" width="400" alt="Console Overview" />
-  <img src="docs/screenshots/rom_list.png" width="400" alt="ROM List" />
+  <img src="screenshots/console_list.png" width="400" alt="Console Overview" />
+  <img src="screenshots/rom_list.png" width="400" alt="ROM List" />
 </p>
 <p align="center">
-  <img src="docs/screenshots/smb_setup.png" width="400" alt="SMB Network Setup" />
-  <img src="docs/screenshots/download_queue.png" width="400" alt="Download Queue" />
+  <img src="screenshots/smb_setup.png" width="400" alt="SMB Network Setup" />
+  <img src="screenshots/download_queue.png" width="400" alt="Download Queue" />
 </p>
 
 ---
