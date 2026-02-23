@@ -3,6 +3,7 @@ package com.retro.rshop
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.StatFs
 import android.util.Log
 import android.view.KeyEvent
 import io.flutter.embedding.android.FlutterActivity
@@ -12,6 +13,7 @@ import java.util.zip.ZipInputStream
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.retro.rshop/zip"
+    private val STORAGE_CHANNEL = "com.retro.rshop/storage"
     private val TAG = "MainActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,6 +47,27 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                     }.start()
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, STORAGE_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getFreeSpace" -> {
+                    val path = call.argument<String>("path")
+                    if (path == null) {
+                        result.error("INVALID_ARGS", "path required", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val stat = StatFs(path)
+                        val freeBytes = stat.availableBytes
+                        val totalBytes = stat.totalBytes
+                        result.success(mapOf("freeBytes" to freeBytes, "totalBytes" to totalBytes))
+                    } catch (e: Exception) {
+                        result.error("STAT_ERROR", e.message, null)
+                    }
                 }
                 else -> result.notImplemented()
             }

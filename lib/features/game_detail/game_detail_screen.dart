@@ -54,6 +54,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     with ConsoleScreenMixin {
   GameDetailController? _controller;
   late InputDebouncer _debouncer;
+  ProviderSubscription? _romChangeSubscription;
   bool _variantNavHeld = false;
 
   @override
@@ -115,7 +116,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     _controller!.addListener(_onControllerChanged);
 
     setState(() {});
-    ref.listenManual(romChangeSignalProvider, (prev, next) {
+    _romChangeSubscription = ref.listenManual(romChangeSignalProvider, (prev, next) {
+      if (!mounted) return;
       if (prev != null && prev != next) {
         _controller?.checkInstallationStatus();
       }
@@ -140,6 +142,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
   @override
   void dispose() {
+    _romChangeSubscription?.close();
     _debouncer.stopHold();
     _controller?.removeListener(_onControllerChanged);
     _controller?.dispose();
@@ -177,7 +180,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       } else {
         ref.read(feedbackServiceProvider).cancel();
       }
-      _executeDialogAction(controller).then((_) => requestScreenFocus());
+      _executeDialogAction(controller).then((_) {
+        if (mounted) requestScreenFocus();
+      });
       return;
     }
 
@@ -677,12 +682,15 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                widget.system.name,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.95),
-                  fontWeight: FontWeight.w600,
-                  fontSize: badgeFontSize,
+              Flexible(
+                child: Text(
+                  widget.system.name,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    fontWeight: FontWeight.w600,
+                    fontSize: badgeFontSize,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Container(

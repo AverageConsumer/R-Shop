@@ -14,7 +14,8 @@ Uint8List? _reencodeAsJpeg(Uint8List input) {
     final decoded = img.decodeImage(input);
     if (decoded == null) return null;
     return Uint8List.fromList(img.encodeJpg(decoded, quality: 90));
-  } catch (_) {
+  } catch (e) {
+    debugPrint('SmartCoverImage: JPEG re-encode failed: $e');
     return null;
   }
 }
@@ -194,7 +195,9 @@ class _SmartCoverImageState extends State<SmartCoverImage> {
           return;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('SmartCoverImage: cache validation failed: $e');
+    }
     if (mounted) setState(() => _validatingCache = false);
   }
 
@@ -269,7 +272,8 @@ class _SmartCoverImageState extends State<SmartCoverImage> {
         setState(() => _dartDecodedBytes = jpegBytes);
         _onSuccess(url);
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('SmartCoverImage: dart decode failed for $url: $e');
       if (mounted) {
         GameCoverCacheManager.instance.removeFile(url);
         onFail();

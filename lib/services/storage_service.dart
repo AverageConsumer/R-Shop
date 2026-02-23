@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/sound_settings.dart';
@@ -28,51 +29,68 @@ class StorageService {
     _prefs = await SharedPreferences.getInstance();
   }
 
+  void _ensureInitialized() {
+    if (_prefs == null) {
+      throw StateError('StorageService not initialized. Call init() first.');
+    }
+  }
+
   String? getRomPath() {
-    return _prefs?.getString(_romPathKey);
+    _ensureInitialized();
+    return _prefs!.getString(_romPathKey);
   }
 
   Future<void> setRomPath(String path) async {
-    await _prefs?.setString(_romPathKey, path);
+    _ensureInitialized();
+    await _prefs!.setString(_romPathKey, path);
   }
 
   bool getHapticEnabled() {
-    return _prefs?.getBool(_hapticEnabledKey) ?? true;
+    _ensureInitialized();
+    return _prefs!.getBool(_hapticEnabledKey) ?? true;
   }
 
   Future<void> setHapticEnabled(bool enabled) async {
-    await _prefs?.setBool(_hapticEnabledKey, enabled);
+    _ensureInitialized();
+    await _prefs!.setBool(_hapticEnabledKey, enabled);
   }
 
   bool getOnboardingCompleted() {
-    return _prefs?.getBool(_onboardingCompletedKey) ?? false;
+    _ensureInitialized();
+    return _prefs!.getBool(_onboardingCompletedKey) ?? false;
   }
 
   Future<void> setOnboardingCompleted(bool completed) async {
-    await _prefs?.setBool(_onboardingCompletedKey, completed);
+    _ensureInitialized();
+    await _prefs!.setBool(_onboardingCompletedKey, completed);
   }
 
   Future<void> resetOnboarding() async {
-    await _prefs?.remove(_onboardingCompletedKey);
-    await _prefs?.remove(_romPathKey);
+    _ensureInitialized();
+    await _prefs!.remove(_onboardingCompletedKey);
+    await _prefs!.remove(_romPathKey);
   }
 
   Future<void> resetAll() async {
-    await _prefs?.clear();
+    _ensureInitialized();
+    await _prefs!.clear();
   }
 
   SoundSettings getSoundSettings() {
-    final json = _prefs?.getString(_soundSettingsKey);
+    _ensureInitialized();
+    final json = _prefs!.getString(_soundSettingsKey);
     if (json == null) return const SoundSettings();
     try {
       return SoundSettings.fromJson(jsonDecode(json) as Map<String, dynamic>);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('StorageService: sound settings parse failed, using defaults: $e');
       return const SoundSettings();
     }
   }
 
   Future<void> setSoundSettings(SoundSettings settings) async {
-    await _prefs?.setString(_soundSettingsKey, jsonEncode(settings.toJson()));
+    _ensureInitialized();
+    await _prefs!.setString(_soundSettingsKey, jsonEncode(settings.toJson()));
   }
 
   Future<String?> pickFolder() async {
@@ -89,95 +107,122 @@ class StorageService {
   }
 
   int getGridColumns(String systemName) {
-    return _prefs?.getInt('$_gridColumnsPrefix$systemName') ?? 4;
+    _ensureInitialized();
+    return _prefs!.getInt('$_gridColumnsPrefix$systemName') ?? 4;
   }
 
   Future<void> setGridColumns(String systemName, int columns) async {
-    await _prefs?.setInt('$_gridColumnsPrefix$systemName', columns);
+    _ensureInitialized();
+    await _prefs!.setInt('$_gridColumnsPrefix$systemName', columns);
   }
 
   bool getShowFullFilename() {
-    return _prefs?.getBool(_showFullFilenameKey) ?? false;
+    _ensureInitialized();
+    return _prefs!.getBool(_showFullFilenameKey) ?? false;
   }
 
   Future<void> setShowFullFilename(bool value) async {
-    await _prefs?.setBool(_showFullFilenameKey, value);
+    _ensureInitialized();
+    await _prefs!.setBool(_showFullFilenameKey, value);
   }
 
   // --- Max Concurrent Downloads ---
 
-  int getMaxConcurrentDownloads() =>
-      _prefs?.getInt(_maxConcurrentDownloadsKey) ?? 2;
+  int getMaxConcurrentDownloads() {
+    _ensureInitialized();
+    return _prefs!.getInt(_maxConcurrentDownloadsKey) ?? 2;
+  }
 
   Future<void> setMaxConcurrentDownloads(int value) async {
-    await _prefs?.setInt(_maxConcurrentDownloadsKey, value);
+    _ensureInitialized();
+    await _prefs!.setInt(_maxConcurrentDownloadsKey, value);
   }
 
   // --- Download Queue Persistence ---
 
-  String? getDownloadQueue() => _prefs?.getString(_downloadQueueKey);
+  String? getDownloadQueue() {
+    _ensureInitialized();
+    return _prefs!.getString(_downloadQueueKey);
+  }
 
   Future<void> setDownloadQueue(String json) async {
-    await _prefs?.setString(_downloadQueueKey, json);
+    _ensureInitialized();
+    await _prefs!.setString(_downloadQueueKey, json);
   }
 
   Future<void> clearDownloadQueue() async {
-    await _prefs?.remove(_downloadQueueKey);
+    _ensureInitialized();
+    await _prefs!.remove(_downloadQueueKey);
   }
 
   // --- Filter Persistence ---
 
-  String? getFilters(String systemId) =>
-      _prefs?.getString('$_filterPrefix$systemId');
+  String? getFilters(String systemId) {
+    _ensureInitialized();
+    return _prefs!.getString('$_filterPrefix$systemId');
+  }
 
   Future<void> setFilters(String systemId, String json) async {
-    await _prefs?.setString('$_filterPrefix$systemId', json);
+    _ensureInitialized();
+    await _prefs!.setString('$_filterPrefix$systemId', json);
   }
 
   Future<void> removeFilters(String systemId) async {
-    await _prefs?.remove('$_filterPrefix$systemId');
+    _ensureInitialized();
+    await _prefs!.remove('$_filterPrefix$systemId');
   }
 
   // --- Global RomM Connection ---
 
-  String? getRommUrl() => _prefs?.getString(_rommUrlKey);
+  String? getRommUrl() {
+    _ensureInitialized();
+    return _prefs!.getString(_rommUrlKey);
+  }
 
   Future<void> setRommUrl(String? url) async {
+    _ensureInitialized();
     if (url == null || url.isEmpty) {
-      await _prefs?.remove(_rommUrlKey);
+      await _prefs!.remove(_rommUrlKey);
     } else {
-      await _prefs?.setString(_rommUrlKey, url);
+      await _prefs!.setString(_rommUrlKey, url);
     }
   }
 
-  String? getRommAuth() => _prefs?.getString(_rommAuthKey);
+  String? getRommAuth() {
+    _ensureInitialized();
+    return _prefs!.getString(_rommAuthKey);
+  }
 
   Future<void> setRommAuth(String? json) async {
+    _ensureInitialized();
     if (json == null) {
-      await _prefs?.remove(_rommAuthKey);
+      await _prefs!.remove(_rommAuthKey);
     } else {
-      await _prefs?.setString(_rommAuthKey, json);
+      await _prefs!.setString(_rommAuthKey, json);
     }
   }
 
   // --- Favorites Persistence ---
 
   List<String> getFavorites() {
-    return _prefs?.getStringList(_favoritesKey) ?? [];
+    _ensureInitialized();
+    return _prefs!.getStringList(_favoritesKey) ?? [];
   }
 
   Future<void> setFavorites(List<String> favorites) async {
-    await _prefs?.setStringList(_favoritesKey, favorites);
+    _ensureInitialized();
+    await _prefs!.setStringList(_favoritesKey, favorites);
   }
 
   Future<void> toggleFavorite(String gameId) async {
+    _ensureInitialized();
     final favorites = getFavorites();
     if (favorites.contains(gameId)) {
       favorites.remove(gameId);
     } else {
       favorites.add(gameId);
     }
-    await _prefs?.setStringList(_favoritesKey, favorites);
+    await _prefs!.setStringList(_favoritesKey, favorites);
   }
 
   bool isFavorite(String gameId) {
@@ -186,7 +231,8 @@ class StorageService {
 
   // Controller Layout
   ControllerLayout getControllerLayout() {
-    final stored = _prefs?.getString(_controllerLayoutKey);
+    _ensureInitialized();
+    final stored = _prefs!.getString(_controllerLayoutKey);
     if (stored != null) {
       return ControllerLayout.values.firstWhere(
         (e) => e.name == stored,
@@ -194,21 +240,24 @@ class StorageService {
       );
     }
     // Migration: read old bool key
-    final oldBool = _prefs?.getBool(_xboxLayoutKey);
+    final oldBool = _prefs!.getBool(_xboxLayoutKey);
     if (oldBool == true) return ControllerLayout.xbox;
     return ControllerLayout.nintendo;
   }
 
   Future<void> setControllerLayout(ControllerLayout layout) async {
-    await _prefs?.setString(_controllerLayoutKey, layout.name);
+    _ensureInitialized();
+    await _prefs!.setString(_controllerLayoutKey, layout.name);
   }
 
   // Home Layout
   bool getHomeLayoutIsGrid() {
-    return _prefs?.getBool(_homeLayoutKey) ?? false;
+    _ensureInitialized();
+    return _prefs!.getBool(_homeLayoutKey) ?? false;
   }
 
   Future<void> setHomeLayoutIsGrid(bool value) async {
-    await _prefs?.setBool(_homeLayoutKey, value);
+    _ensureInitialized();
+    await _prefs!.setBool(_homeLayoutKey, value);
   }
 }

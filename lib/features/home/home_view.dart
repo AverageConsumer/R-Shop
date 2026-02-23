@@ -764,7 +764,9 @@ class _HomeViewState extends ConsumerState<HomeView>
             return _pageController.page ?? _initialPage.toDouble();
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('HomeView: pageController access failed: $e');
+      }
       return _initialPage.toDouble();
     }
 

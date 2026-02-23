@@ -277,7 +277,9 @@ class _RommConnectViewState extends ConsumerState<_RommConnectView> {
               .read(onboardingControllerProvider.notifier)
               .updateRommSetupField('pass', v);
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('RommSetupStep: auth autofill failed: $e');
+      }
     }
   }
 

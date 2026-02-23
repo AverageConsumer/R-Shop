@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../models/game_item.dart';
 import '../models/system_model.dart';
 import '../services/rom_manager.dart';
@@ -36,8 +38,17 @@ class GameMergeHelper {
       byFilename[game.filename] = game;
     }
     for (final game in localGames) {
-      if (remoteTargetNames.contains(game.filename)) continue;
-      byFilename.putIfAbsent(game.filename, () => game);
+      if (remoteTargetNames.contains(game.filename)) {
+        debugPrint('GameMergeHelper: skipping local "${game.filename}" '
+            '(matches remote archive target)');
+        continue;
+      }
+      if (byFilename.containsKey(game.filename)) {
+        debugPrint('GameMergeHelper: local "${game.filename}" '
+            'shadowed by remote with same filename');
+        continue;
+      }
+      byFilename[game.filename] = game;
     }
 
     return byFilename.values.toList()

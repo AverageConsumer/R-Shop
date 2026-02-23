@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:ftpconnect/ftpconnect.dart';
 
 import '../../models/config/provider_config.dart';
@@ -87,7 +88,9 @@ class FtpProvider implements SourceProvider {
         activeClient = null;
         try {
           await client.disconnect();
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('FtpProvider: disconnect failed: $e');
+        }
       },
     );
   }
@@ -102,7 +105,9 @@ class FtpProvider implements SourceProvider {
     } catch (e) {
       return SourceConnectionResult.failed(e.toString());
     } finally {
-      try { await ftp.disconnect(); } catch (_) {}
+      try { await ftp.disconnect(); } catch (e) {
+        debugPrint('FtpProvider: testConnection disconnect failed: $e');
+      }
     }
   }
 
@@ -133,9 +138,15 @@ class FtpProvider implements SourceProvider {
   /// Splits a remote path into (directory, filename).
   /// Returns an empty directory string when the path has no `/`.
   static (String dir, String name) _splitPath(String remotePath) {
-    final lastSlash = remotePath.lastIndexOf('/');
-    if (lastSlash < 0) return ('', remotePath);
-    return (remotePath.substring(0, lastSlash), remotePath.substring(lastSlash + 1));
+    // Strip trailing slash
+    final path = remotePath.endsWith('/') && remotePath.length > 1
+        ? remotePath.substring(0, remotePath.length - 1)
+        : remotePath;
+    final lastSlash = path.lastIndexOf('/');
+    if (lastSlash < 0) return ('', path);
+    final name = path.substring(lastSlash + 1);
+    if (name.isEmpty) return ('/', '');
+    return (path.substring(0, lastSlash), name);
   }
 
 }

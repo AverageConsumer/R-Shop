@@ -60,46 +60,56 @@ class RomManager {
     SystemModel system,
     String targetFolder,
   ) async {
-    final dir = Directory(targetFolder);
-    if (!await dir.exists()) return [];
+    try {
+      final dir = Directory(targetFolder);
+      if (!await dir.exists()) return [];
 
-    final entities = await dir.list().toList();
-    return _scanDirectory(
-      entities,
-      system.romExtensions,
-      system.multiFileExtensions,
-    );
+      final entities = await dir.list().toList();
+      return _scanDirectory(
+        entities,
+        system.romExtensions,
+        system.multiFileExtensions,
+      );
+    } on FileSystemException catch (e) {
+      debugPrint('RomManager: cannot scan $targetFolder: $e');
+      return [];
+    }
   }
 
   Future<bool> exists(
       GameItem game, SystemModel system, String targetFolder) async {
-    final directPath = getTargetPath(game, system, targetFolder);
-    if (await File(directPath).exists()) {
-      return true;
-    }
+    try {
+      final directPath = getTargetPath(game, system, targetFolder);
+      if (await File(directPath).exists()) {
+        return true;
+      }
 
-    final gameName = extractGameName(game.filename);
-    if (gameName != null) {
-      final subfolderPath = safePath(targetFolder, gameName);
-      final subfolder = Directory(subfolderPath);
-      if (await subfolder.exists()) {
-        final validExts = {
-          ...system.romExtensions.map((e) => e.toLowerCase()),
-          ...?system.multiFileExtensions?.map((e) => e.toLowerCase()),
-        };
-        final files = subfolder.listSync();
-        for (final file in files) {
-          if (file is File) {
-            final ext = p.extension(file.path).toLowerCase();
-            if (validExts.contains(ext)) {
-              return true;
+      final gameName = extractGameName(game.filename);
+      if (gameName != null) {
+        final subfolderPath = safePath(targetFolder, gameName);
+        final subfolder = Directory(subfolderPath);
+        if (await subfolder.exists()) {
+          final validExts = {
+            ...system.romExtensions.map((e) => e.toLowerCase()),
+            ...?system.multiFileExtensions?.map((e) => e.toLowerCase()),
+          };
+          final files = subfolder.listSync();
+          for (final file in files) {
+            if (file is File) {
+              final ext = p.extension(file.path).toLowerCase();
+              if (validExts.contains(ext)) {
+                return true;
+              }
             }
           }
         }
       }
-    }
 
-    return false;
+      return false;
+    } on FileSystemException catch (e) {
+      debugPrint('RomManager: exists check failed for ${game.filename}: $e');
+      return false;
+    }
   }
 
   Future<Map<int, bool>> checkMultipleExists(
@@ -116,20 +126,24 @@ class RomManager {
 
   Future<void> delete(
       GameItem game, SystemModel system, String targetFolder) async {
-    final path = getTargetPath(game, system, targetFolder);
-    final file = File(path);
-    if (await file.exists()) {
-      await file.delete();
-      return;
-    }
-
-    final gameName = extractGameName(game.filename);
-    if (gameName != null) {
-      final subfolderPath = safePath(targetFolder, gameName);
-      final subfolder = Directory(subfolderPath);
-      if (await subfolder.exists()) {
-        await subfolder.delete(recursive: true);
+    try {
+      final path = getTargetPath(game, system, targetFolder);
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+        return;
       }
+
+      final gameName = extractGameName(game.filename);
+      if (gameName != null) {
+        final subfolderPath = safePath(targetFolder, gameName);
+        final subfolder = Directory(subfolderPath);
+        if (await subfolder.exists()) {
+          await subfolder.delete(recursive: true);
+        }
+      }
+    } on FileSystemException catch (e) {
+      debugPrint('RomManager: delete failed for ${game.filename}: $e');
     }
   }
 
@@ -200,7 +214,12 @@ class RomManager {
     for (final entity in entities) {
       if (entity is! Directory) continue;
       final name = p.basename(entity.path);
-      final subFiles = entity.listSync(recursive: true);
+      List<FileSystemEntity> subFiles;
+      try {
+        subFiles = entity.listSync(recursive: true);
+      } on FileSystemException {
+        continue;
+      }
       final hasMatchingFile = subFiles.any((f) =>
           f is File && subDirExts.contains(p.extension(f.path).toLowerCase()));
       if (hasMatchingFile) {
@@ -246,13 +265,17 @@ class _ScanParams {
 }
 
 Future<List<GameItem>> _scanLocalGamesIsolateEntry(_ScanParams params) async {
-  final dir = Directory(params.targetFolder);
-  if (!await dir.exists()) return [];
+  try {
+    final dir = Directory(params.targetFolder);
+    if (!await dir.exists()) return [];
 
-  final entities = await dir.list().toList();
-  return RomManager._scanDirectory(
-    entities,
-    params.romExtensions,
-    params.multiFileExtensions,
-  );
+    final entities = await dir.list().toList();
+    return RomManager._scanDirectory(
+      entities,
+      params.romExtensions,
+      params.multiFileExtensions,
+    );
+  } on FileSystemException {
+    return [];
+  }
 }

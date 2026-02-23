@@ -108,7 +108,9 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
           _getController('pass', null).text = auth.pass!;
           _syncField('pass', auth.pass!);
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('ProviderForm: auth autofill failed: $e');
+      }
     }
   }
 

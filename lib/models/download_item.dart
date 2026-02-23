@@ -26,6 +26,7 @@ class DownloadItem {
   final double? downloadSpeed;
   final String? error;
   final int retryCount;
+  final String? tempFilePath;
 
   DownloadItem({
     required this.id,
@@ -40,6 +41,7 @@ class DownloadItem {
     this.downloadSpeed,
     this.error,
     this.retryCount = 0,
+    this.tempFilePath,
   }) : addedAt = addedAt ?? DateTime.now();
 
   String get displayText {
@@ -89,6 +91,7 @@ class DownloadItem {
   bool get isFinished => isComplete || isFailed || isCancelled;
 
   DownloadItem copyWith({
+    GameItem? game,
     DownloadItemStatus? status,
     double? progress,
     int? receivedBytes,
@@ -98,10 +101,12 @@ class DownloadItem {
     bool clearError = false,
     bool clearSpeed = false,
     int? retryCount,
+    String? tempFilePath,
+    bool clearTempFilePath = false,
   }) {
     return DownloadItem(
       id: id,
-      game: game,
+      game: game ?? this.game,
       system: system,
       targetFolder: targetFolder,
       addedAt: addedAt,
@@ -112,6 +117,7 @@ class DownloadItem {
       downloadSpeed: clearSpeed ? null : (downloadSpeed ?? this.downloadSpeed),
       error: clearError ? null : (error ?? this.error),
       retryCount: retryCount ?? this.retryCount,
+      tempFilePath: clearTempFilePath ? null : (tempFilePath ?? this.tempFilePath),
     );
   }
 
@@ -125,12 +131,26 @@ class DownloadItem {
       'systemId': system.id,
       'targetFolder': targetFolder,
       'addedAt': addedAt.toIso8601String(),
-      'status': status.index,
+      'status': status.name,
       'progress': progress,
       'retryCount': retryCount,
+      if (tempFilePath != null) 'tempFilePath': tempFilePath,
       if (game.providerConfig != null)
         'providerConfig': game.providerConfig!.toJsonWithoutAuth(),
     };
+  }
+
+  static DownloadItemStatus _parseStatus(dynamic value) {
+    if (value is String) {
+      return DownloadItemStatus.values.firstWhere(
+        (e) => e.name == value,
+        orElse: () => DownloadItemStatus.queued,
+      );
+    }
+    if (value is int && value < DownloadItemStatus.values.length) {
+      return DownloadItemStatus.values[value];
+    }
+    return DownloadItemStatus.queued;
   }
 
   factory DownloadItem.fromJson(Map<String, dynamic> json, SystemModel system) {
@@ -151,11 +171,10 @@ class DownloadItem {
       system: system,
       targetFolder: (json['targetFolder'] ?? json['romPath']) as String,
       addedAt: DateTime.parse(json['addedAt'] as String),
-      status: (json['status'] as int) < DownloadItemStatus.values.length
-          ? DownloadItemStatus.values[json['status'] as int]
-          : DownloadItemStatus.queued,
+      status: _parseStatus(json['status']),
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
       retryCount: (json['retryCount'] as int?) ?? 0,
+      tempFilePath: json['tempFilePath'] as String?,
     );
   }
 }

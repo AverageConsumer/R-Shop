@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/responsive/responsive.dart';
 import '../../../models/system_model.dart';
+import '../../../providers/app_providers.dart';
 
-class GameListHeader extends StatelessWidget {
+class GameListHeader extends ConsumerWidget {
   final SystemModel system;
   final int gameCount;
   final bool hasActiveFilters;
@@ -20,7 +22,7 @@ class GameListHeader extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final rs = context.rs;
     final titleFontSize = rs.isSmall ? 18.0 : (rs.isMedium ? 21.0 : 24.0);
     final subtitleFontSize = rs.isSmall ? 9.0 : 11.0;
@@ -112,45 +114,55 @@ class GameListHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: rs.isSmall ? 8 : 12,
-                    vertical: rs.isSmall ? 5 : 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(rs.isSmall ? 14 : 20),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.1),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: rs.isSmall ? 8 : 12,
+                        vertical: rs.isSmall ? 5 : 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(rs.isSmall ? 14 : 20),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (hasActiveFilters) ...[
+                            Icon(
+                              Icons.filter_list,
+                              size: iconSize,
+                              color: system.accentColor,
+                            ),
+                            SizedBox(width: rs.isSmall ? 4 : 6),
+                          ],
+                          Icon(
+                            Icons.games,
+                            size: iconSize,
+                            color: system.accentColor,
+                          ),
+                          SizedBox(width: rs.isSmall ? 4 : 8),
+                          Text(
+                            '$gameCount Games',
+                            style: TextStyle(
+                              fontSize: badgeFontSize,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (hasActiveFilters) ...[
-                        Icon(
-                          Icons.filter_list,
-                          size: iconSize,
-                          color: system.accentColor,
-                        ),
-                        SizedBox(width: rs.isSmall ? 4 : 6),
-                      ],
-                      Icon(
-                        Icons.games,
-                        size: iconSize,
-                        color: system.accentColor,
+                    if (targetFolder.isNotEmpty)
+                      _StorageBadge(
+                        targetFolder: targetFolder,
+                        rs: rs,
                       ),
-                      SizedBox(width: rs.isSmall ? 4 : 8),
-                      Text(
-                        '$gameCount Games',
-                        style: TextStyle(
-                          fontSize: badgeFontSize,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -196,5 +208,73 @@ class GameListHeader extends StatelessWidget {
       }
     }
     return path;
+  }
+}
+
+class _StorageBadge extends ConsumerWidget {
+  final String targetFolder;
+  final Responsive rs;
+
+  const _StorageBadge({
+    required this.targetFolder,
+    required this.rs,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final storageAsync = ref.watch(storageInfoProvider(targetFolder));
+
+    return storageAsync.when(
+      data: (info) {
+        if (info == null) return const SizedBox.shrink();
+
+        final Color color;
+        final IconData icon;
+        if (info.isLow) {
+          color = Colors.red;
+          icon = Icons.warning_rounded;
+        } else if (info.isWarning) {
+          color = Colors.amber;
+          icon = Icons.warning_rounded;
+        } else {
+          color = Colors.white54;
+          icon = Icons.storage_rounded;
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: rs.isSmall ? 8 : 10,
+              vertical: rs.isSmall ? 3 : 5,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(rs.isSmall ? 10 : 14),
+              border: Border.all(
+                color: color.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: rs.isSmall ? 10 : 12, color: color),
+                SizedBox(width: rs.isSmall ? 3 : 5),
+                Text(
+                  info.freeSpaceText,
+                  style: TextStyle(
+                    fontSize: rs.isSmall ? 9 : 11,
+                    fontWeight: FontWeight.w500,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
   }
 }

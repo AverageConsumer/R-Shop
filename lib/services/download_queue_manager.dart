@@ -2,10 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import '../models/config/app_config.dart';
+import '../models/config/provider_config.dart';
 import '../models/download_item.dart';
 import '../models/game_item.dart';
 import '../models/system_model.dart';
 import 'download_foreground_service.dart';
+import 'disk_space_service.dart';
 import 'download_service.dart';
 import 'storage_service.dart';
 
@@ -53,11 +56,10 @@ class DownloadQueueState {
   bool canStartNewDownload() => activeCount < maxConcurrent;
 
   DownloadItem? getDownloadById(String id) {
-    try {
-      return queue.firstWhere((item) => item.id == id);
-    } catch (_) {
-      return null;
+    for (final item in queue) {
+      if (item.id == id) return item;
     }
+    return null;
   }
 
   DownloadQueueState copyWith({
@@ -73,10 +75,13 @@ class DownloadQueueState {
 
 class DownloadQueueManager extends ChangeNotifier {
   static const int _maxRetries = 3;
+  static const int _maxQueueSize = 100;
   static final Random _jitterRandom = Random();
 
   DownloadQueueState _state = const DownloadQueueState();
   DownloadQueueState get state => _state;
+  bool _disposed = false;
+  bool _isProcessingQueue = false;
 
   final Map<String, StreamSubscription?> _subscriptions = {};
   final Map<String, DownloadService> _downloadServices = {};
@@ -88,11 +93,15 @@ class DownloadQueueManager extends ChangeNotifier {
     _state = _state.copyWith(maxConcurrent: maxConcurrent);
   }
 
+  void _safeNotify() {
+    if (!_disposed) notifyListeners();
+  }
+
   void setMaxConcurrent(int value) {
     final clamped = value.clamp(1, 3);
     _state = _state.copyWith(maxConcurrent: clamped);
     _storage.setMaxConcurrentDownloads(clamped);
-    notifyListeners();
+    _safeNotify();
     _processQueue();
   }
 
@@ -112,6 +121,7 @@ class DownloadQueueManager extends ChangeNotifier {
     _retryTimers[id]?.cancel();
     _retryTimers[id] = Timer(delay, () {
       _retryTimers.remove(id);
+      if (_disposed) return;
       final item = _state.getDownloadById(id);
       if (item == null || item.status != DownloadItemStatus.error) return;
 
@@ -136,6 +146,20 @@ class DownloadQueueManager extends ChangeNotifier {
       return id;
     }
 
+    if (existing == null && _state.queue.length >= _maxQueueSize) {
+      // Auto-clear finished items before rejecting
+      final unfinished = _state.queue.where((item) => !item.isFinished).toList();
+      if (unfinished.length < _state.queue.length) {
+        _state = _state.copyWith(queue: unfinished);
+        _safeNotify();
+        _persistQueue();
+      }
+      if (_state.queue.length >= _maxQueueSize) {
+        debugPrint('DownloadQueue: queue full ($_maxQueueSize items), rejecting');
+        return id;
+      }
+    }
+
     final item = DownloadItem(
       id: id,
       game: game,
@@ -155,7 +179,7 @@ class DownloadQueueManager extends ChangeNotifier {
 
     newQueue.insert(0, item);
     _state = _state.copyWith(queue: newQueue);
-    notifyListeners();
+    _safeNotify();
     _persistQueue();
 
     _processQueue();
@@ -173,10 +197,10 @@ class DownloadQueueManager extends ChangeNotifier {
     _subscriptions[id]?.cancel();
     _subscriptions.remove(id);
 
-    await _downloadServices[id]?.cancelDownload();
+    await _downloadServices[id]?.cancelDownload(preserveTempFile: false);
     _downloadServices.remove(id);
 
-    _updateItem(id, status: DownloadItemStatus.cancelled);
+    _updateItem(id, status: DownloadItemStatus.cancelled, clearTempFilePath: true);
     _persistQueue();
     _stopForegroundServiceIfIdle();
     _processQueue();
@@ -196,14 +220,14 @@ class DownloadQueueManager extends ChangeNotifier {
     final newQueue = List<DownloadItem>.from(_state.queue)
       ..removeWhere((i) => i.id == id);
     _state = _state.copyWith(queue: newQueue);
-    notifyListeners();
+    _safeNotify();
     _persistQueue();
   }
 
   void clearCompleted() {
     final newQueue = _state.queue.where((item) => !item.isFinished).toList();
     _state = _state.copyWith(queue: newQueue);
-    notifyListeners();
+    _safeNotify();
     _persistQueue();
   }
 
@@ -225,26 +249,57 @@ class DownloadQueueManager extends ChangeNotifier {
   }
 
   void _processQueue() {
+    if (_disposed || _isProcessingQueue) return;
     if (!_state.canStartNewDownload()) return;
 
-    final queuedItems = _state.queuedItems;
-    if (queuedItems.isEmpty) return;
+    _isProcessingQueue = true;
+    try {
+      final queuedItems = _state.queuedItems;
+      if (queuedItems.isEmpty) return;
 
-    final availableSlots = _state.maxConcurrent - _state.activeCount;
-    final itemsToStart = queuedItems.take(availableSlots);
+      final availableSlots = _state.maxConcurrent - _state.activeCount;
+      final itemsToStart = queuedItems.take(availableSlots);
 
-    for (final item in itemsToStart) {
-      _startDownload(item);
+      for (final item in itemsToStart) {
+        // Re-check item is still queued before starting
+        final current = _state.getDownloadById(item.id);
+        if (current == null || current.status != DownloadItemStatus.queued) continue;
+        _startDownload(item);
+      }
+    } finally {
+      _isProcessingQueue = false;
     }
   }
 
-  void _startDownload(DownloadItem item) {
+  Future<void> _startDownload(DownloadItem item) async {
     _updateItem(item.id, status: DownloadItemStatus.downloading);
     _updateForegroundService();
+
+    // Check disk space before starting actual download
+    try {
+      final storageInfo = await DiskSpaceService.getFreeSpace(item.targetFolder);
+      if (_disposed) return;
+      if (storageInfo != null && storageInfo.isLow) {
+        _updateItem(
+          item.id,
+          status: DownloadItemStatus.error,
+          error: 'Not enough disk space (${storageInfo.freeSpaceText})',
+        );
+        _stopForegroundServiceIfIdle();
+        _processQueue();
+        return;
+      }
+    } catch (e) {
+      debugPrint('DownloadQueue: disk space check failed (proceeding): $e');
+    }
 
     final targetFolder = item.targetFolder;
 
     _subscriptions[item.id]?.cancel();
+    _subscriptions.remove(item.id);
+
+    final oldService = _downloadServices.remove(item.id);
+    oldService?.dispose();
 
     final downloadService = DownloadService();
     _downloadServices[item.id] = downloadService;
@@ -254,6 +309,7 @@ class DownloadQueueManager extends ChangeNotifier {
       item.game,
       targetFolder,
       item.system,
+      existingTempFilePath: item.tempFilePath,
     )
         .listen(
       (progress) {
@@ -264,6 +320,7 @@ class DownloadQueueManager extends ChangeNotifier {
           receivedBytes: progress.receivedBytes,
           totalBytes: progress.totalBytes,
           downloadSpeed: progress.downloadSpeed,
+          tempFilePath: downloadService.currentTempFilePath,
         );
         _throttledNotificationUpdate();
       },
@@ -274,6 +331,7 @@ class DownloadQueueManager extends ChangeNotifier {
         _onDownloadComplete(item.id);
       },
       onError: (error) {
+        final tempPath = downloadService.currentTempFilePath;
         _subscriptions.remove(item.id);
         final service = _downloadServices.remove(item.id);
         service?.dispose();
@@ -282,6 +340,7 @@ class DownloadQueueManager extends ChangeNotifier {
           item.id,
           status: DownloadItemStatus.error,
           error: errorMsg,
+          tempFilePath: tempPath,
         );
 
         final currentItem = _state.getDownloadById(item.id);
@@ -313,7 +372,7 @@ class DownloadQueueManager extends ChangeNotifier {
 
     if (item.status != DownloadItemStatus.completed &&
         item.status != DownloadItemStatus.error) {
-      _updateItem(id, status: DownloadItemStatus.completed);
+      _updateItem(id, status: DownloadItemStatus.completed, clearTempFilePath: true);
     }
 
     _persistQueue();
@@ -332,6 +391,8 @@ class DownloadQueueManager extends ChangeNotifier {
     bool clearError = false,
     bool clearSpeed = false,
     int? retryCount,
+    String? tempFilePath,
+    bool clearTempFilePath = false,
   }) {
     final newQueue = _state.queue.map((item) {
       if (item.id == id) {
@@ -345,13 +406,15 @@ class DownloadQueueManager extends ChangeNotifier {
           clearError: clearError,
           clearSpeed: clearSpeed,
           retryCount: retryCount,
+          tempFilePath: tempFilePath,
+          clearTempFilePath: clearTempFilePath,
         );
       }
       return item;
     }).toList();
 
     _state = _state.copyWith(queue: newQueue);
-    notifyListeners();
+    _safeNotify();
   }
 
   // --- Foreground service helpers ---
@@ -368,6 +431,7 @@ class DownloadQueueManager extends ChangeNotifier {
   void _throttledNotificationUpdate() {
     if (_notificationThrottle?.isActive ?? false) return;
     _notificationThrottle = Timer(const Duration(seconds: 2), () {
+      if (_disposed) return;
       final active = _state.activeDownloads;
       String? detail;
       if (active.length == 1) {
@@ -389,24 +453,15 @@ class DownloadQueueManager extends ChangeNotifier {
     }
   }
 
-  DownloadItemStatus _mapStatus(DownloadStatus status) {
-    switch (status) {
-      case DownloadStatus.downloading:
-        return DownloadItemStatus.downloading;
-      case DownloadStatus.extracting:
-        return DownloadItemStatus.extracting;
-      case DownloadStatus.moving:
-        return DownloadItemStatus.moving;
-      case DownloadStatus.completed:
-        return DownloadItemStatus.completed;
-      case DownloadStatus.cancelled:
-        return DownloadItemStatus.cancelled;
-      case DownloadStatus.error:
-        return DownloadItemStatus.error;
-      case DownloadStatus.idle:
-        return DownloadItemStatus.queued;
-    }
-  }
+  DownloadItemStatus _mapStatus(DownloadStatus status) => switch (status) {
+    DownloadStatus.downloading => DownloadItemStatus.downloading,
+    DownloadStatus.extracting => DownloadItemStatus.extracting,
+    DownloadStatus.moving => DownloadItemStatus.moving,
+    DownloadStatus.completed => DownloadItemStatus.completed,
+    DownloadStatus.cancelled => DownloadItemStatus.cancelled,
+    DownloadStatus.error => DownloadItemStatus.error,
+    DownloadStatus.idle => DownloadItemStatus.queued,
+  };
 
   String _generateId(GameItem game, SystemModel system) {
     return '${system.name}_${game.filename}';
@@ -415,20 +470,24 @@ class DownloadQueueManager extends ChangeNotifier {
   // --- Queue Persistence ---
 
   void _persistQueue() {
-    final persistable = _state.queue
-        .where((item) =>
-            item.status == DownloadItemStatus.queued ||
-            item.status == DownloadItemStatus.error)
-        .map((item) => item.toJson())
-        .toList();
-    if (persistable.isEmpty) {
-      _storage.clearDownloadQueue();
-    } else {
-      _storage.setDownloadQueue(jsonEncode(persistable));
+    try {
+      final persistable = _state.queue
+          .where((item) =>
+              item.status == DownloadItemStatus.queued ||
+              item.status == DownloadItemStatus.error)
+          .map((item) => item.toJson())
+          .toList();
+      if (persistable.isEmpty) {
+        _storage.clearDownloadQueue();
+      } else {
+        _storage.setDownloadQueue(jsonEncode(persistable));
+      }
+    } catch (e) {
+      debugPrint('DownloadQueue: failed to persist queue: $e');
     }
   }
 
-  void restoreQueue(List<SystemModel> systems) {
+  void restoreQueue(List<SystemModel> systems, {AppConfig? appConfig}) {
     final json = _storage.getDownloadQueue();
     if (json == null) return;
 
@@ -452,8 +511,16 @@ class DownloadQueueManager extends ChangeNotifier {
         }
 
         final downloadItem = DownloadItem.fromJson(map, system);
+        if (downloadItem.game.providerConfig == null) {
+          debugPrint('DownloadQueue: skipping restore item with null providerConfig');
+          continue;
+        }
+
+        // Re-inject auth credentials from AppConfig (stripped during persist)
+        final restoredItem = _rehydrateAuth(downloadItem, appConfig);
+
         // Reset to queued so they can be restarted
-        restored.add(downloadItem.copyWith(
+        restored.add(restoredItem.copyWith(
           status: DownloadItemStatus.queued,
           progress: 0,
           receivedBytes: 0,
@@ -465,7 +532,7 @@ class DownloadQueueManager extends ChangeNotifier {
       if (restored.isNotEmpty) {
         final newQueue = List<DownloadItem>.from(_state.queue)..addAll(restored);
         _state = _state.copyWith(queue: newQueue);
-        notifyListeners();
+        _safeNotify();
         _processQueue();
       }
     } catch (e) {
@@ -474,8 +541,49 @@ class DownloadQueueManager extends ChangeNotifier {
     }
   }
 
+  /// Re-injects auth credentials from AppConfig into a restored DownloadItem.
+  /// The persisted queue strips auth via toJsonWithoutAuth() — this matches
+  /// the item's provider back to the current AppConfig and restores auth.
+  DownloadItem _rehydrateAuth(DownloadItem item, AppConfig? appConfig) {
+    if (appConfig == null) return item;
+    final pc = item.game.providerConfig;
+    if (pc == null || pc.auth != null) return item;
+
+    final systemConfig = appConfig.systemById(item.system.id);
+    if (systemConfig == null) return item;
+
+    final match = _findMatchingProvider(pc, systemConfig.providers);
+    if (match?.auth == null) return item;
+
+    final rehydrated = pc.copyWith(auth: match!.auth);
+    final updatedGame = item.game.copyWith(providerConfig: rehydrated);
+    return item.copyWith(game: updatedGame);
+  }
+
+  /// Finds a ProviderConfig in [providers] that matches [target] by type and
+  /// connection details (host/url/share), ignoring auth.
+  static ProviderConfig? _findMatchingProvider(
+    ProviderConfig target,
+    List<ProviderConfig> providers,
+  ) {
+    for (final p in providers) {
+      if (p.type != target.type) continue;
+      switch (target.type) {
+        case ProviderType.web:
+        case ProviderType.romm:
+          if (p.url == target.url) return p;
+        case ProviderType.smb:
+          if (p.host == target.host && p.share == target.share) return p;
+        case ProviderType.ftp:
+          if (p.host == target.host) return p;
+      }
+    }
+    return null;
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     _notificationThrottle?.cancel();
 
     for (final timer in _retryTimers.values) {
@@ -489,7 +597,9 @@ class DownloadQueueManager extends ChangeNotifier {
     _subscriptions.clear();
 
     for (final service in _downloadServices.values) {
-      service.reset();
+      try { service.reset(); } catch (e) {
+        debugPrint('DownloadQueue: service reset failed during dispose: $e');
+      }
       service.dispose();
     }
     _downloadServices.clear();

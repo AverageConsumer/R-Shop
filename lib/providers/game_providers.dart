@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/config/app_config.dart';
@@ -11,11 +13,17 @@ import '../services/config_parser.dart';
 import '../services/config_storage_service.dart';
 import '../services/unified_game_service.dart';
 
+/// Whether the config was recovered from a backup (corrupt primary).
+final configRecoveredProvider = StateProvider<bool>((ref) => false);
+
 /// Provides the active AppConfig from the persisted config file.
 final bootstrappedConfigProvider = FutureProvider<AppConfig>((ref) async {
   final storage = ConfigStorageService();
-  final saved = await storage.loadConfig();
-  if (saved != null) return saved;
+  final result = await storage.loadConfigWithRecoveryInfo();
+  if (result.wasRecovered) {
+    ref.read(configRecoveredProvider.notifier).state = true;
+  }
+  if (result.config != null) return result.config!;
   return AppConfig.empty;
 });
 
@@ -66,7 +74,14 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
 
       bool hasRoms = false;
       try {
-        await for (final entity in dir.list(followLinks: false)) {
+        await for (final entity in dir.list(followLinks: false).timeout(
+          const Duration(seconds: 2),
+          onTimeout: (sink) {
+            debugPrint('visibleSystemsProvider: timeout scanning '
+                '${dir.path}, treating as empty');
+            sink.close();
+          },
+        )) {
           if (entity is File) {
             final name = entity.path.toLowerCase();
             if (romExts.any((ext) => name.endsWith(ext))) {

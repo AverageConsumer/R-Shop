@@ -2,6 +2,7 @@ import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/input/input.dart';
 import '../../core/widgets/console_focusable.dart';
@@ -41,6 +42,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   late double _sfxVolume;
   late int _maxDownloads;
   bool _showResetConfirm = false;
+  ProviderSubscription<CoverPreloadState>? _coverPreloadSub;
   final FocusNode _hapticFocusNode = FocusNode();
   final FocusNode _layoutFocusNode = FocusNode();
   final FocusNode _homeLayoutFocusNode = FocusNode();
@@ -84,6 +86,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   @override
   void dispose() {
+    _coverPreloadSub?.close();
     _confettiController.dispose();
     _hapticFocusNode.dispose();
     _layoutFocusNode.dispose();
@@ -224,11 +227,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
     showConsoleNotification(context, message: 'Fetching covers...', isError: false);
 
-    // One-shot listener for completion
-    ProviderSubscription<CoverPreloadState>? sub;
-    sub = ref.listenManual(coverPreloadServiceProvider, (prev, next) {
+    _coverPreloadSub?.close();
+    _coverPreloadSub = ref.listenManual(coverPreloadServiceProvider, (prev, next) {
       if (prev != null && prev.isRunning && !next.isRunning) {
-        sub?.close();
+        _coverPreloadSub?.close();
+        _coverPreloadSub = null;
         if (!mounted) return;
         if (next.failed > 0) {
           showConsoleNotification(
@@ -533,6 +536,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                           ),
                           SizedBox(height: rs.spacing.md),
                           _buildCoverPreloadTile(),
+                          SizedBox(height: rs.spacing.md),
+                          _buildExportLogTile(),
 
                           SizedBox(height: rs.spacing.xl),
                           _buildSectionHeader('About', rs),
@@ -641,6 +646,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       trailing: const Icon(Icons.image_outlined, color: Colors.white70),
       onTap: _startCoverPreload,
     );
+  }
+
+  Widget _buildExportLogTile() {
+    final logFile = ref.read(crashLogServiceProvider).getLogFile();
+    if (logFile == null) {
+      return const SizedBox.shrink();
+    }
+    return SettingsItem(
+      title: 'Export Error Log',
+      subtitle: 'Share crash log for debugging',
+      trailing: const Icon(Icons.upload_file_rounded, color: Colors.white70),
+      onTap: _exportErrorLog,
+    );
+  }
+
+  Future<void> _exportErrorLog() async {
+    final logFile = ref.read(crashLogServiceProvider).getLogFile();
+    if (logFile == null) {
+      if (mounted) {
+        showConsoleNotification(context, message: 'No error log available');
+      }
+      return;
+    }
+    try {
+      await Share.shareXFiles([XFile(logFile.path)]);
+    } catch (e) {
+      if (mounted) {
+        showConsoleNotification(context, message: 'Share failed: $e', isError: true);
+      }
+    }
   }
 
   Widget _buildSwitch(bool value) {

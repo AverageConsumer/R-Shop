@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.9.8] Beta — 2026-02-23
+
+### Added
+- **Crash log service** — local ring-buffer log file (~500KB) captures all uncaught errors with timestamps and stack traces; persists across sessions in app cache
+- **Export Error Log** — new Settings entry (under System) shares the crash log via the system share sheet for easy bug reporting; only visible when log contains data
+- **Disk space pre-check** — downloads are rejected with a clear error when device storage drops below 1 GB
+
+### Improved
+- **HTTP download depth guard** — the `_downloadHttp` resume-restart path now enforces a single-retry limit, preventing infinite recursion if the server keeps returning mismatched content lengths
+- **FocusSyncManager index safety** — `ensureFocusNodes()` clamps `_selectedIndex` after pruning disposed nodes; `validateState()` clamps `_targetColumn` when column count changes — prevents focus jumping to invalid positions during rapid grid resizing
+- **Zone alignment** — `WidgetsFlutterBinding.ensureInitialized()` and `runApp()` now execute inside the same `runZonedGuarded` zone, eliminating the "Zone mismatch" warning on startup
+- **Overlay priority release** — all scope classes (`OverlayFocusScope`, `DialogFocusScope`, `SearchFocusScope`, `ExitConfirmationOverlay`) defer `release()` via `Future()` in `dispose()`, fixing the Riverpod "cannot modify provider during widget tree build" crash
+- **Detail screen layout** — system name badge wrapped in `Flexible` with ellipsis overflow, fixing `RenderFlex` overflow on narrow screens with long system names (e.g. "PlayStation 2")
+- **ConfigModeScreen dispose** — audio manager cached in `initState` to avoid `ref.read()` after widget is disposed
+- **Download queue lookup** — `getDownloadById()` uses a simple loop instead of `firstWhere` + try/catch, eliminating noisy "Bad state: No element" log spam during queue restore
+
+### Fixed
+- **Overlay priority crash** — releasing overlay tokens during widget unmount no longer throws Riverpod state modification errors (was causing "At least listener of the StateNotifier threw an exception" crashes)
+- **FocusSyncManager focus loss** — selected index could point to a disposed `FocusNode` after the item count decreased, causing silent focus failures
+
+### Internal
+- New `CrashLogService` singleton (`lib/services/crash_log_service.dart`) with `log()`, `logError()`, `getLogFile()`, `clearLog()`, `getLogContent()`
+- `crashLogServiceProvider` in `app_providers.dart`, overridden in `main.dart`
+- Global error handlers (`FlutterError.onError`, `PlatformDispatcher.onError`, `runZonedGuarded`) now write to crash log in addition to `debugPrint`
+- Removed spammy `debugPrint` in `FocusSyncManager._enforceFocus()` for deferred focus (fired on every scroll)
+
+---
+
 ## [0.9.7] Beta — 2026-02-22
 
 ### Added

@@ -129,7 +129,8 @@ class RommApiService {
     }
 
     return list
-        .map((e) => RommPlatform.fromJson(e as Map<String, dynamic>))
+        .whereType<Map<String, dynamic>>()
+        .map((e) => RommPlatform.fromJson(e))
         .toList();
   }
 
@@ -165,12 +166,14 @@ class RommApiService {
       }
 
       allRoms.addAll(
-        list.map((e) => RommRom.fromJson(e as Map<String, dynamic>)),
+        list
+            .whereType<Map<String, dynamic>>()
+            .map((e) => RommRom.fromJson(e)),
       );
 
       if (list.length < pageSize) break;
       offset += pageSize;
-      if (offset > 50000) break; // Safety guard against infinite pagination
+      if (offset > 20000) break; // Safety guard against infinite pagination
     }
 
     return allRoms;
@@ -188,11 +191,22 @@ class RommApiService {
       );
       return const SourceConnectionResult.ok();
     } on DioException catch (e) {
-      return SourceConnectionResult.failed(
-        e.response?.statusCode != null
-            ? 'HTTP ${e.response!.statusCode}'
-            : e.message ?? 'Connection failed',
-      );
+      final statusCode = e.response?.statusCode;
+      final String message;
+      if (statusCode == 401) {
+        message = 'Authentication failed — check your credentials';
+      } else if (statusCode == 403) {
+        message = 'Access denied — insufficient permissions';
+      } else if (statusCode == 429) {
+        message = 'Rate limited — try again later';
+      } else if (statusCode != null && statusCode >= 500) {
+        message = 'Server error (HTTP $statusCode)';
+      } else if (statusCode != null) {
+        message = 'HTTP $statusCode';
+      } else {
+        message = e.message ?? 'Connection failed';
+      }
+      return SourceConnectionResult.failed(message);
     } catch (e) {
       return SourceConnectionResult.failed(e.toString());
     }

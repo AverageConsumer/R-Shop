@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 
 class InputDebouncer {
   static const int _actionCooldownMs = 300;
+  static const int _maxHoldDurationMs = 10000;
 
   int _lastActionTime = 0;
   bool _isHolding = false;
   Timer? _holdTimer;
+  Timer? _holdTimeout;
   int _holdIntervalMs = 100;
   VoidCallback? _currentHoldAction;
   int _holdCount = 0;
@@ -25,6 +27,8 @@ class InputDebouncer {
   bool startHold(VoidCallback action) {
     if (!canPerformAction()) return false;
 
+    // Stop any existing hold before starting a new one
+    if (_isHolding) stopHold();
     _isHolding = true;
     _currentHoldAction = action;
     _holdIntervalMs = 100;
@@ -34,6 +38,10 @@ class InputDebouncer {
 
     _holdTimer?.cancel();
     _holdTimer = Timer(const Duration(milliseconds: 400), _executeHold);
+
+    // Safety timeout: auto-stop hold after max duration
+    _holdTimeout?.cancel();
+    _holdTimeout = Timer(const Duration(milliseconds: _maxHoldDurationMs), stopHold);
 
     return true;
   }
@@ -57,6 +65,7 @@ class InputDebouncer {
   void stopHold() {
     _isHolding = false;
     _holdTimer?.cancel();
+    _holdTimeout?.cancel();
     _currentHoldAction = null;
     _holdCount = 0;
   }

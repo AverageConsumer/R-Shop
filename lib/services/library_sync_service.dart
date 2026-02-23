@@ -57,6 +57,10 @@ class LibrarySyncState {
   }
 }
 
+/// Manages library synchronization for all configured systems.
+///
+/// This service uses static [_lastSyncTimes] state and is designed for
+/// single-isolate use only. Do not instantiate across multiple isolates.
 class LibrarySyncService extends StateNotifier<LibrarySyncState> {
   bool _isCancelled = false;
 
@@ -123,7 +127,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         _lastSyncTimes[systemConfig.id] = DateTime.now();
       } catch (e) {
         debugPrint('Library sync failed for ${systemConfig.id}: $e');
-        state = state.copyWith(error: 'Sync failed: ${systemConfig.id}');
+        final reason = _userFriendlyError(e);
+        state = state.copyWith(error: 'Sync failed for $displayName: $reason');
         anyFailed = true;
       }
 
@@ -215,6 +220,37 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       currentSystem: null,
       hadFailures: anyFailed,
     );
+  }
+
+  static String _userFriendlyError(Object e) {
+    final msg = e.toString();
+    if (msg.contains('SocketException') || msg.contains('Connection refused')) {
+      return 'Server unreachable — check your network connection';
+    }
+    if (msg.contains('HandshakeException') || msg.contains('CERTIFICATE_VERIFY')) {
+      return 'SSL/TLS error — check server certificate';
+    }
+    if (msg.contains('TimeoutException') || msg.contains('timed out')) {
+      return 'Connection timed out';
+    }
+    if (msg.contains('401') || msg.contains('Unauthorized')) {
+      return 'Authentication failed — check credentials';
+    }
+    if (msg.contains('403') || msg.contains('Forbidden')) {
+      return 'Access denied — check permissions';
+    }
+    if (msg.contains('404') || msg.contains('Not Found')) {
+      return 'Resource not found — check URL';
+    }
+    if (msg.contains('SMB') || msg.contains('smb')) {
+      return 'SMB connection failed — check share settings';
+    }
+    if (msg.contains('FTP') || msg.contains('ftp')) {
+      return 'FTP connection failed — check host/credentials';
+    }
+    // Truncate long error messages
+    if (msg.length > 100) return '${msg.substring(0, 100)}…';
+    return msg;
   }
 
   void cancel() {

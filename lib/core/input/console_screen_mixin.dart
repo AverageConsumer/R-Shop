@@ -31,11 +31,18 @@ mixin ConsoleScreenMixin<T extends ConsumerStatefulWidget> on ConsumerState<T> {
   }
 
   void _restoreFocus() {
-    final savedState = ref.read(focusStateManagerProvider)[routeId];
-    if (savedState?.savedFocusNode?.canRequestFocus == true) {
-      savedState!.savedFocusNode!.requestFocus();
-    } else {
-      screenFocusNode.requestFocus();
+    try {
+      final savedState = ref.read(focusStateManagerProvider)[routeId];
+      if (savedState?.savedFocusNode?.canRequestFocus == true) {
+        savedState!.savedFocusNode!.requestFocus();
+      } else {
+        screenFocusNode.requestFocus();
+      }
+    } catch (e) {
+      debugPrint('ConsoleScreenMixin: focus restore failed for $routeId: $e');
+      if (screenFocusNode.canRequestFocus) {
+        screenFocusNode.requestFocus();
+      }
     }
   }
 
@@ -73,7 +80,11 @@ mixin ConsoleScreenMixin<T extends ConsumerStatefulWidget> on ConsumerState<T> {
       // Defer state modification — dispose runs during widget tree
       // finalization where Riverpod prohibits provider mutations
       Future.microtask(() {
-        _focusStateManager.saveFocusState(id, savedFocusNode: currentFocus);
+        // Only save if the node is still usable (may have been disposed
+        // along with its owning widget by the time this microtask runs)
+        if (currentFocus.canRequestFocus) {
+          _focusStateManager.saveFocusState(id, savedFocusNode: currentFocus);
+        }
       });
     }
     screenFocusNode.dispose();

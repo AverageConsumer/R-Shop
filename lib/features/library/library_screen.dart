@@ -61,6 +61,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   late InputDebouncer _debouncer;
   late final FocusSyncManager _focusManager;
 
+  ProviderSubscription? _installedFilesSubscription;
+
   // Raw data from DB
   List<_LibraryEntry> _allGames = [];
   Set<String> _installedFiles = {};
@@ -169,9 +171,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
-      ref.listenManual(installedFilesProvider, (prev, next) {
-        final data = next.valueOrNull;
-        if (data != null && mounted) {
+      _installedFilesSubscription = ref.listenManual(installedFilesProvider, (prev, next) {
+        if (!mounted) return;
+        final data = next.value;
+        if (data != null) {
           setState(() => _installedFiles = data.all);
           _applyFilters();
         }
@@ -182,9 +185,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   @override
   void dispose() {
     final selectedIndex = _currentIndex;
-    Future.delayed(Duration.zero, () {
+    Future.microtask(() {
       focusStateManager.saveFocusState(routeId, selectedIndex: selectedIndex);
     });
+    _installedFilesSubscription?.close();
     _debouncer.stopHold();
     _focusManager.dispose();
     _scrollController.dispose();
@@ -208,7 +212,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
               installed.add(p.basename(entity.path));
             }
           }
-        } catch (_) {}
+        } catch (e) { debugPrint('LibraryScreen: dir list failed: $e'); }
       }
     }
     if (mounted) {
@@ -226,7 +230,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     final rawGames = await db.getAllGames();
 
     // Use centralized installed-files index (provider-driven)
-    final installedData = ref.read(installedFilesProvider).valueOrNull;
+    final installedData = ref.read(installedFilesProvider).value;
     if (installedData != null) {
       _installedFiles = installedData.all;
     } else {
@@ -244,7 +248,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         try {
           providerConfig = ProviderConfig.fromJson(
               jsonDecode(pcJson) as Map<String, dynamic>);
-        } catch (_) {}
+        } catch (e) { debugPrint('LibraryScreen: provider config parse failed: $e'); }
       }
 
       entries.add(_LibraryEntry(
@@ -485,7 +489,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       resumeSearchOverlay();
       // Reload to pick up install/favorite changes
       _favoriteIds = ref.read(favoriteGamesProvider).toSet();
-      final data = ref.read(installedFilesProvider).valueOrNull;
+      final data = ref.read(installedFilesProvider).value;
       if (data != null) {
         _installedFiles = data.all;
       }

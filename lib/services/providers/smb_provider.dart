@@ -8,6 +8,8 @@ import '../download_handle.dart';
 import '../source_provider.dart';
 
 class SmbProvider implements SourceProvider {
+  static const _timeout = Duration(seconds: 30);
+
   @override
   final ProviderConfig config;
 
@@ -34,15 +36,15 @@ class SmbProvider implements SourceProvider {
       username: config.auth?.user ?? 'guest',
       password: config.auth?.pass ?? '',
       domain: config.auth?.domain ?? '',
-    );
+    ).timeout(_timeout);
   }
 
   @override
   Future<List<GameItem>> fetchGames(SystemConfig system) async {
     final connection = await _connect();
     try {
-      final folder = await connection.file(_smbRoot);
-      final files = await connection.listFiles(folder);
+      final folder = await connection.file(_smbRoot).timeout(_timeout);
+      final files = await connection.listFiles(folder).timeout(_timeout);
       final games = <GameItem>[];
 
       for (final file in files) {
@@ -74,8 +76,8 @@ class SmbProvider implements SourceProvider {
     try {
       final connection = await _connect();
       try {
-        final folder = await connection.file(_smbRoot);
-        await connection.listFiles(folder);
+        final folder = await connection.file(_smbRoot).timeout(_timeout);
+        await connection.listFiles(folder).timeout(_timeout);
       } finally {
         await connection.close();
       }
@@ -101,8 +103,8 @@ class SmbProvider implements SourceProvider {
   Future<SmbFileReader> openFile(String smbPath) async {
     final connection = await _connect();
     try {
-      final file = await connection.file(smbPath);
-      final stream = await connection.openRead(file);
+      final file = await connection.file(smbPath).timeout(_timeout);
+      final stream = await connection.openRead(file).timeout(_timeout);
       return SmbFileReader(
         stream: stream,
         size: file.size,
@@ -118,11 +120,12 @@ class SmbProvider implements SourceProvider {
 
 /// Handle returned by [SmbProvider.openFile] for streaming downloads.
 ///
-/// The caller must call [close] when done to release the SMB connection.
+/// The caller MUST call [close] when done to release the SMB connection.
 class SmbFileReader {
   final Stream<List<int>> stream;
   final int size;
   final SmbConnect connection;
+  bool _closed = false;
 
   SmbFileReader({
     required this.stream,
@@ -131,6 +134,8 @@ class SmbFileReader {
   });
 
   Future<void> close() async {
+    if (_closed) return;
+    _closed = true;
     await connection.close();
   }
 }

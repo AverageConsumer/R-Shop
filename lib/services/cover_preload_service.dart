@@ -53,6 +53,7 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
 
   Future<void> preloadAll(DatabaseService db) async {
     if (state.isRunning) return;
+    state = state.copyWith(isRunning: true);
     _cancelled = false;
 
     final rows = await db.getGamesNeedingCovers();
@@ -73,8 +74,7 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
       }
     }
 
-    state = CoverPreloadState(
-      isRunning: true,
+    state = state.copyWith(
       total: rows.length,
     );
 
@@ -220,7 +220,8 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
             );
           }
           return true;
-        } catch (_) {
+        } catch (e) {
+          debugPrint('CoverPreload: URL fetch failed for $url: $e');
           FailedUrlsCache.instance.markFailed(url);
           continue;
         }

@@ -20,8 +20,13 @@ class FocusSyncManager {
   final Map<int, FocusNode> _focusNodes = {};
   bool _isScrolling = false;
   bool _isHardwareInput = false;
+  bool _disposed = false;
   Timer? _hardwareInputTimer;
   Timer? _velocityResetTimer;
+  Timer? _scrollResetTimer;
+  Timer? _scrollSafetyTimer;
+  int _scrollRetryCount = 0;
+  static const int _maxScrollRetries = 3;
 
   int get selectedIndex => _selectedIndex;
   bool get isProgrammaticScroll => _isProgrammaticScroll;
@@ -53,6 +58,11 @@ class FocusSyncManager {
       _focusNodes[key]!.dispose();
       _focusNodes.remove(key);
     }
+    // Clamp selected index after pruning to avoid pointing at disposed node
+    if (count > 0 && _selectedIndex >= count) {
+      _selectedIndex = count - 1;
+      _targetColumn = null;
+    }
   }
 
   void setSelectedIndex(int index) {
@@ -62,17 +72,23 @@ class FocusSyncManager {
 
   void validateState(int currentCrossAxisCount) {
     final totalItems = getItemCount();
+    final oldIndex = _selectedIndex;
 
     if (totalItems == 0) {
       _selectedIndex = 0;
       _targetColumn = null;
+      if (oldIndex != 0) onSelectionChanged(0);
       return;
     }
 
-    final wasClamped = _selectedIndex >= totalItems;
     _selectedIndex = _selectedIndex.clamp(0, totalItems - 1);
 
-    if (wasClamped) {
+    // Clamp target column when column count changes
+    if (_targetColumn != null && currentCrossAxisCount > 0) {
+      _targetColumn = _targetColumn!.clamp(0, currentCrossAxisCount - 1);
+    }
+
+    if (_selectedIndex != oldIndex) {
       _targetColumn = null;
       onSelectionChanged(_selectedIndex);
     }
@@ -84,6 +100,7 @@ class FocusSyncManager {
     _hardwareInputTimer = Timer(
       const Duration(milliseconds: _hardwareInputTimeoutMs),
       () {
+        if (_disposed) return;
         _isHardwareInput = false;
       },
     );
@@ -145,9 +162,16 @@ class FocusSyncManager {
     required VoidCallback retryCallback,
   }) {
     if (itemKey?.currentContext != null) {
+      _scrollRetryCount = 0;
       scrollToSelected(itemKey, instant: instant);
       return;
     }
+    if (_scrollRetryCount >= _maxScrollRetries) {
+      _scrollRetryCount = 0;
+      _isProgrammaticScroll = false;
+      return;
+    }
+    _scrollRetryCount++;
     final totalItems = getItemCount();
     if (totalItems == 0) return;
     final row = _selectedIndex ~/ crossAxisCount;
@@ -174,10 +198,22 @@ class FocusSyncManager {
       duration: instant ? Duration.zero : const Duration(milliseconds: 200),
       curve: Curves.easeOut,
     ).then((_) {
-      Future.delayed(const Duration(milliseconds: 100), () {
+      if (_disposed) return;
+      _scrollResetTimer?.cancel();
+      _scrollResetTimer = Timer(const Duration(milliseconds: 100), () {
+        if (_disposed) return;
         _isProgrammaticScroll = false;
         _isScrolling = false;
       });
+    });
+    // Safety fallback: reset after max 2 seconds if animation was aborted
+    _scrollSafetyTimer?.cancel();
+    _scrollSafetyTimer = Timer(const Duration(seconds: 2), () {
+      if (_disposed) return;
+      if (_isProgrammaticScroll) {
+        _isProgrammaticScroll = false;
+        _isScrolling = false;
+      }
     });
   }
 
@@ -200,8 +236,18 @@ class FocusSyncManager {
   }
 
   void _enforceFocus(int targetIndex) {
-    if (_focusNodes.containsKey(targetIndex)) {
-      _focusNodes[targetIndex]!.requestFocus();
+    final node = _focusNodes[targetIndex];
+    if (node != null) {
+      node.requestFocus();
+    } else {
+      // Node not yet built — schedule focus request for after next frame
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_disposed) return;
+        final deferredNode = _focusNodes[targetIndex];
+        if (deferredNode != null && deferredNode.canRequestFocus) {
+          deferredNode.requestFocus();
+        }
+      });
     }
   }
 
@@ -303,12 +349,14 @@ class FocusSyncManager {
         if (!scrollSuppression!.value) scrollSuppression!.value = true;
         _velocityResetTimer?.cancel();
         _velocityResetTimer = Timer(const Duration(milliseconds: 150), () {
+          if (_disposed) return;
           scrollSuppression!.value = false;
         });
       }
     } else if (notification is ScrollEndNotification) {
       _velocityResetTimer?.cancel();
       _velocityResetTimer = Timer(const Duration(milliseconds: 100), () {
+        if (_disposed) return;
         scrollSuppression!.value = false;
       });
     }
@@ -321,12 +369,19 @@ class FocusSyncManager {
     _isProgrammaticScroll = false;
     _isScrolling = false;
     _isHardwareInput = false;
+    _scrollRetryCount = 0;
     _hardwareInputTimer?.cancel();
+    _velocityResetTimer?.cancel();
+    _scrollResetTimer?.cancel();
+    _scrollSafetyTimer?.cancel();
   }
 
   void dispose() {
+    _disposed = true;
     _hardwareInputTimer?.cancel();
     _velocityResetTimer?.cancel();
+    _scrollResetTimer?.cancel();
+    _scrollSafetyTimer?.cancel();
     for (final node in _focusNodes.values) {
       node.dispose();
     }

@@ -25,13 +25,13 @@ class OverlayFocusScope extends ConsumerStatefulWidget {
 
 class _OverlayFocusScopeState extends ConsumerState<OverlayFocusScope> {
   final FocusScopeNode _scopeNode = FocusScopeNode(debugLabel: 'OverlayScope');
-  late final StateController<OverlayPriority> _priorityController;
-  bool _hasClaimed = false;
+  late final OverlayPriorityManager _priorityManager;
+  int? _claimToken;
 
   @override
   void initState() {
     super.initState();
-    _priorityController = ref.read(overlayPriorityProvider.notifier);
+    _priorityManager = ref.read(overlayPriorityProvider.notifier);
     if (widget.isVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -58,16 +58,15 @@ class _OverlayFocusScopeState extends ConsumerState<OverlayFocusScope> {
 
   @override
   void dispose() {
-    if (_hasClaimed) {
-      _hasClaimed = false;
-      final controller = _priorityController;
+    final token = _claimToken;
+    if (token != null) {
+      _claimToken = null;
+      final manager = _priorityManager;
       final priority = widget.priority;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        try {
-          if (controller.state == priority) {
-            controller.state = OverlayPriority.none;
-          }
-        } catch (_) {}
+      Future(() {
+        if (!manager.release(token)) {
+          manager.releaseByPriority(priority);
+        }
       });
     }
     _scopeNode.dispose();
@@ -75,21 +74,18 @@ class _OverlayFocusScopeState extends ConsumerState<OverlayFocusScope> {
   }
 
   void _claimPriority() {
-    final currentPriority = _priorityController.state;
-    if (widget.priority.level > currentPriority.level) {
-      _priorityController.state = widget.priority;
-    }
-    _hasClaimed = true;
+    _claimToken ??= _priorityManager.claim(widget.priority);
     _scopeNode.requestFocus();
   }
 
   void _releasePriority() {
-    _hasClaimed = false;
-    final currentPriority = _priorityController.state;
-    if (currentPriority == widget.priority) {
-      _priorityController.state = OverlayPriority.none;
-      restoreMainFocus(ref);
+    final token = _claimToken;
+    if (token == null) return;
+    _claimToken = null;
+    if (!_priorityManager.release(token)) {
+      _priorityManager.releaseByPriority(widget.priority);
     }
+    restoreMainFocus(ref);
   }
 
   @override
@@ -125,13 +121,13 @@ class DialogFocusScope extends ConsumerStatefulWidget {
 class _DialogFocusScopeState extends ConsumerState<DialogFocusScope> {
   final FocusScopeNode _scopeNode = FocusScopeNode(debugLabel: 'DialogScope');
   final FocusNode _rootFocusNode = FocusNode(debugLabel: 'DialogRoot');
-  late final StateController<OverlayPriority> _priorityController;
-  bool _hasClaimed = false;
+  late final OverlayPriorityManager _priorityManager;
+  int? _claimToken;
 
   @override
   void initState() {
     super.initState();
-    _priorityController = ref.read(overlayPriorityProvider.notifier);
+    _priorityManager = ref.read(overlayPriorityProvider.notifier);
     if (widget.isVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -160,15 +156,14 @@ class _DialogFocusScopeState extends ConsumerState<DialogFocusScope> {
 
   @override
   void dispose() {
-    if (_hasClaimed) {
-      _hasClaimed = false;
-      final controller = _priorityController;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        try {
-          if (controller.state == OverlayPriority.dialog) {
-            controller.state = OverlayPriority.none;
-          }
-        } catch (_) {}
+    final token = _claimToken;
+    if (token != null) {
+      _claimToken = null;
+      final manager = _priorityManager;
+      Future(() {
+        if (!manager.release(token)) {
+          manager.releaseByPriority(OverlayPriority.dialog);
+        }
       });
     }
     _scopeNode.dispose();
@@ -177,21 +172,18 @@ class _DialogFocusScopeState extends ConsumerState<DialogFocusScope> {
   }
 
   void _claimPriority() {
-    final currentPriority = _priorityController.state;
-    if (OverlayPriority.dialog.level > currentPriority.level) {
-      _priorityController.state = OverlayPriority.dialog;
-    }
-    _hasClaimed = true;
+    _claimToken ??= _priorityManager.claim(OverlayPriority.dialog);
     _rootFocusNode.requestFocus();
   }
 
   void _releasePriority() {
-    _hasClaimed = false;
-    final currentPriority = _priorityController.state;
-    if (currentPriority == OverlayPriority.dialog) {
-      _priorityController.state = OverlayPriority.none;
-      restoreMainFocus(ref);
+    final token = _claimToken;
+    if (token == null) return;
+    _claimToken = null;
+    if (!_priorityManager.release(token)) {
+      _priorityManager.releaseByPriority(OverlayPriority.dialog);
     }
+    restoreMainFocus(ref);
   }
 
   @override
@@ -232,13 +224,13 @@ class SearchFocusScope extends ConsumerStatefulWidget {
 
 class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
   final FocusScopeNode _scopeNode = FocusScopeNode(debugLabel: 'SearchScope');
-  late final StateController<OverlayPriority> _priorityController;
-  bool _hasClaimed = false;
+  late final OverlayPriorityManager _priorityManager;
+  int? _claimToken;
 
   @override
   void initState() {
     super.initState();
-    _priorityController = ref.read(overlayPriorityProvider.notifier);
+    _priorityManager = ref.read(overlayPriorityProvider.notifier);
     if (widget.isVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -267,15 +259,14 @@ class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
 
   @override
   void dispose() {
-    if (_hasClaimed) {
-      _hasClaimed = false;
-      final controller = _priorityController;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        try {
-          if (controller.state == OverlayPriority.search) {
-            controller.state = OverlayPriority.none;
-          }
-        } catch (_) {}
+    final token = _claimToken;
+    if (token != null) {
+      _claimToken = null;
+      final manager = _priorityManager;
+      Future(() {
+        if (!manager.release(token)) {
+          manager.releaseByPriority(OverlayPriority.search);
+        }
       });
     }
     _scopeNode.dispose();
@@ -283,11 +274,7 @@ class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
   }
 
   void _claimPriority() {
-    final currentPriority = _priorityController.state;
-    if (OverlayPriority.search.level > currentPriority.level) {
-      _priorityController.state = OverlayPriority.search;
-    }
-    _hasClaimed = true;
+    _claimToken ??= _priorityManager.claim(OverlayPriority.search);
     if (widget.textFieldFocusNode != null) {
       widget.textFieldFocusNode!.requestFocus();
     } else {
@@ -296,12 +283,13 @@ class _SearchFocusScopeState extends ConsumerState<SearchFocusScope> {
   }
 
   void _releasePriority() {
-    _hasClaimed = false;
-    final currentPriority = _priorityController.state;
-    if (currentPriority == OverlayPriority.search) {
-      _priorityController.state = OverlayPriority.none;
-      restoreMainFocus(ref);
+    final token = _claimToken;
+    if (token == null) return;
+    _claimToken = null;
+    if (!_priorityManager.release(token)) {
+      _priorityManager.releaseByPriority(OverlayPriority.search);
     }
+    restoreMainFocus(ref);
   }
 
   @override

@@ -50,6 +50,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   final Map<int, GlobalKey> _itemKeys = {};
 
   bool _isFiltering = false;
+  ProviderSubscription? _installedFilesSubscription;
 
   late int _columns;
   double _lastPinchScale = 1.0;
@@ -168,7 +169,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final systemConfig =
         ConfigBootstrap.configForSystem(appConfig, widget.system);
 
-    final installedData = ref.read(installedFilesProvider).valueOrNull;
+    final installedData = ref.read(installedFilesProvider).value;
 
     _controller = GameListController(
       system: widget.system,
@@ -191,8 +192,9 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreSavedIndex();
-      ref.listenManual(installedFilesProvider, (prev, next) {
-        final data = next.valueOrNull;
+      _installedFilesSubscription = ref.listenManual(installedFilesProvider, (prev, next) {
+        if (!mounted) return;
+        final data = next.value;
         if (data != null) {
           _controller.applyInstalledFilenames(
             data.bySystem[widget.system.id] ?? {},
@@ -218,6 +220,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       focusStateManager.saveFocusState(routeId, selectedIndex: selectedIndex);
     });
 
+    _installedFilesSubscription?.close();
     _debouncer.stopHold();
     _controller.removeListener(_onControllerChanged);
     _controller.dispose();
@@ -231,6 +234,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
   void _onControllerChanged() {
     if (!mounted) return;
+    _focusManager.validateState(_columns);
     setState(() {});
     _updateItemKeys();
   }
@@ -433,8 +437,6 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final searchExtraPadding = rs.isSmall ? 16.0 : 20.0;
     final topPadding =
         baseTopPadding + folderExtraPadding + localOnlyExtraPadding + (isSearchActive ? searchExtraPadding : 0.0);
-
-    _focusManager.validateState(_columns);
 
     return buildWithActions(
       PopScope(

@@ -36,8 +36,8 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
   int _selectedIndex = 0; // 0 = Stay (Default), 1 = Exit
-  StateController<OverlayPriority>? _overlayNotifier;
-  bool _hasClaimed = false;
+  OverlayPriorityManager? _overlayManager;
+  int? _claimToken;
 
   @override
   void initState() {
@@ -57,35 +57,34 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
       curve: Curves.easeIn,
     );
 
+    _focusNode = FocusNode();
+
     _controller.forward();
 
     // Set overlay priority to dialog
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _overlayNotifier = ref.read(overlayPriorityProvider.notifier);
-        _overlayNotifier!.state = OverlayPriority.dialog;
-        _hasClaimed = true;
+        _overlayManager = ref.read(overlayPriorityProvider.notifier);
+        _claimToken = _overlayManager!.claim(OverlayPriority.dialog);
         FocusScope.of(context).requestFocus(_focusNode);
       }
     });
   }
 
-  final FocusNode _focusNode = FocusNode();
+  late final FocusNode _focusNode;
 
   @override
   void dispose() {
-    if (_hasClaimed) {
-      _hasClaimed = false;
-      final notifier = _overlayNotifier;
-      if (notifier != null) {
-        Future(() {
-          if (notifier.state == OverlayPriority.dialog) {
-            notifier.state = OverlayPriority.none;
-          }
-        });
+    final token = _claimToken;
+    if (token != null) {
+      _claimToken = null;
+      final manager = _overlayManager;
+      if (manager != null) {
+        Future(() => manager.release(token));
       }
     }
     _focusNode.dispose();
+    _controller.stop();
     _controller.dispose();
     super.dispose();
   }
@@ -107,10 +106,10 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
   }
 
   void _close() {
-    _hasClaimed = false;
-    final notifier = _overlayNotifier;
-    if (notifier != null && notifier.state == OverlayPriority.dialog) {
-      notifier.state = OverlayPriority.none;
+    final token = _claimToken;
+    if (token != null) {
+      _claimToken = null;
+      _overlayManager?.release(token);
     }
     _controller.reverse().then((_) {
       if (!mounted) return;

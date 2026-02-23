@@ -98,6 +98,9 @@ class WebProvider implements SourceProvider {
       final href = link.attributes['href'];
       if (href == null) continue;
 
+      // Length validation: skip oversized hrefs (crafted URLs)
+      if (href.length > 1024) continue;
+
       final text = link.text.trim();
       if (text == 'Parent Directory' ||
           text == '..' ||
@@ -113,9 +116,14 @@ class WebProvider implements SourceProvider {
         continue;
       }
 
+      // Skip hrefs with control characters
+      if (_containsControlChars(href)) continue;
+
       final hrefLower = href.toLowerCase();
       if (SystemModel.isGameFile(hrefLower)) {
         final decodedFilename = Uri.decodeFull(href);
+        // Skip filenames that are too long after decoding
+        if (decodedFilename.length > 512) continue;
         games.add(GameItem(
           filename: decodedFilename,
           displayName: GameItem.cleanDisplayName(decodedFilename),
@@ -126,6 +134,14 @@ class WebProvider implements SourceProvider {
     }
 
     return games;
+  }
+
+  static bool _containsControlChars(String s) {
+    for (var i = 0; i < s.length; i++) {
+      final c = s.codeUnitAt(i);
+      if (c < 0x20 && c != 0x09) return true; // allow tab, reject other control chars
+    }
+    return false;
   }
 
   static String _trimSlashes(String path) {

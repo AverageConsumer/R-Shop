@@ -56,20 +56,29 @@ class DatabaseService {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // Each migration step is wrapped in a transaction so a partial failure
+    // (e.g. disk full) doesn't leave the DB in a half-migrated state.
+    // Note: SQLite DDL (ALTER TABLE) is transactional in SQLite.
     if (oldVersion < 2) {
-      await db.execute('ALTER TABLE $_tableName ADD COLUMN cover_url TEXT');
-      await db.execute(
-          'CREATE INDEX IF NOT EXISTS idx_filename ON $_tableName (filename)');
+      await db.transaction((txn) async {
+        await txn.execute('ALTER TABLE $_tableName ADD COLUMN cover_url TEXT');
+        await txn.execute(
+            'CREATE INDEX IF NOT EXISTS idx_filename ON $_tableName (filename)');
+      });
     }
     if (oldVersion < 3) {
-      await db.execute(
-          'ALTER TABLE $_tableName ADD COLUMN provider_config TEXT');
+      await db.transaction((txn) async {
+        await txn.execute(
+            'ALTER TABLE $_tableName ADD COLUMN provider_config TEXT');
+      });
     }
     if (oldVersion < 4) {
-      await db.execute(
-          'ALTER TABLE $_tableName ADD COLUMN thumb_hash TEXT');
-      await db.execute(
-          'ALTER TABLE $_tableName ADD COLUMN has_thumbnail INTEGER NOT NULL DEFAULT 0');
+      await db.transaction((txn) async {
+        await txn.execute(
+            'ALTER TABLE $_tableName ADD COLUMN thumb_hash TEXT');
+        await txn.execute(
+            'ALTER TABLE $_tableName ADD COLUMN has_thumbnail INTEGER NOT NULL DEFAULT 0');
+      });
     }
   }
 

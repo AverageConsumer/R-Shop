@@ -94,7 +94,7 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
         _userController.text = auth.user ?? '';
         _passController.text = auth.pass ?? '';
         _apiKeyController.text = auth.apiKey ?? '';
-      } catch (_) {}
+      } catch (e) { debugPrint('RommConfigScreen: auth parse failed: $e'); }
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {

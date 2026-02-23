@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 /// Checks file magic bytes for PNG/JPEG/GIF/WebP headers.
@@ -41,7 +42,8 @@ bool isValidImageFile(File file) {
     } finally {
       raf.closeSync();
     }
-  } catch (_) {
+  } catch (e) {
+    debugPrint('isValidImageFile: header check failed: $e');
     return false;
   }
 }
@@ -66,6 +68,15 @@ class FailedUrlsCache {
 
   void markFailed(String url) {
     _failedUrls[url] = DateTime.now();
+    // Proactively prune expired entries when cache grows large
+    if (_failedUrls.length > 500) {
+      _pruneExpired();
+    }
+  }
+
+  void _pruneExpired() {
+    final now = DateTime.now();
+    _failedUrls.removeWhere((_, failedAt) => now.difference(failedAt) > _ttl);
   }
 
   void clear() {
@@ -101,13 +112,30 @@ class _QueueEntry {
   _QueueEntry(this.completer, this.url);
 }
 
+/// Rate-limited HTTP file service for cache downloads.
+///
+/// NOTE: The static mutable fields (_activeRequests, _queue, _rateLimitedHosts)
+/// are safe because Dart's event loop is single-threaded — async code only
+/// interleaves at `await` points. Do NOT access these from a separate Isolate.
 class RateLimitedFileService extends FileService {
   final HttpFileService _httpFileService = HttpFileService();
   static const int _maxConcurrent = 6;
+  static const int _maxQueueSize = 200;
   static const Duration _requestDelay = Duration(milliseconds: 50);
-  static final Set<String> _rateLimitedHosts = {};
+  static const Duration _rateLimitTtl = Duration(minutes: 10);
+  static final Map<String, DateTime> _rateLimitedHosts = {};
   static int _activeRequests = 0;
   static final List<_QueueEntry> _queue = [];
+
+  static bool _isHostRateLimited(String host) {
+    final limitedAt = _rateLimitedHosts[host];
+    if (limitedAt == null) return false;
+    if (DateTime.now().difference(limitedAt) > _rateLimitTtl) {
+      _rateLimitedHosts.remove(host);
+      return false;
+    }
+    return true;
+  }
 
   @override
   int get concurrentFetches => 50;
@@ -127,9 +155,23 @@ class RateLimitedFileService extends FileService {
   Future<FileServiceResponse> get(String url,
       {Map<String, String>? headers}) async {
     if (_activeRequests >= _maxConcurrent) {
+      // Evict oldest entries when queue is full
+      while (_queue.length >= _maxQueueSize) {
+        final oldest = _queue.removeAt(0);
+        if (!oldest.cancelled && !oldest.completer.isCompleted) {
+          oldest.cancelled = true;
+          oldest.completer.complete();
+        }
+      }
+
       final entry = _QueueEntry(Completer<void>(), url);
       _queue.add(entry);
-      await entry.completer.future;
+      await entry.completer.future.timeout(
+        const Duration(minutes: 5),
+        onTimeout: () {
+          entry.cancelled = true;
+        },
+      );
       if (entry.cancelled) {
         throw HttpExceptionWithStatus(499, 'Cancelled', uri: Uri.parse(url));
       }
@@ -139,7 +181,7 @@ class RateLimitedFileService extends FileService {
 
     try {
       final uri = Uri.parse(url);
-      final isRateLimited = _rateLimitedHosts.contains(uri.host);
+      final isRateLimited = _isHostRateLimited(uri.host);
 
       if (isRateLimited) {
         await Future.delayed(const Duration(seconds: 2));
@@ -150,7 +192,7 @@ class RateLimitedFileService extends FileService {
       final response = await _httpFileService.get(url, headers: headers);
 
       if (response.statusCode == 429) {
-        _rateLimitedHosts.add(uri.host);
+        _rateLimitedHosts[uri.host] = DateTime.now();
         throw HttpExceptionWithStatus(
           429,
           'Rate limited',

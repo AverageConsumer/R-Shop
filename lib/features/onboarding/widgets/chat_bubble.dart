@@ -43,14 +43,14 @@ class _ChatBubbleState extends ConsumerState<ChatBubble> {
       try {
         _audioManager.stopTyping();
         _typingSoundStarted = false;
-      } catch (_) {}
+      } catch (e) { debugPrint('ChatBubble: stopTyping failed: $e'); }
     }
   }
   void _startTypewriter() {
     try {
       _audioManager.startTyping();
       _typingSoundStarted = true;
-    } catch (_) {}
+    } catch (e) { debugPrint('ChatBubble: startTyping failed: $e'); }
     _timer = Timer.periodic(widget.typewriterSpeed, (timer) {
       if (!mounted) { timer.cancel(); return; }
       if (_charIndex < widget.message.length) {

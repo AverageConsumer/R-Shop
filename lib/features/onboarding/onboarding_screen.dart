@@ -43,6 +43,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (!mounted) return KeyEventResult.ignored;
     final isOverlayExpanded = ref.read(downloadOverlayExpandedProvider);
     if (isOverlayExpanded) return KeyEventResult.handled;
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
@@ -349,6 +350,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       final jsonString = const JsonEncoder.withIndent('  ').convert(config.toJson());
       await ConfigStorageService().saveConfig(jsonString);
       await storage.setOnboardingCompleted(true);
+      if (!mounted) return;
       ref.invalidate(bootstrappedConfigProvider);
     } catch (e) {
       if (!mounted) return;

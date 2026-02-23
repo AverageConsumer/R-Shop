@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/input/input.dart';
@@ -5,9 +7,11 @@ import 'core/theme/app_theme.dart';
 import 'models/system_model.dart';
 import 'providers/app_providers.dart';
 import 'providers/download_providers.dart';
+import 'providers/game_providers.dart';
 import 'providers/rom_status_providers.dart';
 import 'features/home/home_view.dart';
 import 'features/onboarding/onboarding_screen.dart';
+import 'services/crash_log_service.dart';
 import 'services/storage_service.dart';
 import 'services/haptic_service.dart';
 import 'services/audio_manager.dart';
@@ -25,33 +29,57 @@ class NoGlowScrollBehavior extends ScrollBehavior {
   }
 }
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  installGamepadKeyFix();
-  final storageService = StorageService();
-  await storageService.init();
+void main() {
+  final crashLogService = CrashLogService();
 
-  final hapticService = HapticService();
-  hapticService.setEnabled(storageService.getHapticEnabled());
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    installGamepadKeyFix();
 
-  final audioManager = AudioManager();
-  await audioManager.init();
-  audioManager.updateSettings(storageService.getSoundSettings());
+    // Initialize crash log service early
+    await crashLogService.init();
 
-  DownloadForegroundService.init();
+    // Global error handlers
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      debugPrint('FlutterError: ${details.exceptionAsString()}');
+      crashLogService.logError(details.exceptionAsString(), details.stack);
+    };
+    PlatformDispatcher.instance.onError = (error, stack) {
+      debugPrint('PlatformDispatcher error: $error\n$stack');
+      crashLogService.logError(error, stack);
+      return true;
+    };
 
-  await ThumbnailService.init();
+    final storageService = StorageService();
+    await storageService.init();
 
-  runApp(
-    ProviderScope(
-      overrides: [
-        storageServiceProvider.overrideWithValue(storageService),
-        hapticServiceProvider.overrideWithValue(hapticService),
-        audioManagerProvider.overrideWithValue(audioManager),
-      ],
-      child: RShopApp(audioManager: audioManager),
-    ),
-  );
+    final hapticService = HapticService();
+    hapticService.setEnabled(storageService.getHapticEnabled());
+
+    final audioManager = AudioManager();
+    await audioManager.init();
+    audioManager.updateSettings(storageService.getSoundSettings());
+
+    DownloadForegroundService.init();
+
+    await ThumbnailService.init();
+
+    runApp(
+      ProviderScope(
+        overrides: [
+          crashLogServiceProvider.overrideWithValue(crashLogService),
+          storageServiceProvider.overrideWithValue(storageService),
+          hapticServiceProvider.overrideWithValue(hapticService),
+          audioManagerProvider.overrideWithValue(audioManager),
+        ],
+        child: RShopApp(audioManager: audioManager),
+      ),
+    );
+  }, (error, stack) {
+    debugPrint('Uncaught error: $error\n$stack');
+    crashLogService.logError(error, stack);
+  });
 }
 
 class RShopApp extends ConsumerStatefulWidget {
@@ -68,10 +96,23 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final configAsync = await ref.read(bootstrappedConfigProvider.future);
       ref
           .read(downloadQueueManagerProvider)
-          .restoreQueue(SystemModel.supportedSystems);
+          .restoreQueue(SystemModel.supportedSystems, appConfig: configAsync);
+
+      // Show recovery notification if config was restored from backup
+      if (mounted && ref.read(configRecoveredProvider)) {
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.showSnackBar(
+          const SnackBar(
+            content: Text('Config recovered from backup'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+
       // Defer thumbnail migration to avoid DB contention at startup
       Future.delayed(const Duration(seconds: 3), () {
         ThumbnailMigrationService.migrateIfNeeded(DatabaseService());

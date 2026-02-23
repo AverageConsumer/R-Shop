@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/config/app_config.dart';
@@ -361,7 +362,8 @@ class OnboardingState {
       return SystemModel.supportedSystems.firstWhere(
         (s) => s.id == selectedConsoleId,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('OnboardingState: system lookup failed for $selectedConsoleId: $e');
       return null;
     }
   }
@@ -1168,7 +1170,8 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           localOnlySystemIds: localOnlyIds,
         ),
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Onboarding: RomM scan failed: $e');
       if (!mounted) return;
       state = state.copyWith(
         rommSetupState: state.rommSetupState!.copyWith(
@@ -1325,7 +1328,8 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       final dirPath = '$basePath/$systemId';
       try {
         await Directory(dirPath).create(recursive: true);
-      } catch (_) {
+      } catch (e) {
+        debugPrint('Onboarding: directory creation failed for $dirPath: $e');
         failedCount++;
         continue;
       }
@@ -1412,7 +1416,8 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           enabledSystemIds: enabledIds,
         ),
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Onboarding: local folder scan failed: $e');
       if (!mounted) return;
       state = state.copyWith(
         localSetupState: state.localSetupState!.copyWith(

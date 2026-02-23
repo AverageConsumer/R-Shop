@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import '../models/system_model.dart';
 
 class FolderInfo {
@@ -40,19 +41,24 @@ class RomFolderService {
       SystemModel.supportedSystems.map((s) => s.id).toList();
   Future<int> _countGamesInFolder(
       String folderPath, List<String> extensions) async {
-    final dir = Directory(folderPath);
-    if (!await dir.exists()) return 0;
-    int count = 0;
-    await for (final entity in dir.list()) {
-      if (entity is File) {
-        final name = entity.path.toLowerCase();
-        final hasValidExt = extensions.any((ext) => name.endsWith(ext));
-        if (hasValidExt || name.endsWith('.zip') || name.endsWith('.7z')) {
-          count++;
+    try {
+      final dir = Directory(folderPath);
+      if (!await dir.exists()) return 0;
+      int count = 0;
+      await for (final entity in dir.list()) {
+        if (entity is File) {
+          final name = entity.path.toLowerCase();
+          final hasValidExt = extensions.any((ext) => name.endsWith(ext.toLowerCase()));
+          if (hasValidExt || name.endsWith('.zip') || name.endsWith('.7z')) {
+            count++;
+          }
         }
       }
+      return count;
+    } on FileSystemException catch (e) {
+      debugPrint('RomFolderService: cannot count games in $folderPath: $e');
+      return 0;
     }
-    return count;
   }
 
   Future<FolderAnalysisResult> analyze(String romPath) async {
@@ -62,11 +68,19 @@ class RomFolderService {
     int missingCount = 0;
     for (final system in SystemModel.supportedSystems) {
       final folderPath = '$romPath/${system.id}';
-      final dir = Directory(folderPath);
-      final exists = await dir.exists();
-      final gameCount = exists
-          ? await _countGamesInFolder(folderPath, system.romExtensions)
-          : 0;
+      bool exists;
+      int gameCount;
+      try {
+        final dir = Directory(folderPath);
+        exists = await dir.exists();
+        gameCount = exists
+            ? await _countGamesInFolder(folderPath, system.romExtensions)
+            : 0;
+      } on FileSystemException catch (e) {
+        debugPrint('RomFolderService: cannot analyze $folderPath: $e');
+        exists = false;
+        gameCount = 0;
+      }
       folders.add(FolderInfo(
         folderName: system.id,
         systemName: system.name,
@@ -98,28 +112,37 @@ class RomFolderService {
   /// Scans all subdirectories of [basePath] and counts ROM files in each.
   Future<List<({String name, int fileCount})>> scanAllSubfolders(
       String basePath) async {
-    final baseDir = Directory(basePath);
-    if (!await baseDir.exists()) return [];
+    try {
+      final baseDir = Directory(basePath);
+      if (!await baseDir.exists()) return [];
 
-    final results = <({String name, int fileCount})>[];
-    await for (final entity in baseDir.list()) {
-      if (entity is Directory) {
-        final name = entity.path.split('/').last;
-        if (name.startsWith('.')) continue;
-        int count = 0;
-        await for (final file in entity.list()) {
-          if (file is File) {
-            final lower = file.path.toLowerCase();
-            if (_allRomExtensions.any((ext) => lower.endsWith(ext))) {
-              count++;
+      final results = <({String name, int fileCount})>[];
+      await for (final entity in baseDir.list()) {
+        if (entity is Directory) {
+          final name = entity.path.split('/').last;
+          if (name.startsWith('.')) continue;
+          int count = 0;
+          try {
+            await for (final file in entity.list()) {
+              if (file is File) {
+                final lower = file.path.toLowerCase();
+                if (_allRomExtensions.any((ext) => lower.endsWith(ext))) {
+                  count++;
+                }
+              }
             }
+          } on FileSystemException catch (e) {
+            debugPrint('RomFolderService: cannot list $name: $e');
           }
+          results.add((name: name, fileCount: count));
         }
-        results.add((name: name, fileCount: count));
       }
+      results.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      return results;
+    } on FileSystemException catch (e) {
+      debugPrint('RomFolderService: cannot scan $basePath: $e');
+      return [];
     }
-    results.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    return results;
   }
 
   Future<List<String>> createMissingFolders(String romPath) async {
@@ -131,7 +154,8 @@ class RomFolderService {
         try {
           await dir.create(recursive: true);
           created.add(system.id);
-        } catch (_) {
+        } catch (e) {
+          debugPrint('RomFolderService: failed to create $folderPath: $e');
         }
       }
     }

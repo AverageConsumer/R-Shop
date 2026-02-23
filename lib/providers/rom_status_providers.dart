@@ -26,16 +26,38 @@ final romWatcherProvider = Provider<void>((ref) {
   }
 
   // --- Download completion watcher ---
-  ref.listen(downloadQueueManagerProvider, (previous, next) {
-    if (previous == null) return;
+  final seenCompleted = <String>{};
+
+  // Seed with already-completed items to avoid false triggers on init
+  final initialQueue = ref.read(downloadQueueManagerProvider).state.queue;
+  for (final item in initialQueue) {
+    if (item.status == DownloadItemStatus.completed) {
+      seenCompleted.add(item.id);
+    }
+  }
+
+  ref.listen(downloadQueueManagerProvider, (_, next) {
+    final currentIds = <String>{};
+    bool foundNew = false;
+
     for (final item in next.state.queue) {
-      if (item.status != DownloadItemStatus.completed) continue;
-      final prev = previous.state.getDownloadById(item.id);
-      if (prev != null && prev.status != DownloadItemStatus.completed) {
-        downloadDebounce?.cancel();
-        downloadDebounce = Timer(const Duration(milliseconds: 500), bump);
-        return;
+      currentIds.add(item.id);
+      if (item.status == DownloadItemStatus.completed &&
+          seenCompleted.add(item.id)) {
+        foundNew = true;
       }
+    }
+
+    seenCompleted.retainAll(currentIds);
+
+    if (foundNew) {
+      // Leading edge: bump immediately if no pending debounce (first in burst)
+      if (downloadDebounce?.isActive != true) {
+        bump();
+      }
+      // Trailing edge: always schedule a final sweep after the burst settles
+      downloadDebounce?.cancel();
+      downloadDebounce = Timer(const Duration(milliseconds: 500), bump);
     }
   });
 
@@ -53,11 +75,17 @@ final romWatcherProvider = Provider<void>((ref) {
       final path = sysConfig.targetFolder;
       if (path.isEmpty) continue;
       final dir = Directory(path);
-      if (!dir.existsSync()) continue;
+      bool dirExists;
+      try {
+        dirExists = dir.existsSync();
+      } on FileSystemException {
+        continue;
+      }
+      if (!dirExists) continue;
       try {
         final sub = dir.watch().listen((_) {
           fsDebounce?.cancel();
-          fsDebounce = Timer(const Duration(seconds: 2), bump);
+          fsDebounce = Timer(const Duration(seconds: 1), bump);
         });
         fsSubscriptions.add(sub);
       } catch (e) {
@@ -69,7 +97,7 @@ final romWatcherProvider = Provider<void>((ref) {
   ref.listen<AsyncValue<AppConfig>>(
     bootstrappedConfigProvider,
     (_, next) {
-      final config = next.valueOrNull;
+      final config = next.value;
       if (config != null) {
         setupFsWatchers(config);
       }

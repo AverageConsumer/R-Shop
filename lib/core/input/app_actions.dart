@@ -101,6 +101,10 @@ class ToggleOverlayAction extends Action<ToggleOverlayIntent> {
 
   ToggleOverlayAction(this.ref, {this.onToggle});
 
+  // Always enabled — Start button must be able to close overlays
+  @override
+  bool isEnabled(ToggleOverlayIntent intent) => true;
+
   @override
   Object? invoke(ToggleOverlayIntent intent) {
     if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;

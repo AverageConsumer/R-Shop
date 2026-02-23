@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/responsive/responsive.dart';
 import '../../providers/app_providers.dart';
+import '../../services/audio_manager.dart';
 import '../../providers/game_providers.dart';
 import '../../services/config_storage_service.dart';
 import '../../widgets/console_hud.dart';
@@ -23,10 +24,12 @@ class ConfigModeScreen extends ConsumerStatefulWidget {
 class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
   final FocusNode _focusNode = FocusNode();
   bool _initialized = false;
+  late final AudioManager _audioManager;
 
   @override
   void initState() {
     super.initState();
+    _audioManager = ref.read(audioManagerProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
@@ -35,8 +38,8 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
   @override
   void dispose() {
     try {
-      ref.read(audioManagerProvider).stopTyping();
-    } catch (_) {}
+      _audioManager.stopTyping();
+    } catch (e) { debugPrint('ConfigModeScreen: stopTyping failed: $e'); }
     _focusNode.dispose();
     super.dispose();
   }

@@ -18,8 +18,54 @@ enum OverlayPriority {
   const OverlayPriority(this.level);
 }
 
-final overlayPriorityProvider = StateProvider<OverlayPriority>((ref) {
-  return OverlayPriority.none;
+class OverlayPriorityManager extends StateNotifier<OverlayPriority> {
+  final List<({OverlayPriority priority, int token})> _stack = [];
+  int _nextToken = 0;
+
+  OverlayPriorityManager() : super(OverlayPriority.none);
+
+  /// Claims a priority and returns a unique token for targeted release.
+  int claim(OverlayPriority priority) {
+    final token = _nextToken++;
+    _stack.add((priority: priority, token: token));
+    _updateState();
+    return token;
+  }
+
+  /// Releases the exact entry identified by [token].
+  /// Returns true if the token was found and removed.
+  bool release(int token) {
+    final before = _stack.length;
+    _stack.removeWhere((e) => e.token == token);
+    final didRemove = _stack.length < before;
+    if (didRemove) _updateState();
+    return didRemove;
+  }
+
+  /// Removes the first entry matching [priority].
+  /// Use for suspend/resume patterns where no token is available.
+  void releaseByPriority(OverlayPriority priority) {
+    final idx = _stack.indexWhere((e) => e.priority == priority);
+    if (idx >= 0) {
+      _stack.removeAt(idx);
+      _updateState();
+    }
+  }
+
+  void _updateState() {
+    if (_stack.isEmpty) {
+      state = OverlayPriority.none;
+    } else {
+      state = _stack
+          .map((e) => e.priority)
+          .reduce((a, b) => a.level >= b.level ? a : b);
+    }
+  }
+}
+
+final overlayPriorityProvider =
+    StateNotifierProvider<OverlayPriorityManager, OverlayPriority>((ref) {
+  return OverlayPriorityManager();
 });
 
 final mainFocusRequestProvider = StateProvider<FocusNode?>((ref) {

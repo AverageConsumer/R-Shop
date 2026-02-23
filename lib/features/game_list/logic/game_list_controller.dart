@@ -252,8 +252,8 @@ class GameListController extends ChangeNotifier {
         _state = _state.copyWith(activeFilters: restored);
         _applyFilters();
       }
-    } catch (_) {
-      // Corrupted data — ignore
+    } catch (e) {
+      debugPrint('GameListController: filter restore failed for ${system.id}: $e');
     }
   }
 

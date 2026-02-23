@@ -33,6 +33,29 @@ class GameItem {
     );
   }
 
+  factory GameItem.fromJson(Map<String, dynamic> json) {
+    return GameItem(
+      filename: json['filename'] as String,
+      displayName: json['displayName'] as String,
+      url: json['url'] as String,
+      cachedCoverUrl: json['cachedCoverUrl'] as String?,
+      providerConfig: json['providerConfig'] != null
+          ? ProviderConfig.fromJson(
+              json['providerConfig'] as Map<String, dynamic>)
+          : null,
+      hasThumbnail: json['hasThumbnail'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'filename': filename,
+        'displayName': displayName,
+        'url': url,
+        if (cachedCoverUrl != null) 'cachedCoverUrl': cachedCoverUrl,
+        if (providerConfig != null) 'providerConfig': providerConfig!.toJson(),
+        if (hasThumbnail) 'hasThumbnail': hasThumbnail,
+      };
+
   static String cleanDisplayName(String filename) {
     return GameMetadata.cleanTitle(filename);
   }

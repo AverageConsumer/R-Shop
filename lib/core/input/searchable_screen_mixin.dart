@@ -29,6 +29,7 @@ mixin SearchableScreenMixin<T extends ConsumerStatefulWidget>
   bool _isSearching = false;
   bool _isSearchFocused = false;
   bool _isClosingSearch = false;
+  int _searchOverlaySuspendCount = 0;
 
   final FocusNode searchFieldNode = FocusNode();
   final TextEditingController searchTextController = TextEditingController();
@@ -100,6 +101,7 @@ mixin SearchableScreenMixin<T extends ConsumerStatefulWidget>
 
   void closeSearch() {
     _isClosingSearch = true;
+    _searchOverlaySuspendCount = 0;
     FocusManager.instance.primaryFocus?.unfocus();
     FocusScope.of(context).unfocus();
 
@@ -153,16 +155,34 @@ mixin SearchableScreenMixin<T extends ConsumerStatefulWidget>
 
   /// Temporarily resets overlay priority to `none` so the pushed screen's
   /// actions are not blocked by the lingering search priority.
+  /// Uses a counter so nested suspend/resume pairs are balanced.
   void suspendSearchOverlay() {
     if (_isSearching) {
-      ref.read(overlayPriorityProvider.notifier).state = OverlayPriority.none;
+      _searchOverlaySuspendCount++;
+      if (_searchOverlaySuspendCount == 1) {
+        ref.read(overlayPriorityProvider.notifier).releaseByPriority(OverlayPriority.search);
+      }
     }
   }
 
   /// Restores `search` priority after returning from a pushed route.
   void resumeSearchOverlay() {
-    if (_isSearching) {
-      ref.read(overlayPriorityProvider.notifier).state = OverlayPriority.search;
+    if (_isSearching && _searchOverlaySuspendCount > 0) {
+      _searchOverlaySuspendCount--;
+      if (_searchOverlaySuspendCount == 0) {
+        ref.read(overlayPriorityProvider.notifier).claim(OverlayPriority.search);
+      }
+    }
+  }
+
+  /// Exception-safe wrapper: suspends search overlay, runs [action], then
+  /// resumes — even if [action] throws.
+  Future<R> withSuspendedSearch<R>(Future<R> Function() action) async {
+    suspendSearchOverlay();
+    try {
+      return await action();
+    } finally {
+      resumeSearchOverlay();
     }
   }
 

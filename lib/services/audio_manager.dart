@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
@@ -22,9 +23,11 @@ class AudioManager {
   final Random _random = Random();
   bool _isInitialized = false;
   bool _isInitializing = false;
+  bool _isDisposed = false;
   bool _bgmStarted = false;
   bool _bgmStarting = false;
   bool _hasAttemptedReinit = false;
+  Timer? _bgmStopTimer;
 
   bool get isInitialized => _isInitialized;
   SoundSettings get settings => _settings;
@@ -84,7 +87,9 @@ class AudioManager {
     if (_bgmHandle != null) {
       try {
         _soLoud!.setVolume(_bgmHandle!, bgmVolume);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('AudioManager: setVolume failed: $e');
+      }
     }
   }
 
@@ -116,14 +121,19 @@ class AudioManager {
 
     try {
       _soLoud!.play(source, volume: _settings.sfxVolume).then((handle) {
-        if (pitch != 1.0) {
+        if (pitch != 1.0 && _soLoud != null) {
           try {
             _soLoud!.setRelativePlaySpeed(handle, pitch);
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('AudioManager: setRelativePlaySpeed failed: $e');
+          }
         }
+      }).catchError((e) {
+        debugPrint('AudioManager: play future failed: $e');
       });
-    } catch (_) {}
-
+    } catch (e) {
+      debugPrint('AudioManager: playSound failed: $e');
+    }
   }
 
   Future<void> startBgm() async {
@@ -135,7 +145,8 @@ class AudioManager {
       try {
         _soLoud!.getVolume(_bgmHandle!);
         return;
-      } catch (_) {
+      } catch (e) {
+        debugPrint('AudioManager: BGM handle invalid, restarting: $e');
         _bgmSource = null;
         _bgmHandle = null;
         _bgmStarted = false;
@@ -150,6 +161,7 @@ class AudioManager {
 
       _bgmStarted = true;
       _bgmStarting = false;
+      _hasAttemptedReinit = false;
 
       if (_settings.enabled) {
         _soLoud!.fadeVolume(
@@ -160,12 +172,16 @@ class AudioManager {
       _bgmStarting = false;
       _bgmStarted = false;
       if (!_hasAttemptedReinit) {
-        await _reinitializeAndRetryBgm();
+        final reinitOk = await _reinitializeAndRetryBgm();
+        if (reinitOk) {
+          // Retry BGM once after successful reinit (non-recursive: _hasAttemptedReinit is now true)
+          await startBgm();
+        }
       }
     }
   }
 
-  Future<void> _reinitializeAndRetryBgm() async {
+  Future<bool> _reinitializeAndRetryBgm() async {
     _hasAttemptedReinit = true;
     _isInitialized = false;
     _soundSources.clear();
@@ -176,11 +192,12 @@ class AudioManager {
       await _soLoud!.init();
       if (await _preloadSounds()) {
         _isInitialized = true;
-        await startBgm();
+        return true;
       }
     } catch (e) {
       debugPrint('AudioManager: reinit failed: $e');
     }
+    return false;
   }
 
   void stopBgm() {
@@ -188,14 +205,20 @@ class AudioManager {
 
     try {
       _soLoud!.fadeVolume(_bgmHandle!, 0.0, const Duration(milliseconds: 500));
-      Future.delayed(const Duration(milliseconds: 600), () {
+      _bgmStopTimer?.cancel();
+      _bgmStopTimer = Timer(const Duration(milliseconds: 600), () {
+        if (_isDisposed) return;
         if (_bgmHandle != null && _soLoud != null && _isInitialized) {
           try {
             _soLoud!.stop(_bgmHandle!);
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('AudioManager: stopBgm delayed stop failed: $e');
+          }
         }
       });
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('AudioManager: stopBgm fadeVolume failed: $e');
+    }
   }
 
   void setBgmVolume(double volume) {
@@ -203,7 +226,9 @@ class AudioManager {
 
     try {
       _soLoud!.setVolume(_bgmHandle!, _settings.enabled ? volume : 0.0);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('AudioManager: setBgmVolume failed: $e');
+    }
   }
 
   Future<void> startTyping() async {
@@ -217,7 +242,9 @@ class AudioManager {
     try {
       _typingHandle = await _soLoud!
           .play(source, volume: _settings.sfxVolume, looping: true);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('AudioManager: startTyping failed: $e');
+    }
   }
 
   void stopTyping() {
@@ -225,7 +252,9 @@ class AudioManager {
 
     try {
       _soLoud!.stop(_typingHandle!);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('AudioManager: stopTyping failed: $e');
+    }
     _typingHandle = null;
   }
 
@@ -237,7 +266,9 @@ class AudioManager {
     if (_bgmHandle != null && _bgmStarted) {
       try {
         _soLoud!.setPause(_bgmHandle!, true);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('AudioManager: pause failed: $e');
+      }
     }
   }
 
@@ -247,7 +278,9 @@ class AudioManager {
     if (_bgmHandle != null && _bgmStarted) {
       try {
         _soLoud!.setPause(_bgmHandle!, false);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('AudioManager: resume failed: $e');
+      }
     }
   }
 
@@ -257,12 +290,16 @@ class AudioManager {
   }
 
   Future<void> dispose() async {
-    if (!_isInitialized) return;
+    if (_isDisposed || !_isInitialized) return;
+    _isDisposed = true;
+    _bgmStopTimer?.cancel();
 
     try {
       stopTyping();
       stopBgm();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('AudioManager: dispose stopAll failed: $e');
+    }
 
     if (_soLoud != null) {
       try {

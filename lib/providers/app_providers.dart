@@ -5,6 +5,8 @@ export '../services/storage_service.dart' show ControllerLayout;
 import '../services/haptic_service.dart';
 import '../services/audio_manager.dart';
 import '../services/feedback_service.dart';
+import '../services/crash_log_service.dart';
+import '../services/disk_space_service.dart';
 import '../models/sound_settings.dart';
 import '../utils/game_metadata.dart';
 
@@ -15,11 +17,16 @@ export '../core/input/input_providers.dart'
         inputDebouncerProvider,
         overlayPriorityProvider,
         OverlayPriority,
+        OverlayPriorityManager,
         focusStateManagerProvider,
         FocusStateManager,
         FocusStateEntry,
         searchRequestedProvider,
         confirmRequestedProvider;
+
+final crashLogServiceProvider = Provider<CrashLogService>((ref) {
+  return CrashLogService();
+});
 
 final storageServiceProvider = Provider<StorageService>((ref) {
   return StorageService();
@@ -46,6 +53,12 @@ class SoundSettingsNotifier extends StateNotifier<SoundSettings> {
 
   SoundSettingsNotifier(this._storage, this._audioManager)
       : super(_storage.getSoundSettings());
+
+  @override
+  void dispose() {
+    _audioManager.stopAll();
+    super.dispose();
+  }
 
   Future<void> setEnabled(bool enabled) async {
     state = state.copyWith(enabled: enabled);
@@ -89,7 +102,9 @@ class GridColumnsNotifier extends StateNotifier<int> {
 
   GridColumnsNotifier(this._storage, this._systemName,
       {this.minColumns = 3, this.maxColumns = 8})
-      : super(
+      : assert(minColumns > 0, 'minColumns must be positive'),
+        assert(maxColumns >= minColumns, 'maxColumns must be >= minColumns'),
+        super(
             _storage.getGridColumns(_systemName).clamp(minColumns, maxColumns));
 
   void setColumns(int columns) {
@@ -218,4 +233,9 @@ final favoriteGamesProvider =
     StateNotifierProvider<FavoriteGamesNotifier, List<String>>((ref) {
   return FavoriteGamesNotifier(ref.read(storageServiceProvider));
 });
+
+final storageInfoProvider =
+    FutureProvider.autoDispose.family<StorageInfo?, String>(
+  (ref, path) => DiskSpaceService.getFreeSpace(path),
+);
 

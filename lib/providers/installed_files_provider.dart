@@ -42,7 +42,7 @@ InstalledFilesState _scanAllSystems(AppConfig config) {
       for (final entity in dir.listSync(followLinks: false)) {
         filenames.add(p.basename(entity.path));
       }
-    } catch (_) {}
+    } catch (e) { debugPrint('InstalledFiles: listSync failed: $e'); }
     bySystem[sysConfig.id] = filenames;
     all.addAll(filenames);
   }
