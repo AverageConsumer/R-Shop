@@ -5,7 +5,7 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
 
 <p align="center">
   <a href="https://averageconsumer.github.io/R-Shop/">
-    <img src="screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
+    <img src="docs/screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
   </a>
 </p>
 
@@ -27,9 +27,11 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
 
 ---
 
-## 🌟 Why R-Shop?
+## 🌟 What is R-Shop?
 
-R-Shop isn't just a file browser; it's a **native console experience**. It bridges the gap between your self-hosted storage (**RomM, SMB, FTP**) and your handheld device (Odin, Retroid, Anbernic), providing a UI that feels like it was built by a major manufacturer.
+R-Shop is a Flutter-based Android application that provides a **seamless, console-like experience** for browsing, downloading, and organizing your retro game library. 
+
+It bridges the gap between your self-hosted storage (**RomM, SMB, FTP, Web**) and your handheld device, providing a native UI that feels like it was built by a major console manufacturer. Optimized specifically for the **AYN Odin, Retroid Pocket, Anbernic** and other Android-based handhelds.
 
 > **🛡️ Neutrality Policy:** R-Shop is a technical tool and directory browser. It does **not** host, distribute, or provide links to copyrighted content. You provide the sources; R-Shop provides the experience.
 
@@ -37,33 +39,26 @@ R-Shop isn't just a file browser; it's a **native console experience**. It bridg
 
 ## ✨ Key Features
 
-* **📚 Library Screen** – Unified cross-system game browser with All/Installed/Favorites tabs, search, sort modes, and adjustable grid zoom (LB/RB).
-* **⚡ Quick Menu (Start Button)** – Contextual overlay with shortcuts to Search, Settings, Zoom, and Downloads — accessible from any screen.
-* **🏠 Home Grid Layout** – Toggle between carousel and grid view on the home screen; grid columns adjustable with LB/RB.
-* **⭐ Favorites System** – Quick-favorite any game from the detail screen with the Select button.
-* **🔄 Background Sync** – Automatic provider sync on launch with live progress badge on the home screen.
-* **🎮 Console-Native UI** – 100% D-pad and analog navigation. Features auto-scroll, haptic feedback, mechanical click sounds, and PlayStation/Xbox-correct Start/Select icons. Built for the AYN Thor, Retroid, Odin, and Anbernic devices.
-* **🌐 Multi-Protocol Mastery** – Connect to **RomM, SMB, FTP, or Web** directories — or go fully local with no remote provider at all. Mix and match sources for every single console in your library.
-* **🖥️ RomM Command Center** – Advanced RomM integration with a centralized management screen. Bulk-sync credentials across all systems or use per-console overrides.
-* **🔍 Library Search (Y-Button)** – Press Y on the home screen to jump straight into the Library with the search field open — find any game across all systems instantly.
-* **📥 Hardened Download Engine** – Background-ready downloads via Android Foreground Service. Features auto-extraction (ZIP/7z), stall detection, and queue persistence across restarts.
-* **🖼️ Automatic Box Art** – Metadata and covers are fetched automatically via [libretro-thumbnails](https://github.com/libretro-thumbnails).
-* **🔒 Rock-Solid Stability** – Features atomic configuration saves, Zip-Slip protection, and aggressive caching for massive libraries (5000+ items).
-* **🔬 Scan Library** – Settings > Scan Library: animated full-library scan across all consoles with per-system progress.
-* **🧭 Smart Onboarding** – Auto-detection of existing ROM folders plus a "Create standard folders" flow with system picker.
-* **💨 Cache-First Loading** – Game lists load instantly from cache while background refresh fetches updates silently.
-* **📡 Offline Indicator** – Amber "Offline — cached data" toast on failed sync, auto-dismissing after 3 seconds.
-* **🔀 Provider Reordering** – Adjust provider priority via D-pad or tap-arrows in the console configuration.
-* **✅ Test & Save** – Test a provider connection and auto-save on success — one button press instead of two.
+* **🎮 Console-Native UI** – 100% D-pad and analog navigation. Features haptic feedback, mechanical click sounds, and correct controller icons.
+* **🌐 Multi-Protocol Mastery** – Connect to **RomM, SMB, FTP, or Web** directories. Mix and match sources for every single console in your library.
+* **📚 Library Screen** – Unified cross-system browser with All/Installed/Favorites tabs, search, and adjustable grid zoom.
+* **📥 Hardened Download Engine** – Background-ready downloads via Android Foreground Service. Features auto-extraction (ZIP/7z) and queue persistence.
+* **🖼️ Automatic Box Art** – Metadata and covers are fetched automatically via libretro-thumbnails.
+* **⚡ Quick Menu (Start Button)** – Instant access to Search, Settings, Zoom, and Downloads from any screen.
+* **🔄 Background Sync** – Automatic provider sync on launch with live progress indicators.
+* **🧭 Smart Onboarding** – Auto-detection of existing ROM folders and guided setup for remote sources.
 
 ---
 
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="screenshots/console_list.png" width="250" alt="Console Overview" />
-  <img src="screenshots/rom_list.png" width="250" alt="ROM List" />
-  <img src="screenshots/download_queue.png" width="250" alt="Download Queue" />
+  <img src="docs/screenshots/console_list.png" width="400" alt="Console Overview" />
+  <img src="docs/screenshots/rom_list.png" width="400" alt="ROM List" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/smb_setup.png" width="400" alt="SMB Network Setup" />
+  <img src="docs/screenshots/download_queue.png" width="400" alt="Download Queue" />
 </p>
 
 ---
@@ -73,10 +68,9 @@ R-Shop isn't just a file browser; it's a **native console experience**. It bridg
 | Nintendo | Sony | SEGA | Other |
 |----------|------|------|-------|
 | NES, SNES, N64 | PlayStation (1-4) | Master System | Neo Geo Pocket Color |
-| GameCube, Wii, Wii U | PSP | Mega Drive | Arcade (MAME) |
-| Switch | PS Vita | Game Gear | Xbox & Xbox 360 |
-| GB, GBC, GBA | | Saturn, Dreamcast | |
-| DS, 3DS | | | |
+| GameCube, Wii, Wii U | PSP, PS Vita | Mega Drive | Arcade (MAME) |
+| Switch | | Saturn, Dreamcast | Xbox & Xbox 360 |
+| GB, GBC, GBA, DS, 3DS | | | |
 
 ---
 
@@ -92,12 +86,11 @@ Download the latest `.apk` from the [**Releases**](../../releases) page and inst
 
 ## 🛠️ Getting Started
 
-1. **Onboarding:** The setup wizard auto-detects existing ROM folders on your device and offers to create a standard folder structure — or connect to RomM, SMB, FTP, and Web sources.
-2. **Library Sync:** Browse your remote sources and watch R-Shop build your local metadata cache automatically on launch.
+1. **Onboarding:** The setup wizard auto-detects existing folders or connects to your RomM, SMB, FTP, or Web sources.
+2. **Library Sync:** Watch R-Shop build your local metadata cache automatically on launch.
 3. **Download & Play:** Hit 'A' to queue a game. R-Shop handles the download, extraction, and organization.
-4. **Quick Menu & Favorites:** Press Start for instant shortcuts; press Select on any game detail to favorite it.
 
-*For the full walkthrough, see the **[User Guide](docs/USER_GUIDE.md)**. Need to tweak things? Head to **Settings > Config Editor** for full JSON control over your setup.*
+*For the full walkthrough, see the **[User Guide](docs/USER_GUIDE.md)**.*
 
 ---
 
