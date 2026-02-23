@@ -4,21 +4,32 @@
 A premium, console-native game manager for Android. Built for handhelds, perfected for controllers, and designed for the retro community.
 
 <p align="center">
-  <img src="screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
+  <a href="https://averageconsumer.github.io/R-Shop/">
+    <img src="screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
+  </a>
 </p>
 
-![Version](https://img.shields.io/badge/version-0.9.8_Beta-blue?style=for-the-badge)
-![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)
-![Platform](https://img.shields.io/badge/platform-Android-brightgreen?style=for-the-badge)
-![Status](https://img.shields.io/badge/status-Public_Beta-orange?style=for-the-badge)
+<p align="center">
+  <a href="https://averageconsumer.github.io/R-Shop/">
+    <img src="https://img.shields.io/badge/Website-Visit_R--Shop-blueviolet?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website" />
+  </a>
+  <a href="https://github.com/averageconsumer/r-shop/releases">
+    <img src="https://img.shields.io/badge/Download-Latest_APK-brightgreen?style=for-the-badge&logo=android&logoColor=white" alt="Download" />
+  </a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-0.9.8_Beta-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/badge/platform-Android-brightgreen?style=flat-square" alt="Platform" />
+  <img src="https://img.shields.io/github/stars/averageconsumer/r-shop?style=flat-square&color=yellow" alt="Stars" />
+</p>
 
 ---
 
-## What is R-Shop?
+## 🌟 Why R-Shop?
 
-R-Shop is a Flutter-based Android application that provides a **seamless, console-like experience** for browsing, downloading, and organizing your retro game library. 
-
-It bridges the gap between your self-hosted storage (RomM, SMB, FTP) and your handheld device, providing a native UI that feels like it was built by a major console manufacturer.
+R-Shop isn't just a file browser; it's a **native console experience**. It bridges the gap between your self-hosted storage (**RomM, SMB, FTP**) and your handheld device (Odin, Retroid, Anbernic), providing a UI that feels like it was built by a major manufacturer.
 
 > **🛡️ Neutrality Policy:** R-Shop is a technical tool and directory browser. It does **not** host, distribute, or provide links to copyrighted content. You provide the sources; R-Shop provides the experience.
 
