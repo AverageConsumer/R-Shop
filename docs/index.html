@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>R-Shop — Your Handheld's Missing Piece</title>
+    <meta name="description"
+        content="A premium, console-native game manager for Android retro handhelds. Built for AYN, Retroid, and Anbernic.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <!-- Audio -->
+    <audio id="sfx-ambience" src="assets/sounds/ambience.wav" loop preload="auto"></audio>
+    <audio id="sfx-typing" src="assets/sounds/rapid_text.wav" preload="auto"></audio>
+    <audio id="sfx-nav" src="assets/sounds/navigation.wav" preload="auto"></audio>
+    <audio id="sfx-confirm" src="assets/sounds/confirm.wav" preload="auto"></audio>
+
+    <!-- Ambient Backgrounds -->
+    <div class="bg-gradient"></div>
+    <div class="bg-radial-glow"></div>
+
+    <!-- Pixel Particle Canvas -->
+    <canvas id="particleCanvas"></canvas>
+
+    <!-- ==================== BOOT SCREEN ==================== -->
+    <div id="bootScreen" class="boot-screen">
+        <div class="boot-content">
+            <!-- Pixel Mascot rendered via Canvas -->
+            <canvas id="mascotCanvas" width="96" height="96" class="boot-mascot"></canvas>
+            <h1 class="boot-title">R-SHOP</h1>
+            <p class="boot-sub">Your handheld's missing piece.</p>
+            <button class="boot-btn" id="bootBtn">
+                <span class="boot-btn-icon">▶</span> START
+            </button>
+            <p class="boot-hint">Audio will play</p>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN EXPERIENCE ==================== -->
+    <main class="experience" id="experience">
+
+        <!-- Progress -->
+        <div class="step-counter" id="stepCounter">
+            <span class="step-current">1</span>/<span class="step-total">7</span>
+        </div>
+
+        <!-- Screenshot Showcase -->
+        <div class="showcase" id="showcase">
+            <div class="showcase-device">
+                <img id="showcaseImg" src="assets/console_list.png" alt="App Screenshot">
+            </div>
+            <p class="showcase-label" id="showcaseLabel">Console Overview</p>
+        </div>
+
+        <!-- Chat Area (matches app's ChatBubble widget) -->
+        <div class="chat-area" id="chatArea">
+            <!-- Pixel Mascot (small, inline) -->
+            <canvas id="mascotSmall" width="48" height="48" class="chat-mascot"></canvas>
+
+            <!-- Chat Bubble -->
+            <div class="chat-bubble" id="chatBubble">
+                <p class="chat-text" id="chatText"></p>
+                <span class="chat-cursor" id="chatCursor"></span>
+            </div>
+        </div>
+
+        <!-- Console HUD (matches app's ConsoleHud widget) -->
+        <div class="console-hud" id="consoleHud">
+            <div class="hud-btn" id="hudPrev">
+                <span class="hud-key">B</span>
+                <span class="hud-label">Back</span>
+            </div>
+            <div class="hud-btn hud-highlight" id="hudNext">
+                <span class="hud-key">A</span>
+                <span class="hud-label">Continue</span>
+            </div>
+        </div>
+
+        <!-- Finale CTA -->
+        <div class="finale" id="finale">
+            <h2 class="finale-title">Ready to sync?</h2>
+            <p class="finale-sub">Free & Open Source. Built for the community.</p>
+            <div class="finale-btns">
+                <a href="https://github.com/AverageConsumer/R-Shop/releases" class="btn-primary" id="btnDownload">
+                    ↓ Download APK
+                </a>
+                <a href="https://github.com/AverageConsumer/R-Shop" class="btn-ghost">
+                    ◇ View on GitHub
+                </a>
+                <a href="https://github.com/AverageConsumer/R-Shop/blob/main/docs/USER_GUIDE.md" class="btn-ghost">
+                    📖 User Guide
+                </a>
+            </div>
+            <div class="finale-tags">
+                <span>RomM</span><span>SMB</span><span>FTP</span><span>HTTP</span>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="js/main.js"></script>
+</body>
+
+</html>

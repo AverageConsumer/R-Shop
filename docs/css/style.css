@@ -1,0 +1,669 @@
+/* ==========================================================================
+   R-Shop V9 — Design-Aligned with the Actual App
+   Mirrors: app_theme.dart, ChatBubble, PixelMascot, ConsoleHud, _RadialGlow
+   ========================================================================== */
+
+:root {
+    /* Exact colors from app_theme.dart */
+    --primary: #FF5252;
+    /* Colors.redAccent */
+    --primary-dim: rgba(255, 82, 82, 0.25);
+    --primary-glow: rgba(255, 82, 82, 0.35);
+    --bg: #000000;
+    /* backgroundColor */
+    --surface: #121212;
+    /* surfaceColor */
+    --card: #1E1E1E;
+    /* cardColor */
+    --text: #E0E0E0;
+    /* grey[200] */
+    --text-dim: #9E9E9E;
+    /* grey[500] */
+    --text-muted: #616161;
+    /* grey[700] */
+    --border: rgba(255, 255, 255, 0.12);
+    --border-focus: rgba(255, 255, 255, 0.25);
+    --font-head: 'Outfit', sans-serif;
+    --font-body: 'Inter', -apple-system, sans-serif;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-round: 999px;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+}
+
+/* ===================== AMBIENT BACKGROUNDS ===================== */
+/* Matches _AnimatedBackground from onboarding_screen.dart */
+.bg-gradient {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(135deg,
+            rgba(255, 82, 82, 0.25) 0%,
+            rgba(255, 82, 82, 0.12) 15%,
+            #080808 35%,
+            #030303 60%,
+            #000 100%);
+}
+
+/* Matches _RadialGlow from onboarding_screen.dart */
+.bg-radial-glow {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background: radial-gradient(ellipse at 30% 30%,
+            rgba(255, 82, 82, 0.35) 0%,
+            rgba(255, 82, 82, 0.15) 30%,
+            rgba(255, 82, 82, 0.05) 60%,
+            transparent 100%);
+    pointer-events: none;
+}
+
+/* ===================== PARTICLE CANVAS ===================== */
+#particleCanvas {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    will-change: contents;
+}
+
+/* ===================== BOOT SCREEN ===================== */
+.boot-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 1s ease, visibility 1s;
+    will-change: opacity;
+}
+
+.boot-screen.done {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.boot-content {
+    text-align: center;
+}
+
+.boot-mascot {
+    width: 96px;
+    height: 96px;
+    margin-bottom: 2rem;
+    animation: mascotBounce 1.5s ease-in-out infinite alternate;
+    image-rendering: pixelated;
+}
+
+.boot-title {
+    font-family: var(--font-head);
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    color: #fff;
+    margin-bottom: 0.3rem;
+}
+
+.boot-sub {
+    font-size: 1rem;
+    color: var(--text-dim);
+    margin-bottom: 2.5rem;
+    letter-spacing: 0.05em;
+}
+
+.boot-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.8rem 2.5rem;
+    background: var(--primary);
+    border: none;
+    border-radius: var(--radius-round);
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 0 30px rgba(255, 82, 82, 0.4), 0 8px 25px rgba(0, 0, 0, 0.5);
+    transition: transform 0.25s var(--ease), box-shadow 0.3s ease;
+    will-change: transform;
+}
+
+.boot-btn:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 0 50px rgba(255, 82, 82, 0.5), 0 12px 35px rgba(0, 0, 0, 0.5);
+}
+
+.boot-btn:active {
+    transform: scale(0.97);
+}
+
+.boot-btn-icon {
+    font-size: 0.9rem;
+}
+
+.boot-hint {
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+}
+
+@keyframes mascotBounce {
+    0% {
+        transform: translateY(0);
+    }
+
+    100% {
+        transform: translateY(-8px);
+    }
+}
+
+/* ===================== MAIN EXPERIENCE ===================== */
+.experience {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    gap: 1.2rem;
+    opacity: 0;
+    transition: opacity 1s ease;
+    will-change: opacity;
+}
+
+.experience.active {
+    opacity: 1;
+}
+
+/* --- Step Counter --- */
+.step-counter {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    font-family: var(--font-head);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+}
+
+.step-current {
+    color: var(--primary);
+    font-size: 1.1rem;
+}
+
+/* --- Screenshot Showcase --- */
+.showcase {
+    z-index: 5;
+    opacity: 0;
+    transform: translateY(15px) translateZ(0);
+    transition: opacity 1s ease, transform 1.2s var(--ease);
+    will-change: transform, opacity;
+}
+
+.showcase.active {
+    opacity: 1;
+    transform: translateY(0) translateZ(0);
+}
+
+.showcase-device {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 8px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+    width: 850px;
+    max-width: 85vw;
+}
+
+.showcase-device img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: var(--radius-md);
+}
+
+.showcase-label {
+    text-align: center;
+    font-family: var(--font-head);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 0.8rem;
+}
+
+/* --- Chat Area --- */
+.chat-area {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    z-index: 15;
+    width: 850px;
+    max-width: 85vw;
+    opacity: 0;
+    transform: translateY(15px) translateZ(0);
+    transition: opacity 0.6s ease, transform 0.6s var(--ease);
+    will-change: transform, opacity;
+}
+
+.chat-area.visible {
+    opacity: 1;
+    transform: translateY(0) translateZ(0);
+}
+
+.chat-mascot {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    image-rendering: pixelated;
+    animation: mascotBounce 1.5s ease-in-out infinite alternate;
+}
+
+/* Matches ChatBubble from chat_bubble.dart */
+.chat-bubble {
+    flex: 1;
+    background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.12) 0%,
+            rgba(255, 255, 255, 0.06) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-sm) var(--radius-xl) var(--radius-xl) var(--radius-xl);
+    padding: 1.4rem 1.8rem;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: flex-end;
+    min-height: 90px;
+}
+
+.chat-text {
+    flex: 1;
+    font-size: 1.25rem;
+    line-height: 1.6;
+    color: #fff;
+    font-weight: 400;
+}
+
+.chat-text strong {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+/* Blinking cursor matching ChatBubble's cursor widget */
+.chat-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1.2em;
+    background: rgba(255, 255, 255, 0.8);
+    margin-left: 0.5rem;
+    flex-shrink: 0;
+    animation: cursorBlink 0.6s step-end infinite;
+}
+
+.chat-cursor.done {
+    opacity: 0;
+}
+
+@keyframes cursorBlink {
+    50% {
+        opacity: 0;
+    }
+}
+
+/* --- Console HUD --- */
+/* Matches ConsoleHud from console_hud.dart */
+.console-hud {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    z-index: 20;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.5s ease, transform 0.5s var(--ease);
+}
+
+.console-hud.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.hud-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.2rem;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-round);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.hud-btn:hover {
+    border-color: var(--border-focus);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.hud-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: 1.5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    font-family: var(--font-head);
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-dim);
+}
+
+.hud-highlight .hud-key {
+    border-color: var(--primary);
+    color: var(--primary);
+    box-shadow: 0 0 8px rgba(255, 82, 82, 0.3);
+}
+
+.hud-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.03em;
+}
+
+.hud-highlight .hud-label {
+    color: #fff;
+}
+
+/* ===================== FINALE ===================== */
+.finale {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px) translateZ(0);
+    transition: opacity 1s ease, transform 1s var(--ease);
+    will-change: transform, opacity;
+}
+
+.finale.active {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) translateZ(0);
+}
+
+.finale-title {
+    font-family: var(--font-head);
+    font-size: 3rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.4rem;
+}
+
+.finale-sub {
+    font-size: 1rem;
+    color: var(--text-dim);
+    margin-bottom: 2.5rem;
+    letter-spacing: 0.03em;
+}
+
+.finale-btns {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.9rem 2.5rem;
+    background: var(--primary);
+    border: none;
+    border-radius: var(--radius-round);
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #fff;
+    text-decoration: none;
+    box-shadow: 0 0 25px rgba(255, 82, 82, 0.4), 0 8px 25px rgba(0, 0, 0, 0.5);
+    transition: transform 0.25s var(--ease), box-shadow 0.3s ease;
+    will-change: transform;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 45px rgba(255, 82, 82, 0.5), 0 12px 35px rgba(0, 0, 0, 0.5);
+}
+
+.btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.9rem 2.5rem;
+    background: transparent;
+    border: 1.5px solid var(--border-focus);
+    border-radius: var(--radius-round);
+    font-family: var(--font-head);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+    transition: border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.btn-ghost:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    box-shadow: 0 0 15px rgba(255, 82, 82, 0.15);
+}
+
+.finale-tags {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.finale-tags span {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0.25rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+}
+
+/* ===================== RESPONSIVE ===================== */
+
+/* Clickable cursor for the entire experience (desktop hint) */
+.experience {
+    cursor: pointer;
+}
+
+.experience .btn-primary,
+.experience .btn-ghost {
+    cursor: pointer;
+}
+
+@media (max-width: 768px),
+(orientation: portrait) {
+    .boot-mascot {
+        width: 72px;
+        height: 72px;
+    }
+
+    .boot-title {
+        font-size: 2.2rem;
+    }
+
+    .boot-sub {
+        font-size: 0.9rem;
+        margin-bottom: 2rem;
+    }
+
+    .experience {
+        padding: 1rem;
+        gap: 0.8rem;
+    }
+
+    .showcase-device {
+        width: 95vw;
+        max-width: 95vw;
+        padding: 5px;
+        border-radius: var(--radius-md);
+    }
+
+    .showcase-device img {
+        border-radius: 6px;
+    }
+
+    .showcase-label {
+        font-size: 0.65rem;
+        margin-top: 0.5rem;
+    }
+
+    .chat-area {
+        width: 95vw;
+        max-width: 95vw;
+        gap: 0.6rem;
+    }
+
+    .chat-mascot {
+        width: 32px;
+        height: 32px;
+    }
+
+    .chat-bubble {
+        padding: 1rem 1.2rem;
+        border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg) var(--radius-lg);
+    }
+
+    .chat-text {
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    .chat-cursor {
+        height: 1em;
+    }
+
+    .console-hud {
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .hud-btn {
+        padding: 0.4rem 1rem;
+    }
+
+    .hud-key {
+        width: 20px;
+        height: 20px;
+        font-size: 0.6rem;
+    }
+
+    .hud-label {
+        font-size: 0.7rem;
+    }
+
+    .step-counter {
+        top: 0.8rem;
+        right: 1rem;
+        font-size: 0.75rem;
+    }
+
+    .step-current {
+        font-size: 0.9rem;
+    }
+
+    .finale-title {
+        font-size: 2.2rem;
+    }
+
+    .finale-sub {
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .finale-btns {
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+    }
+
+    .btn-primary,
+    .btn-ghost {
+        width: 90vw;
+        max-width: 400px;
+        justify-content: center;
+        padding: 1rem 2rem;
+    }
+
+    .finale-tags {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+/* Extra small phones */
+@media (max-width: 400px) {
+    .boot-title {
+        font-size: 1.8rem;
+        letter-spacing: 0.1em;
+    }
+
+    .chat-mascot {
+        width: 28px;
+        height: 28px;
+    }
+
+    .chat-text {
+        font-size: 0.9rem;
+    }
+
+    .finale-title {
+        font-size: 1.8rem;
+    }
+}
