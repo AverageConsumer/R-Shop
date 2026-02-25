@@ -26,10 +26,22 @@ class SmbProvider implements SourceProvider {
     return '/$share$cleanPath';
   }
 
+  // Matches hostname, IPv4, or bracketed IPv6
+  static final _hostPattern = RegExp(
+    r'^([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$'
+    r'|'
+    r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
+    r'|'
+    r'^\[[:0-9a-fA-F]+\]$',
+  );
+
   Future<SmbConnect> _connect() async {
     final host = config.host;
     if (host == null || host.isEmpty) {
       throw StateError('SMB provider requires a host');
+    }
+    if (!_hostPattern.hasMatch(host)) {
+      throw StateError('Invalid SMB host format: $host');
     }
     return SmbConnect.connectAuth(
       host: host,

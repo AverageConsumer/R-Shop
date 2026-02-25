@@ -34,14 +34,19 @@ class ConfigStorageService {
   static const _backupFileName = 'config.json.bak';
 
   final _saveLock = _AsyncLock();
+  final Future<Directory> Function() _directoryProvider;
+
+  ConfigStorageService({
+    Future<Directory> Function()? directoryProvider,
+  }) : _directoryProvider = directoryProvider ?? getApplicationDocumentsDirectory;
 
   Future<File> _configFile() async {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await _directoryProvider();
     return File('${dir.path}/$_fileName');
   }
 
   Future<File> _backupFile() async {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await _directoryProvider();
     return File('${dir.path}/$_backupFileName');
   }
 
@@ -123,7 +128,14 @@ class ConfigStorageService {
         final file = await _configFile();
         await backup.copy(file.path);
       } catch (e) {
-        debugPrint('ConfigStorage: failed to restore backup as primary: $e');
+        debugPrint('ConfigStorage: recovery copy failed: $e');
+        // Delete corrupt primary so next load doesn't get stuck
+        try {
+          final file = await _configFile();
+          if (await file.exists()) await file.delete();
+        } catch (e2) {
+          debugPrint('ConfigStorage: corrupt file cleanup failed: $e2');
+        }
       } finally {
         release();
       }

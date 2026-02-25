@@ -12,11 +12,14 @@ import 'providers/rom_status_providers.dart';
 import 'features/home/home_view.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'services/crash_log_service.dart';
+import 'services/device_info_service.dart';
+import 'services/image_cache_service.dart';
 import 'services/storage_service.dart';
 import 'services/haptic_service.dart';
 import 'services/audio_manager.dart';
 import 'services/database_service.dart';
 import 'services/download_foreground_service.dart';
+import 'services/download_service.dart';
 import 'services/thumbnail_migration_service.dart';
 import 'services/thumbnail_service.dart';
 import 'widgets/download_overlay.dart';
@@ -65,6 +68,29 @@ void main() {
 
     await ThumbnailService.init();
 
+    // Clean orphaned temp files from interrupted downloads (fire-and-forget)
+    DownloadService.cleanOrphanedTempFiles();
+
+    // Configure image cache based on device RAM
+    final deviceMemory = await DeviceInfoService.getDeviceMemory();
+    RateLimitedFileService.configure(
+      maxConcurrent: deviceMemory.coverCacheMaxConcurrent,
+      requestDelay: Duration(milliseconds: deviceMemory.coverCacheRequestDelayMs),
+    );
+    GameCoverCacheManager.init(maxObjects: deviceMemory.coverDiskCacheMaxObjects);
+    PaintingBinding.instance.imageCache.maximumSize =
+        deviceMemory.imageCacheMaxImages;
+    PaintingBinding.instance.imageCache.maximumSizeBytes =
+        deviceMemory.imageCacheMaxBytes;
+    debugPrint(
+        'ImageCache configured: tier=${deviceMemory.tier.name}, '
+        'maxImages=${deviceMemory.imageCacheMaxImages}, '
+        'maxBytes=${deviceMemory.imageCacheMaxBytes ~/ (1024 * 1024)}MB, '
+        'maxConcurrent=${deviceMemory.coverCacheMaxConcurrent}, '
+        'delay=${deviceMemory.coverCacheRequestDelayMs}ms, '
+        'diskCache=${deviceMemory.coverDiskCacheMaxObjects}, '
+        'totalRAM=${deviceMemory.totalGB.toStringAsFixed(1)}GB');
+
     runApp(
       ProviderScope(
         overrides: [
@@ -72,6 +98,7 @@ void main() {
           storageServiceProvider.overrideWithValue(storageService),
           hapticServiceProvider.overrideWithValue(hapticService),
           audioManagerProvider.overrideWithValue(audioManager),
+          deviceMemoryProvider.overrideWithValue(deviceMemory),
         ],
         child: RShopApp(audioManager: audioManager),
       ),

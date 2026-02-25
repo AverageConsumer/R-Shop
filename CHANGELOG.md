@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.9.9] Beta — 2026-02-25
+
+### Added
+- **Custom Shelves** — create personal game collections with manual curation, filter rules (by system, region, language), or hybrid mode; supports reordering, renaming, and per-shelf sort modes
+- **Device Info Service** — adaptive memory tiering (low/standard/high RAM) that auto-tunes image cache sizes, grid cache extents, and cover preload pools for low-end handhelds
+- **Shelf Picker Dialog** — quick-add games to shelves from library and game detail screens
+- **System Selector Overlay** — filter library view by system with visual system badges
+
+### Improved
+- **Settings screen refactored** — split into Preferences, System, and About tabs with extracted `DeviceInfoCard` widget (1048→604 lines)
+- **Download overlay refactored** — extracted 7 widgets to `lib/widgets/download/` (DownloadItemCard, CoverThumbnail, PulsingDot, LowSpaceWarning, StatusLabel, DownloadProgressBar, DownloadActionButton) (1477→793 lines)
+- **Shelf edit screen refactored** — extracted GameListOverlay, TextInputDialog to shared library widgets (1108→631 lines)
+- **RomM onboarding refactored** — extracted RommConnectView, RommSelectView, RommFolderView, RommActionButton (1405→122 lines); state classes moved to `onboarding_state.dart` (1713→1362 lines)
+- **Library screen refactored** — extracted ReorderableCardWrapper, LibraryEntry to dedicated widgets (1490→1386 lines)
+- **Dependency pinning** — all 16 remaining caret-range dependencies pinned to exact resolved versions for reproducible builds
+
+### Internal
+- New models: `CustomShelf`, `ShelfFilterRule` with JSON serialization
+- New providers: `CustomShelvesNotifier` / `customShelvesProvider` for shelf CRUD
+- `DeviceInfoService` with `MemoryTier` classification
+- ~20 new test files covering download queue manager, unified game service, library sync, thumbnail service, custom shelves, database service, config storage, image cache, storage service, and widget tests
+
+---
+
 ## [0.9.8] Beta — 2026-02-23
 
 ### Added

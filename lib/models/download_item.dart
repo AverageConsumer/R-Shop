@@ -44,6 +44,14 @@ class DownloadItem {
     this.tempFilePath,
   }) : addedAt = addedAt ?? DateTime.now();
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DownloadItem && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
   String get displayText {
     switch (status) {
       case DownloadItemStatus.queued:

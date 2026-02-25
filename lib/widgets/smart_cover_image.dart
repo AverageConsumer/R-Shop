@@ -111,9 +111,10 @@ class _SmartCoverImageState extends State<SmartCoverImage> {
     }
   }
 
-  void _teardownSuppressionListener() {
-    if (_suppressionListener != null && widget.scrollSuppression != null) {
-      widget.scrollSuppression!.removeListener(_suppressionListener!);
+  void _teardownSuppressionListener([SmartCoverImage? oldWidget]) {
+    final w = oldWidget ?? widget;
+    if (_suppressionListener != null && w.scrollSuppression != null) {
+      w.scrollSuppression!.removeListener(_suppressionListener!);
       _suppressionListener = null;
     }
   }
@@ -155,6 +156,12 @@ class _SmartCoverImageState extends State<SmartCoverImage> {
       _usedCache = widget.cachedUrl != null &&
           widget.cachedUrl!.isNotEmpty &&
           !FailedUrlsCache.instance.hasFailed(widget.cachedUrl!);
+    }
+
+    // scrollSuppression notifier changed — re-attach listener
+    if (oldWidget.scrollSuppression != widget.scrollSuppression) {
+      _teardownSuppressionListener(oldWidget);
+      _setupSuppressionListener();
     }
 
     // Thumbnail was generated (hasThumbnail false→true)

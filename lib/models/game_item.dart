@@ -1,6 +1,13 @@
 import '../utils/game_metadata.dart';
 import 'config/provider_config.dart';
 
+class AlternativeSource {
+  final String url;
+  final ProviderConfig providerConfig;
+
+  const AlternativeSource({required this.url, required this.providerConfig});
+}
+
 class GameItem {
   final String filename;
   final String displayName;
@@ -8,6 +15,7 @@ class GameItem {
   final String? cachedCoverUrl;
   final ProviderConfig? providerConfig;
   final bool hasThumbnail;
+  final List<AlternativeSource> alternativeSources;
 
   const GameItem({
     required this.filename,
@@ -16,20 +24,24 @@ class GameItem {
     this.cachedCoverUrl,
     this.providerConfig,
     this.hasThumbnail = false,
+    this.alternativeSources = const [],
   });
 
   GameItem copyWith({
+    String? url,
     String? cachedCoverUrl,
     ProviderConfig? providerConfig,
     bool? hasThumbnail,
+    List<AlternativeSource>? alternativeSources,
   }) {
     return GameItem(
       filename: filename,
       displayName: displayName,
-      url: url,
+      url: url ?? this.url,
       cachedCoverUrl: cachedCoverUrl ?? this.cachedCoverUrl,
       providerConfig: providerConfig ?? this.providerConfig,
       hasThumbnail: hasThumbnail ?? this.hasThumbnail,
+      alternativeSources: alternativeSources ?? this.alternativeSources,
     );
   }
 
@@ -59,4 +71,12 @@ class GameItem {
   static String cleanDisplayName(String filename) {
     return GameMetadata.cleanTitle(filename);
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GameItem && filename == other.filename && url == other.url;
+
+  @override
+  int get hashCode => Object.hash(filename, url);
 }

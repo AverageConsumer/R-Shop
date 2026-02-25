@@ -18,10 +18,22 @@ class FtpProvider implements SourceProvider {
 
   String get _remotePath => config.path ?? '/';
 
+  // Matches hostname, IPv4, or bracketed IPv6
+  static final _hostPattern = RegExp(
+    r'^([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$'
+    r'|'
+    r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
+    r'|'
+    r'^\[[:0-9a-fA-F]+\]$',
+  );
+
   FTPConnect _createClient() {
     final host = config.host;
     if (host == null || host.isEmpty) {
       throw StateError('FTP provider requires a host');
+    }
+    if (!_hostPattern.hasMatch(host)) {
+      throw StateError('Invalid FTP host format: $host');
     }
     return FTPConnect(
       host,
@@ -35,10 +47,10 @@ class FtpProvider implements SourceProvider {
   @override
   Future<List<GameItem>> fetchGames(SystemConfig system) async {
     final ftp = _createClient();
-    await ftp.connect();
+    await ftp.connect().timeout(const Duration(seconds: 30));
     try {
-      await ftp.changeDirectory(_remotePath);
-      final entries = await ftp.listDirectoryContent();
+      await ftp.changeDirectory(_remotePath).timeout(const Duration(seconds: 15));
+      final entries = await ftp.listDirectoryContent().timeout(const Duration(seconds: 60));
       final games = <GameItem>[];
 
       for (final entry in entries) {
@@ -70,7 +82,7 @@ class FtpProvider implements SourceProvider {
       downloadToFile: (dest, {onProgress}) async {
         final ftp = _createClient();
         activeClient = ftp;
-        await ftp.connect();
+        await ftp.connect().timeout(const Duration(seconds: 30));
         try {
           final (dir, fileName) = _splitPath(game.url);
           if (dir.isNotEmpty) {
@@ -99,8 +111,8 @@ class FtpProvider implements SourceProvider {
   Future<SourceConnectionResult> testConnection() async {
     final ftp = _createClient();
     try {
-      await ftp.connect();
-      await ftp.changeDirectory(_remotePath);
+      await ftp.connect().timeout(const Duration(seconds: 30));
+      await ftp.changeDirectory(_remotePath).timeout(const Duration(seconds: 15));
       return const SourceConnectionResult.ok();
     } catch (e) {
       return SourceConnectionResult.failed(e.toString());
@@ -123,7 +135,7 @@ class FtpProvider implements SourceProvider {
   /// since FTP files can't be fetched via HTTP.
   Future<void> downloadToFile(String remotePath, File destination) async {
     final ftp = _createClient();
-    await ftp.connect();
+    await ftp.connect().timeout(const Duration(seconds: 30));
     try {
       final (dir, fileName) = _splitPath(remotePath);
       if (dir.isNotEmpty) {

@@ -7,14 +7,22 @@ import android.os.StatFs
 import android.util.Log
 import android.view.KeyEvent
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.io.*
+import java.util.concurrent.Executors
 import java.util.zip.ZipInputStream
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.retro.rshop/zip"
     private val STORAGE_CHANNEL = "com.retro.rshop/storage"
+    private val PROGRESS_CHANNEL = "com.retro.rshop/zip_progress"
     private val TAG = "MainActivity"
+
+    private val extractorPool = Executors.newFixedThreadPool(2)
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private var progressSink: EventChannel.EventSink? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,29 +32,40 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: io.flutter.embedding.engine.FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, PROGRESS_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    progressSink = events
+                }
+                override fun onCancel(arguments: Any?) {
+                    progressSink = null
+                }
+            }
+        )
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "extractZip" -> {
                     val zipPath = call.argument<String>("zipPath")
                     val targetPath = call.argument<String>("targetPath")
-                    
+
                     if (zipPath == null || targetPath == null) {
                         result.error("INVALID_ARGS", "zipPath and targetPath required", null)
                         return@setMethodCallHandler
                     }
 
-                    Thread {
+                    extractorPool.execute {
                         try {
                             val extractedFiles = extractZip(zipPath, targetPath)
-                            Handler(Looper.getMainLooper()).post {
+                            mainHandler.post {
                                 result.success(extractedFiles)
                             }
                         } catch (e: Exception) {
-                            Handler(Looper.getMainLooper()).post {
+                            mainHandler.post {
                                 result.error("EXTRACT_ERROR", e.message, null)
                             }
                         }
-                    }.start()
+                    }
                 }
                 else -> result.notImplemented()
             }
@@ -69,8 +88,32 @@ class MainActivity : FlutterActivity() {
                         result.error("STAT_ERROR", e.message, null)
                     }
                 }
+                "getDeviceMemory" -> {
+                    try {
+                        val am = getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                        val memInfo = android.app.ActivityManager.MemoryInfo()
+                        am.getMemoryInfo(memInfo)
+                        result.success(mapOf("totalBytes" to memInfo.totalMem))
+                    } catch (e: Exception) {
+                        result.error("MEMORY_ERROR", e.message, null)
+                    }
+                }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    override fun onDestroy() {
+        extractorPool.shutdown()
+        super.onDestroy()
+    }
+
+    private fun sendProgress(extractedBytes: Long, totalBytes: Long) {
+        val sink = progressSink ?: return
+        if (totalBytes <= 0) return
+        val percent = (extractedBytes.toDouble() / totalBytes * 100).toInt().coerceIn(0, 100)
+        mainHandler.post {
+            sink.success(mapOf("extracted" to extractedBytes, "total" to totalBytes, "percent" to percent))
         }
     }
 
@@ -97,6 +140,7 @@ class MainActivity : FlutterActivity() {
             var entry = zis.nextEntry
 
             val canonicalTarget = File(targetPath).canonicalPath
+            var lastReportedPercent = -1
 
             while (entry != null) {
                 val file = File(targetPath, entry.name)
@@ -112,7 +156,7 @@ class MainActivity : FlutterActivity() {
                     file.mkdirs()
                 } else {
                     file.parentFile?.mkdirs()
-                    
+
                     FileOutputStream(file).use { fos ->
                         var len: Int
                         while (zis.read(buffer).also { len = it } > 0) {
@@ -120,13 +164,22 @@ class MainActivity : FlutterActivity() {
                             extractedBytes += len
                         }
                     }
-                    
+
                     extractedFiles.add(entry.name)
+
+                    // Report progress (throttle: only on percent change)
+                    if (totalBytes > 0) {
+                        val currentPercent = (extractedBytes.toDouble() / totalBytes * 100).toInt()
+                        if (currentPercent != lastReportedPercent) {
+                            lastReportedPercent = currentPercent
+                            sendProgress(extractedBytes, totalBytes)
+                        }
+                    }
                 }
-                
+
                 entry = zis.nextEntry
             }
-            
+
             zis.close()
         }
 

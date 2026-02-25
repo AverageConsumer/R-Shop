@@ -69,8 +69,16 @@ class FailedUrlsCache {
   void markFailed(String url) {
     _failedUrls[url] = DateTime.now();
     // Proactively prune expired entries when cache grows large
-    if (_failedUrls.length > 500) {
+    if (_failedUrls.length > 200) {
       _pruneExpired();
+    }
+    // Hard cap to prevent unbounded growth with 80k+ ROMs
+    if (_failedUrls.length > 1000) {
+      final sorted = _failedUrls.entries.toList()
+        ..sort((a, b) => a.value.compareTo(b.value));
+      _failedUrls
+        ..clear()
+        ..addEntries(sorted.skip(sorted.length - 500));
     }
   }
 
@@ -88,6 +96,17 @@ class GameCoverCacheManager {
   static const key = 'gameCoverCache';
 
   static CacheManager? _instance;
+
+  static void init({int maxObjects = 5000}) {
+    if (_instance != null) return;
+    _instance = CacheManager(Config(
+      key,
+      stalePeriod: const Duration(days: 30),
+      maxNrOfCacheObjects: maxObjects,
+      repo: JsonCacheInfoRepository(databaseName: key),
+      fileService: RateLimitedFileService(),
+    ));
+  }
 
   static CacheManager get instance {
     _instance ??= CacheManager(
@@ -119,9 +138,17 @@ class _QueueEntry {
 /// interleaves at `await` points. Do NOT access these from a separate Isolate.
 class RateLimitedFileService extends FileService {
   final HttpFileService _httpFileService = HttpFileService();
-  static const int _maxConcurrent = 6;
+  static int _maxConcurrent = 6;
   static const int _maxQueueSize = 200;
-  static const Duration _requestDelay = Duration(milliseconds: 50);
+  static Duration _requestDelay = const Duration(milliseconds: 10);
+  static bool _configured = false;
+
+  static void configure({required int maxConcurrent, required Duration requestDelay}) {
+    if (_configured) return;
+    _maxConcurrent = maxConcurrent;
+    _requestDelay = requestDelay;
+    _configured = true;
+  }
   static const Duration _rateLimitTtl = Duration(minutes: 10);
   static final Map<String, DateTime> _rateLimitedHosts = {};
   static int _activeRequests = 0;
@@ -210,7 +237,7 @@ class RateLimitedFileService extends FileService {
 
   static void _releaseNext() {
     while (_queue.isNotEmpty) {
-      final next = _queue.removeLast();
+      final next = _queue.removeAt(0);
       if (next.cancelled) continue;
       if (!next.completer.isCompleted) {
         next.completer.complete();

@@ -28,6 +28,8 @@ class GameGrid extends StatefulWidget {
   final bool isLocalOnly;
   final String targetFolder;
   final ValueNotifier<bool>? scrollSuppression;
+  final int memCacheWidthMax;
+  final double gridCacheExtent;
 
   const GameGrid({
     super.key,
@@ -51,6 +53,8 @@ class GameGrid extends StatefulWidget {
     this.isLocalOnly = false,
     this.targetFolder = '',
     this.scrollSuppression,
+    this.memCacheWidthMax = 500,
+    this.gridCacheExtent = 400,
   });
 
   @override
@@ -76,8 +80,7 @@ class _GameGridState extends State<GameGrid> {
   @override
   void didUpdateWidget(GameGrid oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.filteredGroups, widget.filteredGroups) ||
-        !identical(oldWidget.groupedGames, widget.groupedGames)) {
+    if (!identical(oldWidget.filteredGroups, widget.filteredGroups)) {
       _rebuildCoverUrlCache();
     }
     if (oldWidget.crossAxisCount != widget.crossAxisCount) {
@@ -103,7 +106,7 @@ class _GameGridState extends State<GameGrid> {
     final gridWidth = MediaQuery.of(context).size.width - gridPadding;
     final itemWidth = (gridWidth - (widget.crossAxisCount - 1) * spacing) / widget.crossAxisCount;
     final dpr = MediaQuery.of(context).devicePixelRatio;
-    return (itemWidth * dpr).round().clamp(150, 500);
+    return (itemWidth * dpr).round().clamp(150, widget.memCacheWidthMax);
   }
 
   @override
@@ -152,7 +155,7 @@ class _GameGridState extends State<GameGrid> {
         onNotification: widget.onScrollNotification,
         child: RepaintBoundary(
           child: GridView.builder(
-            cacheExtent: 400,
+            cacheExtent: widget.gridCacheExtent,
             controller: widget.scrollController,
             padding: EdgeInsets.only(
               left: rs.spacing.lg,

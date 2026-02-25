@@ -10,6 +10,7 @@ import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
 import '../../providers/rom_status_providers.dart';
 import '../../providers/game_providers.dart';
+import '../../providers/shelf_providers.dart';
 import '../../services/download_queue_manager.dart';
 import '../../services/input_debouncer.dart';
 import '../../utils/game_metadata.dart';
@@ -22,6 +23,7 @@ import '../../widgets/installed_indicator.dart';
 import '../../widgets/quick_menu.dart';
 import '../game_list/widgets/dynamic_background.dart';
 import '../game_list/widgets/tinted_overlay.dart';
+import '../library/widgets/shelf_picker_dialog.dart';
 import 'game_detail_controller.dart';
 import 'game_detail_state.dart';
 import 'widgets/cover_section.dart';
@@ -234,15 +236,31 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     if (controller.state.isOverlayOpen) return;
 
     ref.read(feedbackServiceProvider).tick();
-    ref.read(favoriteGamesProvider.notifier).toggleFavorite(widget.game.displayName);
+    ref.read(favoriteGamesProvider.notifier).toggleFavorite(controller.selectedVariant.filename);
   }
 
-  List<QuickMenuItem> _buildQuickMenuItems() {
+  void _downloadFromSource(AlternativeSource source) {
+    final controller = _controller;
+    if (controller == null) return;
+
+    final variant = controller.selectedVariant;
+    final modifiedGame = variant.copyWith(
+      url: source.url,
+      providerConfig: source.providerConfig,
+    );
+
+    final queueManager = ref.read(downloadQueueManagerProvider);
+    queueManager.addToQueue(modifiedGame, widget.system, widget.targetFolder);
+  }
+
+  List<QuickMenuItem?> _buildQuickMenuItems() {
     final controller = _controller;
     if (controller == null) return [];
-    final metadata = GameMetadata.parse(controller.selectedVariant.filename);
-    final isFavorite = ref.read(favoriteGamesProvider).contains(widget.game.displayName);
+    final variant = controller.selectedVariant;
+    final metadata = GameMetadata.parse(variant.filename);
+    final isFavorite = ref.read(favoriteGamesProvider).contains(variant.filename);
     final hasDownloads = ref.read(hasQueueItemsProvider);
+    final hasAlternatives = variant.alternativeSources.isNotEmpty;
     return [
       QuickMenuItem(
         label: isFavorite ? 'Unfavorite' : 'Favorite',
@@ -264,13 +282,53 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         shortcutHint: 'X',
         onSelect: _handleFilenameToggle,
       ),
-      if (hasDownloads)
+      if (hasAlternatives && !controller.state.isVariantInstalled) ...[
+        null,
+        QuickMenuItem(
+          label: 'from ${variant.providerConfig?.detailLabel ?? "Primary"}',
+          icon: Icons.cloud_download_outlined,
+          onSelect: () => controller.performAction(),
+        ),
+        for (final alt in variant.alternativeSources)
+          QuickMenuItem(
+            label: 'from ${alt.providerConfig.detailLabel}',
+            icon: Icons.cloud_download_outlined,
+            onSelect: () => _downloadFromSource(alt),
+          ),
+      ],
+      if (ref.read(customShelvesProvider)
+          .any((s) => !s.containsGame(
+              variant.filename, variant.displayName, widget.system.id))) ...[
+        null,
+        QuickMenuItem(
+          label: 'Add to Shelf',
+          icon: Icons.playlist_add_rounded,
+          onSelect: () {
+            final shelves = ref.read(customShelvesProvider)
+                .where((s) => !s.containsGame(
+                    variant.filename, variant.displayName, widget.system.id))
+                .toList();
+            showShelfPickerDialog(
+              context: context,
+              ref: ref,
+              shelves: shelves,
+              onSelect: (shelfId) {
+                ref.read(customShelvesProvider.notifier)
+                    .addGameToShelf(shelfId, variant.filename);
+              },
+            );
+          },
+        ),
+      ],
+      if (hasDownloads) ...[
+        null,
         QuickMenuItem(
           label: 'Downloads',
           icon: Icons.download_rounded,
           onSelect: () => toggleDownloadOverlay(ref),
           highlight: true,
         ),
+      ],
     ];
   }
 
@@ -381,7 +439,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final GameMetadataFull metadata =
         GameMetadata.parse(selectedVariant.filename);
     final isMultiRom = widget.variants.length > 1;
-    final isFavorite = ref.watch(favoriteGamesProvider).contains(widget.game.displayName);
+    final favoriteFilenames = ref.watch(favoriteGamesProvider).toSet();
+    final isFavorite = favoriteFilenames.contains(controller.selectedVariant.filename);
     return buildWithActions(
       PopScope(
         canPop: false,
@@ -404,9 +463,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               bottom: false,
               child: rs.isPortrait
                   ? _buildPortraitLayout(rs, state, controller, metadata,
-                      isMultiRom, coverUrls, selectedVariant, isFavorite)
+                      isMultiRom, coverUrls, selectedVariant, isFavorite, favoriteFilenames)
                   : _buildLandscapeLayout(rs, state, controller, metadata,
-                      isMultiRom, coverUrls, selectedVariant, isFavorite),
+                      isMultiRom, coverUrls, selectedVariant, isFavorite, favoriteFilenames),
             ),
             _buildControls(state, metadata),
             if (showQuickMenu)
@@ -458,6 +517,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     List<String> coverUrls,
     GameItem selectedVariant,
     bool isFavorite,
+    Set<String> favoriteFilenames,
   ) {
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -485,7 +545,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           Expanded(
             flex: isMultiRom ? 65 : 60,
             child:
-                _buildInfoSection(rs, state, controller, metadata, isMultiRom),
+                _buildInfoSection(rs, state, controller, metadata, isMultiRom, isFavorite, favoriteFilenames),
           ),
         ],
       ),
@@ -501,6 +561,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     List<String> coverUrls,
     GameItem selectedVariant,
     bool isFavorite,
+    Set<String> favoriteFilenames,
   ) {
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: rs.spacing.md),
@@ -531,6 +592,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               system: widget.system,
               selectedIndex: state.selectedIndex,
               installedStatus: state.installedStatus,
+              favoriteFilenames: favoriteFilenames,
               onSelectionChanged: (index) {
                 controller.selectVariant(index);
               },
@@ -550,6 +612,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               variant: controller.selectedVariant,
               system: widget.system,
               isInstalled: state.isVariantInstalled,
+              isFavorite: isFavorite,
             ),
           ],
           SizedBox(height: rs.spacing.xxl),
@@ -589,6 +652,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     GameDetailController controller,
     GameMetadataFull metadata,
     bool isMultiRom,
+    bool isFavorite,
+    Set<String> favoriteFilenames,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -605,6 +670,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                 system: widget.system,
                 selectedIndex: state.selectedIndex,
                 installedStatus: state.installedStatus,
+                favoriteFilenames: favoriteFilenames,
                 onSelectionChanged: (index) {
                   controller.selectVariant(index);
                 },
@@ -627,6 +693,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
             variant: controller.selectedVariant,
             system: widget.system,
             isInstalled: state.isVariantInstalled,
+            isFavorite: isFavorite,
           ),
           const Spacer(),
         ],

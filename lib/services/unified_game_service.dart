@@ -65,10 +65,23 @@ class UnifiedGameService {
         successes++;
 
         for (final game in games) {
-          // Higher-priority (lower number) providers come first in the list,
-          // so only add if not already present. Use filename as key to
-          // preserve region variants (e.g. "Mario (USA).zip" vs "Mario (EUR).zip").
-          results.putIfAbsent(game.filename, () => game);
+          if (results.containsKey(game.filename)) {
+            // Same ROM from a lower-priority provider — store as alternative source
+            if (game.providerConfig != null) {
+              final existing = results[game.filename]!;
+              results[game.filename] = existing.copyWith(
+                alternativeSources: [
+                  ...existing.alternativeSources,
+                  AlternativeSource(
+                    url: game.url,
+                    providerConfig: game.providerConfig!,
+                  ),
+                ],
+              );
+            }
+          } else {
+            results[game.filename] = game;
+          }
         }
       } catch (e) {
         debugPrint('Provider failed: $e');

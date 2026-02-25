@@ -7,6 +7,7 @@ import '../models/system_model.dart';
 import '../utils/game_merge_helper.dart';
 import 'database_service.dart';
 import 'rom_manager.dart';
+import 'thumbnail_service.dart';
 import 'unified_game_service.dart';
 
 class LibrarySyncState {
@@ -137,6 +138,11 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     }
 
     state = state.copyWith(isSyncing: false, currentSystem: null, hadFailures: anyFailed);
+
+    // Clean orphan thumbnails after sync
+    ThumbnailService.cleanOrphans(db).catchError((e) {
+      debugPrint('LibrarySyncService: orphan cleanup failed: $e');
+    });
   }
 
   /// Discovers all games across ALL configured systems (including local-only).
@@ -220,6 +226,11 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       currentSystem: null,
       hadFailures: anyFailed,
     );
+
+    // Clean orphan thumbnails after discover
+    ThumbnailService.cleanOrphans(db).catchError((e) {
+      debugPrint('LibrarySyncService: orphan cleanup failed: $e');
+    });
   }
 
   static String _userFriendlyError(Object e) {

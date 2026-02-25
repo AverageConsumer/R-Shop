@@ -11,15 +11,18 @@ import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
+import '../../models/custom_shelf.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
 import '../../providers/installed_files_provider.dart';
 import '../../providers/game_providers.dart';
+import '../../providers/shelf_providers.dart';
 import '../../services/config_bootstrap.dart';
 import '../../services/database_service.dart';
 import '../../services/input_debouncer.dart';
+import '../../services/thumbnail_service.dart';
 import '../../utils/game_metadata.dart';
 import '../../utils/image_helper.dart';
 import '../game_detail/game_detail_screen.dart';
@@ -28,9 +31,15 @@ import '../../widgets/console_hud.dart';
 import '../../widgets/download_overlay.dart';
 import '../../widgets/quick_menu.dart';
 import '../../widgets/selection_aware_item.dart';
+import 'shelf_edit_screen.dart';
+import 'widgets/library_entry.dart';
 import 'widgets/library_tabs.dart';
+import 'widgets/reorderable_card_wrapper.dart';
+import 'widgets/shelf_picker_dialog.dart';
 
 enum LibrarySortMode { alphabetical, bySystem }
+
+enum ReorderState { none, selecting, grabbed }
 
 class LibraryScreen extends ConsumerStatefulWidget {
   final bool openSearch;
@@ -42,8 +51,15 @@ class LibraryScreen extends ConsumerStatefulWidget {
 
 class _LibraryScreenState extends ConsumerState<LibraryScreen>
     with ConsoleScreenMixin, SearchableScreenMixin {
-  int _selectedTab = 0; // 0=All, 1=Installed, 2=Favorites
+  static const _fixedTabCount = 3;
+  int _selectedTab = 0; // 0=All, 1=Installed, 2=Favorites, 3+=Shelves
   LibrarySortMode _sortMode = LibrarySortMode.alphabetical;
+  List<CustomShelf> _shelves = [];
+
+  // Reorder mode
+  ReorderState _reorderState = ReorderState.none;
+  int _grabbedIndex = -1;
+  int? _reorderClaimToken;
   final ValueNotifier<int> _selectedIndexNotifier = ValueNotifier(0);
   int get _currentIndex => _selectedIndexNotifier.value;
   set _currentIndex(int v) {
@@ -64,11 +80,24 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   ProviderSubscription? _installedFilesSubscription;
 
   // Raw data from DB
-  List<_LibraryEntry> _allGames = [];
+  List<LibraryEntry> _allGames = [];
   Set<String> _installedFiles = {};
   Set<String> _favoriteIds = {};
   // Filtered/sorted view
-  List<_LibraryEntry> _filteredGames = [];
+  List<LibraryEntry> _filteredGames = [];
+  // Pre-computed cover URLs per filtered index
+  Map<int, List<String>> _coverUrlCache = {};
+
+  int get _totalTabCount => _fixedTabCount + _shelves.length;
+
+  bool get _isShelfTab => _selectedTab >= _fixedTabCount;
+
+  CustomShelf? get _activeShelf {
+    if (!_isShelfTab) return null;
+    final idx = _selectedTab - _fixedTabCount;
+    if (idx < 0 || idx >= _shelves.length) return null;
+    return _shelves[idx];
+  }
 
   @override
   String get routeId => 'library';
@@ -118,21 +147,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     return {
         NavigateIntent: OverlayGuardedAction<NavigateIntent>(ref,
           onInvoke: (intent) { _navigateGrid(intent.direction); return null; },
-          isEnabledOverride: searchOrNone,
+          isEnabledOverride: _reorderOrSearchOrNone,
         ),
         AdjustColumnsIntent: OverlayGuardedAction<AdjustColumnsIntent>(ref,
           onInvoke: (intent) { _adjustColumns(intent.increase); return null; },
           isEnabledOverride: searchOrNone,
         ),
-        ConfirmIntent: CallbackAction<ConfirmIntent>(
-          onInvoke: (_) {
-            _openSelectedGame();
-            return null;
-          },
+        ConfirmIntent: OverlayGuardedAction<ConfirmIntent>(ref,
+          onInvoke: (_) { _handleConfirm(); return null; },
+          isEnabledOverride: _reorderOrSearchOrNone,
         ),
         BackIntent: OverlayGuardedAction<BackIntent>(ref,
           onInvoke: (_) { _handleBack(); return null; },
-          isEnabledOverride: searchOrNone,
+          isEnabledOverride: _reorderOrSearchOrNone,
         ),
         SearchIntent: CallbackAction<SearchIntent>(
           onInvoke: (_) {
@@ -148,8 +175,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
             return null;
           },
         ),
+        FavoriteIntent: OverlayGuardedAction<FavoriteIntent>(ref,
+          onInvoke: (_) { _handleFavorite(); return null; },
+        ),
         ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: toggleQuickMenu),
       };
+  }
+
+  bool _reorderOrSearchOrNone(dynamic _) {
+    if (_reorderState != ReorderState.none) return true;
+    return searchOrNone(_);
   }
 
   @override
@@ -157,6 +192,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     super.initState();
     _columns = ref.read(gridColumnsProvider('library'));
     _debouncer = ref.read(inputDebouncerProvider);
+    _shelves = ref.read(customShelvesProvider);
 
     _focusManager = FocusSyncManager(
       scrollController: _scrollController,
@@ -184,6 +220,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   @override
   void dispose() {
+    _exitReorderMode();
     final selectedIndex = _currentIndex;
     Future.microtask(() {
       focusStateManager.saveFocusState(routeId, selectedIndex: selectedIndex);
@@ -224,7 +261,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     setState(() => _isLoading = true);
 
     final db = DatabaseService();
-    final favorites = ref.read(favoriteGamesProvider).toSet();
 
     // Load all games from DB
     final rawGames = await db.getAllGames();
@@ -238,7 +274,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       await _refreshInstalledFiles();
     }
 
-    final entries = <_LibraryEntry>[];
+    final entries = <LibraryEntry>[];
     for (final row in rawGames) {
       final systemSlug = row['systemSlug'] as String;
 
@@ -251,7 +287,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         } catch (e) { debugPrint('LibraryScreen: provider config parse failed: $e'); }
       }
 
-      entries.add(_LibraryEntry(
+      entries.add(LibraryEntry(
         filename: row['filename'] as String,
         displayName: GameMetadata.cleanTitle(row['filename'] as String),
         url: row['url'] as String,
@@ -264,9 +300,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
     if (!mounted) return;
 
+    // Trigger deferred migration from displayName → filename favorites
+    final allGameItems = entries.map((e) => GameItem(
+      filename: e.filename,
+      displayName: e.displayName,
+      url: e.url,
+    )).toList();
+    ref.read(favoriteGamesProvider.notifier).migrateIfNeeded(allGameItems);
+    final migratedFavorites = ref.read(favoriteGamesProvider).toSet();
+
     setState(() {
       _allGames = entries;
-      _favoriteIds = favorites;
+      _favoriteIds = migratedFavorites;
       _isLoading = false;
     });
 
@@ -289,42 +334,60 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   void _applyFilters() {
-    var games = List<_LibraryEntry>.from(_allGames);
+    List<LibraryEntry> games;
+    bool isManualSort = false;
+    ShelfSortMode? shelfSortMode;
 
-    // Tab filter
-    switch (_selectedTab) {
-      case 1: // Installed
-        games = games
-            .where((g) => _isGameInstalled(g))
-            .toList();
-      case 2: // Favorites
-        games =
-            games.where((g) => _favoriteIds.contains(g.displayName)).toList();
+    if (_isShelfTab) {
+      final resolved = _resolveShelfGames();
+      games = resolved.games;
+      isManualSort = resolved.isManualSort;
+      shelfSortMode = resolved.shelfSortMode;
+    } else {
+      games = List<LibraryEntry>.from(_allGames);
+      // Tab filter
+      switch (_selectedTab) {
+        case 1: // Installed
+          games = games
+              .where((g) => _isGameInstalled(g))
+              .toList();
+        case 2: // Favorites
+          games =
+              games.where((g) => _favoriteIds.contains(g.filename)).toList();
+      }
     }
 
     // Search filter
     if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
+      final query = GameMetadata.normalizeForSearch(_searchQuery);
       games = games
-          .where((g) => g.displayName.toLowerCase().contains(query))
+          .where((g) => GameMetadata.normalizeForSearch(g.displayName).contains(query))
           .toList();
     }
 
-    // Sort
-    switch (_sortMode) {
-      case LibrarySortMode.alphabetical:
-        games.sort(
-            (a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
-      case LibrarySortMode.bySystem:
-        games.sort((a, b) {
-          final cmp = a.systemSlug.compareTo(b.systemSlug);
-          if (cmp != 0) return cmp;
-          return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
-        });
+    // Sort (skip for manual-sort shelves)
+    if (!isManualSort) {
+      final effectiveSort = shelfSortMode != null
+          ? (shelfSortMode == ShelfSortMode.bySystem
+              ? LibrarySortMode.bySystem
+              : LibrarySortMode.alphabetical)
+          : _sortMode;
+      switch (effectiveSort) {
+        case LibrarySortMode.alphabetical:
+          games.sort(
+              (a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
+        case LibrarySortMode.bySystem:
+          games.sort((a, b) {
+            final cmp = a.systemSlug.compareTo(b.systemSlug);
+            if (cmp != 0) return cmp;
+            return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+          });
+      }
     }
 
     setState(() {
       _filteredGames = games;
+      _rebuildCoverUrlCache();
       _updateItemKeys();
       if (_currentIndex >= _filteredGames.length) {
         _currentIndex =
@@ -333,19 +396,64 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     });
   }
 
+  ({List<LibraryEntry> games, bool isManualSort, ShelfSortMode? shelfSortMode}) _resolveShelfGames() {
+    final shelf = _activeShelf;
+    if (shelf == null) return (games: <LibraryEntry>[], isManualSort: false, shelfSortMode: null);
+
+    final allGameRecords = _allGames
+        .map((g) => (
+              filename: g.filename,
+              displayName: g.displayName,
+              systemSlug: g.systemSlug,
+            ))
+        .toList();
+
+    final filenames = shelf.resolveFilenames(allGameRecords);
+    final lookup = <String, LibraryEntry>{};
+    for (final g in _allGames) {
+      lookup[g.filename] = g;
+    }
+
+    final games = <LibraryEntry>[];
+    for (final f in filenames) {
+      final entry = lookup[f];
+      if (entry != null) games.add(entry);
+    }
+
+    return (games: games, isManualSort: shelf.sortMode == ShelfSortMode.manual, shelfSortMode: shelf.sortMode);
+  }
+
   void _updateItemKeys() {
+    final count = _filteredGames.length;
+    if (_itemKeys.length == count) return;
     _itemKeys.clear();
-    for (int i = 0; i < _filteredGames.length; i++) {
+    for (int i = 0; i < count; i++) {
       _itemKeys[i] = GlobalKey();
+    }
+  }
+
+  void _rebuildCoverUrlCache() {
+    _coverUrlCache = {};
+    for (int i = 0; i < _filteredGames.length; i++) {
+      final entry = _filteredGames[i];
+      final systemModel = SystemModel.supportedSystems
+          .where((s) => s.id == entry.systemSlug)
+          .firstOrNull;
+      if (systemModel != null) {
+        _coverUrlCache[i] =
+            ImageHelper.getCoverUrlsForSingle(systemModel, entry.filename);
+      }
     }
   }
 
   // --- Tab Navigation ---
 
   void _nextTab() {
+    if (_reorderState != ReorderState.none) return;
     ref.read(feedbackServiceProvider).tick();
+    _shelves = ref.read(customShelvesProvider);
     setState(() {
-      _selectedTab = (_selectedTab + 1) % 3;
+      _selectedTab = (_selectedTab + 1) % _totalTabCount;
       _currentIndex = 0;
     });
     _applyFilters();
@@ -353,9 +461,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   void _prevTab() {
+    if (_reorderState != ReorderState.none) return;
     ref.read(feedbackServiceProvider).tick();
+    _shelves = ref.read(customShelvesProvider);
     setState(() {
-      _selectedTab = (_selectedTab - 1 + 3) % 3;
+      _selectedTab = (_selectedTab - 1 + _totalTabCount) % _totalTabCount;
       _currentIndex = 0;
     });
     _applyFilters();
@@ -364,7 +474,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   void _selectTab(int index) {
     if (index == _selectedTab) return;
+    if (_reorderState != ReorderState.none) return;
     ref.read(feedbackServiceProvider).tick();
+    _shelves = ref.read(customShelvesProvider);
     setState(() {
       _selectedTab = index;
       _currentIndex = 0;
@@ -375,12 +487,27 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   void _cycleSortMode() {
     ref.read(feedbackServiceProvider).tick();
-    setState(() {
+
+    if (_isShelfTab) {
+      final shelf = _activeShelf;
+      if (shelf == null) return;
+      final next = switch (shelf.sortMode) {
+        ShelfSortMode.alphabetical => ShelfSortMode.bySystem,
+        ShelfSortMode.bySystem => ShelfSortMode.manual,
+        ShelfSortMode.manual => ShelfSortMode.alphabetical,
+      };
+      ref.read(customShelvesProvider.notifier).updateShelf(
+        shelf.id,
+        shelf.copyWith(sortMode: next),
+      );
+      _shelves = ref.read(customShelvesProvider);
+    } else {
       _sortMode = _sortMode == LibrarySortMode.alphabetical
           ? LibrarySortMode.bySystem
           : LibrarySortMode.alphabetical;
-      _currentIndex = 0;
-    });
+    }
+
+    setState(() => _currentIndex = 0);
     _applyFilters();
     _scrollToTop();
   }
@@ -395,6 +522,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   void _navigateGrid(GridDirection direction) {
     if (_filteredGames.isEmpty) return;
+
+    if (_reorderState == ReorderState.grabbed) {
+      _reorderMove(direction);
+      return;
+    }
 
     if (_debouncer.startHold(() {
       if (_focusManager.moveFocus(direction)) {
@@ -446,7 +578,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     _openGameDetail(entry);
   }
 
-  Future<void> _openGameDetail(_LibraryEntry entry) async {
+  Future<void> _openGameDetail(LibraryEntry entry) async {
     searchFieldNode.unfocus();
     suspendSearchOverlay();
     ref.read(feedbackServiceProvider).confirm();
@@ -487,8 +619,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
     if (mounted) {
       resumeSearchOverlay();
-      // Reload to pick up install/favorite changes
+      // Reload to pick up install/favorite/shelf changes
       _favoriteIds = ref.read(favoriteGamesProvider).toSet();
+      _shelves = ref.read(customShelvesProvider);
       final data = ref.read(installedFilesProvider).value;
       if (data != null) {
         _installedFiles = data.all;
@@ -500,8 +633,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     }
   }
 
+  void _handleConfirm() {
+    if (_reorderState == ReorderState.selecting) {
+      _grabItem();
+      return;
+    }
+    if (_reorderState == ReorderState.grabbed) {
+      _dropItem();
+      return;
+    }
+    _openSelectedGame();
+  }
+
   void _handleBack() {
     ref.read(feedbackServiceProvider).cancel();
+    if (_reorderState == ReorderState.grabbed) {
+      _dropItem();
+      return;
+    }
+    if (_reorderState == ReorderState.selecting) {
+      _exitReorderMode();
+      return;
+    }
     if (isSearchActive) {
       handleSearchBack();
     } else {
@@ -509,10 +662,237 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     }
   }
 
-  List<QuickMenuItem> _buildQuickMenuItems() {
-    final sortLabel =
-        _sortMode == LibrarySortMode.alphabetical ? 'Sort by System' : 'Sort A-Z';
+  Future<void> _onCoverFound(String url, LibraryEntry entry) async {
+    await DatabaseService().updateGameCover(entry.filename, url);
+    final idx = _allGames.indexWhere((g) => g.filename == entry.filename);
+    if (idx >= 0) {
+      _allGames[idx] = LibraryEntry(
+        filename: entry.filename,
+        displayName: entry.displayName,
+        url: entry.url,
+        coverUrl: url,
+        systemSlug: entry.systemSlug,
+        providerConfig: entry.providerConfig,
+        hasThumbnail: entry.hasThumbnail,
+      );
+    }
+  }
+
+  Future<void> _onThumbnailNeeded(String url, LibraryEntry entry) async {
+    if (entry.hasThumbnail) return;
+    final result = await ThumbnailService.generateThumbnail(url);
+    if (result.success) {
+      await DatabaseService().updateGameThumbnailData(
+        entry.filename,
+        hasThumbnail: true,
+      );
+      final idx = _allGames.indexWhere((g) => g.filename == entry.filename);
+      if (idx >= 0) {
+        _allGames[idx] = LibraryEntry(
+          filename: entry.filename,
+          displayName: entry.displayName,
+          url: entry.url,
+          coverUrl: entry.coverUrl,
+          systemSlug: entry.systemSlug,
+          providerConfig: entry.providerConfig,
+          hasThumbnail: true,
+        );
+      }
+    }
+  }
+
+  // --- Reorder Mode ---
+
+  void _enterReorderMode() {
+    final shelf = _activeShelf;
+    if (shelf == null || shelf.sortMode != ShelfSortMode.manual) return;
+    _reorderClaimToken = ref.read(overlayPriorityProvider.notifier).claim(OverlayPriority.dialog);
+    setState(() {
+      _reorderState = ReorderState.selecting;
+      _grabbedIndex = -1;
+    });
+  }
+
+  void _exitReorderMode() {
+    if (_reorderState == ReorderState.none) return;
+    final token = _reorderClaimToken;
+    if (token != null) {
+      _reorderClaimToken = null;
+      if (!ref.read(overlayPriorityProvider.notifier).release(token)) {
+        ref.read(overlayPriorityProvider.notifier).releaseByPriority(OverlayPriority.dialog);
+      }
+    }
+    setState(() {
+      _reorderState = ReorderState.none;
+      _grabbedIndex = -1;
+    });
+  }
+
+  void _grabItem() {
+    if (_filteredGames.isEmpty) return;
+    ref.read(feedbackServiceProvider).confirm();
+    setState(() {
+      _reorderState = ReorderState.grabbed;
+      _grabbedIndex = _currentIndex;
+    });
+  }
+
+  void _dropItem() {
+    ref.read(feedbackServiceProvider).tick();
+    setState(() {
+      _reorderState = ReorderState.selecting;
+      _grabbedIndex = -1;
+    });
+  }
+
+  void _reorderMove(GridDirection direction) {
+    final shelf = _activeShelf;
+    if (shelf == null || _grabbedIndex < 0) return;
+
+    int targetIndex;
+    switch (direction) {
+      case GridDirection.left:
+        targetIndex = _grabbedIndex - 1;
+      case GridDirection.right:
+        targetIndex = _grabbedIndex + 1;
+      case GridDirection.up:
+        targetIndex = _grabbedIndex - _columns;
+      case GridDirection.down:
+        targetIndex = _grabbedIndex + _columns;
+    }
+
+    if (targetIndex < 0 || targetIndex >= _filteredGames.length) return;
+
+    ref.read(feedbackServiceProvider).tick();
+    ref.read(customShelvesProvider.notifier).reorderGameInShelf(
+      shelf.id,
+      _grabbedIndex,
+      targetIndex,
+      resolvedOrder: _filteredGames.map((g) => g.filename).toList(),
+    );
+    _shelves = ref.read(customShelvesProvider);
+    _applyFilters();
+    setState(() {
+      _grabbedIndex = targetIndex;
+      _currentIndex = targetIndex;
+    });
+    _scrollToSelected();
+  }
+
+  // --- Shelf Management ---
+
+  Future<void> _createShelf() async {
+    final allGameRecords = _allGames.map((g) => (
+      filename: g.filename,
+      displayName: g.displayName,
+      systemSlug: g.systemSlug,
+    )).toList();
+    final shelf = await Navigator.push<CustomShelf>(
+      context,
+      MaterialPageRoute(builder: (_) => ShelfEditScreen(allGameRecords: allGameRecords)),
+    );
+    if (shelf != null && mounted) {
+      ref.read(customShelvesProvider.notifier).addShelf(shelf);
+      _shelves = ref.read(customShelvesProvider);
+      setState(() {
+        _selectedTab = _fixedTabCount + _shelves.length - 1;
+        _currentIndex = 0;
+      });
+      _applyFilters();
+      _scrollToTop();
+    }
+  }
+
+  Future<void> _editShelf() async {
+    final shelf = _activeShelf;
+    if (shelf == null) return;
+    final allGameRecords = _allGames.map((g) => (
+      filename: g.filename,
+      displayName: g.displayName,
+      systemSlug: g.systemSlug,
+    )).toList();
+    final updated = await Navigator.push<CustomShelf>(
+      context,
+      MaterialPageRoute(builder: (_) => ShelfEditScreen(shelf: shelf, allGameRecords: allGameRecords)),
+    );
+    if (!mounted) return;
+    if (updated != null) {
+      ref.read(customShelvesProvider.notifier).updateShelf(shelf.id, updated);
+    }
+    // Always refresh — shelf may have been deleted from edit screen
+    _shelves = ref.read(customShelvesProvider);
+    final stillExists = _shelves.any((s) => s.id == shelf.id);
+    if (!stillExists) {
+      setState(() {
+        _selectedTab = (_selectedTab - 1).clamp(0, _totalTabCount - 1);
+      });
+    }
+    _currentIndex = 0;
+    _applyFilters();
+    _scrollToTop();
+  }
+
+  void _addCurrentGameToShelf() {
+    if (_currentIndex < 0 || _currentIndex >= _filteredGames.length) return;
+    if (_shelves.isEmpty) return;
+    final entry = _filteredGames[_currentIndex];
+    final availableShelves = _shelves
+        .where((s) => !s.containsGame(
+            entry.filename, entry.displayName, entry.systemSlug))
+        .toList();
+    if (availableShelves.isEmpty) return;
+    showShelfPickerDialog(
+      context: context,
+      ref: ref,
+      shelves: availableShelves,
+      onSelect: (shelfId) {
+        ref.read(customShelvesProvider.notifier).addGameToShelf(shelfId, entry.filename);
+        _shelves = ref.read(customShelvesProvider);
+        _applyFilters();
+      },
+    );
+  }
+
+  void _removeCurrentGameFromShelf() {
+    final shelf = _activeShelf;
+    if (shelf == null) return;
+    if (_currentIndex < 0 || _currentIndex >= _filteredGames.length) return;
+    final entry = _filteredGames[_currentIndex];
+    final matchesFilter = shelf.filterRules.any(
+      (r) => r.matches(entry.displayName, entry.systemSlug),
+    );
+    if (matchesFilter) {
+      // Filter-matched: must explicitly exclude so filter doesn't re-add it
+      ref.read(customShelvesProvider.notifier).excludeGameFromShelf(shelf.id, entry.filename);
+    } else {
+      // Truly manual: just remove from manualGameIds, no exclusion needed
+      ref.read(customShelvesProvider.notifier).removeGameFromShelf(shelf.id, entry.filename);
+    }
+    _shelves = ref.read(customShelvesProvider);
+    _applyFilters();
+  }
+
+  void _handleFavorite() {
+    if (_currentIndex < 0 || _currentIndex >= _filteredGames.length) return;
+    final entry = _filteredGames[_currentIndex];
+    ref.read(feedbackServiceProvider).tick();
+    ref.read(favoriteGamesProvider.notifier).toggleFavorite(entry.filename);
+    _favoriteIds = ref.read(favoriteGamesProvider).toSet();
+    _applyFilters();
+  }
+
+  List<QuickMenuItem?> _buildQuickMenuItems() {
+    final sortLabel = _isShelfTab
+        ? switch (_activeShelf?.sortMode ?? ShelfSortMode.alphabetical) {
+            ShelfSortMode.alphabetical => 'Sort by System',
+            ShelfSortMode.bySystem => 'Sort Manual',
+            ShelfSortMode.manual => 'Sort A-Z',
+          }
+        : _sortMode == LibrarySortMode.alphabetical
+            ? 'Sort by System'
+            : 'Sort A-Z';
     final hasDownloads = ref.read(hasQueueItemsProvider);
+    final shelf = _activeShelf;
     return [
       QuickMenuItem(
         label: 'Search',
@@ -520,43 +900,66 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         shortcutHint: 'Y',
         onSelect: openSearch,
       ),
+      if (_filteredGames.isNotEmpty) ...[
+        QuickMenuItem(
+          label: _favoriteIds.contains(_filteredGames[_currentIndex].filename)
+              ? 'Unfavorite' : 'Favorite',
+          icon: _favoriteIds.contains(_filteredGames[_currentIndex].filename)
+              ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          shortcutHint: '−',
+          onSelect: _handleFavorite,
+        ),
+      ],
       QuickMenuItem(
         label: sortLabel,
         icon: Icons.sort_rounded,
         shortcutHint: 'X',
         onSelect: _cycleSortMode,
       ),
+      // --- Shelf management ---
+      null,
       QuickMenuItem(
-        label: 'Prev Tab',
-        icon: Icons.chevron_left_rounded,
-        shortcutHint: 'ZL',
-        onSelect: _prevTab,
+        label: 'New Shelf',
+        icon: Icons.create_new_folder_rounded,
+        onSelect: _createShelf,
       ),
-      QuickMenuItem(
-        label: 'Next Tab',
-        icon: Icons.chevron_right_rounded,
-        shortcutHint: 'ZR',
-        onSelect: _nextTab,
-      ),
-      QuickMenuItem(
-        label: 'Zoom In',
-        icon: Icons.zoom_in_rounded,
-        shortcutHint: 'R',
-        onSelect: () => _adjustColumns(false),
-      ),
-      QuickMenuItem(
-        label: 'Zoom Out',
-        icon: Icons.zoom_out_rounded,
-        shortcutHint: 'L',
-        onSelect: () => _adjustColumns(true),
-      ),
-      if (hasDownloads)
+      if (shelf != null)
+        QuickMenuItem(
+          label: 'Edit Shelf',
+          icon: Icons.edit_rounded,
+          onSelect: _editShelf,
+        ),
+      if (_filteredGames.isNotEmpty && _shelves.any((s) => !s.containsGame(
+          _filteredGames[_currentIndex].filename,
+          _filteredGames[_currentIndex].displayName,
+          _filteredGames[_currentIndex].systemSlug)))
+        QuickMenuItem(
+          label: 'Add to Shelf',
+          icon: Icons.playlist_add_rounded,
+          onSelect: _addCurrentGameToShelf,
+        ),
+      if (shelf != null && _filteredGames.isNotEmpty)
+        QuickMenuItem(
+          label: 'Remove from Shelf',
+          icon: Icons.playlist_remove_rounded,
+          onSelect: _removeCurrentGameFromShelf,
+        ),
+      if (shelf != null && shelf.sortMode == ShelfSortMode.manual && _filteredGames.length > 1)
+        QuickMenuItem(
+          label: 'Reorder Games',
+          icon: Icons.swap_vert_rounded,
+          onSelect: _enterReorderMode,
+        ),
+      // --- Downloads ---
+      if (hasDownloads) ...[
+        null,
         QuickMenuItem(
           label: 'Downloads',
           icon: Icons.download_rounded,
           onSelect: () => toggleDownloadOverlay(ref),
           highlight: true,
         ),
+      ],
     ];
   }
 
@@ -574,7 +977,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   // --- Count helpers ---
 
-  bool _isGameInstalled(_LibraryEntry entry) {
+  bool _isGameInstalled(LibraryEntry entry) {
     final filename = entry.filename;
     if (_installedFiles.contains(filename)) return true;
     // Strip archive extension for extracted ROM match
@@ -604,7 +1007,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       _allGames.where((g) => _isGameInstalled(g)).length;
 
   int get _favoritesCount =>
-      _allGames.where((g) => _favoriteIds.contains(g.displayName)).length;
+      _allGames.where((g) => _favoriteIds.contains(g.filename)).length;
 
   // --- Build ---
 
@@ -651,8 +1054,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   Widget _buildHeader(Responsive rs) {
-    final tabLabels = ['All', 'Installed', 'Favorites'];
-    final tabCounts = [_allCount, _installedCount, _favoritesCount];
+    final fixedLabels = ['All', 'Installed', 'Favorites'];
+    final fixedCounts = [_allCount, _installedCount, _favoritesCount];
+
+    final tabs = <LibraryTab>[
+      for (int i = 0; i < _fixedTabCount; i++)
+        LibraryTab(label: fixedLabels[i], count: fixedCounts[i]),
+      for (final shelf in _shelves)
+        LibraryTab(
+          label: shelf.name,
+          count: _shelfGameCount(shelf),
+          isCustomShelf: true,
+        ),
+    ];
 
     return Positioned(
       top: 0,
@@ -706,9 +1120,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        _sortMode == LibrarySortMode.alphabetical
-                            ? 'A-Z'
-                            : 'BY SYSTEM',
+                        _isShelfTab
+                            ? switch (_activeShelf?.sortMode ?? ShelfSortMode.alphabetical) {
+                                ShelfSortMode.alphabetical => 'A-Z',
+                                ShelfSortMode.bySystem => 'BY SYSTEM',
+                                ShelfSortMode.manual => 'MANUAL',
+                              }
+                            : _sortMode == LibrarySortMode.alphabetical
+                                ? 'A-Z'
+                                : 'BY SYSTEM',
                         style: TextStyle(
                           fontSize: rs.isSmall ? 9 : 10,
                           fontWeight: FontWeight.w600,
@@ -722,13 +1142,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 SizedBox(height: rs.isSmall ? 6 : 10),
                 LibraryTabs(
                   selectedTab: _selectedTab,
-                  tabs: List.generate(
-                    3,
-                    (i) => LibraryTab(
-                      label: tabLabels[i],
-                      count: tabCounts[i],
-                    ),
-                  ),
+                  tabs: tabs,
                   accentColor: Colors.cyanAccent,
                   onTap: _selectTab,
                 ),
@@ -738,6 +1152,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         ),
       ),
     );
+  }
+
+  int _shelfGameCount(CustomShelf shelf) {
+    final allGameRecords = _allGames
+        .map((g) => (
+              filename: g.filename,
+              displayName: g.displayName,
+              systemSlug: g.systemSlug,
+            ))
+        .toList();
+    return shelf.resolveFilenames(allGameRecords).length;
   }
 
   Widget _buildSearchBar() {
@@ -764,9 +1189,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                   ? 'No installed games'
                   : _selectedTab == 2
                       ? 'No favorites yet'
-                      : _searchQuery.isNotEmpty
-                          ? 'No results for "$_searchQuery"'
-                          : 'No games in library',
+                      : _isShelfTab
+                          ? (_searchQuery.isNotEmpty
+                              ? 'No results for "$_searchQuery"'
+                              : 'No games in this shelf')
+                          : _searchQuery.isNotEmpty
+                              ? 'No results for "$_searchQuery"'
+                              : 'No games in library',
               style: TextStyle(color: Colors.grey[500], fontSize: 16),
             ),
             if (_allGames.isEmpty) ...[
@@ -781,18 +1210,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       );
     }
 
+    final deviceMemory = ref.read(deviceMemoryProvider);
     final gridPadding = rs.spacing.lg * 2;
     final spacing = rs.isSmall ? 10.0 : 16.0;
     final gridWidth = MediaQuery.of(context).size.width - gridPadding;
     final itemWidth = (gridWidth - (_columns - 1) * spacing) / _columns;
     final dpr = MediaQuery.of(context).devicePixelRatio;
-    final optimalCacheWidth = (itemWidth * dpr).round().clamp(150, 500);
+    final optimalCacheWidth =
+        (itemWidth * dpr).round().clamp(150, deviceMemory.memCacheWidthMax);
 
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
       child: RepaintBoundary(
         child: GridView.builder(
-        cacheExtent: 600,
+        cacheExtent: deviceMemory.libraryCacheExtent,
         controller: _scrollController,
         padding: EdgeInsets.only(
           left: rs.spacing.lg,
@@ -810,22 +1241,23 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         itemBuilder: (context, index) {
         final entry = _filteredGames[index];
         final isInstalled = _isGameInstalled(entry);
-        final isFavorite = _favoriteIds.contains(entry.displayName);
+        final isFavorite = _favoriteIds.contains(entry.filename);
+
+        final coverUrls = _coverUrlCache[index] ?? const [];
 
         final systemModel = SystemModel.supportedSystems
             .where((s) => s.id == entry.systemSlug)
             .firstOrNull;
-
-        final coverUrls = systemModel != null
-            ? ImageHelper.getCoverUrlsForSingle(systemModel, entry.filename)
-            : <String>[];
 
         // Short system label for badge
         final systemLabel = _systemShortLabel(entry.systemSlug);
         final systemColor =
             systemModel?.accentColor ?? Colors.grey;
 
-        return RepaintBoundary(
+        final isGrabbed = _reorderState == ReorderState.grabbed && _grabbedIndex == index;
+        final isReordering = _reorderState != ReorderState.none;
+
+        Widget card = RepaintBoundary(
           key: _itemKeys[index],
           child: SelectionAwareItem(
             selectedIndexNotifier: _selectedIndexNotifier,
@@ -842,7 +1274,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
               isInstalled: isInstalled,
               isSelected: isSelected,
               isFavorite: isFavorite,
+              onCoverFound: (url) => _onCoverFound(url, entry),
+              onThumbnailNeeded: (url) => _onThumbnailNeeded(url, entry),
               onTap: () {
+                if (_reorderState == ReorderState.selecting) {
+                  _currentIndex = index;
+                  _grabItem();
+                  return;
+                }
+                if (_reorderState == ReorderState.grabbed) return;
                 if (_currentIndex == index) {
                   _openGameDetail(entry);
                 } else {
@@ -851,14 +1291,32 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 }
               },
               onTapSelect: () {
+                if (_reorderState != ReorderState.none) return;
                 if (_currentIndex != index) {
                   _currentIndex = index;
                   ref.read(feedbackServiceProvider).tick();
                 }
               },
+              onLongPress: isReordering ? null : () {
+                if (_isShelfTab && _activeShelf?.sortMode == ShelfSortMode.manual) {
+                  _currentIndex = index;
+                  _enterReorderMode();
+                  _grabItem();
+                }
+              },
             ),
           ),
         );
+
+        if (isReordering) {
+          card = ReorderableCardWrapper(
+            isJiggling: _reorderState == ReorderState.selecting,
+            isGrabbed: isGrabbed,
+            child: card,
+          );
+        }
+
+        return card;
       },
       ),
       ),
@@ -866,6 +1324,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   Widget _buildHud() {
+    if (_reorderState == ReorderState.grabbed) {
+      return ConsoleHud(
+        dpad: (label: '\u2190\u2191\u2193\u2192', action: 'Move'),
+        a: HudAction('Drop', onTap: _dropItem),
+        b: HudAction('Cancel', onTap: _dropItem),
+      );
+    }
+    if (_reorderState == ReorderState.selecting) {
+      return ConsoleHud(
+        a: HudAction('Grab', onTap: _grabItem),
+        b: HudAction('Done', onTap: _exitReorderMode),
+      );
+    }
     if (isSearchActive) {
       return buildSearchHud(
         aAction: HudAction('Select', onTap: _openSelectedGame),
@@ -911,25 +1382,5 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     };
     return labels[slug] ?? slug.toUpperCase();
   }
-}
-
-class _LibraryEntry {
-  final String filename;
-  final String displayName;
-  final String url;
-  final String? coverUrl;
-  final String systemSlug;
-  final ProviderConfig? providerConfig;
-  final bool hasThumbnail;
-
-  const _LibraryEntry({
-    required this.filename,
-    required this.displayName,
-    required this.url,
-    this.coverUrl,
-    required this.systemSlug,
-    this.providerConfig,
-    this.hasThumbnail = false,
-  });
 }
 

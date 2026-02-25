@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/custom_shelf.dart';
 import '../models/sound_settings.dart';
 
 enum ControllerLayout { nintendo, xbox, playstation }
@@ -23,6 +24,8 @@ class StorageService {
   static const _xboxLayoutKey = 'xbox_layout'; // legacy bool key
   static const _controllerLayoutKey = 'controller_layout';
   static const _homeLayoutKey = 'home_layout';
+  static const _favoritesVersionKey = 'favorites_version';
+  static const _customShelvesKey = 'custom_shelves';
   SharedPreferences? _prefs;
 
   Future<void> init() async {
@@ -204,6 +207,16 @@ class StorageService {
 
   // --- Favorites Persistence ---
 
+  int getFavoritesVersion() {
+    _ensureInitialized();
+    return _prefs!.getInt(_favoritesVersionKey) ?? 0;
+  }
+
+  Future<void> setFavoritesVersion(int version) async {
+    _ensureInitialized();
+    await _prefs!.setInt(_favoritesVersionKey, version);
+  }
+
   List<String> getFavorites() {
     _ensureInitialized();
     return _prefs!.getStringList(_favoritesKey) ?? [];
@@ -259,5 +272,30 @@ class StorageService {
   Future<void> setHomeLayoutIsGrid(bool value) async {
     _ensureInitialized();
     await _prefs!.setBool(_homeLayoutKey, value);
+  }
+
+  // --- Custom Shelves ---
+
+  List<CustomShelf> getCustomShelves() {
+    _ensureInitialized();
+    final json = _prefs!.getString(_customShelvesKey);
+    if (json == null) return [];
+    try {
+      final list = jsonDecode(json) as List<dynamic>;
+      return list
+          .map((e) => CustomShelf.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('StorageService: custom shelves parse failed: $e');
+      return [];
+    }
+  }
+
+  Future<void> setCustomShelves(List<CustomShelf> shelves) async {
+    _ensureInitialized();
+    await _prefs!.setString(
+      _customShelvesKey,
+      jsonEncode(shelves.map((s) => s.toJson()).toList()),
+    );
   }
 }

@@ -22,6 +22,8 @@ import '../../widgets/download_overlay.dart';
 import '../../widgets/quick_menu.dart';
 import '../../providers/download_providers.dart';
 import '../../providers/installed_files_provider.dart';
+import '../../providers/shelf_providers.dart';
+import '../library/widgets/shelf_picker_dialog.dart';
 import 'widgets/game_grid.dart';
 import 'widgets/game_list_header.dart';
 import 'widgets/filter_overlay.dart';
@@ -154,6 +156,9 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
             return null;
           },
         ),
+        FavoriteIntent: OverlayGuardedAction<FavoriteIntent>(ref,
+          onInvoke: (_) { _handleFavorite(); return null; },
+        ),
         ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: toggleQuickMenu),
       };
   }
@@ -234,6 +239,10 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
   void _onControllerChanged() {
     if (!mounted) return;
+    // Trigger deferred migration (idempotent, no-op if already migrated)
+    if (_controller.state.allGames.isNotEmpty) {
+      ref.read(favoriteGamesProvider.notifier).migrateIfNeeded(_controller.state.allGames);
+    }
     _focusManager.validateState(_columns);
     setState(() {});
     _updateItemKeys();
@@ -337,7 +346,74 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     }
   }
 
-  List<QuickMenuItem> _buildQuickMenuItems() {
+  void _handleFavorite() {
+    final state = _controller.state;
+    final selectedIndex = _focusManager.selectedIndex;
+    if (selectedIndex < 0 || selectedIndex >= state.filteredGroups.length) return;
+
+    final displayName = state.filteredGroups[selectedIndex];
+    final variants = state.filteredGroupedGames[displayName];
+    if (variants == null || variants.length != 1) return;
+
+    ref.read(feedbackServiceProvider).tick();
+    ref.read(favoriteGamesProvider.notifier).toggleFavorite(variants.first.filename);
+  }
+
+  void _handleAddToShelf() {
+    final state = _controller.state;
+    final selectedIndex = _focusManager.selectedIndex;
+    if (selectedIndex < 0 || selectedIndex >= state.filteredGroups.length) return;
+
+    final displayName = state.filteredGroups[selectedIndex];
+    final variants = state.filteredGroupedGames[displayName];
+    if (variants == null || variants.length != 1) return;
+
+    final game = variants.first;
+    final shelves = ref.read(customShelvesProvider);
+    final availableShelves = shelves
+        .where((s) => !s.containsGame(game.filename, game.displayName, widget.system.id))
+        .toList();
+    if (availableShelves.isEmpty) return;
+
+    showShelfPickerDialog(
+      context: context,
+      ref: ref,
+      shelves: availableShelves,
+      onSelect: (shelfId) {
+        ref.read(customShelvesProvider.notifier).addGameToShelf(shelfId, game.filename);
+      },
+    );
+  }
+
+  bool _selectedIsSingleVariant() {
+    final state = _controller.state;
+    final idx = _focusManager.selectedIndex;
+    if (idx < 0 || idx >= state.filteredGroups.length) return false;
+    final variants = state.filteredGroupedGames[state.filteredGroups[idx]];
+    return variants != null && variants.length == 1;
+  }
+
+  bool _selectedIsFavorite() {
+    final state = _controller.state;
+    final idx = _focusManager.selectedIndex;
+    if (idx < 0 || idx >= state.filteredGroups.length) return false;
+    final variants = state.filteredGroupedGames[state.filteredGroups[idx]];
+    if (variants == null || variants.length != 1) return false;
+    return ref.read(favoriteGamesProvider).contains(variants.first.filename);
+  }
+
+  bool _canAddToShelf() {
+    if (!_selectedIsSingleVariant()) return false;
+    final shelves = ref.read(customShelvesProvider);
+    if (shelves.isEmpty) return false;
+    final state = _controller.state;
+    final idx = _focusManager.selectedIndex;
+    final variants = state.filteredGroupedGames[state.filteredGroups[idx]];
+    final game = variants!.first;
+    return shelves.any((s) => !s.containsGame(game.filename, game.displayName, widget.system.id));
+  }
+
+  List<QuickMenuItem?> _buildQuickMenuItems() {
     final state = _controller.state;
     final hasDownloads = ref.read(hasQueueItemsProvider);
     return [
@@ -347,31 +423,36 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         shortcutHint: 'Y',
         onSelect: openSearch,
       ),
+      if (_selectedIsSingleVariant()) ...[
+        QuickMenuItem(
+          label: _selectedIsFavorite() ? 'Unfavorite' : 'Favorite',
+          icon: _selectedIsFavorite()
+              ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+          shortcutHint: '−',
+          onSelect: _handleFavorite,
+        ),
+      ],
+      if (_canAddToShelf())
+        QuickMenuItem(
+          label: 'Add to Shelf',
+          icon: Icons.playlist_add_rounded,
+          onSelect: _handleAddToShelf,
+        ),
       QuickMenuItem(
         label: state.activeFilters.isNotEmpty ? 'Filter (active)' : 'Filter',
         icon: Icons.filter_list_rounded,
         shortcutHint: 'X',
         onSelect: _toggleFilter,
       ),
-      QuickMenuItem(
-        label: 'Zoom In',
-        icon: Icons.zoom_in_rounded,
-        shortcutHint: 'R',
-        onSelect: () => _adjustColumns(false),
-      ),
-      QuickMenuItem(
-        label: 'Zoom Out',
-        icon: Icons.zoom_out_rounded,
-        shortcutHint: 'L',
-        onSelect: () => _adjustColumns(true),
-      ),
-      if (hasDownloads)
+      if (hasDownloads) ...[
+        null,
         QuickMenuItem(
           label: 'Downloads',
           icon: Icons.download_rounded,
           onSelect: () => toggleDownloadOverlay(ref),
           highlight: true,
         ),
+      ],
     ];
   }
 
@@ -406,7 +487,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     );
     if (mounted) resumeSearchOverlay();
     if (isLocalOnly) {
-      await _controller.loadGames();
+      await _controller.loadGames(silent: true);
     } else {
       await _controller.updateInstalledStatus(displayName);
     }
@@ -539,7 +620,14 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         onRetry: _controller.loadGames,
       );
     }
-    final favorites = ref.watch(favoriteGamesProvider).toSet();
+    final favoriteFilenames = ref.watch(favoriteGamesProvider).toSet();
+    final favorites = <String>{};
+    for (final entry in state.filteredGroupedGames.entries) {
+      if (entry.value.any((v) => favoriteFilenames.contains(v.filename))) {
+        favorites.add(entry.key);
+      }
+    }
+    final deviceMemory = ref.read(deviceMemoryProvider);
     return GameGrid(
       key: const ValueKey('game_grid'),
       system: widget.system,
@@ -576,6 +664,8 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       hasActiveFilters: state.activeFilters.isNotEmpty,
       isLocalOnly: state.isLocalOnly,
       targetFolder: widget.targetFolder,
+      memCacheWidthMax: deviceMemory.memCacheWidthMax,
+      gridCacheExtent: deviceMemory.gridCacheExtent,
     );
   }
 

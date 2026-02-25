@@ -30,6 +30,7 @@ class BaseGameCard extends StatelessWidget {
   // Optional behavior
   final FocusNode? focusNode;
   final VoidCallback? onTapSelect;
+  final VoidCallback? onLongPress;
   final void Function(String)? onCoverFound;
 
   const BaseGameCard({
@@ -51,6 +52,7 @@ class BaseGameCard extends StatelessWidget {
     this.scrollSuppression,
     this.focusNode,
     this.onTapSelect,
+    this.onLongPress,
     this.onCoverFound,
   });
 
@@ -69,6 +71,7 @@ class BaseGameCard extends StatelessWidget {
     Widget card = GestureDetector(
       onTapDown: (_) => onTapSelect?.call(),
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Transform.scale(
         scale: isSelected ? selectedScale : 1.0,
         child: Container(

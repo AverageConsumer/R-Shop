@@ -139,7 +139,8 @@ class FocusSyncManager {
 
     final gridWidth = MediaQuery.of(context).size.width - 48;
     final itemWidth = (gridWidth - (crossAxisCount - 1) * 16) / crossAxisCount;
-    final itemHeight = itemWidth / getGridRatio();
+    final ratio = getGridRatio();
+    final itemHeight = ratio > 0 ? (itemWidth / ratio) : itemWidth;
     final rowHeight = itemHeight + 16;
 
     final centerOffset =

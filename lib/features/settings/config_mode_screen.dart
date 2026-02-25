@@ -48,13 +48,13 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     if (_initialized) return;
     _initialized = true;
     final configAsync = ref.read(bootstrappedConfigProvider);
-    configAsync.whenData((config) {
+    if (configAsync case AsyncData(value: final config)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           ref.read(onboardingControllerProvider.notifier).loadFromConfig(config);
         }
       });
-    });
+    }
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
@@ -157,7 +157,9 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     final rs = context.rs;
 
     // Initialize on first build once config is available
-    ref.watch(bootstrappedConfigProvider).whenData((_) => _initFromConfig());
+    if (ref.watch(bootstrappedConfigProvider) case AsyncData()) {
+      _initFromConfig();
+    }
 
     // Re-request focus only after structural changes (console select/deselect,
     // form open/close). Skip minor changes (folder path, toggles, merge mode)

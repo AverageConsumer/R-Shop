@@ -12,7 +12,19 @@ class DatabaseService {
   static const String _tableName = 'games';
   static const int _dbVersion = 4;
 
-  Future<Database> get database => _initFuture ??= _initDatabase();
+  @visibleForTesting
+  static Database? testDatabase;
+
+  Future<Database> get database {
+    if (testDatabase != null) return Future.value(testDatabase!);
+    return _initFuture ??= _initDatabase();
+  }
+
+  @visibleForTesting
+  static void resetForTesting() {
+    _initFuture = null;
+    testDatabase = null;
+  }
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
@@ -199,6 +211,16 @@ class DatabaseService {
       columns: ['filename', 'cover_url'],
       where: 'cover_url IS NOT NULL AND has_thumbnail = 0',
     );
+  }
+
+  Future<Set<String>> getAllCoverUrls() async {
+    final db = await database;
+    final rows = await db.query(
+      _tableName,
+      columns: ['cover_url'],
+      where: 'cover_url IS NOT NULL',
+    );
+    return rows.map((r) => r['cover_url'] as String).toSet();
   }
 
   Future<List<Map<String, dynamic>>> getGamesNeedingCovers() async {

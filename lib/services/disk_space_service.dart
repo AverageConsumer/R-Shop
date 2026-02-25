@@ -12,7 +12,7 @@ class StorageInfo {
   double get freeGB => freeBytes / (1024 * 1024 * 1024);
   double get totalGB => totalBytes / (1024 * 1024 * 1024);
   double get usagePercent =>
-      totalBytes > 0 ? (totalBytes - freeBytes) / totalBytes : 0;
+      totalBytes > 0 ? ((totalBytes - freeBytes) / totalBytes).clamp(0.0, 1.0) : 0;
 
   /// Less than 1 GB free.
   bool get isLow => freeBytes < 1024 * 1024 * 1024;

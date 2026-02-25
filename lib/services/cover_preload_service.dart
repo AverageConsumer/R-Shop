@@ -51,7 +51,7 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
 
   bool _cancelled = false;
 
-  Future<void> preloadAll(DatabaseService db) async {
+  Future<void> preloadAll(DatabaseService db, {int phase1Pool = 6, int phase2Pool = 4}) async {
     if (state.isRunning) return;
     state = state.copyWith(isRunning: true);
     _cancelled = false;
@@ -84,11 +84,10 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
       systemMap[s.id] = s;
     }
 
-    // Phase 1 — Games with cover_url (batch 3, 100ms pause)
-    await _processBatches(
+    // Phase 1 — Games with cover_url
+    await _processPool(
       items: phase1,
-      batchSize: 3,
-      pauseMs: 100,
+      poolSize: phase1Pool,
       processItem: (row) => _processWithCoverUrl(
         db: db,
         filename: row['filename'] as String,
@@ -96,12 +95,11 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
       ),
     );
 
-    // Phase 2 — Games without cover_url (batch 2, 200ms pause)
+    // Phase 2 — Games without cover_url (needs URL resolution)
     if (!_cancelled) {
-      await _processBatches(
+      await _processPool(
         items: phase2,
-        batchSize: 2,
-        pauseMs: 200,
+        poolSize: phase2Pool,
         processItem: (row) => _processWithoutCoverUrl(
           db: db,
           filename: row['filename'] as String,
@@ -114,42 +112,30 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
     state = state.copyWith(isRunning: false);
   }
 
-  Future<void> _processBatches({
+  Future<void> _processPool({
     required List<Map<String, dynamic>> items,
-    required int batchSize,
-    required int pauseMs,
+    required int poolSize,
     required Future<bool> Function(Map<String, dynamic>) processItem,
   }) async {
-    for (int i = 0; i < items.length; i += batchSize) {
-      if (_cancelled) return;
+    int nextIndex = 0;
 
-      final end = (i + batchSize).clamp(0, items.length);
-      final batch = items.sublist(i, end);
+    Future<void> worker() async {
+      while (!_cancelled) {
+        final index = nextIndex++;
+        if (index >= items.length) return;
 
-      final results = await Future.wait(
-        batch.map((row) => processItem(row)),
-      );
+        final ok = await processItem(items[index]);
 
-      int batchSucceeded = 0;
-      int batchFailed = 0;
-      for (final ok in results) {
-        if (ok) {
-          batchSucceeded++;
-        } else {
-          batchFailed++;
-        }
-      }
-
-      state = state.copyWith(
-        completed: state.completed + batch.length,
-        succeeded: state.succeeded + batchSucceeded,
-        failed: state.failed + batchFailed,
-      );
-
-      if (i + batchSize < items.length && !_cancelled) {
-        await Future.delayed(Duration(milliseconds: pauseMs));
+        state = state.copyWith(
+          completed: state.completed + 1,
+          succeeded: state.succeeded + (ok ? 1 : 0),
+          failed: state.failed + (ok ? 0 : 1),
+        );
       }
     }
+
+    final workerCount = poolSize.clamp(1, items.length);
+    await Future.wait(List.generate(workerCount, (_) => worker()));
   }
 
   Future<bool> _processWithCoverUrl({
@@ -168,13 +154,14 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
         return false;
       }
 
-      final result = await ThumbnailService.generateThumbnail(coverUrl);
-      if (!result.success) return false;
-
-      await db.updateGameThumbnailData(
-        filename,
-        hasThumbnail: true,
-      );
+      // Fire-and-forget: thumbnail generation runs async in worker isolate
+      ThumbnailService.generateThumbnail(coverUrl).then((result) {
+        if (result.success) {
+          db.updateGameThumbnailData(filename, hasThumbnail: true);
+        }
+      }).catchError((e) {
+        debugPrint('Thumbnail generation failed for $filename: $e');
+      });
       return true;
     } catch (e) {
       debugPrint('Cover preload failed for $filename: $e');
@@ -211,14 +198,14 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
           // Found a valid cover — persist URL
           await db.updateGameCover(filename, url);
 
-          // Generate thumbnail
-          final result = await ThumbnailService.generateThumbnail(url);
-          if (result.success) {
-            await db.updateGameThumbnailData(
-              filename,
-              hasThumbnail: true,
-            );
-          }
+          // Fire-and-forget: thumbnail generation runs async in worker isolate
+          ThumbnailService.generateThumbnail(url).then((result) {
+            if (result.success) {
+              db.updateGameThumbnailData(filename, hasThumbnail: true);
+            }
+          }).catchError((e) {
+            debugPrint('Thumbnail generation failed for $filename: $e');
+          });
           return true;
         } catch (e) {
           debugPrint('CoverPreload: URL fetch failed for $url: $e');

@@ -6,9 +6,10 @@ import '../services/haptic_service.dart';
 import '../services/audio_manager.dart';
 import '../services/feedback_service.dart';
 import '../services/crash_log_service.dart';
+import '../services/device_info_service.dart';
 import '../services/disk_space_service.dart';
+import '../models/game_item.dart';
 import '../models/sound_settings.dart';
-import '../utils/game_metadata.dart';
 
 export '../core/input/input_providers.dart'
     show
@@ -146,36 +147,55 @@ final homeGridColumnsProvider =
 
 class FavoriteGamesNotifier extends StateNotifier<List<String>> {
   final StorageService _storage;
+  Set<String>? _pendingMigrationNames;
 
   FavoriteGamesNotifier(this._storage) : super(_storage.getFavorites()) {
-    _migrateFavoriteNames();
-  }
-
-  void _migrateFavoriteNames() {
-    final current = state;
-    final migrated = current.map(GameMetadata.cleanTitle).toSet().toList();
-    if (migrated.length != current.length ||
-        !_listEquals(current, migrated)) {
-      _storage.setFavorites(migrated);
-      state = migrated;
+    if (_storage.getFavoritesVersion() == 0 && state.isNotEmpty) {
+      _pendingMigrationNames = state.toSet();
     }
   }
 
-  static bool _listEquals(List<String> a, List<String> b) {
-    if (a.length != b.length) return false;
-    for (int i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
+  /// Maps old displayName-based favorites to filenames. Idempotent.
+  void migrateIfNeeded(List<GameItem> allGames) {
+    final pending = _pendingMigrationNames;
+    if (pending == null) return;
+    _pendingMigrationNames = null;
+
+    // Build displayName → filenames map
+    final nameToFilenames = <String, List<String>>{};
+    for (final game in allGames) {
+      nameToFilenames
+          .putIfAbsent(game.displayName, () => [])
+          .add(game.filename);
     }
-    return true;
+
+    final migrated = <String>{};
+    for (final oldName in pending) {
+      final filenames = nameToFilenames[oldName];
+      if (filenames != null) {
+        migrated.addAll(filenames);
+      }
+    }
+
+    _storage.setFavorites(migrated.toList());
+    _storage.setFavoritesVersion(1);
+    state = migrated.toList();
   }
 
-  void toggleFavorite(String gameId) {
-    _storage.toggleFavorite(gameId);
+  void toggleFavorite(String filename) {
+    _storage.toggleFavorite(filename);
     state = _storage.getFavorites();
   }
 
-  bool isFavorite(String gameId) {
-    return state.contains(gameId);
+  bool isFavorite(String filename) {
+    return state.contains(filename);
+  }
+
+  bool isAnyFavorite(List<String> filenames) {
+    for (final f in filenames) {
+      if (state.contains(f)) return true;
+    }
+    return false;
   }
 }
 
@@ -205,7 +225,7 @@ class ControllerLayoutNotifier extends StateNotifier<ControllerLayout> {
 
 final controllerLayoutProvider =
     StateNotifierProvider<ControllerLayoutNotifier, ControllerLayout>((ref) {
-  final storage = ref.watch(storageServiceProvider);
+  final storage = ref.read(storageServiceProvider);
   return ControllerLayoutNotifier(storage);
 });
 
@@ -219,19 +239,23 @@ class HomeLayoutNotifier extends StateNotifier<bool> {
 
   Future<void> toggle() async {
     final newValue = !state;
-    await _storage.setHomeLayoutIsGrid(newValue);
     state = newValue;
+    await _storage.setHomeLayoutIsGrid(newValue);
   }
 }
 
 final homeLayoutProvider = StateNotifierProvider<HomeLayoutNotifier, bool>((ref) {
-  final storage = ref.watch(storageServiceProvider);
+  final storage = ref.read(storageServiceProvider);
   return HomeLayoutNotifier(storage);
 });
 
 final favoriteGamesProvider =
     StateNotifierProvider<FavoriteGamesNotifier, List<String>>((ref) {
   return FavoriteGamesNotifier(ref.read(storageServiceProvider));
+});
+
+final deviceMemoryProvider = Provider<DeviceMemoryInfo>((ref) {
+  throw UnimplementedError('Must be overridden in main.dart');
 });
 
 final storageInfoProvider =

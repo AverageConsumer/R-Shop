@@ -8,8 +8,22 @@ import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
+import 'database_service.dart';
 import 'image_cache_service.dart';
 
+
+class ThumbnailDiskUsage {
+  final int fileCount;
+  final int totalBytes;
+
+  const ThumbnailDiskUsage({required this.fileCount, required this.totalBytes});
+
+  String get formattedSize {
+    if (totalBytes < 1024) return '$totalBytes B';
+    if (totalBytes < 1024 * 1024) return '${(totalBytes / 1024).toStringAsFixed(1)} KB';
+    return '${(totalBytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
 
 class ThumbnailResult {
   final bool success;
@@ -164,7 +178,7 @@ class ThumbnailService {
       if (message is SendPort) {
         // Handshake: worker sends its SendPort
         _workerSendPort = message;
-        _workerReady!.complete();
+        if (!_workerReady!.isCompleted) _workerReady!.complete();
       } else if (message is _WorkerResponse) {
         final completer = _pending.remove(message.id);
         if (completer != null) {
@@ -211,6 +225,10 @@ class ThumbnailService {
       if (!_disposed) {
         debugPrint(
             'ThumbnailService: max respawn attempts ($_maxRespawnAttempts) reached, giving up');
+        // Allow recovery after cooldown period
+        Future.delayed(const Duration(minutes: 5), () {
+          if (!_disposed) _respawnAttempts = 0;
+        });
       }
       return;
     }
@@ -260,6 +278,12 @@ class ThumbnailService {
         if (_workerSendPort == null) return ThumbnailResult.failed;
       }
 
+      // Hard-cap to prevent unbounded growth if worker is slow/stuck
+      if (_pending.length >= 500) {
+        _inProgress.remove(coverUrl);
+        return ThumbnailResult.failed;
+      }
+
       final id = _nextRequestId++;
       final completer = Completer<ThumbnailResult>();
       _pending[id] = completer;
@@ -270,12 +294,63 @@ class ThumbnailService {
         outputPath: outputPath,
       ));
 
-      return await completer.future;
+      return await completer.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          _pending.remove(id);
+          debugPrint('Thumbnail generation timed out for $coverUrl');
+          return ThumbnailResult.failed;
+        },
+      );
     } catch (e) {
       debugPrint('Thumbnail generation failed for $coverUrl: $e');
       return ThumbnailResult.failed;
     } finally {
       _inProgress.remove(coverUrl);
+    }
+  }
+
+  static Future<ThumbnailDiskUsage> getDiskUsage() async {
+    if (_thumbDir == null || !_thumbDir!.existsSync()) {
+      return const ThumbnailDiskUsage(fileCount: 0, totalBytes: 0);
+    }
+    int count = 0;
+    int bytes = 0;
+    for (final entity in _thumbDir!.listSync()) {
+      if (entity is File) {
+        count++;
+        bytes += entity.lengthSync();
+      }
+    }
+    return ThumbnailDiskUsage(fileCount: count, totalBytes: bytes);
+  }
+
+  static Future<void> cleanOrphans(DatabaseService db) async {
+    if (_thumbDir == null || !_thumbDir!.existsSync()) return;
+    try {
+      final coverUrls = await db.getAllCoverUrls();
+      final validHashes = coverUrls
+          .map((url) => sha1.convert(utf8.encode(url)).toString())
+          .toSet();
+
+      int removed = 0;
+      for (final entity in _thumbDir!.listSync()) {
+        if (entity is File) {
+          final name = entity.uri.pathSegments.last;
+          final hash = name.endsWith('.jpg')
+              ? name.substring(0, name.length - 4)
+              : name;
+          if (!validHashes.contains(hash)) {
+            entity.deleteSync();
+            removed++;
+          }
+        }
+      }
+      if (removed > 0) {
+        debugPrint('ThumbnailService: cleaned $removed orphan thumbnails');
+      }
+    } catch (e) {
+      debugPrint('ThumbnailService: orphan cleanup failed: $e');
     }
   }
 

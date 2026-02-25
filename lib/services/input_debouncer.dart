@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 class InputDebouncer {
-  static const int _actionCooldownMs = 300;
+  static const int _actionCooldownMs = 150;
   static const int _maxHoldDurationMs = 10000;
 
   int _lastActionTime = 0;
@@ -31,13 +31,13 @@ class InputDebouncer {
     if (_isHolding) stopHold();
     _isHolding = true;
     _currentHoldAction = action;
-    _holdIntervalMs = 100;
+    _holdIntervalMs = 80;
     _holdCount = 0;
 
     action();
 
     _holdTimer?.cancel();
-    _holdTimer = Timer(const Duration(milliseconds: 400), _executeHold);
+    _holdTimer = Timer(const Duration(milliseconds: 250), _executeHold);
 
     // Safety timeout: auto-stop hold after max duration
     _holdTimeout?.cancel();
@@ -53,9 +53,9 @@ class InputDebouncer {
     _holdCount++;
 
     if (_holdCount > 8) {
-      _holdIntervalMs = 60;
+      _holdIntervalMs = 45;
     } else if (_holdCount > 4) {
-      _holdIntervalMs = 80;
+      _holdIntervalMs = 60;
     }
 
     _holdTimer?.cancel();

@@ -57,7 +57,7 @@ void main() {
         debouncer.startHold(() => count++);
         expect(count, 1);
 
-        fakeAsync.elapse(const Duration(milliseconds: 400));
+        fakeAsync.elapse(const Duration(milliseconds: 300));
         expect(count, 2);
 
         debouncer.dispose();

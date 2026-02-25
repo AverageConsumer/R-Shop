@@ -56,6 +56,7 @@ app.*.map.json
 /android/gradlew.bat
 /android/**/GeneratedPluginRegistrant.java
 /android/.cxx/
+android/app/.settings/
 
 # Signing
 *.jks

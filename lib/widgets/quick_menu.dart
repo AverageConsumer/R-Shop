@@ -23,7 +23,7 @@ class QuickMenuItem {
 }
 
 class QuickMenuOverlay extends ConsumerStatefulWidget {
-  final List<QuickMenuItem> items;
+  final List<QuickMenuItem?> items;
   final VoidCallback onClose;
 
   const QuickMenuOverlay({
@@ -82,9 +82,15 @@ class _QuickMenuOverlayState extends ConsumerState<QuickMenuOverlay>
     });
   }
 
+  List<int> get _selectableIndices => [
+        for (int i = 0; i < widget.items.length; i++)
+          if (widget.items[i] != null) i,
+      ];
+
   void _selectItem(int index) {
     if (index < 0 || index >= widget.items.length) return;
     final item = widget.items[index];
+    if (item == null) return;
     // Close first, then invoke action after overlay priority releases
     _animController.reverse().then((_) {
       if (!mounted) return;
@@ -123,17 +129,21 @@ class _QuickMenuOverlayState extends ConsumerState<QuickMenuOverlay>
       return KeyEventResult.handled;
     }
 
-    // Navigate: Up/Down
+    // Navigate: Up/Down (skip separators)
     if (key == LogicalKeyboardKey.arrowUp) {
-      if (_focusedIndex > 0) {
-        setState(() => _focusedIndex--);
+      final indices = _selectableIndices;
+      final pos = indices.indexOf(_focusedIndex);
+      if (pos > 0) {
+        setState(() => _focusedIndex = indices[pos - 1]);
         ref.read(feedbackServiceProvider).tick();
       }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      if (_focusedIndex < widget.items.length - 1) {
-        setState(() => _focusedIndex++);
+      final indices = _selectableIndices;
+      final pos = indices.indexOf(_focusedIndex);
+      if (pos >= 0 && pos < indices.length - 1) {
+        setState(() => _focusedIndex = indices[pos + 1]);
         ref.read(feedbackServiceProvider).tick();
       }
       return KeyEventResult.handled;
@@ -270,14 +280,26 @@ class _QuickMenuOverlayState extends ConsumerState<QuickMenuOverlay>
   List<Widget> _buildItems(Responsive rs) {
     final widgets = <Widget>[];
     for (int i = 0; i < widget.items.length; i++) {
-      if (i > 0) {
-        widgets.add(Container(
-          height: 1,
-          margin: EdgeInsets.symmetric(horizontal: rs.spacing.md),
-          color: Colors.white.withValues(alpha: 0.06),
+      final item = widget.items[i];
+      if (item == null) {
+        // Separator
+        widgets.add(Padding(
+          padding: EdgeInsets.symmetric(vertical: 4, horizontal: rs.spacing.md),
+          child: Container(
+            height: 1,
+            color: Colors.white.withValues(alpha: 0.12),
+          ),
         ));
+      } else {
+        if (i > 0 && widget.items[i - 1] != null) {
+          widgets.add(Container(
+            height: 1,
+            margin: EdgeInsets.symmetric(horizontal: rs.spacing.md),
+            color: Colors.white.withValues(alpha: 0.06),
+          ));
+        }
+        widgets.add(_buildItem(i, rs));
       }
-      widgets.add(_buildItem(i, rs));
     }
     return widgets;
   }
@@ -350,7 +372,7 @@ class _QuickMenuOverlayState extends ConsumerState<QuickMenuOverlay>
   }
 
   Widget _buildItem(int index, Responsive rs) {
-    final item = widget.items[index];
+    final item = widget.items[index]!;
     final isFocused = _focusedIndex == index;
     final hint = _swapHint(item.shortcutHint);
     final hintTint = _hintColor(item.shortcutHint);

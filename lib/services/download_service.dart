@@ -41,6 +41,9 @@ class DownloadProgress {
   String get displayText {
     switch (status) {
       case DownloadStatus.extracting:
+        if (progress > 0 && progress < 1.0) {
+          return 'Extracting ${(progress * 100).toStringAsFixed(0)}%';
+        }
         return 'Extracting...';
       case DownloadStatus.moving:
         return 'Moving...';
@@ -69,6 +72,7 @@ class DownloadProgress {
 
 class DownloadService {
   static const _zipChannel = MethodChannel('com.retro.rshop/zip');
+  static const _zipProgressChannel = EventChannel('com.retro.rshop/zip_progress');
 
   HttpClient? _httpClient;
   String? _tempFilePath;
@@ -76,6 +80,7 @@ class DownloadService {
   bool _isCancelled = false;
   bool _isDownloadInProgress = false;
   StreamSubscription? _downloadSubscription;
+  StreamSubscription? _zipProgressSubscription;
   StreamController<DownloadProgress>? _progressController;
   Future<void> Function()? _activeConnectionCleanup;
 
@@ -86,6 +91,29 @@ class DownloadService {
     _httpClient = HttpClient()
       ..connectionTimeout = const Duration(seconds: 30)
       ..idleTimeout = const Duration(minutes: 5);
+  }
+
+  /// Cleans up orphaned temp files from interrupted downloads.
+  /// Should be called once at app startup (fire-and-forget).
+  static Future<void> cleanOrphanedTempFiles() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final now = DateTime.now();
+      await for (final entity in tempDir.list()) {
+        if (entity is! File) continue;
+        final name = p.basename(entity.path);
+        // Only clean files matching our temp pattern (timestamp_hash_filename)
+        if (!RegExp(r'^\d+_\d+_').hasMatch(name)) continue;
+        final stat = await entity.stat();
+        // Only clean files older than 24h (not in-progress downloads)
+        if (now.difference(stat.modified) > const Duration(hours: 24)) {
+          await entity.delete();
+          debugPrint('DownloadService: cleaned orphaned temp file: $name');
+        }
+      }
+    } catch (e) {
+      debugPrint('DownloadService: temp cleanup failed: $e');
+    }
   }
 
   bool get isDownloadInProgress => _isDownloadInProgress;
@@ -105,6 +133,8 @@ class DownloadService {
     _isCancelled = true;
     _downloadSubscription?.cancel();
     _downloadSubscription = null;
+    _zipProgressSubscription?.cancel();
+    _zipProgressSubscription = null;
 
     // Close active SMB/FTP connections
     try {
@@ -570,7 +600,9 @@ class DownloadService {
         inactivityTimer = Timer(const Duration(seconds: 60), () {
           inactivityTimer = null;
           inactivityFired = true;
-          try { handle.disconnect?.call(); } catch (e) { debugPrint('DownloadService: FTP inactivity disconnect: $e'); }
+          try { handle.disconnect?.call().catchError((e) {
+            debugPrint('DownloadService: FTP inactivity disconnect error: $e');
+          }); } catch (e) { debugPrint('DownloadService: FTP inactivity disconnect: $e'); }
         });
       }
 
@@ -733,6 +765,20 @@ class DownloadService {
   }
 
   Future<void> _extractZipNative(File zipFile, String targetFolder) async {
+    _zipProgressSubscription = _zipProgressChannel
+        .receiveBroadcastStream()
+        .listen((event) {
+      if (event is Map && _progressController?.isClosed == false) {
+        final percent = event['percent'] as int? ?? 0;
+        _progressController?.add(DownloadProgress(
+          status: DownloadStatus.extracting,
+          progress: percent / 100.0,
+        ));
+      }
+    }, onError: (e) {
+      debugPrint('DownloadService: zip progress stream error: $e');
+    });
+
     try {
       await _zipChannel.invokeMethod<List<dynamic>>('extractZip', {
         'zipPath': zipFile.path,
@@ -740,6 +786,9 @@ class DownloadService {
       });
     } on PlatformException catch (e) {
       throw Exception('ZIP extraction failed: ${e.message}');
+    } finally {
+      await _zipProgressSubscription?.cancel();
+      _zipProgressSubscription = null;
     }
   }
 

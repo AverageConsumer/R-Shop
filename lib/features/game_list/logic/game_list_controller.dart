@@ -129,9 +129,13 @@ class GameListController extends ChangeNotifier {
     loadGames();
   }
 
-  Future<void> loadGames({bool forceRefresh = false}) async {
-    _state = _state.copyWith(isLoading: true, error: null);
-    notifyListeners();
+  Future<void> loadGames({bool forceRefresh = false, bool silent = false}) async {
+    if (silent) {
+      _state = _state.copyWith(error: null);
+    } else {
+      _state = _state.copyWith(isLoading: true, error: null);
+      notifyListeners();
+    }
 
     try {
       // Local-only systems always scan filesystem (it IS the source of truth)
@@ -286,7 +290,7 @@ class GameListController extends ChangeNotifier {
   }
 
   void filterGames(String query) {
-    _state = _state.copyWith(searchQuery: query.toLowerCase());
+    _state = _state.copyWith(searchQuery: GameMetadata.normalizeForSearch(query));
     _applyFilters();
   }
 
@@ -339,7 +343,7 @@ class GameListController extends ChangeNotifier {
     // 1. Search filter
     if (_state.searchQuery.isNotEmpty) {
       groups = groups
-          .where((name) => name.toLowerCase().contains(_state.searchQuery))
+          .where((name) => GameMetadata.normalizeForSearch(name).contains(_state.searchQuery))
           .toList();
     }
 
@@ -382,7 +386,7 @@ class GameListController extends ChangeNotifier {
     }
 
     if (filters.favoritesOnly) {
-      final isFavorite = _storage?.getFavorites().contains(game.displayName) ?? false;
+      final isFavorite = _storage?.getFavorites().contains(game.filename) ?? false;
       if (!isFavorite) return false;
     }
 

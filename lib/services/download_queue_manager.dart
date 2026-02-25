@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../models/config/app_config.dart';
@@ -136,6 +137,55 @@ class DownloadQueueManager extends ChangeNotifier {
       );
       _processQueue();
     });
+  }
+
+  Future<void> _switchToAlternativeSource(String id) async {
+    final item = _state.getDownloadById(id);
+    if (item == null) return;
+
+    final alts = item.game.alternativeSources;
+    if (alts.isEmpty) return;
+
+    final next = alts.first;
+    final remaining = alts.skip(1).toList();
+
+    // Delete temp file from failed source
+    if (item.tempFilePath != null) {
+      try {
+        await File(item.tempFilePath!).delete();
+      } catch (e) {
+        debugPrint('DownloadQueue: temp file cleanup failed: $e');
+      }
+      _updateItem(id, clearTempFilePath: true);
+    }
+
+    final updatedGame = item.game.copyWith(
+      url: next.url,
+      providerConfig: next.providerConfig,
+      alternativeSources: remaining,
+    );
+
+    _updateItem(
+      id,
+      status: DownloadItemStatus.queued,
+      progress: 0,
+      receivedBytes: 0,
+      retryCount: 0,
+      clearError: true,
+      clearSpeed: true,
+    );
+
+    // Replace the game on the item
+    final newQueue = _state.queue.map((i) {
+      if (i.id == id) return i.copyWith(game: updatedGame);
+      return i;
+    }).toList();
+    _state = _state.copyWith(queue: newQueue);
+    _safeNotify();
+
+    debugPrint('DownloadQueue: switched to alternative source '
+        '${next.providerConfig.detailLabel} for ${item.game.filename}');
+    _processQueue();
   }
 
   String addToQueue(GameItem game, SystemModel system, String targetFolder) {
@@ -345,6 +395,12 @@ class DownloadQueueManager extends ChangeNotifier {
 
         final currentItem = _state.getDownloadById(item.id);
         if (currentItem != null &&
+            currentItem.game.alternativeSources.isNotEmpty &&
+            _isRetryableError(errorMsg)) {
+          _switchToAlternativeSource(item.id);
+          return;
+        }
+        if (currentItem != null &&
             currentItem.retryCount < _maxRetries &&
             _isRetryableError(errorMsg)) {
           _scheduleRetry(item.id, currentItem.retryCount);
@@ -469,7 +525,15 @@ class DownloadQueueManager extends ChangeNotifier {
 
   // --- Queue Persistence ---
 
+  bool _isPersisting = false;
+  bool _persistAgain = false;
+
   void _persistQueue() {
+    if (_isPersisting) {
+      _persistAgain = true;
+      return;
+    }
+    _isPersisting = true;
     try {
       final persistable = _state.queue
           .where((item) =>
@@ -484,6 +548,12 @@ class DownloadQueueManager extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('DownloadQueue: failed to persist queue: $e');
+    } finally {
+      _isPersisting = false;
+      if (_persistAgain) {
+        _persistAgain = false;
+        _persistQueue();
+      }
     }
   }
 

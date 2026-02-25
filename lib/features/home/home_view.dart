@@ -39,6 +39,7 @@ class _HomeViewState extends ConsumerState<HomeView>
   int _lastStablePage = _initialPage;
   bool _showExitDialog = false;
   bool _wasGrid = false;
+  ProviderSubscription? _visibleSystemsSub;
 
   final ScrollController _gridScrollController = ScrollController();
   final Map<int, GlobalKey> _gridItemKeys = {};
@@ -131,6 +132,30 @@ class _HomeViewState extends ConsumerState<HomeView>
       // Trigger background library sync
       _triggerLibrarySync();
     });
+    _visibleSystemsSub = ref.listenManual(visibleSystemsProvider, (prev, next) {
+      if (next case AsyncData<List<SystemModel>>(value: final filtered)) {
+        final oldIds = _configuredSystems.map((s) => s.id).toList();
+        final newIds = filtered.map((s) => s.id).toList();
+        final changed = oldIds.length != newIds.length ||
+            !oldIds.every((id) => newIds.contains(id));
+        if (!changed) return;
+        if (filtered.isEmpty) {
+          setState(() => _configuredSystems = []);
+          _gridItemKeys.clear();
+          return;
+        }
+        setState(() {
+          _configuredSystems = filtered;
+          _currentIndex = _lastStablePage % (filtered.length + 1);
+        });
+        _updateGridItemKeys();
+        if (ref.read(homeLayoutProvider)) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _scrollToSelected();
+          });
+        }
+      }
+    }, fireImmediately: true);
   }
 
   Future<void> _triggerLibrarySync() async {
@@ -143,6 +168,7 @@ class _HomeViewState extends ConsumerState<HomeView>
 
   @override
   void dispose() {
+    _visibleSystemsSub?.close();
     _debouncer.stopHold();
     _gridScrollController.dispose();
     _pageController.removeListener(_onPageScroll);
@@ -275,6 +301,7 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   void _updateGridItemKeys() {
+    if (_gridItemKeys.length == _totalItemCount) return;
     _gridItemKeys.clear();
     for (int i = 0; i < _totalItemCount; i++) {
       _gridItemKeys[i] = GlobalKey();
@@ -384,8 +411,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     setState(() => _showExitDialog = false);
   }
 
-  List<QuickMenuItem> _buildQuickMenuItems() {
-    final isGrid = ref.read(homeLayoutProvider);
+  List<QuickMenuItem?> _buildQuickMenuItems() {
     final hasDownloads = ref.read(hasQueueItemsProvider);
     return [
       QuickMenuItem(
@@ -400,21 +426,8 @@ class _HomeViewState extends ConsumerState<HomeView>
         shortcutHint: 'X',
         onSelect: _openSettings,
       ),
-      if (isGrid) ...[
-        QuickMenuItem(
-          label: 'Zoom In',
-          icon: Icons.zoom_in_rounded,
-          shortcutHint: 'R',
-          onSelect: _zoomIn,
-        ),
-        QuickMenuItem(
-          label: 'Zoom Out',
-          icon: Icons.zoom_out_rounded,
-          shortcutHint: 'L',
-          onSelect: _zoomOut,
-        ),
-      ],
-      if (hasDownloads)
+      if (hasDownloads) ...[
+        null,
         QuickMenuItem(
           label: 'Downloads',
           icon: Icons.download_rounded,
@@ -422,6 +435,7 @@ class _HomeViewState extends ConsumerState<HomeView>
           onSelect: () => toggleDownloadOverlay(ref),
           highlight: true,
         ),
+      ],
     ];
   }
 
@@ -440,38 +454,8 @@ class _HomeViewState extends ConsumerState<HomeView>
   Widget build(BuildContext context) {
     final rs = context.rs;
 
-    // Filter systems: hides local-only consoles with no content
+    // Filter systems: kept in sync via _visibleSystemsSub listener
     final visibleAsync = ref.watch(visibleSystemsProvider);
-    visibleAsync.whenData((filtered) {
-      final oldIds = _configuredSystems.map((s) => s.id).toList();
-      final newIds = filtered.map((s) => s.id).toList();
-      final changed = oldIds.length != newIds.length ||
-          !oldIds.every((id) => newIds.contains(id));
-      if (!changed) return;
-      if (filtered.isEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            setState(() => _configuredSystems = []);
-            _gridItemKeys.clear();
-          }
-        });
-        return;
-      }
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {
-            _configuredSystems = filtered;
-            _currentIndex = _lastStablePage % (filtered.length + 1);
-          });
-          _updateGridItemKeys();
-          if (ref.read(homeLayoutProvider)) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) _scrollToSelected();
-            });
-          }
-        }
-      });
-    });
 
     // Still loading → black screen, don't flash "No consoles" prematurely
     if (_configuredSystems.isEmpty && visibleAsync.isLoading) {
@@ -798,7 +782,7 @@ class _HomeViewState extends ConsumerState<HomeView>
                 curve: Curves.easeOut,
               );
               Future.delayed(const Duration(milliseconds: 250), () {
-                _navigateToCurrentSystem();
+                if (mounted) _navigateToCurrentSystem();
               });
             }
 
