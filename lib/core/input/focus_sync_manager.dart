@@ -189,12 +189,13 @@ class FocusSyncManager {
   }
 
   void scrollToSelected(GlobalKey? itemKey, {bool instant = false}) {
-    if (itemKey?.currentContext == null) return;
+    final context = itemKey?.currentContext;
+    if (context == null) return;
 
     _isProgrammaticScroll = true;
     _isScrolling = true;
     Scrollable.ensureVisible(
-      itemKey!.currentContext!,
+      context,
       alignment: 0.5,
       duration: instant ? Duration.zero : const Duration(milliseconds: 200),
       curve: Curves.easeOut,

@@ -30,4 +30,13 @@ class AppConfig {
       'systems': systems.map((s) => s.toJson()).toList(),
     };
   }
+
+  /// Like [toJson] but strips all auth credentials (passwords, API keys).
+  /// Used for config export to prevent accidental credential sharing.
+  Map<String, dynamic> toJsonWithoutAuth() {
+    return {
+      'version': version,
+      'systems': systems.map((s) => s.toJsonWithoutAuth()).toList(),
+    };
+  }
 }

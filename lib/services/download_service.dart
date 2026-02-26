@@ -313,8 +313,7 @@ class DownloadService {
       existingBytes = await tempFile.length();
     }
 
-    final encodedUrl = _encodeUrl(handle.url);
-    final uri = Uri.parse(encodedUrl);
+    final uri = Uri.parse(handle.url);
     final request = await client.openUrl('GET', uri);
 
     request.headers.set('User-Agent',
@@ -901,13 +900,4 @@ class DownloadService {
     _httpClient = null;
   }
 
-  String _encodeUrl(String url) {
-    try {
-      final uri = Uri.parse(url);
-      return uri.replace(pathSegments: uri.pathSegments).toString();
-    } catch (e) {
-      debugPrint('DownloadService: URL encode failed for "$url": $e');
-      return url;
-    }
-  }
 }

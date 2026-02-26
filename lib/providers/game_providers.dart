@@ -10,15 +10,15 @@ import '../models/config/system_config.dart';
 import '../models/game_item.dart';
 import '../models/system_model.dart';
 import '../services/config_parser.dart';
-import '../services/config_storage_service.dart';
 import '../services/unified_game_service.dart';
+import 'app_providers.dart';
 
 /// Whether the config was recovered from a backup (corrupt primary).
 final configRecoveredProvider = StateProvider<bool>((ref) => false);
 
 /// Provides the active AppConfig from the persisted config file.
 final bootstrappedConfigProvider = FutureProvider<AppConfig>((ref) async {
-  final storage = ConfigStorageService();
+  final storage = ref.read(configStorageServiceProvider);
   final result = await storage.loadConfigWithRecoveryInfo();
   if (result.wasRecovered) {
     ref.read(configRecoveredProvider.notifier).state = true;
@@ -91,7 +91,7 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
           }
         }
       } catch (e) {
-        // Ignore permission or access errors when scanning directory
+        debugPrint('visibleSystemsProvider: error scanning ${dir.path}: $e');
       }
       
       if (hasRoms) {
@@ -129,7 +129,7 @@ Future<({bool cancelled, String? error, AppConfig? config})> importConfigFile(Wi
     final config = ConfigParser.parse(content);
 
     // Persist
-    await ConfigStorageService().saveConfig(content);
+    await ref.read(configStorageServiceProvider).saveConfig(content);
 
     // Reload
     ref.invalidate(bootstrappedConfigProvider);

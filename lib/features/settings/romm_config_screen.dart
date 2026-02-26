@@ -12,10 +12,10 @@ import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
-import '../../services/config_storage_service.dart';
 import '../../services/romm_api_service.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
+import '../onboarding/widgets/provider_form.dart' show isPrivateNetworkUrl;
 import 'widgets/settings_item.dart';
 
 enum _ConsoleStatus { synced, stale, independent }
@@ -221,7 +221,7 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
   Future<void> _persistConfig(AppConfig config) async {
     final jsonString =
         const JsonEncoder.withIndent('  ').convert(config.toJson());
-    await ConfigStorageService().saveConfig(jsonString);
+    await ref.read(configStorageServiceProvider).saveConfig(jsonString);
     ref.invalidate(bootstrappedConfigProvider);
   }
 
@@ -297,6 +297,21 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
   Future<void> _save() async {
     final storage = ref.read(storageServiceProvider);
     final url = _urlController.text.trim();
+
+    // Block non-LAN HTTP when the setting is off
+    if (url.startsWith('http://') &&
+        !isPrivateNetworkUrl(url) &&
+        !storage.getAllowNonLanHttp()) {
+      if (mounted) {
+        showConsoleNotification(
+          context,
+          message: 'HTTP to non-local servers is blocked. '
+              'Enable in Settings → System.',
+          isError: true,
+        );
+      }
+      return;
+    }
 
     if (url.isEmpty) {
       await storage.setRommUrl(null);

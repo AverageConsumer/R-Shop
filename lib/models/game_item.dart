@@ -68,6 +68,42 @@ class GameItem {
         if (hasThumbnail) 'hasThumbnail': hasThumbnail,
       };
 
+  /// Re-injects auth credentials from system providers into games loaded
+  /// from DB (which strips auth for security). Matches by provider type
+  /// and connection details.
+  static List<GameItem> rehydrateAuth(
+    List<GameItem> games,
+    List<ProviderConfig> providers,
+  ) {
+    if (providers.isEmpty) return games;
+    return games.map((game) {
+      final pc = game.providerConfig;
+      if (pc == null || pc.auth != null) return game;
+      final match = _findMatchingProvider(pc, providers);
+      if (match?.auth == null) return game;
+      return game.copyWith(providerConfig: pc.copyWith(auth: match!.auth));
+    }).toList();
+  }
+
+  static ProviderConfig? _findMatchingProvider(
+    ProviderConfig target,
+    List<ProviderConfig> providers,
+  ) {
+    for (final p in providers) {
+      if (p.type != target.type) continue;
+      switch (target.type) {
+        case ProviderType.web:
+        case ProviderType.romm:
+          if (p.url == target.url) return p;
+        case ProviderType.smb:
+          if (p.host == target.host && p.share == target.share) return p;
+        case ProviderType.ftp:
+          if (p.host == target.host) return p;
+      }
+    }
+    return null;
+  }
+
   static String cleanDisplayName(String filename) {
     return GameMetadata.cleanTitle(filename);
   }

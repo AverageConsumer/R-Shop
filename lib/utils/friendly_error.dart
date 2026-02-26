@@ -17,7 +17,7 @@ String getUserFriendlyError(dynamic e) {
     return 'File not found (404) - Server does not have this file.';
   }
   if (errorString.contains('status 403')) {
-    return 'Access denied (403) - Rate limit reached? Wait a moment.';
+    return 'Access denied (403) - Check your permissions.';
   }
   if (errorString.contains('status 503')) {
     return 'Server overloaded (503) - Try again in a few minutes.';

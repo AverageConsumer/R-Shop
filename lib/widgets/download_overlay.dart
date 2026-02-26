@@ -8,6 +8,7 @@ import '../core/responsive/responsive.dart';
 import '../models/download_item.dart';
 import '../providers/app_providers.dart';
 import '../providers/download_providers.dart';
+import '../services/download_queue_manager.dart';
 import '../services/input_debouncer.dart';
 import '../widgets/console_hud.dart';
 import 'download/download_item_card.dart';
@@ -29,15 +30,16 @@ class DownloadOverlay extends ConsumerStatefulWidget {
 }
 
 class _DownloadOverlayState extends ConsumerState<DownloadOverlay> {
-  @override
-  Widget build(BuildContext context) {
-    final isExpanded = ref.watch(downloadOverlayExpandedProvider);
-    final queueState = ref.watch(downloadQueueManagerProvider).state;
+  ProviderSubscription<DownloadQueueManager>? _queueSubscription;
 
+  @override
+  void initState() {
+    super.initState();
     // Auto-close modal when queue becomes empty while expanded
-    if (queueState.isEmpty && isExpanded) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
+    _queueSubscription = ref.listenManual(downloadQueueManagerProvider, (prev, next) {
+      if (!mounted) return;
+      final isExpanded = ref.read(downloadOverlayExpandedProvider);
+      if (next.state.isEmpty && isExpanded) {
         ref.read(downloadOverlayExpandedProvider.notifier).state = false;
         final priority = ref.read(overlayPriorityProvider);
         if (priority == OverlayPriority.downloadModal) {
@@ -45,9 +47,20 @@ class _DownloadOverlayState extends ConsumerState<DownloadOverlay> {
               .releaseByPriority(OverlayPriority.downloadModal);
         }
         restoreMainFocus(ref);
-      });
-      return const SizedBox.shrink();
-    }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _queueSubscription?.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isExpanded = ref.watch(downloadOverlayExpandedProvider);
+    final queueState = ref.watch(downloadQueueManagerProvider).state;
 
     if (queueState.isEmpty) {
       return const SizedBox.shrink();

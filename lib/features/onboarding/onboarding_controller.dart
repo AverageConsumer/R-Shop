@@ -8,6 +8,7 @@ import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
 import '../../models/config/system_config.dart';
 import '../../models/system_model.dart';
+import '../../providers/app_providers.dart';
 import '../../services/config_storage_service.dart';
 import '../../services/local_folder_matcher.dart';
 import '../../services/provider_factory.dart';
@@ -19,7 +20,9 @@ import 'onboarding_state.dart';
 export 'onboarding_state.dart';
 
 class OnboardingController extends StateNotifier<OnboardingState> {
-  OnboardingController() : super(const OnboardingState());
+  final ConfigStorageService _configStorage;
+
+  OnboardingController(this._configStorage) : super(const OnboardingState());
 
   /// Pre-initializes the controller from an existing config (for config mode).
   void loadFromConfig(AppConfig config) {
@@ -43,9 +46,13 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       if (rs != null && rs.subStep == RommSetupSubStep.select) {
         // select → folder
         state = state.copyWith(
-          rommSetupState: rs.copyWith(subStep: RommSetupSubStep.folder),
+          rommSetupState: rs.copyWith(
+            subStep: RommSetupSubStep.folder,
+            isAutoDetecting: true,
+          ),
           canProceed: true,
         );
+        _autoDetectRommRomFolder();
         return;
       }
       // folder → skip localSetup, go directly to consoleSetup
@@ -115,7 +122,8 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     final rommSetup = state.rommSetupState;
     if (rommSetup == null ||
         (rommSetup.selectedSystemIds.isEmpty &&
-            rommSetup.localOnlySystemIds.isEmpty)) {
+            rommSetup.localOnlySystemIds.isEmpty &&
+            rommSetup.scannedFolders == null)) {
       return;
     }
 
@@ -194,6 +202,30 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         autoExtract: system.isZipped,
         mergeMode: false,
       );
+    }
+
+    // Pre-save scanned+matched but not explicitly enabled consoles (path only)
+    final scannedFolders = rommSetup.scannedFolders;
+    if (scannedFolders != null) {
+      for (final folder in scannedFolders) {
+        final systemId = folder.autoMatchedSystemId;
+        if (systemId == null) continue;
+        if (updated.containsKey(systemId)) continue;
+
+        final system = SystemModel.supportedSystems
+            .where((s) => s.id == systemId)
+            .firstOrNull;
+        if (system == null) continue;
+
+        updated[systemId] = SystemConfig(
+          id: systemId,
+          name: system.name,
+          targetFolder: '$basePath/${folder.name}',
+          providers: const [],
+          autoExtract: system.isZipped,
+          mergeMode: false,
+        );
+      }
     }
 
     state = state.copyWith(configuredSystems: updated);
@@ -621,7 +653,12 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         );
       case RommSetupSubStep.folder:
         state = state.copyWith(
-          rommSetupState: rs.copyWith(subStep: RommSetupSubStep.select),
+          rommSetupState: rs.copyWith(
+            subStep: RommSetupSubStep.select,
+            clearDetectedPath: true,
+            clearScannedFolders: true,
+            isAutoDetecting: false,
+          ),
         );
     }
   }
@@ -770,6 +807,19 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     if (path == null) return;
     if (!mounted) return;
 
+    _scanRommFolder(path);
+  }
+
+  void scanDetectedRommFolder() {
+    final rs = state.rommSetupState;
+    if (rs?.detectedPath == null) return;
+    _scanRommFolder(rs!.detectedPath!);
+  }
+
+  Future<void> _scanRommFolder(String path) async {
+    final rs = state.rommSetupState;
+    if (rs == null) return;
+
     state = state.copyWith(
       rommSetupState: rs.copyWith(
         romBasePath: path,
@@ -852,6 +902,18 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     );
   }
 
+  void unassignFolder(String folderName) {
+    final rs = state.rommSetupState;
+    if (rs == null) return;
+
+    final updated = Map<String, String>.from(rs.folderAssignments);
+    updated.removeWhere((_, v) => v == folderName);
+
+    state = state.copyWith(
+      rommSetupState: rs.copyWith(folderAssignments: updated),
+    );
+  }
+
   void rommFolderConfirm() {
     nextStep();
   }
@@ -887,6 +949,38 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         clearDetectedPath: found == null,
       ),
       canProceed: true,
+    );
+  }
+
+  Future<void> _autoDetectRommRomFolder() async {
+    final rs = state.rommSetupState;
+    if (rs == null) return;
+
+    const knownPaths = [
+      '/storage/emulated/0/ROMs',
+      '/storage/emulated/0/Roms',
+      '/storage/emulated/0/roms',
+    ];
+
+    String? found;
+    for (final path in knownPaths) {
+      if (await Directory(path).exists()) {
+        found = path;
+        break;
+      }
+    }
+
+    if (!mounted) return;
+    // Guard against step/sub-step change during async gap
+    if (state.currentStep != OnboardingStep.rommSetup) return;
+    if (state.rommSetupState?.subStep != RommSetupSubStep.folder) return;
+
+    state = state.copyWith(
+      rommSetupState: state.rommSetupState?.copyWith(
+        detectedPath: found,
+        isAutoDetecting: false,
+        clearDetectedPath: found == null,
+      ),
     );
   }
 
@@ -1151,7 +1245,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
 
   void _autoConfigureLocalSystems() {
     final ls = state.localSetupState;
-    if (ls == null || ls.enabledSystemIds.isEmpty) return;
+    if (ls == null) return;
 
     final basePath = ls.romBasePath ?? _defaultRomBasePath;
     final updated = Map<String, SystemConfig>.from(state.configuredSystems);
@@ -1194,6 +1288,30 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         autoExtract: system.isZipped,
         mergeMode: false,
       );
+    }
+
+    // Pre-save scanned+matched but not explicitly enabled consoles (path only)
+    final scannedFolders = ls.scannedFolders;
+    if (scannedFolders != null) {
+      for (final folder in scannedFolders) {
+        final systemId = folder.autoMatchedSystemId;
+        if (systemId == null) continue;
+        if (updated.containsKey(systemId)) continue;
+
+        final system = SystemModel.supportedSystems
+            .where((s) => s.id == systemId)
+            .firstOrNull;
+        if (system == null) continue;
+
+        updated[systemId] = SystemConfig(
+          id: systemId,
+          name: system.name,
+          targetFolder: '$basePath/${folder.name}',
+          providers: const [],
+          autoExtract: system.isZipped,
+          mergeMode: false,
+        );
+      }
     }
 
     state = state.copyWith(configuredSystems: updated);
@@ -1352,11 +1470,11 @@ class OnboardingController extends StateNotifier<OnboardingState> {
 
   Future<void> exportConfig() async {
     final config = buildFinalConfig();
-    await ConfigStorageService().exportConfig(config);
+    await _configStorage.exportConfig(config);
   }
 }
 
 final onboardingControllerProvider =
     StateNotifierProvider<OnboardingController, OnboardingState>((ref) {
-  return OnboardingController();
+  return OnboardingController(ref.read(configStorageServiceProvider));
 });

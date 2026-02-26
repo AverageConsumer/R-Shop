@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:retro_eshop/providers/app_providers.dart';
@@ -15,6 +16,7 @@ Future<StorageService> _createMockStorage({
   SharedPreferences.setMockInitialValues({
     'controller_layout': layout.name,
   });
+  FlutterSecureStorage.setMockInitialValues({});
   final storage = StorageService();
   await storage.init();
   return storage;

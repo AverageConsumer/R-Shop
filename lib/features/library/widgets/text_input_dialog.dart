@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 class TextInputDialog extends StatefulWidget {
   final String title;
   final String? hintText;
-  final TextEditingController controller;
+  final String initialValue;
   final ValueChanged<String> onSubmit;
 
   const TextInputDialog({
     super.key,
     required this.title,
     this.hintText,
-    required this.controller,
+    this.initialValue = '',
     required this.onSubmit,
   });
 
@@ -19,11 +19,13 @@ class TextInputDialog extends StatefulWidget {
 }
 
 class _TextInputDialogState extends State<TextInputDialog> {
+  late final TextEditingController _controller;
   final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
@@ -31,6 +33,7 @@ class _TextInputDialogState extends State<TextInputDialog> {
 
   @override
   void dispose() {
+    _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
@@ -56,7 +59,7 @@ class _TextInputDialogState extends State<TextInputDialog> {
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: widget.controller,
+              controller: _controller,
               focusNode: _focusNode,
               autofocus: true,
               style: const TextStyle(color: Colors.white),
@@ -93,7 +96,7 @@ class _TextInputDialogState extends State<TextInputDialog> {
                 ),
                 const SizedBox(width: 8),
                 TextButton(
-                  onPressed: () => widget.onSubmit(widget.controller.text),
+                  onPressed: () => widget.onSubmit(_controller.text),
                   child: const Text(
                     'OK',
                     style: TextStyle(color: Colors.cyanAccent),

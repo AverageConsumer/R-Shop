@@ -82,10 +82,16 @@ void main() {
       expect(result, 'snes');
     });
 
-    test('alias: mame → arcade', () {
+    test('alias: megacd → segacd', () {
       final result =
-          LocalFolderMatcher.matchFolder('mame', _allSystems, const []);
-      expect(result, 'arcade');
+          LocalFolderMatcher.matchFolder('megacd', _allSystems, const []);
+      expect(result, 'segacd');
+    });
+
+    test('alias: 2600 → atari2600', () {
+      final result =
+          LocalFolderMatcher.matchFolder('2600', _allSystems, const []);
+      expect(result, 'atari2600');
     });
 
     test('alias: 3ds → n3ds', () {
@@ -98,6 +104,30 @@ void main() {
       final result =
           LocalFolderMatcher.matchFolder('GameCube', _allSystems, const []);
       expect(result, 'gc');
+    });
+
+    test('alias: DS → nds', () {
+      final result =
+          LocalFolderMatcher.matchFolder('DS', _allSystems, const []);
+      expect(result, 'nds');
+    });
+
+    test('normalized id: Wii_U → wiiu', () {
+      final result =
+          LocalFolderMatcher.matchFolder('Wii_U', _allSystems, const []);
+      expect(result, 'wiiu');
+    });
+
+    test('normalized id: PS_Vita → psvita', () {
+      final result =
+          LocalFolderMatcher.matchFolder('PS_Vita', _allSystems, const []);
+      expect(result, 'psvita');
+    });
+
+    test('normalized id: PICO-8 → pico8', () {
+      final result =
+          LocalFolderMatcher.matchFolder('PICO-8', _allSystems, const []);
+      expect(result, 'pico8');
     });
 
     test('alias: sms → mastersystem', () {

@@ -151,8 +151,10 @@ class GameListController extends ChangeNotifier {
 
       // Cache-first: show cached games immediately if available
       if (!forceRefresh && await _databaseService.hasCache(system.id)) {
-        final cached = await _databaseService.getGames(system.id);
+        var cached = await _databaseService.getGames(system.id);
         if (cached.isNotEmpty) {
+          // DB strips auth for security — rehydrate from config
+          cached = GameItem.rehydrateAuth(cached, systemConfig.providers);
           _state = _state.copyWith(allGames: cached, isLocalOnly: false);
           _groupGames();
           _restoreFilters();

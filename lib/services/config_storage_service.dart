@@ -32,6 +32,7 @@ class _AsyncLock {
 class ConfigStorageService {
   static const _fileName = 'config.json';
   static const _backupFileName = 'config.json.bak';
+  static const _maxConfigSizeBytes = 5 * 1024 * 1024; // 5 MB
 
   final _saveLock = _AsyncLock();
   final Future<Directory> Function() _directoryProvider;
@@ -102,6 +103,11 @@ class ConfigStorageService {
       if (!await file.exists()) {
         return (config: null, wasRecovered: false);
       }
+      final stat = await file.stat();
+      if (stat.size > _maxConfigSizeBytes) {
+        throw ConfigParseException(
+            'Config file too large (${stat.size} bytes)');
+      }
       final content = await file.readAsString();
       final config = ConfigParser.parse(content);
       return (config: config, wasRecovered: false);
@@ -118,6 +124,11 @@ class ConfigStorageService {
       if (!await backup.exists()) {
         debugPrint('ConfigStorage: no backup file found');
         return (config: null, wasRecovered: false);
+      }
+      final stat = await backup.stat();
+      if (stat.size > _maxConfigSizeBytes) {
+        throw ConfigParseException(
+            'Backup config file too large (${stat.size} bytes)');
       }
       final content = await backup.readAsString();
       final config = ConfigParser.parse(content);
@@ -170,9 +181,10 @@ class ConfigStorageService {
   }
 
   /// Exports the config as a formatted JSON file via the system share sheet.
+  /// Auth credentials are stripped to prevent accidental sharing.
   Future<void> exportConfig(AppConfig config) async {
     final jsonString =
-        const JsonEncoder.withIndent('  ').convert(config.toJson());
+        const JsonEncoder.withIndent('  ').convert(config.toJsonWithoutAuth());
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/r_shop_config.json');
     await file.writeAsString(jsonString);

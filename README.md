@@ -22,7 +22,7 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.9.9_Beta-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
   <img src="https://img.shields.io/badge/platform-Android-brightgreen?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/github/stars/averageconsumer/R-Shop?style=flat-square&color=yellow" alt="Stars" />
@@ -66,21 +66,21 @@ It bridges the gap between your self-hosted storage (**RomM, SMB, FTP, Web**) an
 
 ---
 
-## 🗂️ Supported Systems (27 systems · 200+ file formats)
+## 🗂️ Supported Systems (29 systems · 200+ file formats)
 
-| Nintendo | Sony | SEGA | Other |
-|----------|------|------|-------|
-| NES, SNES, N64 | PlayStation (1-4) | Master System | Neo Geo Pocket Color |
-| GameCube, Wii, Wii U | PSP, PS Vita | Mega Drive | Arcade (MAME) |
-| Switch | | Saturn, Dreamcast | Xbox & Xbox 360 |
-| GB, GBC, GBA, DS, 3DS | | | |
+| Nintendo | Sony | SEGA | Atari | Other |
+|----------|------|------|-------|-------|
+| NES, SNES, N64 | PlayStation | Master System | 2600 | PICO-8 |
+| GameCube, Wii, Wii U | PlayStation 2, PS3 | Mega Drive, Game Gear | 5200, 7800 | |
+| Switch | PSP, PS Vita | Sega CD, 32X | Lynx | |
+| GB, GBC, GBA, DS, 3DS | | Saturn, Dreamcast | | |
 
 ---
 
 ## 📲 Installation
 
 ### 🚀 The Best Way: Obtainium
-Keep R-Shop updated automatically and never miss a Beta release. Click the button below on your Android device to add R-Shop directly to Obtainium:
+Keep R-Shop updated automatically and never miss a release. Click the button below on your Android device to add R-Shop directly to Obtainium:
 
 [![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/averageconsumer/r-shop)
 

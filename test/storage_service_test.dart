@@ -1,3 +1,4 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:retro_eshop/services/storage_service.dart';
@@ -10,6 +11,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
     service = StorageService();
     await service.init();
   });
@@ -138,6 +140,7 @@ void main() {
     test('migration: old xbox_layout bool → ControllerLayout.xbox', () async {
       // Simulate old storage with only the legacy bool key
       SharedPreferences.setMockInitialValues({'xbox_layout': true});
+      FlutterSecureStorage.setMockInitialValues({});
       final migrationService = StorageService();
       await migrationService.init();
       expect(migrationService.getControllerLayout(), ControllerLayout.xbox);
@@ -145,6 +148,7 @@ void main() {
 
     test('migration: old xbox_layout false → nintendo', () async {
       SharedPreferences.setMockInitialValues({'xbox_layout': false});
+      FlutterSecureStorage.setMockInitialValues({});
       final migrationService = StorageService();
       await migrationService.init();
       expect(
@@ -187,6 +191,36 @@ void main() {
       await service.setRommUrl('https://romm.example.com');
       await service.setRommUrl('');
       expect(service.getRommUrl(), isNull);
+    });
+
+    test('setRommAuth + getRommAuth round-trip', () async {
+      await service.setRommAuth('{"user":"admin","pass":"secret"}');
+      expect(service.getRommAuth(), '{"user":"admin","pass":"secret"}');
+      await service.setRommAuth(null);
+      expect(service.getRommAuth(), isNull);
+    });
+
+    test('migrates auth from SharedPreferences to SecureStorage', () async {
+      // Simulate old storage with RomM auth in plain SharedPreferences
+      SharedPreferences.setMockInitialValues({
+        'romm_url': 'https://romm.example.com',
+        'romm_auth': '{"user":"admin"}',
+      });
+      FlutterSecureStorage.setMockInitialValues({});
+      final migrationService = StorageService();
+      await migrationService.init();
+
+      // Auth should be accessible via the service
+      expect(migrationService.getRommUrl(), 'https://romm.example.com');
+      expect(migrationService.getRommAuth(), '{"user":"admin"}');
+
+      // Old SharedPreferences keys should be removed
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('romm_url'), isNull);
+      expect(prefs.getString('romm_auth'), isNull);
+
+      // Migration flag should be set
+      expect(prefs.getBool('secure_auth_migrated'), isTrue);
     });
   });
 

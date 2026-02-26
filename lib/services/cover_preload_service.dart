@@ -88,7 +88,7 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
     await _processPool(
       items: phase1,
       poolSize: phase1Pool,
-      processItem: (row) => _processWithCoverUrl(
+      processItem: (row) => processWithCoverUrl(
         db: db,
         filename: row['filename'] as String,
         coverUrl: row['cover_url'] as String,
@@ -100,7 +100,7 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
       await _processPool(
         items: phase2,
         poolSize: phase2Pool,
-        processItem: (row) => _processWithoutCoverUrl(
+        processItem: (row) => processWithoutCoverUrl(
           db: db,
           filename: row['filename'] as String,
           systemSlug: row['systemSlug'] as String,
@@ -134,11 +134,14 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
       }
     }
 
+    if (items.isEmpty) return;
     final workerCount = poolSize.clamp(1, items.length);
     await Future.wait(List.generate(workerCount, (_) => worker()));
   }
 
-  Future<bool> _processWithCoverUrl({
+  @protected
+  @visibleForTesting
+  Future<bool> processWithCoverUrl({
     required DatabaseService db,
     required String filename,
     required String coverUrl,
@@ -155,9 +158,13 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
       }
 
       // Fire-and-forget: thumbnail generation runs async in worker isolate
-      ThumbnailService.generateThumbnail(coverUrl).then((result) {
+      ThumbnailService.generateThumbnail(coverUrl).then((result) async {
         if (result.success) {
-          db.updateGameThumbnailData(filename, hasThumbnail: true);
+          try {
+            await db.updateGameThumbnailData(filename, hasThumbnail: true);
+          } catch (e) {
+            debugPrint('DB thumbnail update failed for $filename: $e');
+          }
         }
       }).catchError((e) {
         debugPrint('Thumbnail generation failed for $filename: $e');
@@ -169,7 +176,9 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
     }
   }
 
-  Future<bool> _processWithoutCoverUrl({
+  @protected
+  @visibleForTesting
+  Future<bool> processWithoutCoverUrl({
     required DatabaseService db,
     required String filename,
     required String systemSlug,

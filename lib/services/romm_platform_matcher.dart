@@ -19,7 +19,6 @@ class RommPlatformMatcher {
     'psx': 7,
     'ps2': 8,
     'ps3': 9,
-    'ps4': 48,
     'psp': 38,
     'psvita': 46,
     'mastersystem': 64,
@@ -27,10 +26,12 @@ class RommPlatformMatcher {
     'gamegear': 35,
     'dreamcast': 23,
     'saturn': 32,
-    'ngpc': 136,
-    'arcade': 52,
-    'xbox': 11,
-    'xbox360': 12,
+    'segacd': 78,
+    'sega32x': 30,
+    'atari2600': 59,
+    'atari5200': 66,
+    'atari7800': 60,
+    'lynx': 61,
   };
 
   static String _normalize(String value) {

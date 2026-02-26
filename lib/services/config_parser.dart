@@ -16,7 +16,7 @@ class ConfigParser {
   ConfigParser._();
 
   static AppConfig parse(String jsonString) {
-    final dynamic decoded;
+    final Object decoded;
     try {
       decoded = json.decode(jsonString);
     } catch (e) {
@@ -56,6 +56,10 @@ class ConfigParser {
       if (system.targetFolder.isEmpty) {
         throw const ConfigParseException(
             'System target_folder must not be empty');
+      }
+      if (system.targetFolder.contains('..')) {
+        throw ConfigParseException(
+            'System target_folder must not contain "..": "${system.id}"');
       }
       if (!seenIds.add(system.id)) {
         throw ConfigParseException('Duplicate system ID: "${system.id}"');

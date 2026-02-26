@@ -10,6 +10,7 @@ import 'settings_item.dart';
 class SettingsSystemTab extends ConsumerWidget {
   final FocusNode firstSystemTabNode;
   final int maxDownloads;
+  final bool allowNonLanHttp;
   final String coverSubtitle;
   final VoidCallback onOpenRommConfig;
   final VoidCallback onOpenConfigMode;
@@ -17,11 +18,13 @@ class SettingsSystemTab extends ConsumerWidget {
   final VoidCallback onStartCoverPreload;
   final VoidCallback onExportErrorLog;
   final ValueChanged<int> onAdjustMaxDownloads;
+  final VoidCallback onToggleAllowNonLanHttp;
 
   const SettingsSystemTab({
     super.key,
     required this.firstSystemTabNode,
     required this.maxDownloads,
+    required this.allowNonLanHttp,
     required this.coverSubtitle,
     required this.onOpenRommConfig,
     required this.onOpenConfigMode,
@@ -29,6 +32,7 @@ class SettingsSystemTab extends ConsumerWidget {
     required this.onStartCoverPreload,
     required this.onExportErrorLog,
     required this.onAdjustMaxDownloads,
+    required this.onToggleAllowNonLanHttp,
   });
 
   @override
@@ -129,6 +133,25 @@ class SettingsSystemTab extends ConsumerWidget {
                 ),
               ),
               SizedBox(height: rs.spacing.md),
+              _buildSettingsItemWrapper(
+                ref: ref,
+                onNavigate: (dir) {
+                  if (dir == GridDirection.left ||
+                      dir == GridDirection.right) {
+                    onToggleAllowNonLanHttp();
+                    return true;
+                  }
+                  return false;
+                },
+                child: SettingsItem(
+                  title: 'Allow HTTP for external servers',
+                  subtitle:
+                      'Only enable if your server doesn\'t support HTTPS',
+                  trailing: _buildSwitch(allowNonLanHttp),
+                  onTap: onToggleAllowNonLanHttp,
+                ),
+              ),
+              SizedBox(height: rs.spacing.md),
               SettingsItem(
                 title: 'Edit Consoles',
                 subtitle: 'Add, remove or reconfigure consoles',
@@ -206,6 +229,39 @@ class SettingsSystemTab extends ConsumerWidget {
       trailing:
           const Icon(Icons.upload_file_rounded, color: Colors.white70),
       onTap: onExportErrorLog,
+    );
+  }
+
+  Widget _buildSwitch(bool value) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: 50,
+      height: 28,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: value
+            ? AppTheme.primaryColor
+            : Colors.grey.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Align(
+        alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

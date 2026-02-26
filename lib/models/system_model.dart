@@ -28,6 +28,15 @@ class SystemModel {
   /// Returns the local asset path for this system's icon.
   String get iconAssetPath => 'assets/platform_icons/$iconName';
 
+  /// Returns a color suitable for icon tinting on dark backgrounds.
+  /// Ensures minimum luminance so icons stay visible.
+  Color get iconColor {
+    final luminance = accentColor.computeLuminance();
+    if (luminance >= 0.15) return accentColor;
+    final hsl = HSLColor.fromColor(accentColor);
+    return hsl.withLightness(hsl.lightness.clamp(0.45, 1.0)).toColor();
+  }
+
   static const List<SystemModel> supportedSystems = [
     // ===== NINTENDO =====
     SystemModel(
@@ -38,7 +47,7 @@ class SystemModel {
       isZipped: true,
       libretroId: 'Nintendo_-_Nintendo_Entertainment_System',
       romExtensions: ['.nes'],
-      iconName: 'NES.png',
+      iconName: 'nintendo_nes.svg',
       accentColor: Color(0xFFE11D48),
     ),
     SystemModel(
@@ -49,7 +58,7 @@ class SystemModel {
       isZipped: true,
       libretroId: 'Nintendo_-_Super_Nintendo_Entertainment_System',
       romExtensions: ['.sfc', '.smc'],
-      iconName: 'SNES.png',
+      iconName: 'nintendo_snes.svg',
       accentColor: Color(0xFF9333EA),
     ),
     SystemModel(
@@ -60,7 +69,7 @@ class SystemModel {
       isZipped: true,
       libretroId: 'Nintendo_-_Nintendo_64',
       romExtensions: ['.z64', '.n64', '.v64'],
-      iconName: 'N64.png',
+      iconName: 'nintendo_64.svg',
       accentColor: Color(0xFFF97316),
     ),
     SystemModel(
@@ -71,7 +80,7 @@ class SystemModel {
       isZipped: false,
       libretroId: 'Nintendo_-_GameCube',
       romExtensions: ['.rvz', '.iso', '.gcm', '.ciso'],
-      iconName: 'GAMECUBE.png',
+      iconName: 'nintendo_gamecube.svg',
       accentColor: Color(0xFF7C3AED),
     ),
     SystemModel(
@@ -82,7 +91,7 @@ class SystemModel {
       isZipped: false,
       libretroId: 'Nintendo_-_Wii',
       romExtensions: ['.rvz', '.wbfs', '.iso', '.wia', '.ciso'],
-      iconName: 'Wii.png',
+      iconName: 'nintendo_wii.svg',
       accentColor: Color(0xFF0EA5E9),
     ),
     SystemModel(
@@ -93,7 +102,7 @@ class SystemModel {
       isZipped: false,
       libretroId: 'Nintendo_-_Wii_U',
       romExtensions: ['.wua', '.wud', '.wux', '.rpx'],
-      iconName: 'Wii_U.png',
+      iconName: 'nintendo_wiiu.svg',
       accentColor: Color(0xFF0284C7),
     ),
     SystemModel(
@@ -104,7 +113,7 @@ class SystemModel {
       isZipped: false,
       libretroId: 'Nintendo_-_Switch',
       romExtensions: ['.nsp', '.xci'],
-      iconName: 'Switch.png',
+      iconName: 'nintendo_switch.svg',
       accentColor: Color(0xFFE60012),
     ),
     SystemModel(
@@ -115,7 +124,7 @@ class SystemModel {
       isZipped: true,
       libretroId: 'Nintendo_-_Game_Boy',
       romExtensions: ['.gb'],
-      iconName: 'Game_Boy.png',
+      iconName: 'nintendo_gameboy.svg',
       accentColor: Color(0xFF8BAC0F),
     ),
     SystemModel(
@@ -126,8 +135,8 @@ class SystemModel {
       isZipped: true,
       libretroId: 'Nintendo_-_Game_Boy_Color',
       romExtensions: ['.gbc', '.gb'],
-      iconName: 'Game_Boy_Color.png',
-      accentColor: Color(0xFF7C3AED),
+      iconName: 'nintendo_gameboy_color.svg',
+      accentColor: Color(0xFF06B6D4),
     ),
     SystemModel(
       id: 'gba',
@@ -137,7 +146,7 @@ class SystemModel {
       isZipped: true,
       libretroId: 'Nintendo_-_Game_Boy_Advance',
       romExtensions: ['.gba'],
-      iconName: 'Game_Boy_Advance.png',
+      iconName: 'nintendo_gameboy_advance.svg',
       accentColor: Color(0xFF4F46E5),
     ),
     SystemModel(
@@ -148,7 +157,7 @@ class SystemModel {
       isZipped: true,
       libretroId: 'Nintendo_-_Nintendo_DS',
       romExtensions: ['.nds'],
-      iconName: 'NINTENDO_DS.png',
+      iconName: 'nintendo_ds.svg',
       accentColor: Color(0xFF6B7280),
     ),
     SystemModel(
@@ -159,7 +168,7 @@ class SystemModel {
       isZipped: false,
       libretroId: 'Nintendo_-_Nintendo_3DS',
       romExtensions: ['.3ds', '.cia'],
-      iconName: 'NINTENDO_3DS.png',
+      iconName: 'nintendo_3ds.svg',
       accentColor: Color(0xFFDC2626),
     ),
     // ===== SONY =====
@@ -171,7 +180,7 @@ class SystemModel {
       isZipped: false,
       libretroId: 'Sony_-_PlayStation',
       romExtensions: ['.chd', '.pbp', '.cue', '.iso', '.img'],
-      iconName: 'PS1.png',
+      iconName: 'playstation_flat.svg',
       accentColor: Color(0xFF5B21B6),
       multiFileExtensions: ['.bin', '.cue'],
     ),
@@ -183,7 +192,7 @@ class SystemModel {
       isZipped: false,
       libretroId: 'Sony_-_PlayStation_2',
       romExtensions: ['.iso', '.chd', '.cso'],
-      iconName: 'PS2.png',
+      iconName: 'playstation_ps2.svg',
       accentColor: Color(0xFF1E3A8A),
       multiFileExtensions: ['.bin', '.cue'],
     ),
@@ -195,19 +204,8 @@ class SystemModel {
       isZipped: false,
       libretroId: 'Sony_-_PlayStation_3',
       romExtensions: ['.iso', '.pkg'],
-      iconName: 'PS3.png',
+      iconName: 'playstation3_flat.svg',
       accentColor: Color(0xFF1E293B),
-    ),
-    SystemModel(
-      id: 'ps4',
-      name: 'PlayStation 4',
-      manufacturer: 'Sony',
-      releaseYear: 2013,
-      isZipped: false,
-      libretroId: '',
-      romExtensions: ['.pkg'],
-      iconName: 'PS4.png',
-      accentColor: Color(0xFF1D4ED8),
     ),
     SystemModel(
       id: 'psp',
@@ -216,9 +214,9 @@ class SystemModel {
       releaseYear: 2004,
       isZipped: false,
       libretroId: 'Sony_-_PlayStation_Portable',
-      romExtensions: ['.iso', '.cso', '.pbp'],
-      iconName: 'PSP.png',
-      accentColor: Color(0xFF111827),
+      romExtensions: ['.iso', '.cso', '.pbp', '.chd'],
+      iconName: 'playstation_psp.svg',
+      accentColor: Color(0xFF475569),
     ),
     SystemModel(
       id: 'psvita',
@@ -228,7 +226,7 @@ class SystemModel {
       isZipped: false,
       libretroId: 'Sony_-_PlayStation_Vita',
       romExtensions: ['.vpk'],
-      iconName: 'PS_VITA.png',
+      iconName: 'playstation_vita.svg',
       accentColor: Color(0xFF1E40AF),
     ),
     // ===== SEGA =====
@@ -240,7 +238,7 @@ class SystemModel {
       isZipped: true,
       libretroId: 'Sega_-_Master_System_-_Mark_III',
       romExtensions: ['.sms'],
-      iconName: 'GENESIS.png',
+      iconName: 'sega_master_system.svg',
       accentColor: Color(0xFF1D4ED8),
     ),
     SystemModel(
@@ -251,8 +249,8 @@ class SystemModel {
       isZipped: true,
       libretroId: 'Sega_-_Mega_Drive_-_Genesis',
       romExtensions: ['.md', '.gen', '.bin', '.smd'],
-      iconName: 'GENESIS.png',
-      accentColor: Color(0xFF111827),
+      iconName: 'sega_megadrive.svg',
+      accentColor: Color(0xFF374151),
     ),
     SystemModel(
       id: 'gamegear',
@@ -262,8 +260,31 @@ class SystemModel {
       isZipped: true,
       libretroId: 'Sega_-_Game_Gear',
       romExtensions: ['.gg'],
-      iconName: 'GAME_GEAR.png',
+      iconName: 'sega_gamegear.svg',
       accentColor: Color(0xFF0F766E),
+    ),
+    SystemModel(
+      id: 'segacd',
+      name: 'Sega CD',
+      manufacturer: 'Sega',
+      releaseYear: 1991,
+      isZipped: false,
+      libretroId: 'Sega_-_Mega-CD_-_Sega_CD',
+      romExtensions: ['.chd', '.cue', '.iso'],
+      iconName: 'sega_cd.svg',
+      accentColor: Color(0xFF0369A1),
+      multiFileExtensions: ['.bin', '.cue'],
+    ),
+    SystemModel(
+      id: 'sega32x',
+      name: 'Sega 32X',
+      manufacturer: 'Sega',
+      releaseYear: 1994,
+      isZipped: true,
+      libretroId: 'Sega_-_32X',
+      romExtensions: ['.32x'],
+      iconName: 'sega_32x.svg',
+      accentColor: Color(0xFF991B1B),
     ),
     SystemModel(
       id: 'dreamcast',
@@ -273,7 +294,7 @@ class SystemModel {
       isZipped: false,
       libretroId: 'Sega_-_Dreamcast',
       romExtensions: ['.chd', '.cdi', '.gdi'],
-      iconName: 'Dreamcast.png',
+      iconName: 'sega_dreamcast.svg',
       accentColor: Color(0xFFDC2626),
     ),
     SystemModel(
@@ -284,56 +305,66 @@ class SystemModel {
       isZipped: false,
       libretroId: 'Sega_-_Saturn',
       romExtensions: ['.chd', '.cue', '.iso'],
-      iconName: 'SATURN.png',
-      accentColor: Color(0xFF7C3AED),
+      iconName: 'sega_saturn.svg',
+      accentColor: Color(0xFF64748B),
       multiFileExtensions: ['.bin', '.cue'],
     ),
-    // ===== SNK =====
+    // ===== ATARI =====
     SystemModel(
-      id: 'ngpc',
-      name: 'Neo Geo Pocket Color',
-      manufacturer: 'SNK',
-      releaseYear: 1999,
+      id: 'atari2600',
+      name: 'Atari 2600',
+      manufacturer: 'Atari',
+      releaseYear: 1977,
       isZipped: true,
-      libretroId: 'SNK_-_Neo_Geo_Pocket_Color',
-      romExtensions: ['.ngc', '.ngp'],
-      iconName: 'Neo_Geo_Pocket_Color.png',
-      accentColor: Color(0xFF4338CA),
-    ),
-    // ===== ARCADE =====
-    SystemModel(
-      id: 'arcade',
-      name: 'Arcade',
-      manufacturer: 'Various',
-      releaseYear: 1978,
-      isZipped: false,
-      libretroId: 'MAME',
-      romExtensions: ['.zip', '.7z'],
-      iconName: 'Arcade.png',
+      libretroId: 'Atari_-_2600',
+      romExtensions: ['.a26', '.bin'],
+      iconName: 'atari_2600.svg',
       accentColor: Color(0xFFD97706),
     ),
-    // ===== MICROSOFT =====
     SystemModel(
-      id: 'xbox',
-      name: 'Xbox',
-      manufacturer: 'Microsoft',
-      releaseYear: 2001,
-      isZipped: false,
-      libretroId: 'Microsoft_-_Xbox',
-      romExtensions: ['.iso'],
-      iconName: 'Xbox.png',
-      accentColor: Color(0xFF16A34A),
+      id: 'atari5200',
+      name: 'Atari 5200',
+      manufacturer: 'Atari',
+      releaseYear: 1982,
+      isZipped: true,
+      libretroId: 'Atari_-_5200',
+      romExtensions: ['.a52', '.bin'],
+      iconName: 'atari_5200.svg',
+      accentColor: Color(0xFF78716C),
     ),
     SystemModel(
-      id: 'xbox360',
-      name: 'Xbox 360',
-      manufacturer: 'Microsoft',
-      releaseYear: 2005,
+      id: 'atari7800',
+      name: 'Atari 7800',
+      manufacturer: 'Atari',
+      releaseYear: 1986,
+      isZipped: true,
+      libretroId: 'Atari_-_7800',
+      romExtensions: ['.a78', '.bin'],
+      iconName: 'atari_7800.svg',
+      accentColor: Color(0xFF6B7280),
+    ),
+    SystemModel(
+      id: 'lynx',
+      name: 'Atari Lynx',
+      manufacturer: 'Atari',
+      releaseYear: 1989,
+      isZipped: true,
+      libretroId: 'Atari_-_Lynx',
+      romExtensions: ['.lnx'],
+      iconName: 'atari_lynx.svg',
+      accentColor: Color(0xFF059669),
+    ),
+    // ===== OTHER =====
+    SystemModel(
+      id: 'pico8',
+      name: 'PICO-8',
+      manufacturer: 'Lexaloffle',
+      releaseYear: 2015,
       isZipped: false,
       libretroId: '',
-      romExtensions: ['.iso', '.xex'],
-      iconName: 'Xbox_360.png',
-      accentColor: Color(0xFF65A30D),
+      romExtensions: ['.p8'],
+      iconName: 'pico-8.svg',
+      accentColor: Color(0xFFEC4899),
     ),
   ];
 

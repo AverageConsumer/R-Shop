@@ -11,7 +11,6 @@ import '../../core/widgets/screen_layout.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
 import '../../widgets/download_overlay.dart';
-import '../../services/config_storage_service.dart';
 import '../../services/cover_preload_service.dart';
 import '../../services/database_service.dart';
 import '../../services/image_cache_service.dart';
@@ -43,6 +42,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   late double _bgmVolume;
   late double _sfxVolume;
   late int _maxDownloads;
+  late bool _allowNonLanHttp;
   bool _showResetConfirm = false;
   ProviderSubscription<CoverPreloadState>? _coverPreloadSub;
   ThumbnailDiskUsage? _thumbnailUsage;
@@ -88,6 +88,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final storage = ref.read(storageServiceProvider);
     _hapticEnabled = storage.getHapticEnabled();
     _maxDownloads = storage.getMaxConcurrentDownloads();
+    _allowNonLanHttp = storage.getAllowNonLanHttp();
     final soundSettings = ref.read(soundSettingsProvider);
     _soundEnabled = soundSettings.enabled;
     _bgmVolume = soundSettings.bgmVolume;
@@ -212,6 +213,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     ref.read(downloadQueueManagerProvider).setMaxConcurrent(newValue);
   }
 
+  Future<void> _toggleAllowNonLanHttp() async {
+    final value = !_allowNonLanHttp;
+    await ref.read(storageServiceProvider).setAllowNonLanHttp(value);
+    setState(() => _allowNonLanHttp = value);
+    ref.read(feedbackServiceProvider).tick();
+  }
+
   void _openRommConfig() {
     Navigator.push(
       context,
@@ -232,7 +240,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     try {
       final storage = ref.read(storageServiceProvider);
       await storage.resetAll();
-      await ConfigStorageService().deleteConfig();
+      await ref.read(configStorageServiceProvider).deleteConfig();
       final db = DatabaseService();
       await db.clearThumbnailData();
       await db.clearCache();
@@ -472,6 +480,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                         1 => SettingsSystemTab(
                             firstSystemTabNode: _firstSystemTabNode,
                             maxDownloads: _maxDownloads,
+                            allowNonLanHttp: _allowNonLanHttp,
                             coverSubtitle: _buildCoverSubtitle(),
                             onOpenRommConfig: _openRommConfig,
                             onOpenConfigMode: _openConfigMode,
@@ -479,6 +488,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             onStartCoverPreload: _startCoverPreload,
                             onExportErrorLog: _exportErrorLog,
                             onAdjustMaxDownloads: _adjustMaxDownloads,
+                            onToggleAllowNonLanHttp: _toggleAllowNonLanHttp,
                           ),
                         _ => SettingsAboutTab(
                             appVersion: _appVersion,

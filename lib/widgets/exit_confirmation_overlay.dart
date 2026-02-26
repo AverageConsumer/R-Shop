@@ -106,12 +106,12 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
   }
 
   void _close() {
-    final token = _claimToken;
-    if (token != null) {
-      _claimToken = null;
-      _overlayManager?.release(token);
-    }
     _controller.reverse().then((_) {
+      final token = _claimToken;
+      if (token != null) {
+        _claimToken = null;
+        _overlayManager?.release(token);
+      }
       if (!mounted) return;
       restoreMainFocus(ref);
       widget.onCancel();

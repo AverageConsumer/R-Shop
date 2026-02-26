@@ -29,6 +29,7 @@ class _SystemSelectorOverlayState
   late Set<String> _selected;
   int _focusedIndex = 0;
   final FocusNode _focusNode = FocusNode(debugLabel: 'SystemSelector');
+  final ScrollController _scrollController = ScrollController();
 
   static const _systems = SystemModel.supportedSystems;
 
@@ -44,7 +45,40 @@ class _SystemSelectorOverlayState
   @override
   void dispose() {
     _focusNode.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scrollToFocused() {
+    if (!_scrollController.hasClients) return;
+
+    const cols = 4;
+    const crossAxisSpacing = 6.0;
+    const mainAxisSpacing = 6.0;
+    const aspectRatio = 2.0;
+
+    final rs = context.rs;
+    final containerWidth =
+        rs.isPortrait ? rs.screenWidth * 0.9 : rs.screenWidth * 0.6;
+    final gridWidth = containerWidth - 2 * rs.spacing.md;
+    final itemWidth = (gridWidth - (cols - 1) * crossAxisSpacing) / cols;
+    final itemHeight = itemWidth / aspectRatio;
+    final rowStride = itemHeight + mainAxisSpacing;
+
+    final row = _focusedIndex ~/ cols;
+    final targetOffset = row * rowStride;
+    final viewportHeight = _scrollController.position.viewportDimension;
+    final currentOffset = _scrollController.offset;
+
+    if (targetOffset < currentOffset) {
+      _scrollController.animateTo(targetOffset,
+          duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+    } else if (targetOffset + itemHeight > currentOffset + viewportHeight) {
+      _scrollController.animateTo(
+          targetOffset + itemHeight - viewportHeight,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut);
+    }
   }
 
   void _toggle(int index) {
@@ -84,6 +118,7 @@ class _SystemSelectorOverlayState
       if (_focusedIndex >= cols) {
         setState(() => _focusedIndex -= cols);
         ref.read(feedbackServiceProvider).tick();
+        _scrollToFocused();
       }
       return KeyEventResult.handled;
     }
@@ -91,6 +126,7 @@ class _SystemSelectorOverlayState
       if (_focusedIndex + cols < _systems.length) {
         setState(() => _focusedIndex += cols);
         ref.read(feedbackServiceProvider).tick();
+        _scrollToFocused();
       }
       return KeyEventResult.handled;
     }
@@ -171,6 +207,7 @@ class _SystemSelectorOverlayState
                       ),
                       Flexible(
                         child: GridView.builder(
+                          controller: _scrollController,
                           padding: EdgeInsets.fromLTRB(
                             rs.spacing.md,
                             0,

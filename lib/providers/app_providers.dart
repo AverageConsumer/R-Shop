@@ -7,6 +7,7 @@ import '../services/audio_manager.dart';
 import '../services/feedback_service.dart';
 import '../services/crash_log_service.dart';
 import '../services/device_info_service.dart';
+import '../services/config_storage_service.dart';
 import '../services/disk_space_service.dart';
 import '../models/game_item.dart';
 import '../models/sound_settings.dart';
@@ -24,6 +25,10 @@ export '../core/input/input_providers.dart'
         FocusStateEntry,
         searchRequestedProvider,
         confirmRequestedProvider;
+
+final configStorageServiceProvider = Provider<ConfigStorageService>((ref) {
+  return ConfigStorageService();
+});
 
 final crashLogServiceProvider = Provider<CrashLogService>((ref) {
   return CrashLogService();

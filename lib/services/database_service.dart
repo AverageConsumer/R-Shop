@@ -126,7 +126,7 @@ class DatabaseService {
           'region': _extractRegion(game.filename),
           'cover_url': game.cachedCoverUrl,
           'provider_config': game.providerConfig != null
-              ? jsonEncode(game.providerConfig!.toJson())
+              ? jsonEncode(game.providerConfig!.toJsonWithoutAuth())
               : null,
           'has_thumbnail':
               game.hasThumbnail ? 1 : (prev?['has_thumbnail'] ?? 0),

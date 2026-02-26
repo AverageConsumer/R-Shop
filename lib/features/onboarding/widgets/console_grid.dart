@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../models/system_model.dart';
 import '../onboarding_controller.dart';
@@ -145,12 +146,12 @@ class _ConsoleTileState extends State<_ConsoleTile> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(rs.radius.sm),
-                      child: Image.asset(
+                      child: SvgPicture.asset(
                         widget.system.iconAssetPath,
                         width: iconSize,
                         height: iconSize,
-                        cacheWidth: 128,
-                        errorBuilder: (_, __, ___) => Icon(
+                        colorFilter: ColorFilter.mode(widget.system.iconColor, BlendMode.srcIn),
+                        placeholderBuilder: (_) => Icon(
                           Icons.videogame_asset,
                           color: widget.system.accentColor,
                           size: iconSize,

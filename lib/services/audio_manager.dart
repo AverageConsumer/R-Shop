@@ -6,13 +6,79 @@ import '../models/sound_settings.dart';
 
 enum SoundType { navigation, confirm, cancel, typing }
 
-class AudioManager {
-  SoLoud? _soLoud;
-  SoundHandle? _bgmHandle;
-  SoundHandle? _typingHandle;
-  AudioSource? _bgmSource;
+/// Thin abstraction over SoLoud so AudioManager can be tested with a fake.
+/// Handles are [Object] because SoLoud's concrete types have @internal ctors.
+abstract class AudioEngine {
+  Future<void> init();
+  void deinit();
+  Future<Object> loadAsset(String path);
+  Future<Object> play(Object source, {double volume, bool looping});
+  void setVolume(Object handle, double volume);
+  void fadeVolume(Object handle, double to, Duration duration);
+  void setRelativePlaySpeed(Object handle, double speed);
+  double getVolume(Object handle);
+  void setPause(Object handle, bool pause);
+  void stop(Object handle);
+  void disposeSource(Object source);
+}
 
-  final Map<SoundType, AudioSource> _soundSources = {};
+class _SoLoudEngine implements AudioEngine {
+  final SoLoud _soLoud = SoLoud.instance;
+
+  @override
+  Future<void> init() => _soLoud.init();
+
+  @override
+  void deinit() => _soLoud.deinit();
+
+  @override
+  Future<Object> loadAsset(String path) => _soLoud.loadAsset(path);
+
+  @override
+  Future<Object> play(Object source,
+      {double volume = 1.0, bool looping = false}) async {
+    final SoundHandle handle = await _soLoud.play(source as AudioSource,
+        volume: volume, looping: looping);
+    // SoundHandle is an extension type on int — box it as Object explicitly
+    return handle as Object;
+  }
+
+  @override
+  void setVolume(Object handle, double volume) =>
+      _soLoud.setVolume(handle as SoundHandle, volume);
+
+  @override
+  void fadeVolume(Object handle, double to, Duration duration) =>
+      _soLoud.fadeVolume(handle as SoundHandle, to, duration);
+
+  @override
+  void setRelativePlaySpeed(Object handle, double speed) =>
+      _soLoud.setRelativePlaySpeed(handle as SoundHandle, speed);
+
+  @override
+  double getVolume(Object handle) =>
+      _soLoud.getVolume(handle as SoundHandle);
+
+  @override
+  void setPause(Object handle, bool pause) =>
+      _soLoud.setPause(handle as SoundHandle, pause);
+
+  @override
+  void stop(Object handle) => _soLoud.stop(handle as SoundHandle);
+
+  @override
+  void disposeSource(Object source) =>
+      _soLoud.disposeSource(source as AudioSource);
+}
+
+class AudioManager {
+  AudioEngine? _engine;
+  final AudioEngine? _injectedEngine;
+  Object? _bgmHandle;
+  Object? _typingHandle;
+  Object? _bgmSource;
+
+  final Map<SoundType, Object> _soundSources = {};
 
   SoundSettings _settings = const SoundSettings();
   int _lastNavigationTime = 0;
@@ -29,6 +95,8 @@ class AudioManager {
   bool _hasAttemptedReinit = false;
   Timer? _bgmStopTimer;
 
+  AudioManager({AudioEngine? engine}) : _injectedEngine = engine;
+
   bool get isInitialized => _isInitialized;
   SoundSettings get settings => _settings;
 
@@ -36,37 +104,37 @@ class AudioManager {
     if (_isInitialized || _isInitializing) return;
 
     _isInitializing = true;
-    _soLoud = SoLoud.instance;
+    _engine = _injectedEngine ?? _SoLoudEngine();
 
     try {
-      await _initSoLoud();
+      await _initEngine();
       _isInitialized = true;
     } catch (e) {
       debugPrint('AudioManager: init failed: $e');
-      _soLoud = null;
+      _engine = null;
       _isInitialized = false;
     } finally {
       _isInitializing = false;
     }
   }
 
-  Future<void> _initSoLoud() async {
-    await _soLoud!.init();
+  Future<void> _initEngine() async {
+    await _engine!.init();
     await _preloadSounds();
   }
 
   Future<bool> _preloadSounds() async {
-    if (_soLoud == null) return false;
+    if (_engine == null) return false;
 
     try {
       _soundSources[SoundType.navigation] =
-          await _soLoud!.loadAsset('assets/sounds/navigation.wav');
+          await _engine!.loadAsset('assets/sounds/navigation.wav');
       _soundSources[SoundType.confirm] =
-          await _soLoud!.loadAsset('assets/sounds/confirm.wav');
+          await _engine!.loadAsset('assets/sounds/confirm.wav');
       _soundSources[SoundType.cancel] =
-          await _soLoud!.loadAsset('assets/sounds/cancel.wav');
+          await _engine!.loadAsset('assets/sounds/cancel.wav');
       _soundSources[SoundType.typing] =
-          await _soLoud!.loadAsset('assets/sounds/rapid_text.wav');
+          await _engine!.loadAsset('assets/sounds/rapid_text.wav');
       return true;
     } catch (e) {
       debugPrint('AudioManager: preload sounds failed: $e');
@@ -80,13 +148,13 @@ class AudioManager {
   }
 
   void _applyVolumes() {
-    if (_soLoud == null || !_isInitialized) return;
+    if (_engine == null || !_isInitialized) return;
 
     final bgmVolume = _settings.enabled ? _settings.bgmVolume : 0.0;
 
     if (_bgmHandle != null) {
       try {
-        _soLoud!.setVolume(_bgmHandle!, bgmVolume);
+        _engine!.setVolume(_bgmHandle!, bgmVolume);
       } catch (e) {
         debugPrint('AudioManager: setVolume failed: $e');
       }
@@ -117,13 +185,13 @@ class AudioManager {
 
   void _playSound(SoundType type, {double pitch = 1.0}) {
     final source = _soundSources[type];
-    if (source == null || _soLoud == null || !_isInitialized) return;
+    if (source == null || _engine == null || !_isInitialized) return;
 
     try {
-      _soLoud!.play(source, volume: _settings.sfxVolume).then((handle) {
-        if (pitch != 1.0 && _soLoud != null) {
+      _engine!.play(source, volume: _settings.sfxVolume).then((handle) {
+        if (pitch != 1.0 && _engine != null) {
           try {
-            _soLoud!.setRelativePlaySpeed(handle, pitch);
+            _engine!.setRelativePlaySpeed(handle, pitch);
           } catch (e) {
             debugPrint('AudioManager: setRelativePlaySpeed failed: $e');
           }
@@ -137,13 +205,13 @@ class AudioManager {
   }
 
   Future<void> startBgm() async {
-    if (!_isInitialized || _soLoud == null || _bgmStarting) {
+    if (!_isInitialized || _engine == null || _bgmStarting) {
       return;
     }
 
     if (_bgmStarted && _bgmHandle != null) {
       try {
-        _soLoud!.getVolume(_bgmHandle!);
+        _engine!.getVolume(_bgmHandle!);
         return;
       } catch (e) {
         debugPrint('AudioManager: BGM handle invalid, restarting: $e');
@@ -156,15 +224,15 @@ class AudioManager {
     _bgmStarting = true;
 
     try {
-      _bgmSource = await _soLoud!.loadAsset('assets/sounds/ambience.wav');
-      _bgmHandle = await _soLoud!.play(_bgmSource!, volume: 0.0, looping: true);
+      _bgmSource = await _engine!.loadAsset('assets/sounds/ambience.wav');
+      _bgmHandle = await _engine!.play(_bgmSource!, volume: 0.0, looping: true);
 
       _bgmStarted = true;
       _bgmStarting = false;
       _hasAttemptedReinit = false;
 
       if (_settings.enabled) {
-        _soLoud!.fadeVolume(
+        _engine!.fadeVolume(
             _bgmHandle!, _settings.bgmVolume, const Duration(seconds: 2));
       }
     } catch (e) {
@@ -189,7 +257,7 @@ class AudioManager {
     await Future.delayed(const Duration(milliseconds: 100));
 
     try {
-      await _soLoud!.init();
+      await _engine!.init();
       if (await _preloadSounds()) {
         _isInitialized = true;
         return true;
@@ -201,16 +269,16 @@ class AudioManager {
   }
 
   void stopBgm() {
-    if (_bgmHandle == null || _soLoud == null || !_isInitialized) return;
+    if (_bgmHandle == null || _engine == null || !_isInitialized) return;
 
     try {
-      _soLoud!.fadeVolume(_bgmHandle!, 0.0, const Duration(milliseconds: 500));
+      _engine!.fadeVolume(_bgmHandle!, 0.0, const Duration(milliseconds: 500));
       _bgmStopTimer?.cancel();
       _bgmStopTimer = Timer(const Duration(milliseconds: 600), () {
         if (_isDisposed) return;
-        if (_bgmHandle != null && _soLoud != null && _isInitialized) {
+        if (_bgmHandle != null && _engine != null && _isInitialized) {
           try {
-            _soLoud!.stop(_bgmHandle!);
+            _engine!.stop(_bgmHandle!);
           } catch (e) {
             debugPrint('AudioManager: stopBgm delayed stop failed: $e');
           }
@@ -222,10 +290,10 @@ class AudioManager {
   }
 
   void setBgmVolume(double volume) {
-    if (_bgmHandle == null || _soLoud == null || !_isInitialized) return;
+    if (_bgmHandle == null || _engine == null || !_isInitialized) return;
 
     try {
-      _soLoud!.setVolume(_bgmHandle!, _settings.enabled ? volume : 0.0);
+      _engine!.setVolume(_bgmHandle!, _settings.enabled ? volume : 0.0);
     } catch (e) {
       debugPrint('AudioManager: setBgmVolume failed: $e');
     }
@@ -240,7 +308,7 @@ class AudioManager {
     stopTyping();
 
     try {
-      _typingHandle = await _soLoud!
+      _typingHandle = await _engine!
           .play(source, volume: _settings.sfxVolume, looping: true);
     } catch (e) {
       debugPrint('AudioManager: startTyping failed: $e');
@@ -248,10 +316,10 @@ class AudioManager {
   }
 
   void stopTyping() {
-    if (_typingHandle == null || _soLoud == null) return;
+    if (_typingHandle == null || _engine == null) return;
 
     try {
-      _soLoud!.stop(_typingHandle!);
+      _engine!.stop(_typingHandle!);
     } catch (e) {
       debugPrint('AudioManager: stopTyping failed: $e');
     }
@@ -259,13 +327,13 @@ class AudioManager {
   }
 
   void pause() {
-    if (!_isInitialized || _soLoud == null) return;
+    if (!_isInitialized || _engine == null) return;
 
     stopTyping();
 
     if (_bgmHandle != null && _bgmStarted) {
       try {
-        _soLoud!.setPause(_bgmHandle!, true);
+        _engine!.setPause(_bgmHandle!, true);
       } catch (e) {
         debugPrint('AudioManager: pause failed: $e');
       }
@@ -273,11 +341,11 @@ class AudioManager {
   }
 
   void resume() {
-    if (!_isInitialized || _soLoud == null) return;
+    if (!_isInitialized || _engine == null) return;
 
     if (_bgmHandle != null && _bgmStarted) {
       try {
-        _soLoud!.setPause(_bgmHandle!, false);
+        _engine!.setPause(_bgmHandle!, false);
       } catch (e) {
         debugPrint('AudioManager: resume failed: $e');
       }
@@ -301,15 +369,15 @@ class AudioManager {
       debugPrint('AudioManager: dispose stopAll failed: $e');
     }
 
-    if (_soLoud != null) {
+    if (_engine != null) {
       try {
         for (final source in _soundSources.values) {
-          _soLoud!.disposeSource(source);
+          _engine!.disposeSource(source);
         }
         if (_bgmSource != null) {
-          _soLoud!.disposeSource(_bgmSource!);
+          _engine!.disposeSource(_bgmSource!);
         }
-        _soLoud!.deinit();
+        _engine!.deinit();
       } catch (e) {
         debugPrint('AudioManager: dispose cleanup failed: $e');
       }
@@ -319,7 +387,7 @@ class AudioManager {
     _bgmSource = null;
     _bgmHandle = null;
     _typingHandle = null;
-    _soLoud = null;
+    _engine = null;
     _isInitialized = false;
     _bgmStarted = false;
     _bgmStarting = false;

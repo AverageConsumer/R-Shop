@@ -7,7 +7,6 @@ import '../../core/responsive/responsive.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
-import '../../services/config_storage_service.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../../widgets/download_overlay.dart';
@@ -170,7 +169,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           return KeyEventResult.handled;
         }
         if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-          if (state.canTest && !state.isTestingConnection) {
+          if (state.canTest &&
+              !state.isTestingConnection &&
+              !isNonLanHttpBlocked(state, ref)) {
             controller.testAndSaveProvider();
           }
           return KeyEventResult.handled;
@@ -348,7 +349,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     try {
       final config = controller.buildFinalConfig();
       final jsonString = const JsonEncoder.withIndent('  ').convert(config.toJson());
-      await ConfigStorageService().saveConfig(jsonString);
+      await ref.read(configStorageServiceProvider).saveConfig(jsonString);
       await storage.setOnboardingCompleted(true);
       if (!mounted) return;
       ref.invalidate(bootstrappedConfigProvider);

@@ -123,7 +123,7 @@ void main() {
       expect(loaded.first.providerConfig!.priority, 1);
     });
 
-    test('ProviderConfig (smb with auth) round-trip', () async {
+    test('ProviderConfig (smb with auth) strips auth on save', () async {
       const config = ProviderConfig(
         type: ProviderType.smb,
         priority: 2,
@@ -147,9 +147,8 @@ void main() {
       expect(pc.host, '192.168.1.100');
       expect(pc.share, 'roms');
       expect(pc.path, '/snes');
-      expect(pc.auth!.user, 'admin');
-      expect(pc.auth!.pass, 'secret');
-      expect(pc.auth!.domain, 'WORKGROUP');
+      // Auth credentials are stripped from DB for security
+      expect(pc.auth, isNull);
     });
 
     test('null providerConfig loads as null', () async {

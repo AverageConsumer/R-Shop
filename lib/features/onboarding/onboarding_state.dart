@@ -111,6 +111,8 @@ class RommSetupState {
   final Map<String, String> folderAssignments;
   final bool isScanning;
   final Set<String> localOnlySystemIds;
+  final String? detectedPath;
+  final bool isAutoDetecting;
 
   const RommSetupState({
     this.subStep = RommSetupSubStep.ask,
@@ -126,6 +128,8 @@ class RommSetupState {
     this.folderAssignments = const {},
     this.isScanning = false,
     this.localOnlySystemIds = const {},
+    this.detectedPath,
+    this.isAutoDetecting = false,
   });
 
   RommSetupState copyWith({
@@ -142,8 +146,11 @@ class RommSetupState {
     Map<String, String>? folderAssignments,
     bool? isScanning,
     Set<String>? localOnlySystemIds,
+    String? detectedPath,
+    bool? isAutoDetecting,
     bool clearRomBasePath = false,
     bool clearScannedFolders = false,
+    bool clearDetectedPath = false,
   }) {
     return RommSetupState(
       subStep: subStep ?? this.subStep,
@@ -159,6 +166,8 @@ class RommSetupState {
       folderAssignments: folderAssignments ?? this.folderAssignments,
       isScanning: isScanning ?? this.isScanning,
       localOnlySystemIds: localOnlySystemIds ?? this.localOnlySystemIds,
+      detectedPath: clearDetectedPath ? null : (detectedPath ?? this.detectedPath),
+      isAutoDetecting: isAutoDetecting ?? this.isAutoDetecting,
     );
   }
 

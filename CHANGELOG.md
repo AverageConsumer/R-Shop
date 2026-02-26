@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.0.0] — 2026-02-26
+
+### Highlights
+- **Stable release** — R-Shop exits beta
+- **SVG platform icons** — all 29 system icons migrated from PNG to crisp SVG format
+- **Android package restructure** — migrated from `com.example.r_shop` to `com.retro.rshop`
+- **Network security config** — dedicated XML configuration for local network protocols
+
+### Improved
+- **Test coverage** — 950+ tests covering controllers, services, models, and utilities
+- **Code quality** — zero TODO/FIXME markers, zero silent catches, all error paths logged
+- **Dependency hygiene** — all dependencies pinned to exact versions
+
+### Internal
+- New test suites: GameListController (43 tests), GameMergeHelper (12 tests), ImageHelper (19 tests)
+- 8 additional test files covering app config, audio manager, config parser, onboarding, providers, and cover preload
+
+---
+
 ## [0.9.9] Beta — 2026-02-25
 
 ### Added

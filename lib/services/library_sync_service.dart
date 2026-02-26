@@ -210,6 +210,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         debugPrint('Library discover failed for ${systemConfig.id}: $e');
         perSystem[systemConfig.id] = 0;
         anyFailed = true;
+        final reason = _userFriendlyError(e);
+        state = state.copyWith(error: 'Scan failed for $displayName: $reason');
       }
 
       completed++;

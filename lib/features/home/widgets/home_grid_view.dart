@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../models/system_model.dart';
 
@@ -297,10 +298,11 @@ class HomeGridView extends StatelessWidget {
                 Container(
                   color: const Color(0xFF151515),
                   padding: EdgeInsets.all(rs.isSmall ? 20.0 : 28.0),
-                  child: Image.asset(
+                  child: SvgPicture.asset(
                     system.iconAssetPath,
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) => Icon(
+                    colorFilter: ColorFilter.mode(system.iconColor, BlendMode.srcIn),
+                    placeholderBuilder: (_) => Icon(
                       Icons.gamepad,
                       size: 48,
                       color: Colors.grey.withValues(alpha: 0.3),

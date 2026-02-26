@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/responsive/responsive.dart';
 import '../../../core/widgets/console_focusable.dart';
@@ -332,11 +333,12 @@ class _CreateSystemRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Image.asset(
+            SvgPicture.asset(
               system.iconAssetPath,
               width: 20,
               height: 20,
-              errorBuilder: (_, __, ___) => Icon(
+              colorFilter: ColorFilter.mode(system.iconColor, BlendMode.srcIn),
+              placeholderBuilder: (_) => Icon(
                 Icons.videogame_asset_rounded,
                 color: system.accentColor,
                 size: 20,

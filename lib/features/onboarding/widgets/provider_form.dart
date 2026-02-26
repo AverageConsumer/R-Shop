@@ -12,6 +12,19 @@ import '../../../services/romm_api_service.dart';
 import '../onboarding_controller.dart';
 import 'connection_test_indicator.dart';
 
+/// Returns true when the URL points at a private/local network address.
+bool isPrivateNetworkUrl(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null) return false;
+  final host = uri.host;
+  if (host.isEmpty) return false;
+  if (host == 'localhost' || host == '127.0.0.1') return true;
+  final privateIp = RegExp(
+    r'^(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$',
+  );
+  return privateIp.hasMatch(host);
+}
+
 class ProviderForm extends ConsumerStatefulWidget {
   const ProviderForm({super.key});
 
@@ -59,6 +72,28 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
     }
     _typeSelectorFocusNode.dispose();
     super.dispose();
+  }
+
+  bool _isHttpWithCredentials(ProviderFormState form) {
+    final url = form.fields['url']?.toString() ?? '';
+    if (!url.startsWith('http://') || isPrivateNetworkUrl(url)) {
+      return false;
+    }
+    final hasAuth = (form.fields['user']?.toString() ?? '').isNotEmpty ||
+        (form.fields['pass']?.toString() ?? '').isNotEmpty ||
+        (form.fields['apiKey']?.toString() ?? '').isNotEmpty;
+    return hasAuth;
+  }
+
+  bool _isNonLanHttp(ProviderFormState form) {
+    final url = form.fields['url']?.toString() ?? '';
+    return url.startsWith('http://') && !isPrivateNetworkUrl(url);
+  }
+
+  bool _isNonLanHttpBlocked(ProviderFormState form) {
+    if (!_isNonLanHttp(form)) return false;
+    final storage = ref.read(storageServiceProvider);
+    return !storage.getAllowNonLanHttp();
   }
 
   void _syncField(String key, String value) {
@@ -150,6 +185,46 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
           SizedBox(height: rs.spacing.md),
           ..._buildFieldsForType(rs, form),
           SizedBox(height: rs.spacing.md),
+          if (_isNonLanHttpBlocked(form))
+            Padding(
+              padding: EdgeInsets.only(bottom: rs.spacing.sm),
+              child: Row(
+                children: [
+                  Icon(Icons.block, color: Colors.red.shade300, size: 16),
+                  SizedBox(width: rs.spacing.xs),
+                  Expanded(
+                    child: Text(
+                      'HTTP to non-local servers is blocked. '
+                      'Enable in Settings → System.',
+                      style: TextStyle(
+                        color: Colors.red.shade300,
+                        fontSize: rs.isSmall ? 10 : 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (_isHttpWithCredentials(form))
+            Padding(
+              padding: EdgeInsets.only(bottom: rs.spacing.sm),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      color: Colors.orange.shade300, size: 16),
+                  SizedBox(width: rs.spacing.xs),
+                  Expanded(
+                    child: Text(
+                      'Credentials will be sent unencrypted over HTTP',
+                      style: TextStyle(
+                        color: Colors.orange.shade300,
+                        fontSize: rs.isSmall ? 10 : 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ConnectionTestIndicator(
             isTesting: state.isTestingConnection,
             isSuccess: state.connectionTestSuccess,

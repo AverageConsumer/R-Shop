@@ -20,6 +20,30 @@ class RommFolderView extends ConsumerWidget {
 
     final scanned = rommSetup.scannedFolders;
 
+    // Auto-detecting ROM folder
+    if (rommSetup.isAutoDetecting) {
+      return FocusScope(
+        child: Column(
+          key: const ValueKey('rommFolderDetecting'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ChatBubble(
+              message: "Let me check if you have a ROM folder...",
+              onComplete: onComplete,
+            ),
+            SizedBox(height: rs.spacing.lg),
+            Padding(
+              padding: EdgeInsets.only(left: rs.isSmall ? 40 : 60),
+              child: const CircularProgressIndicator(
+                color: Colors.redAccent,
+                strokeWidth: 2,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     // Phase 1: No scan yet — show choice buttons
     if (scanned == null && !rommSetup.isScanning) {
       return FolderChoiceView(onComplete: onComplete);
@@ -64,8 +88,14 @@ class FolderChoiceView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(onboardingControllerProvider.notifier);
+    final rommSetup = ref.watch(onboardingControllerProvider).rommSetupState;
+    final detectedPath = rommSetup?.detectedPath;
     final rs = context.rs;
     final hintFontSize = rs.isSmall ? 10.0 : 12.0;
+
+    final chatMessage = detectedPath != null
+        ? "I found a ROM folder at $detectedPath! Want me to scan it?"
+        : "Do you have an existing ROM folder on your device? I can scan it and match subfolders to your consoles!";
 
     return FocusScope(
       child: Column(
@@ -73,8 +103,8 @@ class FolderChoiceView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ChatBubble(
-            message:
-                "Do you have an existing ROM folder on your device? I can scan it and match subfolders to your consoles!",
+            key: ValueKey('bubble_folderChoice_${detectedPath != null}'),
+            message: chatMessage,
             onComplete: onComplete,
           ),
           SizedBox(height: rs.spacing.lg),
@@ -84,25 +114,49 @@ class FolderChoiceView extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 FocusTraversalGroup(
-                  child: Row(
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: RommActionButton(
-                          label: 'Yes, pick folder',
-                          icon: Icons.folder_open_rounded,
-                          color: Colors.blue,
-                          autofocus: true,
-                          onTap: () => controller.rommFolderChoice(true),
+                      if (detectedPath != null) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: RommActionButton(
+                                label: 'Scan found folder',
+                                icon: Icons.search_rounded,
+                                color: Colors.blue,
+                                autofocus: true,
+                                onTap: () => controller.scanDetectedRommFolder(),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      SizedBox(width: rs.spacing.md),
-                      Expanded(
-                        child: RommActionButton(
-                          label: 'No, create new',
-                          icon: Icons.create_new_folder_rounded,
-                          color: Colors.green,
-                          onTap: () => controller.rommFolderChoice(false),
-                        ),
+                        SizedBox(height: rs.spacing.sm),
+                      ],
+                      Row(
+                        children: [
+                          Expanded(
+                            child: RommActionButton(
+                              label: detectedPath != null
+                                  ? 'Pick different folder'
+                                  : 'Yes, pick folder',
+                              icon: Icons.folder_open_rounded,
+                              color: detectedPath != null
+                                  ? Colors.grey
+                                  : Colors.blue,
+                              autofocus: detectedPath == null,
+                              onTap: () => controller.rommFolderChoice(true),
+                            ),
+                          ),
+                          SizedBox(width: rs.spacing.md),
+                          Expanded(
+                            child: RommActionButton(
+                              label: 'No, create new',
+                              icon: Icons.create_new_folder_rounded,
+                              color: Colors.green,
+                              onTap: () => controller.rommFolderChoice(false),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -254,6 +308,10 @@ class FolderResultsView extends ConsumerWidget {
                                 .map((e) => e.key)
                                 .firstOrNull ??
                             folder.autoMatchedSystemId,
+                        isManuallyAssigned: manualAssignments.values.contains(folder.name),
+                        onUnassign: manualAssignments.values.contains(folder.name)
+                            ? () => controller.unassignFolder(folder.name)
+                            : null,
                       ),
                     // Local-only folders
                     if (localFound.isNotEmpty) ...[
@@ -389,6 +447,8 @@ class FolderRow extends StatelessWidget {
   final FolderStatus status;
   final String? assignedSystemId;
   final bool autofocus;
+  final bool isManuallyAssigned;
+  final VoidCallback? onUnassign;
 
   const FolderRow({
     super.key,
@@ -396,6 +456,8 @@ class FolderRow extends StatelessWidget {
     required this.status,
     this.assignedSystemId,
     this.autofocus = false,
+    this.isManuallyAssigned = false,
+    this.onUnassign,
   });
 
   @override
@@ -473,6 +535,17 @@ class FolderRow extends StatelessWidget {
                 fontSize: detailFontSize,
               ),
             ),
+            if (isManuallyAssigned && onUnassign != null) ...[
+              SizedBox(width: rs.spacing.sm),
+              GestureDetector(
+                onTap: onUnassign,
+                child: Icon(
+                  Icons.close_rounded,
+                  color: Colors.grey.shade500,
+                  size: 16,
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -97,11 +97,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   void initState() {
     super.initState();
     _debouncer = ref.read(inputDebouncerProvider);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final queueManager = ref.read(downloadQueueManagerProvider);
-      _initController(queueManager);
-    });
+    final queueManager = ref.read(downloadQueueManagerProvider);
+    _initController(queueManager);
   }
 
   void _initController(DownloadQueueManager queueManager) {
@@ -117,7 +114,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     );
     _controller!.addListener(_onControllerChanged);
 
-    setState(() {});
     _romChangeSubscription = ref.listenManual(romChangeSignalProvider, (prev, next) {
       if (!mounted) return;
       if (prev != null && prev != next) {

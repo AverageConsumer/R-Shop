@@ -182,9 +182,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       };
   }
 
-  bool _reorderOrSearchOrNone(dynamic _) {
+  bool _reorderOrSearchOrNone(dynamic priority) {
     if (_reorderState != ReorderState.none) return true;
-    return searchOrNone(_);
+    return searchOrNone(priority);
   }
 
   @override
@@ -1367,7 +1367,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       'psx': 'PS1',
       'ps2': 'PS2',
       'ps3': 'PS3',
-      'ps4': 'PS4',
       'psp': 'PSP',
       'psvita': 'Vita',
       'mastersystem': 'SMS',
@@ -1375,10 +1374,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       'gamegear': 'GG',
       'dreamcast': 'DC',
       'saturn': 'Saturn',
-      'ngpc': 'NGPC',
-      'arcade': 'Arcade',
-      'xbox': 'Xbox',
-      'xbox360': 'X360',
+      'segacd': 'SCD',
+      'sega32x': '32X',
+      'atari2600': '2600',
+      'atari5200': '5200',
+      'atari7800': '7800',
+      'lynx': 'Lynx',
+      'pico8': 'P-8',
     };
     return labels[slug] ?? slug.toUpperCase();
   }

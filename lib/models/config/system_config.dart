@@ -44,6 +44,18 @@ class SystemConfig {
     };
   }
 
+  /// Like [toJson] but strips auth credentials from all providers.
+  Map<String, dynamic> toJsonWithoutAuth() {
+    return {
+      'id': id,
+      'name': name,
+      'target_folder': targetFolder,
+      'providers': providers.map((p) => p.toJsonWithoutAuth()).toList(),
+      'auto_extract': autoExtract,
+      'merge_mode': mergeMode,
+    };
+  }
+
   SystemConfig copyWith({
     String? id,
     String? name,

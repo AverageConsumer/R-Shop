@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../models/system_model.dart';
 class HeroCarouselItem extends StatelessWidget {
@@ -21,12 +22,10 @@ class HeroCarouselItem extends StatelessWidget {
   Widget build(BuildContext context) {
 
     final iconSize = rs.isPortrait
-    ? (rs.isSmall ? rs.screenHeight * 0.25 : rs.screenHeight * 0.32)
-    : (rs.isSmall ? rs.screenHeight * 0.4 : rs.screenHeight * 0.5);
+    ? (rs.isSmall ? rs.screenHeight * 0.30 : rs.screenHeight * 0.38)
+    : (rs.isSmall ? rs.screenHeight * 0.50 : rs.screenHeight * 0.60);
     final accentColor = system.accentColor;
-    final borderRadius = rs.isSmall ? 24.0 : 32.0;
-    final innerBorderRadius = rs.isSmall ? 22.0 : 30.0;
-    final padding = rs.isSmall ? 16.0 : 24.0;
+    final padding = rs.isSmall ? 8.0 : 12.0;
     return GestureDetector(
       onTap: onTap,
       child: Center(
@@ -40,107 +39,41 @@ class HeroCarouselItem extends StatelessWidget {
             child: SizedBox(
               height: iconSize,
               width: iconSize,
-              child: AspectRatio(
-                aspectRatio: 1.0,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  margin: EdgeInsets.symmetric(horizontal: rs.spacing.md),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(borderRadius),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF1A1A1A),
-                        Color(0xFF0F0F0F),
-                      ],
-                    ),
-                    boxShadow: isSelected
-                    ? [
-                      BoxShadow(
-                        color: accentColor.withValues(alpha: 0.6),
-                        blurRadius: rs.isSmall ? 30 : 60,
-                        spreadRadius: rs.isSmall ? 5 : 10,
-                      ),
-                      BoxShadow(
-                        color: accentColor.withValues(alpha: 0.4),
-                        blurRadius: rs.isSmall ? 50 : 100,
-                        spreadRadius: rs.isSmall ? 10 : 20,
-                      ),
-                      BoxShadow(
-                        color: accentColor.withValues(alpha: 0.2),
-                        blurRadius: rs.isSmall ? 75 : 150,
-                        spreadRadius: rs.isSmall ? 20 : 40,
-                      ),
-                      BoxShadow(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        blurRadius: 30,
-                        spreadRadius: 0,
-                      ),
-                    ]
-                    : [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        blurRadius: 25,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(innerBorderRadius),
-                    child: Stack(
-                      children: [
-                        if (isSelected)
-                          Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: RadialGradient(
-                                  center: Alignment.center,
-                                  radius: 0.7,
-                                  colors: [
-                                    accentColor.withValues(alpha: 0.15),
-                                    Colors.transparent,
-                                  ],
-                                ),
-                              ),
-                            ),
+              child: Stack(
+                children: [
+                  if (isSelected)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            center: Alignment.center,
+                            radius: 0.55,
+                            colors: [
+                              accentColor.withValues(alpha: 0.35),
+                              accentColor.withValues(alpha: 0.1),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.5, 1.0],
                           ),
-                          Padding(
-                            padding: EdgeInsets.all(padding),
-                            child: Image.asset(
-                              system.iconAssetPath,
-                              fit: BoxFit.contain,
-                              cacheWidth: 256,
-                              errorBuilder: (context, error, stackTrace) => Icon(
-                                Icons.gamepad,
-                                size: iconSize * 0.4,
-                                color: Colors.grey.withValues(alpha: 0.3),
-                              ),
-                            ),
-                          ),
-                          if (isSelected)
-                            Positioned(
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              child: Container(
-                                height: rs.isSmall ? 1.5 : 2,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.transparent,
-                                      accentColor,
-                                      Colors.transparent,
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                      ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                    Positioned.fill(
+                      child: Padding(
+                        padding: EdgeInsets.all(padding),
+                        child: SvgPicture.asset(
+                          system.iconAssetPath,
+                          fit: BoxFit.contain,
+                          colorFilter: ColorFilter.mode(system.iconColor, BlendMode.srcIn),
+                          placeholderBuilder: (_) => Icon(
+                            Icons.gamepad,
+                            size: iconSize * 0.4,
+                            color: Colors.grey.withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -169,11 +102,10 @@ class HeroLibraryCarouselItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final iconSize = rs.isPortrait
-        ? (rs.isSmall ? rs.screenHeight * 0.25 : rs.screenHeight * 0.32)
-        : (rs.isSmall ? rs.screenHeight * 0.4 : rs.screenHeight * 0.5);
+        ? (rs.isSmall ? rs.screenHeight * 0.30 : rs.screenHeight * 0.38)
+        : (rs.isSmall ? rs.screenHeight * 0.50 : rs.screenHeight * 0.60);
     const accentColor = Colors.cyanAccent;
-    final borderRadius = rs.isSmall ? 24.0 : 32.0;
-    final innerBorderRadius = rs.isSmall ? 22.0 : 30.0;
+    final padding = rs.isSmall ? 8.0 : 12.0;
 
     return GestureDetector(
       onTap: onTap,
@@ -188,101 +120,38 @@ class HeroLibraryCarouselItem extends StatelessWidget {
             child: SizedBox(
               height: iconSize,
               width: iconSize,
-              child: AspectRatio(
-                aspectRatio: 1.0,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  margin: EdgeInsets.symmetric(horizontal: rs.spacing.md),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(borderRadius),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF0A1628),
-                        Color(0xFF0F0F0F),
-                      ],
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: accentColor.withValues(alpha: 0.6),
-                              blurRadius: rs.isSmall ? 30 : 60,
-                              spreadRadius: rs.isSmall ? 5 : 10,
-                            ),
-                            BoxShadow(
-                              color: accentColor.withValues(alpha: 0.4),
-                              blurRadius: rs.isSmall ? 50 : 100,
-                              spreadRadius: rs.isSmall ? 10 : 20,
-                            ),
-                            BoxShadow(
-                              color: accentColor.withValues(alpha: 0.2),
-                              blurRadius: rs.isSmall ? 75 : 150,
-                              spreadRadius: rs.isSmall ? 20 : 40,
-                            ),
-                            BoxShadow(
-                              color: Colors.white.withValues(alpha: 0.1),
-                              blurRadius: 30,
-                              spreadRadius: 0,
-                            ),
-                          ]
-                        : [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 25,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(innerBorderRadius),
-                    child: Stack(
-                      children: [
-                        if (isSelected)
-                          Positioned.fill(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                gradient: RadialGradient(
-                                  center: Alignment.center,
-                                  radius: 0.7,
-                                  colors: [
-                                    accentColor.withValues(alpha: 0.15),
-                                    Colors.transparent,
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        Center(
-                          child: Icon(
-                            Icons.library_books_rounded,
-                            size: iconSize * 0.35,
-                            color: accentColor.withValues(alpha: 0.6),
+              child: Stack(
+                children: [
+                  if (isSelected)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            center: Alignment.center,
+                            radius: 0.55,
+                            colors: [
+                              accentColor.withValues(alpha: 0.35),
+                              accentColor.withValues(alpha: 0.1),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.5, 1.0],
                           ),
                         ),
-                        if (isSelected)
-                          Positioned(
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            child: Container(
-                              height: rs.isSmall ? 1.5 : 2,
-                              decoration: const BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.transparent,
-                                    accentColor,
-                                    Colors.transparent,
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
+                      ),
+                    ),
+                  Positioned.fill(
+                    child: Padding(
+                      padding: EdgeInsets.all(padding),
+                      child: Center(
+                        child: Icon(
+                          Icons.library_books_rounded,
+                          size: iconSize * 0.45,
+                          color: accentColor.withValues(alpha: 0.6),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ),

@@ -55,7 +55,7 @@ void main() {
     test('status 403 returns access denied', () {
       expect(
         getUserFriendlyError('HTTP status 403'),
-        'Access denied (403) - Rate limit reached? Wait a moment.',
+        'Access denied (403) - Check your permissions.',
       );
     });
 

@@ -165,7 +165,16 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
         break;
       case AppLifecycleState.resumed:
         widget.audioManager.resume();
-        restoreMainFocus(ref);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            final currentFocus = FocusManager.instance.primaryFocus;
+            if (currentFocus != null && currentFocus.canRequestFocus) {
+              currentFocus.requestFocus();
+            } else {
+              restoreMainFocus(ref);
+            }
+          }
+        });
         break;
       case AppLifecycleState.detached:
         widget.audioManager.dispose();

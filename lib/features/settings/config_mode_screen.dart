@@ -7,7 +7,6 @@ import '../../core/responsive/responsive.dart';
 import '../../providers/app_providers.dart';
 import '../../services/audio_manager.dart';
 import '../../providers/game_providers.dart';
-import '../../services/config_storage_service.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../onboarding/onboarding_controller.dart';
@@ -122,7 +121,7 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     final config = controller.buildFinalConfig();
     final jsonString =
         const JsonEncoder.withIndent('  ').convert(config.toJson());
-    await ConfigStorageService().saveConfig(jsonString);
+    await ref.read(configStorageServiceProvider).saveConfig(jsonString);
     ref.invalidate(bootstrappedConfigProvider);
     if (!mounted) return;
     Navigator.pop(context);

@@ -73,6 +73,7 @@ class RommRom {
 }
 
 class RommApiService {
+  static const _maxPaginationItems = 20000;
   final Dio _dio;
 
   RommApiService({Dio? dio})
@@ -173,7 +174,7 @@ class RommApiService {
 
       if (list.length < pageSize) break;
       offset += pageSize;
-      if (offset > 20000) break; // Safety guard against infinite pagination
+      if (offset > _maxPaginationItems) break; // Safety guard
     }
 
     return allRoms;

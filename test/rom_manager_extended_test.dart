@@ -237,4 +237,276 @@ void main() {
       expect(subDir.existsSync(), isFalse);
     });
   });
+
+  // ─── getTargetFilename edge cases ──────────────────────────────
+
+  group('getTargetFilename edge cases', () {
+    test('archive with empty romExtensions strips extension only', () {
+      const noExtSystem = SystemModel(
+        id: 'custom',
+        name: 'Custom',
+        manufacturer: 'Test',
+        releaseYear: 2000,
+        romExtensions: [],
+        accentColor: Color(0xFF000000),
+      );
+      const game = GameItem(
+        filename: 'Game.zip',
+        displayName: 'Game',
+        url: '',
+      );
+      // zip is stripped, but no replacement ext → just 'Game'
+      expect(RomManager.getTargetFilename(game, noExtSystem), 'Game');
+    });
+
+    test('non-archive preserves original with empty romExts', () {
+      const noExtSystem = SystemModel(
+        id: 'custom',
+        name: 'Custom',
+        manufacturer: 'Test',
+        releaseYear: 2000,
+        romExtensions: [],
+        accentColor: Color(0xFF000000),
+      );
+      const game = GameItem(
+        filename: 'game.gba',
+        displayName: 'game',
+        url: '',
+      );
+      // Non-archive → filename unchanged
+      expect(RomManager.getTargetFilename(game, noExtSystem), 'game.gba');
+    });
+  });
+
+  // ─── checkMultipleExists ───────────────────────────────────────
+
+  group('checkMultipleExists', () {
+    late Directory tempDir;
+    late RomManager romManager;
+    const testSystem = SystemModel(
+      id: 'gba',
+      name: 'Game Boy Advance',
+      manufacturer: 'Nintendo',
+      releaseYear: 2001,
+      romExtensions: ['.gba'],
+      accentColor: Color(0xFF4CAF50),
+    );
+
+    setUp(() {
+      tempDir = Directory.systemTemp.createTempSync('rom_manager_multi_');
+      romManager = RomManager();
+    });
+
+    tearDown(() {
+      tempDir.deleteSync(recursive: true);
+    });
+
+    test('returns correct map {0: true, 1: false, 2: true}', () async {
+      File('${tempDir.path}/game_a.gba').writeAsStringSync('rom');
+      File('${tempDir.path}/game_c.gba').writeAsStringSync('rom');
+
+      const variants = [
+        GameItem(filename: 'game_a.gba', displayName: 'A', url: ''),
+        GameItem(filename: 'game_b.gba', displayName: 'B', url: ''),
+        GameItem(filename: 'game_c.gba', displayName: 'C', url: ''),
+      ];
+
+      final result =
+          await romManager.checkMultipleExists(variants, testSystem, tempDir.path);
+
+      expect(result, {0: true, 1: false, 2: true});
+    });
+
+    test('returns empty map for empty list', () async {
+      final result =
+          await romManager.checkMultipleExists([], testSystem, tempDir.path);
+      expect(result, isEmpty);
+    });
+
+    test('all not found returns all false', () async {
+      const variants = [
+        GameItem(filename: 'x.gba', displayName: 'X', url: ''),
+        GameItem(filename: 'y.gba', displayName: 'Y', url: ''),
+      ];
+
+      final result =
+          await romManager.checkMultipleExists(variants, testSystem, tempDir.path);
+      expect(result, {0: false, 1: false});
+    });
+  });
+
+  // ─── getInstalledFilenames ─────────────────────────────────────
+
+  group('getInstalledFilenames', () {
+    late Directory tempDir;
+    late RomManager romManager;
+    const testSystem = SystemModel(
+      id: 'gba',
+      name: 'Game Boy Advance',
+      manufacturer: 'Nintendo',
+      releaseYear: 2001,
+      romExtensions: ['.gba'],
+      accentColor: Color(0xFF4CAF50),
+    );
+
+    setUp(() {
+      tempDir = Directory.systemTemp.createTempSync('rom_manager_installed_');
+      romManager = RomManager();
+    });
+
+    tearDown(() {
+      tempDir.deleteSync(recursive: true);
+    });
+
+    test('returns filenames of installed variants only', () async {
+      File('${tempDir.path}/pokemon.gba').writeAsStringSync('rom');
+
+      const variants = [
+        GameItem(filename: 'pokemon.gba', displayName: 'Pokemon', url: ''),
+        GameItem(filename: 'zelda.gba', displayName: 'Zelda', url: ''),
+      ];
+
+      final installed = await romManager.getInstalledFilenames(
+          variants, testSystem, tempDir.path);
+      expect(installed, {'pokemon.gba'});
+    });
+
+    test('returns empty set when none installed', () async {
+      const variants = [
+        GameItem(filename: 'missing_a.gba', displayName: 'A', url: ''),
+        GameItem(filename: 'missing_b.gba', displayName: 'B', url: ''),
+      ];
+
+      final installed = await romManager.getInstalledFilenames(
+          variants, testSystem, tempDir.path);
+      expect(installed, isEmpty);
+    });
+  });
+
+  // ─── isAnyVariantInstalled ─────────────────────────────────────
+
+  group('isAnyVariantInstalled', () {
+    late Directory tempDir;
+    late RomManager romManager;
+    const testSystem = SystemModel(
+      id: 'gba',
+      name: 'Game Boy Advance',
+      manufacturer: 'Nintendo',
+      releaseYear: 2001,
+      romExtensions: ['.gba'],
+      accentColor: Color(0xFF4CAF50),
+    );
+
+    setUp(() {
+      tempDir = Directory.systemTemp.createTempSync('rom_manager_any_');
+      romManager = RomManager();
+    });
+
+    tearDown(() {
+      tempDir.deleteSync(recursive: true);
+    });
+
+    test('returns true on first match', () async {
+      File('${tempDir.path}/zelda.gba').writeAsStringSync('rom');
+
+      const variants = [
+        GameItem(filename: 'missing.gba', displayName: 'Missing', url: ''),
+        GameItem(filename: 'zelda.gba', displayName: 'Zelda', url: ''),
+      ];
+
+      final result = await romManager.isAnyVariantInstalled(
+          variants, testSystem, tempDir.path);
+      expect(result, isTrue);
+    });
+
+    test('returns false when none installed', () async {
+      const variants = [
+        GameItem(filename: 'a.gba', displayName: 'A', url: ''),
+        GameItem(filename: 'b.gba', displayName: 'B', url: ''),
+      ];
+
+      final result = await romManager.isAnyVariantInstalled(
+          variants, testSystem, tempDir.path);
+      expect(result, isFalse);
+    });
+  });
+
+  // ─── delete edge cases ─────────────────────────────────────────
+
+  group('delete edge cases', () {
+    late Directory tempDir;
+    late RomManager romManager;
+    const testSystem = SystemModel(
+      id: 'gba',
+      name: 'Game Boy Advance',
+      manufacturer: 'Nintendo',
+      releaseYear: 2001,
+      romExtensions: ['.gba'],
+      accentColor: Color(0xFF4CAF50),
+    );
+
+    setUp(() {
+      tempDir = Directory.systemTemp.createTempSync('rom_manager_del_');
+      romManager = RomManager();
+    });
+
+    tearDown(() {
+      tempDir.deleteSync(recursive: true);
+    });
+
+    test('non-existent file/subfolder → no exception', () async {
+      const game = GameItem(
+        filename: 'does_not_exist.gba',
+        displayName: 'Ghost',
+        url: '',
+      );
+
+      // Should complete without throwing
+      await romManager.delete(game, testSystem, tempDir.path);
+    });
+  });
+
+  // ─── scanLocalGames with multiFileExtensions ───────────────────
+
+  group('scanLocalGames with multiFileExtensions', () {
+    late Directory tempDir;
+    const ps1System = SystemModel(
+      id: 'ps1',
+      name: 'PlayStation',
+      manufacturer: 'Sony',
+      releaseYear: 1994,
+      romExtensions: ['.chd', '.iso'],
+      multiFileExtensions: ['.bin', '.cue'],
+      accentColor: Color(0xFF2196F3),
+    );
+
+    setUp(() {
+      tempDir = Directory.systemTemp.createTempSync('rom_manager_multi_ext_');
+    });
+
+    tearDown(() {
+      tempDir.deleteSync(recursive: true);
+    });
+
+    test('subfolder with .bin/.cue is detected as game', () async {
+      final subDir = Directory('${tempDir.path}/Crash Bandicoot');
+      subDir.createSync();
+      File('${subDir.path}/game.bin').writeAsStringSync('data');
+      File('${subDir.path}/game.cue').writeAsStringSync('cue sheet');
+
+      final games = await RomManager.scanLocalGames(ps1System, tempDir.path);
+      expect(games.length, 1);
+      expect(games.first.filename, 'Crash Bandicoot');
+    });
+
+    test('individual .bin file without subfolder not detected (only in subDirExts)',
+        () async {
+      // A standalone .bin file should NOT be detected as a game
+      // because .bin is only in multiFileExtensions (subDirExts), not in romExtensions
+      File('${tempDir.path}/track01.bin').writeAsStringSync('data');
+
+      final games = await RomManager.scanLocalGames(ps1System, tempDir.path);
+      expect(games, isEmpty);
+    });
+  });
 }

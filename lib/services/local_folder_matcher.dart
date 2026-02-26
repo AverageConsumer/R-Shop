@@ -11,7 +11,7 @@ class LocalFolderMatcher {
     'gb': ['gameboy'],
     'gbc': ['gameboycolor'],
     'gba': ['gameboyadvance'],
-    'nds': ['nintendods'],
+    'nds': ['ds', 'nintendods'],
     'n3ds': ['3ds', 'nintendo3ds'],
     'gc': ['gamecube', 'ngc'],
     'wii': [],
@@ -20,7 +20,6 @@ class LocalFolderMatcher {
     'psx': ['ps1', 'playstation', 'playstation1'],
     'ps2': ['playstation2'],
     'ps3': ['playstation3'],
-    'ps4': ['playstation4'],
     'psp': ['playstationportable'],
     'psvita': ['vita'],
     'mastersystem': ['sms', 'segamastersystem'],
@@ -28,10 +27,13 @@ class LocalFolderMatcher {
     'gamegear': ['gg', 'segagamegear'],
     'dreamcast': ['dc', 'segadreamcast'],
     'saturn': ['segasaturn'],
-    'ngpc': ['neogeopocketcolor', 'neogeopocket'],
-    'arcade': ['mame', 'fbneo', 'fbalpha'],
-    'xbox': [],
-    'xbox360': [],
+    'segacd': ['megacd', 'scd'],
+    'sega32x': ['32x'],
+    'atari2600': ['2600', 'vcs'],
+    'atari5200': ['5200'],
+    'atari7800': ['7800'],
+    'lynx': ['atarilynx'],
+    'pico8': ['pico-8'],
   };
 
   // Reverse lookup: alias → system.id
@@ -41,7 +43,7 @@ class LocalFolderMatcher {
     final map = <String, String>{};
     for (final entry in _aliasMap.entries) {
       for (final alias in entry.value) {
-        map[alias] = entry.key;
+        map[_normalize(alias)] = entry.key;
       }
     }
     return map;
@@ -75,8 +77,11 @@ class LocalFolderMatcher {
       if (id.toLowerCase() == lower) return id;
     }
 
-    // 3. Alias map
+    // 2.5 Normalized match on system.id (strips _-spaces)
     final normalized = _normalize(folderName);
+    if (systemIds.contains(normalized)) return normalized;
+
+    // 3. Alias map
     final aliasMatch = _reverseLookup[normalized];
     if (aliasMatch != null && systemIds.contains(aliasMatch)) return aliasMatch;
 

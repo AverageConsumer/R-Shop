@@ -69,6 +69,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
   @override
   void onSearchQueryChanged(String query) {
+    if (!mounted) return;
     final prevCount = _controller.state.filteredGroups.length;
     _controller.filterGames(query);
     final newCount = _controller.state.filteredGroups.length;
@@ -212,8 +213,11 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   void _restoreSavedIndex() {
     final saved = getSavedFocusState();
     if (saved?.selectedIndex != null && saved!.selectedIndex! > 0) {
-      _focusManager.setSelectedIndex(saved.selectedIndex!);
-      _selectedIndexNotifier.value = saved.selectedIndex!;
+      final maxIndex = _controller.state.filteredGroups.length - 1;
+      if (maxIndex < 0) return;
+      final clampedIndex = saved.selectedIndex!.clamp(0, maxIndex);
+      _focusManager.setSelectedIndex(clampedIndex);
+      _selectedIndexNotifier.value = clampedIndex;
     }
   }
 
@@ -221,7 +225,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   void dispose() {
     // Capture before dispose, defer save to avoid provider modification during finalization
     final selectedIndex = _focusManager.selectedIndex;
-    Future.delayed(Duration.zero, () {
+    Future.microtask(() {
       focusStateManager.saveFocusState(routeId, selectedIndex: selectedIndex);
     });
 

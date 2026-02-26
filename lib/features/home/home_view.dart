@@ -510,6 +510,16 @@ class _HomeViewState extends ConsumerState<HomeView>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _scrollToSelected();
       });
+    } else if (!isGrid && _wasGrid) {
+      // Grid→Carousel: jump PageController to match _currentIndex
+      final targetPage =
+          _initialPage - (_initialPage % _totalItemCount) + _currentIndex;
+      _lastStablePage = targetPage;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _pageController.hasClients) {
+          _pageController.jumpToPage(targetPage);
+        }
+      });
     }
     _wasGrid = isGrid;
 

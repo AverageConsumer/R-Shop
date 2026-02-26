@@ -18,7 +18,7 @@ class DownloadActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
-    final (color, icon, tooltip) = _getConfig();
+    final (color, icon, _) = _getConfig();
     final buttonSize = rs.isSmall ? 34.0 : 40.0;
 
     return GestureDetector(

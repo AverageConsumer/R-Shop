@@ -45,7 +45,7 @@ class ThumbnailMigrationService {
                 );
               }
             } catch (e) {
-              // Skip failures — they'll get thumbnails on next view
+              debugPrint('Thumbnail migration: skipping ${row['filename']}: $e');
             }
           }),
         );

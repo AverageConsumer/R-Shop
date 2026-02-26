@@ -190,12 +190,11 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
   }
 
   Future<void> _editName() async {
-    final controller = TextEditingController(text: _name);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => TextInputDialog(
         title: 'Shelf Name',
-        controller: controller,
+        initialValue: _name,
         onSubmit: (value) => Navigator.pop(ctx, value),
       ),
     );
@@ -207,13 +206,12 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
 
   Future<void> _editFilterText(int index) async {
     final rule = _filterRules[index];
-    final controller = TextEditingController(text: rule.textQuery ?? '');
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => TextInputDialog(
         title: 'Filter Text',
         hintText: 'e.g. Pokemon',
-        controller: controller,
+        initialValue: rule.textQuery ?? '',
         onSubmit: (value) => Navigator.pop(ctx, value),
       ),
     );
