@@ -75,6 +75,22 @@ class GameMetadata {
     return name;
   }
 
+  /// Like [cleanTitle] but preserves parenthesized/bracketed tags (region,
+  /// version, etc.) so that multiple ROM variants remain distinguishable.
+  static String fileTitle(String filename) {
+    var name = filename;
+    final extensions = SystemModel.allGameExtensions;
+    for (final ext in extensions) {
+      if (name.toLowerCase().endsWith(ext)) {
+        name = name.substring(0, name.length - ext.length);
+        break;
+      }
+    }
+    name = name.replaceAll('_', ' ');
+    name = name.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return name;
+  }
+
   static RegionInfo extractRegion(String filename) {
     final regionPatterns = _getOrderedRegionPatterns();
 

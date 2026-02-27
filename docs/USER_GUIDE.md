@@ -261,7 +261,7 @@ A standard FTP server.
 
 **Example:** Host `192.168.1.100`, Port `21`, Path `/roms/snes`
 
-**Note:** Anonymous login is used when no credentials are provided. Connection timeout is 30 seconds.
+**Note:** Anonymous login is used when no credentials are provided. Connection timeout is 30 seconds. Directory listing operations allow up to 60 seconds.
 
 ### RomM Provider
 
@@ -307,6 +307,8 @@ R-Shop uses a queue system for managing file downloads.
 | Progress updates | Every 500ms with speed (KB/s) and percentage |
 | Inactivity timeout | 60 seconds of no data received |
 | HTTP timeouts | 30s connection, 5 min idle |
+| FTP timeouts | 30s connection, 60s directory listing |
+| SMB timeout | 30s connection |
 
 ### Persistence
 
@@ -315,6 +317,8 @@ The download queue survives app restarts. Active downloads resume from the queue
 ### Archive Extraction
 
 ZIP files are extracted automatically when the system has auto-extract enabled. Multi-file games (e.g. PlayStation .bin/.cue pairs) are extracted into subfolders, preserving the file structure.
+
+Multi-file games (bin/cue pairs) can also be downloaded as complete folders directly via SMB and FTP providers, without needing archives.
 
 7z archives are moved directly without extraction.
 
@@ -461,7 +465,7 @@ The PlayStation layout uses symbol buttons:
 
 ## Supported Systems
 
-R-Shop supports 27 systems across 6 manufacturers. All systems support archive formats (`.zip`, `.7z`, `.rar`) in addition to their native ROM extensions.
+R-Shop supports 29 systems across 5 manufacturers. All systems support archive formats (`.zip`, `.7z`, `.rar`) in addition to their native ROM extensions.
 
 ### Nintendo
 
@@ -486,10 +490,9 @@ R-Shop supports 27 systems across 6 manufacturers. All systems support archive f
 |--------|----|------|----------------|
 | PlayStation | `psx` | 1994 | `.chd`, `.pbp`, `.cue`, `.iso`, `.img` |
 | PlayStation 2 | `ps2` | 2000 | `.iso`, `.chd`, `.cso` |
-| PlayStation Portable | `psp` | 2004 | `.iso`, `.cso`, `.pbp` |
+| PlayStation Portable | `psp` | 2004 | `.iso`, `.cso`, `.pbp`, `.chd` |
 | PlayStation 3 | `ps3` | 2006 | `.iso`, `.pkg` |
 | PlayStation Vita | `psvita` | 2011 | `.vpk` |
-| PlayStation 4 | `ps4` | 2013 | `.pkg` |
 
 Multi-file systems: PlayStation and PlayStation 2 support `.bin` + `.cue` pairs. When downloading archives containing multiple `.bin` files, R-Shop extracts them into a subfolder preserving the file structure.
 
@@ -500,29 +503,27 @@ Multi-file systems: PlayStation and PlayStation 2 support `.bin` + `.cue` pairs.
 | Master System | `mastersystem` | 1985 | `.sms` |
 | Mega Drive | `megadrive` | 1988 | `.md`, `.gen`, `.bin`, `.smd` |
 | Game Gear | `gamegear` | 1990 | `.gg` |
+| Sega CD | `segacd` | 1991 | `.chd`, `.cue`, `.iso` |
+| Sega 32X | `sega32x` | 1994 | `.32x` |
 | Saturn | `saturn` | 1994 | `.chd`, `.cue`, `.iso` |
 | Dreamcast | `dreamcast` | 1998 | `.chd`, `.cdi`, `.gdi` |
 
-Saturn also supports `.bin` + `.cue` multi-file pairs.
+Sega CD and Saturn also support `.bin` + `.cue` multi-file pairs.
 
-### SNK
-
-| System | ID | Year | ROM Extensions |
-|--------|----|------|----------------|
-| Neo Geo Pocket Color | `ngpc` | 1999 | `.ngc`, `.ngp` |
-
-### Arcade
+### Atari
 
 | System | ID | Year | ROM Extensions |
 |--------|----|------|----------------|
-| Arcade | `arcade` | 1978 | `.zip`, `.7z` |
+| Atari 2600 | `atari2600` | 1977 | `.a26`, `.bin` |
+| Atari 5200 | `atari5200` | 1982 | `.a52`, `.bin` |
+| Atari 7800 | `atari7800` | 1986 | `.a78`, `.bin` |
+| Atari Lynx | `lynx` | 1989 | `.lnx` |
 
-### Microsoft
+### Other
 
 | System | ID | Year | ROM Extensions |
 |--------|----|------|----------------|
-| Xbox | `xbox` | 2001 | `.iso` |
-| Xbox 360 | `xbox360` | 2005 | `.iso`, `.xex` |
+| PICO-8 | `pico8` | 2015 | `.p8` |
 
 ---
 

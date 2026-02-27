@@ -330,6 +330,39 @@ void main() {
     });
   });
 
+  group('File Title', () {
+    test('Extension is removed', () {
+      expect(GameMetadata.fileTitle('Game.zip'), equals('Game'));
+      expect(GameMetadata.fileTitle('Game.7z'), equals('Game'));
+      expect(GameMetadata.fileTitle('Game.rvz'), equals('Game'));
+    });
+
+    test('Tags in parentheses and brackets are preserved', () {
+      expect(GameMetadata.fileTitle('Super Mario (USA).zip'),
+          equals('Super Mario (USA)'));
+      expect(GameMetadata.fileTitle('Game (Japan) (v1.0).zip'),
+          equals('Game (Japan) (v1.0)'));
+      expect(GameMetadata.fileTitle('Game [!].zip'), equals('Game [!]'));
+    });
+
+    test('Underscores are replaced with spaces', () {
+      expect(GameMetadata.fileTitle('Game_Name_(USA).zip'),
+          equals('Game Name (USA)'));
+    });
+
+    test('Multiple spaces are collapsed', () {
+      expect(GameMetadata.fileTitle('Game   Name.zip'), equals('Game Name'));
+    });
+
+    test('Multiple variants are distinguishable', () {
+      final usa = GameMetadata.fileTitle('Super Mario (USA).zip');
+      final beta = GameMetadata.fileTitle('Super Mario (Beta).zip');
+      final revA = GameMetadata.fileTitle('Super Mario (USA) (Rev A).zip');
+      expect(usa, isNot(equals(beta)));
+      expect(usa, isNot(equals(revA)));
+    });
+  });
+
   group('File Type', () {
     test('File type is correctly identified', () {
       expect(GameMetadata.getFileType('game.zip'), equals('ZIP'));

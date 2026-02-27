@@ -5,6 +5,7 @@ import '../models/system_model.dart';
 import '../utils/image_helper.dart';
 import 'database_service.dart';
 import 'image_cache_service.dart';
+import 'thumbnail_index_service.dart';
 import 'thumbnail_service.dart';
 
 class CoverPreloadState {
@@ -50,6 +51,7 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
   CoverPreloadService() : super(const CoverPreloadState());
 
   bool _cancelled = false;
+  ThumbnailIndexService? _indexService;
 
   Future<void> preloadAll(DatabaseService db, {int phase1Pool = 6, int phase2Pool = 4}) async {
     if (state.isRunning) return;
@@ -95,7 +97,24 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
       ),
     );
 
-    // Phase 2 — Games without cover_url (needs URL resolution)
+    // Index preload — download system indexes for Phase 2 fuzzy fallback
+    if (!_cancelled && phase2.isNotEmpty) {
+      _indexService ??= ThumbnailIndexService();
+      final systemIds = <String>{};
+      for (final row in phase2) {
+        final slug = row['systemSlug'] as String;
+        final system = systemMap[slug];
+        if (system != null && system.libretroId.isNotEmpty) {
+          systemIds.add(system.libretroId);
+        }
+      }
+      // Download indexes in parallel
+      await Future.wait(
+        systemIds.map((id) => _indexService!.loadIndex(id)),
+      );
+    }
+
+    // Phase 2 — Games without cover_url (URL resolution + fuzzy fallback)
     if (!_cancelled) {
       await _processPool(
         items: phase2,
@@ -222,14 +241,65 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
           continue;
         }
       }
-      return false;
+
+      // Fuzzy fallback: try matching against system thumbnail index
+      return _tryFuzzyMatch(
+        db: db,
+        filename: filename,
+        system: system,
+      );
     } catch (e) {
       debugPrint('Cover URL resolution failed for $filename: $e');
       return false;
     }
   }
 
+  Future<bool> _tryFuzzyMatch({
+    required DatabaseService db,
+    required String filename,
+    required SystemModel system,
+  }) async {
+    final indexService = _indexService;
+    if (indexService == null) return false;
+
+    final match = indexService.findBestMatch(system.libretroId, filename);
+    if (match == null) return false;
+
+    final url = ThumbnailIndexService.buildUrl(system.libretroId, match);
+    if (FailedUrlsCache.instance.hasFailed(url)) return false;
+
+    try {
+      final file = await GameCoverCacheManager.instance.getSingleFile(url);
+      if (!isValidImageFile(file)) {
+        await GameCoverCacheManager.instance.removeFile(url);
+        FailedUrlsCache.instance.markFailed(url);
+        return false;
+      }
+
+      await db.updateGameCover(filename, url);
+
+      ThumbnailService.generateThumbnail(url).then((result) {
+        if (result.success) {
+          db.updateGameThumbnailData(filename, hasThumbnail: true);
+        }
+      }).catchError((e) {
+        debugPrint('Thumbnail generation failed for $filename: $e');
+      });
+      return true;
+    } catch (e) {
+      debugPrint('CoverPreload: fuzzy match fetch failed for $url: $e');
+      FailedUrlsCache.instance.markFailed(url);
+      return false;
+    }
+  }
+
   void cancel() {
     _cancelled = true;
+  }
+
+  @override
+  void dispose() {
+    _indexService?.dispose();
+    super.dispose();
   }
 }

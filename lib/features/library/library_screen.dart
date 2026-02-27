@@ -287,9 +287,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         } catch (e) { debugPrint('LibraryScreen: provider config parse failed: $e'); }
       }
 
+      final fname = row['filename'] as String;
       entries.add(LibraryEntry(
-        filename: row['filename'] as String,
-        displayName: GameMetadata.cleanTitle(row['filename'] as String),
+        filename: fname,
+        displayName: GameMetadata.cleanTitle(fname),
+        cardTitle: GameMetadata.fileTitle(fname),
         url: row['url'] as String,
         coverUrl: row['cover_url'] as String?,
         systemSlug: systemSlug,
@@ -348,9 +350,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       // Tab filter
       switch (_selectedTab) {
         case 1: // Installed
-          games = games
-              .where((g) => _isGameInstalled(g))
-              .toList();
+          games = _deduplicateInstalled(
+            games.where((g) => _isGameInstalled(g)).toList(),
+          );
         case 2: // Favorites
           games =
               games.where((g) => _favoriteIds.contains(g.filename)).toList();
@@ -669,6 +671,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       _allGames[idx] = LibraryEntry(
         filename: entry.filename,
         displayName: entry.displayName,
+        cardTitle: entry.cardTitle,
         url: entry.url,
         coverUrl: url,
         systemSlug: entry.systemSlug,
@@ -691,6 +694,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         _allGames[idx] = LibraryEntry(
           filename: entry.filename,
           displayName: entry.displayName,
+          cardTitle: entry.cardTitle,
           url: entry.url,
           coverUrl: entry.coverUrl,
           systemSlug: entry.systemSlug,
@@ -1001,10 +1005,33 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     return false;
   }
 
+  /// Deduplicates installed entries that share the same display name and system
+  /// (e.g., Mario.iso and Mario.zip both matching after archive-fallback).
+  /// Prefers the entry with an exact filesystem match.
+  List<LibraryEntry> _deduplicateInstalled(List<LibraryEntry> games) {
+    final seen = <String, LibraryEntry>{};
+    for (final game in games) {
+      final key = '${game.systemSlug}::${game.displayName.toLowerCase()}';
+      final existing = seen[key];
+      if (existing == null) {
+        seen[key] = game;
+      } else {
+        final gameIsExact = _installedFiles.contains(game.filename);
+        final existingIsExact = _installedFiles.contains(existing.filename);
+        if (gameIsExact && !existingIsExact) {
+          seen[key] = game;
+        }
+      }
+    }
+    return seen.values.toList();
+  }
+
   int get _allCount => _allGames.length;
 
   int get _installedCount =>
-      _allGames.where((g) => _isGameInstalled(g)).length;
+      _deduplicateInstalled(
+        _allGames.where((g) => _isGameInstalled(g)).toList(),
+      ).length;
 
   int get _favoritesCount =>
       _allGames.where((g) => _favoriteIds.contains(g.filename)).length;
@@ -1263,7 +1290,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
             selectedIndexNotifier: _selectedIndexNotifier,
             index: index,
             builder: (isSelected) => BaseGameCard(
-              displayName: entry.displayName,
+              displayName: entry.cardTitle,
               systemLabel: systemLabel,
               accentColor: systemColor,
               coverUrls: coverUrls,
