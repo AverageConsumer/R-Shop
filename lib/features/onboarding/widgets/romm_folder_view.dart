@@ -297,6 +297,39 @@ class FolderResultsView extends ConsumerWidget {
               child: FocusTraversalGroup(
                 child: ListView(
                   children: [
+                    // Scan error warning
+                    if (rommSetup.scanError != null)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: rs.spacing.md),
+                        child: Container(
+                          padding: EdgeInsets.all(rs.spacing.md),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.1),
+                            borderRadius:
+                                BorderRadius.circular(rs.radius.sm),
+                            border: Border.all(
+                              color: Colors.orange.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.warning_amber_rounded,
+                                  color: Colors.orange.shade300, size: 18),
+                              SizedBox(width: rs.spacing.sm),
+                              Expanded(
+                                child: Text(
+                                  rommSetup.scanError!,
+                                  style: TextStyle(
+                                    color: Colors.orange.shade300,
+                                    fontSize: rs.isSmall ? 10.0 : 12.0,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     // Matched folders (RomM)
                     for (final (i, folder) in matched.indexed)
                       FolderRow(
@@ -497,7 +530,7 @@ class FolderRow extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: rs.spacing.xs),
       child: ConsoleFocusableListItem(
-        onSelect: () {},
+        onSelect: isManuallyAssigned && onUnassign != null ? onUnassign! : () {},
         autofocus: autofocus,
         borderRadius: rs.radius.sm,
         padding: EdgeInsets.symmetric(
@@ -689,7 +722,9 @@ class UnmatchedFolderRow extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: rs.spacing.xs),
       child: ConsoleFocusableListItem(
-        onSelect: () {},
+        onSelect: availableSystemIds.isNotEmpty
+            ? () => onAssign(availableSystemIds.first)
+            : null,
         borderRadius: rs.radius.sm,
         padding: EdgeInsets.symmetric(
           horizontal: rs.spacing.md,

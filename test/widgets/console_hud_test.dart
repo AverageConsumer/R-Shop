@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,7 +40,7 @@ void main() {
       expect(find.byType(ControlButton), findsNothing);
     });
 
-    testWidgets('Nintendo layout shows A/B labels', (tester) async {
+    testWidgets('Nintendo layout renders SVG buttons for A/B', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.nintendo);
       await tester.pumpWidget(createTestAppWithProviders(
         const Stack(children: [
@@ -51,13 +52,13 @@ void main() {
         overrides: _overrides(storage),
       ));
 
-      expect(find.text('A'), findsOneWidget);
-      expect(find.text('B'), findsOneWidget);
+      // Both A and B should render as SVG icons
+      expect(find.byType(SvgPicture), findsNWidgets(2));
       expect(find.text('Confirm'), findsOneWidget);
       expect(find.text('Back'), findsOneWidget);
     });
 
-    testWidgets('Xbox layout shows A/B labels (swapped display positions)', (tester) async {
+    testWidgets('Xbox layout renders SVG buttons (swapped display positions)', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.xbox);
       await tester.pumpWidget(createTestAppWithProviders(
         const Stack(children: [
@@ -69,15 +70,12 @@ void main() {
         overrides: _overrides(storage),
       ));
 
-      // Xbox: labelA='B', labelB='A'; displayA=b, displayB=a
-      // So we still see 'A' and 'B' texts but with swapped actions
-      expect(find.text('A'), findsOneWidget);
-      expect(find.text('B'), findsOneWidget);
+      expect(find.byType(SvgPicture), findsNWidgets(2));
       expect(find.text('Confirm'), findsOneWidget);
       expect(find.text('Back'), findsOneWidget);
     });
 
-    testWidgets('PlayStation layout uses CustomPaint instead of text labels', (tester) async {
+    testWidgets('PlayStation layout renders SVG icons', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.playstation);
       await tester.pumpWidget(createTestAppWithProviders(
         const Stack(children: [
@@ -89,13 +87,12 @@ void main() {
         overrides: _overrides(storage),
       ));
 
-      // PlayStation uses painters, not text labels
-      expect(find.byType(CustomPaint), findsWidgets);
+      expect(find.byType(SvgPicture), findsNWidgets(2));
       expect(find.text('Confirm'), findsOneWidget);
       expect(find.text('Back'), findsOneWidget);
     });
 
-    testWidgets('Xbox face buttons have colors', (tester) async {
+    testWidgets('Xbox face buttons all render SVGs', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.xbox);
       await tester.pumpWidget(createTestAppWithProviders(
         const Stack(children: [
@@ -109,11 +106,11 @@ void main() {
         overrides: _overrides(storage),
       ));
 
-      // All 4 face buttons rendered
       expect(find.byType(ControlButton), findsNWidgets(4));
+      expect(find.byType(SvgPicture), findsNWidgets(4));
     });
 
-    testWidgets('Nintendo Start shows NintendoPlusPainter', (tester) async {
+    testWidgets('Nintendo Start renders SVG (plus button)', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.nintendo);
       await tester.pumpWidget(createTestAppWithProviders(
         const Stack(children: [
@@ -122,13 +119,10 @@ void main() {
         overrides: _overrides(storage),
       ));
 
-      final finder = find.byWidgetPredicate(
-        (w) => w is CustomPaint && w.painter is NintendoPlusPainter,
-      );
-      expect(finder, findsOneWidget);
+      expect(find.byType(SvgPicture), findsOneWidget);
     });
 
-    testWidgets('Xbox Start shows menu icon', (tester) async {
+    testWidgets('Xbox Start renders SVG (menu button)', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.xbox);
       await tester.pumpWidget(createTestAppWithProviders(
         const Stack(children: [
@@ -137,10 +131,10 @@ void main() {
         overrides: _overrides(storage),
       ));
 
-      expect(find.byIcon(Icons.menu_rounded), findsOneWidget);
+      expect(find.byType(SvgPicture), findsOneWidget);
     });
 
-    testWidgets('PlayStation Start=menu, Select=share icons', (tester) async {
+    testWidgets('PlayStation Start/Select render SVGs', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.playstation);
       await tester.pumpWidget(createTestAppWithProviders(
         const Stack(children: [
@@ -152,11 +146,10 @@ void main() {
         overrides: _overrides(storage),
       ));
 
-      expect(find.byIcon(Icons.menu_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.share_rounded), findsOneWidget);
+      expect(find.byType(SvgPicture), findsNWidgets(2));
     });
 
-    testWidgets('Nintendo LB/RB labels are L/R', (tester) async {
+    testWidgets('Nintendo LB/RB render SVGs', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.nintendo);
       await tester.pumpWidget(createTestAppWithProviders(
         const Stack(children: [
@@ -168,11 +161,10 @@ void main() {
         overrides: _overrides(storage),
       ));
 
-      expect(find.text('L'), findsOneWidget);
-      expect(find.text('R'), findsOneWidget);
+      expect(find.byType(SvgPicture), findsNWidgets(2));
     });
 
-    testWidgets('Xbox LB/RB labels are LB/RB', (tester) async {
+    testWidgets('Xbox LB/RB render SVGs', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.xbox);
       await tester.pumpWidget(createTestAppWithProviders(
         const Stack(children: [
@@ -184,11 +176,10 @@ void main() {
         overrides: _overrides(storage),
       ));
 
-      expect(find.text('LB'), findsOneWidget);
-      expect(find.text('RB'), findsOneWidget);
+      expect(find.byType(SvgPicture), findsNWidgets(2));
     });
 
-    testWidgets('PlayStation LB/RB labels are L1/R1', (tester) async {
+    testWidgets('PlayStation LB/RB render SVGs', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.playstation);
       await tester.pumpWidget(createTestAppWithProviders(
         const Stack(children: [
@@ -200,8 +191,7 @@ void main() {
         overrides: _overrides(storage),
       ));
 
-      expect(find.text('L1'), findsOneWidget);
-      expect(find.text('R1'), findsOneWidget);
+      expect(find.byType(SvgPicture), findsNWidgets(2));
     });
 
     testWidgets('embedded=true has no Positioned wrapper', (tester) async {

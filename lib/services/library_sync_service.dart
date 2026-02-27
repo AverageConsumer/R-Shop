@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/config/app_config.dart';
 import '../models/game_item.dart';
 import '../models/system_model.dart';
+import '../utils/friendly_error.dart';
 import '../utils/game_merge_helper.dart';
 import 'database_service.dart';
 import 'rom_manager.dart';
@@ -235,36 +236,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     });
   }
 
-  static String _userFriendlyError(Object e) {
-    final msg = e.toString();
-    if (msg.contains('SocketException') || msg.contains('Connection refused')) {
-      return 'Server unreachable — check your network connection';
-    }
-    if (msg.contains('HandshakeException') || msg.contains('CERTIFICATE_VERIFY')) {
-      return 'SSL/TLS error — check server certificate';
-    }
-    if (msg.contains('TimeoutException') || msg.contains('timed out')) {
-      return 'Connection timed out';
-    }
-    if (msg.contains('401') || msg.contains('Unauthorized')) {
-      return 'Authentication failed — check credentials';
-    }
-    if (msg.contains('403') || msg.contains('Forbidden')) {
-      return 'Access denied — check permissions';
-    }
-    if (msg.contains('404') || msg.contains('Not Found')) {
-      return 'Resource not found — check URL';
-    }
-    if (msg.contains('SMB') || msg.contains('smb')) {
-      return 'SMB connection failed — check share settings';
-    }
-    if (msg.contains('FTP') || msg.contains('ftp')) {
-      return 'FTP connection failed — check host/credentials';
-    }
-    // Truncate long error messages
-    if (msg.length > 100) return '${msg.substring(0, 100)}…';
-    return msg;
-  }
+  static String _userFriendlyError(Object e) =>
+      getUserFriendlyError(e, returnRawOnNoMatch: true);
 
   void cancel() {
     _isCancelled = true;

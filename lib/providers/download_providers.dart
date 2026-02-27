@@ -5,7 +5,10 @@ import 'app_providers.dart';
 
 final downloadQueueManagerProvider =
     ChangeNotifierProvider<DownloadQueueManager>((ref) {
-  return DownloadQueueManager(ref.read(storageServiceProvider));
+  return DownloadQueueManager(
+    ref.read(storageServiceProvider),
+    ref.read(nativeSmbServiceProvider),
+  );
 });
 
 final downloadQueueProvider = Provider<List<DownloadItem>>((ref) {

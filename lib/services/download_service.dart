@@ -1,13 +1,17 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/game_item.dart';
 import '../models/system_model.dart';
+import '../utils/file_utils.dart';
 import '../utils/friendly_error.dart';
+import '../utils/network_constants.dart';
 import 'download_handle.dart';
+import 'native_smb_service.dart';
 import 'provider_factory.dart';
 import 'rom_manager.dart';
 
@@ -74,23 +78,29 @@ class DownloadService {
   static const _zipChannel = MethodChannel('com.retro.rshop/zip');
   static const _zipProgressChannel = EventChannel('com.retro.rshop/zip_progress');
 
+  final NativeSmbService _smbService;
+
   HttpClient? _httpClient;
   String? _tempFilePath;
+  Directory? _folderTempDir;
   Directory? _extractTempDir;
   bool _isCancelled = false;
   bool _isDownloadInProgress = false;
   StreamSubscription? _downloadSubscription;
   StreamSubscription? _zipProgressSubscription;
+  StreamSubscription? _smbProgressSubscription;
   StreamController<DownloadProgress>? _progressController;
   Future<void> Function()? _activeConnectionCleanup;
+  String? _activeSmbDownloadId;
 
   static const int _progressIntervalMs = 500;
   static const int _initialDelayMs = 1000;
+  static const int _writeBufferThreshold = 256 * 1024; // 256KB
 
-  DownloadService() {
+  DownloadService(this._smbService) {
     _httpClient = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 30)
-      ..idleTimeout = const Duration(minutes: 5);
+      ..connectionTimeout = NetworkTimeouts.httpConnect
+      ..idleTimeout = NetworkTimeouts.httpIdle;
   }
 
   /// Cleans up orphaned temp files from interrupted downloads.
@@ -127,6 +137,11 @@ class DownloadService {
     _tempFilePath = null;
     _downloadSubscription?.cancel();
     _downloadSubscription = null;
+    _zipProgressSubscription?.cancel();
+    _zipProgressSubscription = null;
+    _smbProgressSubscription?.cancel();
+    _smbProgressSubscription = null;
+    _activeSmbDownloadId = null;
   }
 
   Future<void> cancelDownload({bool preserveTempFile = false}) async {
@@ -135,8 +150,17 @@ class DownloadService {
     _downloadSubscription = null;
     _zipProgressSubscription?.cancel();
     _zipProgressSubscription = null;
+    _smbProgressSubscription?.cancel();
+    _smbProgressSubscription = null;
 
-    // Close active SMB/FTP connections
+    // Cancel active native SMB download
+    final smbId = _activeSmbDownloadId;
+    _activeSmbDownloadId = null;
+    if (smbId != null) {
+      await _smbService.cancelDownload(smbId);
+    }
+
+    // Close active FTP connections
     try {
       await _activeConnectionCleanup?.call();
     } catch (e) {
@@ -155,6 +179,15 @@ class DownloadService {
       }
     }
 
+    // Clean up any folder download temp directory
+    final folderDir = _folderTempDir;
+    _folderTempDir = null;
+    if (folderDir != null && await folderDir.exists()) {
+      try { await folderDir.delete(recursive: true); } catch (e) {
+        debugPrint('DownloadService: folder temp dir cleanup failed: $e');
+      }
+    }
+
     // Clean up any partially extracted files
     final extractDir = _extractTempDir;
     _extractTempDir = null;
@@ -166,8 +199,8 @@ class DownloadService {
 
     _httpClient?.close(force: true);
     _httpClient = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 30)
-      ..idleTimeout = const Duration(minutes: 5);
+      ..connectionTimeout = NetworkTimeouts.httpConnect
+      ..idleTimeout = NetworkTimeouts.httpIdle;
 
     _isDownloadInProgress = false;
   }
@@ -186,18 +219,21 @@ class DownloadService {
     }
     _downloadSubscription?.cancel();
     _downloadSubscription = null;
+    _zipProgressSubscription?.cancel();
+    _zipProgressSubscription = null;
 
     final controller = StreamController<DownloadProgress>();
     _progressController = controller;
     _isDownloadInProgress = false;
 
-    try {
-      _startDownload(game, targetFolder, system,
-          existingTempFilePath: existingTempFilePath);
-    } catch (e) {
-      controller.addError(e);
-      controller.close();
-    }
+    _startDownload(game, targetFolder, system,
+        existingTempFilePath: existingTempFilePath)
+      .catchError((e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+          controller.close();
+        }
+      });
 
     return controller.stream;
   }
@@ -269,10 +305,16 @@ class DownloadService {
       switch (handle) {
         case HttpDownloadHandle():
           await _downloadHttp(handle, tempFile);
-        case SmbDownloadHandle():
-          await _downloadSmb(handle, tempFile);
+        case NativeSmbDownloadHandle():
+          await _downloadNativeSmb(handle, tempFile);
         case FtpDownloadHandle():
           await _downloadFtp(handle, tempFile);
+        case NativeSmbFolderDownloadHandle():
+          await _downloadNativeSmbFolder(handle, game, targetFolder);
+          return; // folder download handles its own post-processing
+        case FtpFolderDownloadHandle():
+          await _downloadFtpFolder(handle, game, targetFolder);
+          return; // folder download handles its own post-processing
       }
 
       if (_isCancelled) {
@@ -301,8 +343,8 @@ class DownloadService {
   }) async {
     _httpClient?.close(force: true);
     _httpClient = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 30)
-      ..idleTimeout = const Duration(minutes: 5);
+      ..connectionTimeout = NetworkTimeouts.httpConnect
+      ..idleTimeout = NetworkTimeouts.httpIdle;
 
     final client = _httpClient;
     if (client == null) throw StateError('DownloadService has been disposed');
@@ -374,34 +416,36 @@ class DownloadService {
 
     final effectiveTotalBytes = totalBytes > 0 ? totalBytes : null;
     final sink = tempFile.openWrite(mode: writeMode);
-    int lastUpdateTime = DateTime.now().millisecondsSinceEpoch;
+    int lastUpdateTime = 0;
     // Stopwatch only measures new bytes for speed calculation
     final stopwatch = Stopwatch()..start();
     int newBytes = 0;
 
     final completer = Completer<void>();
 
-    // Inactivity timer: cancel if no data received for 60s
-    Timer? inactivityTimer;
-    void resetInactivityTimer() {
-      inactivityTimer?.cancel();
-      inactivityTimer = Timer(const Duration(seconds: 60), () {
-        inactivityTimer = null;
+    // Inactivity detection: timestamp + periodic check (avoids Timer churn per chunk)
+    int lastDataTick = 0;
+    final inactivityCheck = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (stopwatch.elapsedMilliseconds - lastDataTick > 60000) {
         if (!completer.isCompleted) {
           _downloadSubscription?.cancel();
           sink.close().catchError((e) { debugPrint('DownloadService: sink close on stall: $e'); });
           completer.completeError(
               Exception('Download stalled — no data received for 60 seconds'));
         }
-      });
-    }
+      }
+    });
 
-    resetInactivityTimer();
+    // Write buffer: accumulate chunks, flush at threshold to reduce syscalls
+    final writeBuffer = BytesBuilder(copy: false);
 
     _downloadSubscription = response.listen(
       (chunk) {
         if (_isCancelled) {
-          inactivityTimer?.cancel();
+          inactivityCheck.cancel();
+          if (writeBuffer.length > 0) {
+            sink.add(writeBuffer.takeBytes());
+          }
           _downloadSubscription?.cancel();
           _downloadSubscription = null;
           sink.close().catchError((e) { debugPrint('DownloadService: sink close on cancel: $e'); });
@@ -409,20 +453,27 @@ class DownloadService {
           return;
         }
 
-        sink.add(chunk);
+        writeBuffer.add(chunk);
         downloadedBytes += chunk.length;
         newBytes += chunk.length;
-        resetInactivityTimer();
+        lastDataTick = stopwatch.elapsedMilliseconds;
 
-        final now = DateTime.now().millisecondsSinceEpoch;
+        if (writeBuffer.length >= _writeBufferThreshold) {
+          sink.add(writeBuffer.takeBytes());
+        }
+
+        final now = stopwatch.elapsedMilliseconds;
         if (now - lastUpdateTime >= _progressIntervalMs) {
           lastUpdateTime = now;
           _emitResumeProgress(downloadedBytes, effectiveTotalBytes, newBytes, stopwatch);
         }
       },
       onDone: () async {
-        inactivityTimer?.cancel();
+        inactivityCheck.cancel();
         if (_isCancelled) {
+          if (writeBuffer.length > 0) {
+            sink.add(writeBuffer.takeBytes());
+          }
           try { await sink.close(); } catch (e) {
             debugPrint('DownloadService: sink close on cancel done: $e');
           }
@@ -430,6 +481,9 @@ class DownloadService {
           return;
         }
         try {
+          if (writeBuffer.length > 0) {
+            sink.add(writeBuffer.takeBytes());
+          }
           await sink.close();
           _emitResumeProgress(downloadedBytes, effectiveTotalBytes, newBytes, stopwatch);
           if (!completer.isCompleted) completer.complete();
@@ -438,7 +492,12 @@ class DownloadService {
         }
       },
       onError: (e) async {
-        inactivityTimer?.cancel();
+        inactivityCheck.cancel();
+        if (writeBuffer.length > 0) {
+          try { sink.add(writeBuffer.takeBytes()); } catch (e3) {
+            debugPrint('DownloadService: buffer flush on error: $e3');
+          }
+        }
         try { await sink.close(); } catch (e2) {
           debugPrint('DownloadService: sink close on error: $e2');
         }
@@ -450,7 +509,7 @@ class DownloadService {
     try {
       await completer.future;
     } finally {
-      inactivityTimer?.cancel();
+      inactivityCheck.cancel();
     }
   }
 
@@ -477,97 +536,80 @@ class DownloadService {
     ));
   }
 
-  Future<void> _downloadSmb(
-    SmbDownloadHandle handle,
+  Future<void> _downloadNativeSmb(
+    NativeSmbDownloadHandle handle,
     File tempFile,
   ) async {
-    final reader = await handle.openFile();
-    _activeConnectionCleanup = () => reader.close();
-    try {
-      final sink = tempFile.openWrite();
-      int downloadedBytes = 0;
-      final totalBytes = reader.size;
-      final stopwatch = Stopwatch()..start();
-      int lastUpdateTime = DateTime.now().millisecondsSinceEpoch;
+    final downloadId = '${DateTime.now().millisecondsSinceEpoch}_${identityHashCode(this)}';
+    _activeSmbDownloadId = downloadId;
 
-      final completer = Completer<void>();
+    final completer = Completer<void>();
+    final stopwatch = Stopwatch()..start();
+    int? smbTotalBytes;
 
-      // Inactivity timer: cancel if no data received for 60s
-      Timer? inactivityTimer;
-      void resetInactivityTimer() {
-        inactivityTimer?.cancel();
-        inactivityTimer = Timer(const Duration(seconds: 60), () {
-          inactivityTimer = null;
-          if (!completer.isCompleted) {
-            _downloadSubscription?.cancel();
-            sink.close().catchError((e) { debugPrint('DownloadService: SMB sink close on stall: $e'); });
-            completer.completeError(
-                Exception('Download stalled — no data received for 60 seconds'));
+    _smbProgressSubscription = _smbService.progressStream
+        .where((event) => event['downloadId'] == downloadId)
+        .listen((event) {
+      final status = event['status'] as String;
+      final bytesWritten = (event['bytesWritten'] as num?)?.toInt() ?? 0;
+      final totalBytes = (event['totalBytes'] as num?)?.toInt() ?? 0;
+
+      switch (status) {
+        case 'progress':
+          if (totalBytes > 0) smbTotalBytes = totalBytes;
+          final elapsedMs = stopwatch.elapsedMilliseconds;
+          final speed = elapsedMs > 0
+              ? (bytesWritten * 1000) / (elapsedMs * 1024)
+              : 0.0;
+          if (_progressController?.isClosed == false) {
+            _progressController?.add(DownloadProgress(
+              status: DownloadStatus.downloading,
+              progress: totalBytes > 0 ? bytesWritten / totalBytes : 0,
+              receivedBytes: bytesWritten,
+              totalBytes: totalBytes > 0 ? totalBytes : null,
+              downloadSpeed: speed,
+            ));
           }
-        });
+        case 'complete':
+          if (!completer.isCompleted) completer.complete();
+        case 'cancelled':
+          if (!completer.isCompleted) completer.complete();
+        case 'error':
+          final error = event['error'] as String? ?? 'SMB download failed';
+          if (!completer.isCompleted) completer.completeError(Exception(error));
       }
+    }, onError: (e) {
+      if (!completer.isCompleted) completer.completeError(e);
+    });
 
-      resetInactivityTimer();
-
-      _downloadSubscription = reader.stream.listen(
-        (chunk) {
-          if (_isCancelled) {
-            inactivityTimer?.cancel();
-            _downloadSubscription?.cancel();
-            _downloadSubscription = null;
-            sink.close().catchError((e) { debugPrint('DownloadService: SMB sink close on cancel: $e'); });
-            if (!completer.isCompleted) completer.complete();
-            return;
-          }
-
-          sink.add(chunk);
-          downloadedBytes += chunk.length;
-          resetInactivityTimer();
-
-          final now = DateTime.now().millisecondsSinceEpoch;
-          if (now - lastUpdateTime >= _progressIntervalMs) {
-            lastUpdateTime = now;
-            _emitProgress(downloadedBytes, totalBytes, stopwatch);
-          }
-        },
-        onDone: () async {
-          inactivityTimer?.cancel();
-          if (_isCancelled) {
-            try { await sink.close(); } catch (e) {
-              debugPrint('DownloadService: SMB sink close on cancel done: $e');
-            }
-            if (!completer.isCompleted) completer.complete();
-            return;
-          }
-          try {
-            await sink.close();
-            _emitProgress(downloadedBytes, totalBytes, stopwatch);
-            if (!completer.isCompleted) completer.complete();
-          } catch (e) {
-            if (!completer.isCompleted) completer.completeError(e);
-          }
-        },
-        onError: (e) async {
-          inactivityTimer?.cancel();
-          try { await sink.close(); } catch (e2) {
-            debugPrint('DownloadService: SMB sink close on error: $e2');
-          }
-          if (!completer.isCompleted) completer.completeError(e);
-        },
-        cancelOnError: true,
+    try {
+      await _smbService.startDownload(
+        downloadId: downloadId,
+        host: handle.host,
+        port: handle.port,
+        share: handle.share,
+        filePath: handle.filePath,
+        outputPath: tempFile.path,
+        user: handle.user,
+        pass: handle.pass,
+        domain: handle.domain,
       );
 
-      try {
-        await completer.future;
-      } finally {
-        inactivityTimer?.cancel();
+      await completer.future;
+
+      // Verify downloaded file size matches expected total
+      if (!_isCancelled && smbTotalBytes != null && smbTotalBytes! > 0) {
+        final actualSize = await tempFile.length();
+        if (actualSize != smbTotalBytes) {
+          throw Exception(
+            'SMB download incomplete: expected $smbTotalBytes bytes, got $actualSize',
+          );
+        }
       }
     } finally {
-      try {
-        await reader.close();
-      } finally {
-        _activeConnectionCleanup = null;
-      }
+      _activeSmbDownloadId = null;
+      _smbProgressSubscription?.cancel();
+      _smbProgressSubscription = null;
     }
   }
 
@@ -589,29 +631,25 @@ class DownloadService {
       }
 
       final stopwatch = Stopwatch()..start();
-      int lastUpdateTime = DateTime.now().millisecondsSinceEpoch;
+      int lastUpdateTime = 0;
 
-      // Inactivity timer: force-disconnect if no progress for 60s
-      Timer? inactivityTimer;
+      // Inactivity detection: timestamp + periodic check (avoids Timer churn per callback)
+      int lastDataTick = 0;
       bool inactivityFired = false;
-      void resetInactivityTimer() {
-        inactivityTimer?.cancel();
-        inactivityTimer = Timer(const Duration(seconds: 60), () {
-          inactivityTimer = null;
+      final inactivityCheck = Timer.periodic(const Duration(seconds: 10), (_) {
+        if (stopwatch.elapsedMilliseconds - lastDataTick > 60000) {
           inactivityFired = true;
           try { handle.disconnect?.call().catchError((e) {
             debugPrint('DownloadService: FTP inactivity disconnect error: $e');
           }); } catch (e) { debugPrint('DownloadService: FTP inactivity disconnect: $e'); }
-        });
-      }
-
-      resetInactivityTimer();
+        }
+      });
 
       try {
         await handle.downloadToFile(tempFile, onProgress: (percent, received, total) {
           if (_isCancelled) return;
-          resetInactivityTimer();
-          final now = DateTime.now().millisecondsSinceEpoch;
+          lastDataTick = stopwatch.elapsedMilliseconds;
+          final now = stopwatch.elapsedMilliseconds;
           if (now - lastUpdateTime >= _progressIntervalMs) {
             lastUpdateTime = now;
             _emitProgress(received, total, stopwatch);
@@ -623,13 +661,260 @@ class DownloadService {
         }
         rethrow;
       } finally {
-        inactivityTimer?.cancel();
+        inactivityCheck.cancel();
       }
 
       // FTP library doesn't support mid-transfer cancel from callback,
       // so clean up after it finishes if user cancelled during transfer
       if (_isCancelled) {
         await _cleanupTempFile(tempFile);
+      }
+    } finally {
+      _activeConnectionCleanup = null;
+    }
+  }
+
+  Future<void> _downloadNativeSmbFolder(
+    NativeSmbFolderDownloadHandle handle,
+    GameItem game,
+    String targetFolder,
+  ) async {
+    // List files in the remote folder
+    final entries = await _smbService.listFiles(
+      host: handle.host,
+      port: handle.port,
+      share: handle.share,
+      path: handle.folderPath,
+      user: handle.user,
+      pass: handle.pass,
+      domain: handle.domain,
+    );
+
+    final files = entries.where((e) => !e.isDirectory).toList();
+    if (files.isEmpty) {
+      _emitError('Folder is empty');
+      return;
+    }
+
+    final totalBytes = files.fold<int>(0, (sum, f) => sum + f.size);
+    final tempDir = await getTemporaryDirectory();
+    final folderTempDir = Directory(
+        '${tempDir.path}/folder_${DateTime.now().millisecondsSinceEpoch}');
+    await folderTempDir.create(recursive: true);
+    _folderTempDir = folderTempDir;
+
+    final stopwatch = Stopwatch()..start();
+    int cumulativeBytes = 0;
+
+    try {
+      for (final file in files) {
+        if (_isCancelled) { _emitCancelled(); return; }
+
+        final localFile = File('${folderTempDir.path}/${p.basename(file.name)}');
+        final downloadId = '${DateTime.now().millisecondsSinceEpoch}_${identityHashCode(file)}';
+        _activeSmbDownloadId = downloadId;
+
+        final completer = Completer<void>();
+
+        _smbProgressSubscription = _smbService.progressStream
+            .where((event) => event['downloadId'] == downloadId)
+            .listen((event) {
+          final status = event['status'] as String;
+          final bytesWritten = (event['bytesWritten'] as num?)?.toInt() ?? 0;
+
+          switch (status) {
+            case 'progress':
+              final currentTotal = cumulativeBytes + bytesWritten;
+              final elapsedMs = stopwatch.elapsedMilliseconds;
+              final speed = elapsedMs > 0
+                  ? (currentTotal * 1000) / (elapsedMs * 1024)
+                  : 0.0;
+              if (_progressController?.isClosed == false) {
+                _progressController?.add(DownloadProgress(
+                  status: DownloadStatus.downloading,
+                  progress: totalBytes > 0 ? currentTotal / totalBytes : 0,
+                  receivedBytes: currentTotal,
+                  totalBytes: totalBytes > 0 ? totalBytes : null,
+                  downloadSpeed: speed,
+                ));
+              }
+            case 'complete':
+              cumulativeBytes += file.size;
+              if (!completer.isCompleted) completer.complete();
+            case 'cancelled':
+              if (!completer.isCompleted) completer.complete();
+            case 'error':
+              final error = event['error'] as String? ?? 'SMB download failed';
+              if (!completer.isCompleted) completer.completeError(Exception(error));
+          }
+        }, onError: (e) {
+          if (!completer.isCompleted) completer.completeError(e);
+        });
+
+        try {
+          await _smbService.startDownload(
+            downloadId: downloadId,
+            host: handle.host,
+            port: handle.port,
+            share: handle.share,
+            filePath: file.path,
+            outputPath: localFile.path,
+            user: handle.user,
+            pass: handle.pass,
+            domain: handle.domain,
+          );
+
+          await completer.future;
+        } finally {
+          _activeSmbDownloadId = null;
+          _smbProgressSubscription?.cancel();
+          _smbProgressSubscription = null;
+        }
+      }
+
+      if (_isCancelled) { _emitCancelled(); return; }
+
+      // Move folder to target
+      if (_progressController?.isClosed == false) {
+        _progressController?.add(DownloadProgress(
+          status: DownloadStatus.moving,
+          progress: 1.0,
+        ));
+      }
+
+      final targetDir =
+          Directory(RomManager.safePath(targetFolder, game.filename));
+      await targetDir.create(recursive: true);
+
+      for (final tempFile in folderTempDir.listSync().whereType<File>()) {
+        if (_isCancelled) { _emitCancelled(); return; }
+        final targetPath =
+            RomManager.safePath(targetDir.path, p.basename(tempFile.path));
+        await moveFile(tempFile, targetPath);
+      }
+
+      if (_progressController?.isClosed == false) {
+        _progressController?.add(DownloadProgress(
+          status: DownloadStatus.completed,
+          progress: 1.0,
+        ));
+        _progressController?.close();
+      }
+    } finally {
+      _folderTempDir = null;
+      _isDownloadInProgress = false;
+      try {
+        if (await folderTempDir.exists()) {
+          await folderTempDir.delete(recursive: true);
+        }
+      } catch (e) {
+        debugPrint('DownloadService: folder temp cleanup: $e');
+      }
+    }
+  }
+
+  Future<void> _downloadFtpFolder(
+    FtpFolderDownloadHandle handle,
+    GameItem game,
+    String targetFolder,
+  ) async {
+    _activeConnectionCleanup = () async {
+      try { await handle.disconnect?.call(); } catch (e) {
+        debugPrint('DownloadService: FTP folder disconnect: $e');
+      }
+    };
+
+    try {
+      final fileNames = await handle.listFiles();
+      if (fileNames.isEmpty) {
+        _emitError('Folder is empty');
+        return;
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final folderTempDir = Directory(
+          '${tempDir.path}/folder_${DateTime.now().millisecondsSinceEpoch}');
+      await folderTempDir.create(recursive: true);
+      _folderTempDir = folderTempDir;
+
+      final stopwatch = Stopwatch()..start();
+      int filesCompleted = 0;
+      int lastUpdateTime = DateTime.now().millisecondsSinceEpoch;
+
+      try {
+        for (final fileName in fileNames) {
+          if (_isCancelled) { _emitCancelled(); return; }
+
+          final remotePath = game.url.endsWith('/')
+              ? '${game.url}$fileName'
+              : '${game.url}/$fileName';
+          final localFile = File('${folderTempDir.path}/$fileName');
+
+          await handle.downloadFile(remotePath, localFile,
+              onProgress: (percent, received, total) {
+            if (_isCancelled) return;
+            final now = DateTime.now().millisecondsSinceEpoch;
+            if (now - lastUpdateTime >= _progressIntervalMs) {
+              lastUpdateTime = now;
+              // Progress = (completed files + current file progress) / total files
+              final overallProgress =
+                  (filesCompleted + percent / 100.0) / fileNames.length;
+              if (_progressController?.isClosed == false) {
+                final elapsedMs = stopwatch.elapsedMilliseconds;
+                final speed =
+                    elapsedMs > 0 ? (received * 1000) / (elapsedMs * 1024) : 0.0;
+                _progressController?.add(DownloadProgress(
+                  status: DownloadStatus.downloading,
+                  progress: overallProgress,
+                  receivedBytes: received,
+                  totalBytes: total,
+                  downloadSpeed: speed,
+                ));
+              }
+            }
+          });
+
+          filesCompleted++;
+        }
+
+        if (_isCancelled) { _emitCancelled(); return; }
+
+        // Move folder to target
+        if (_progressController?.isClosed == false) {
+          _progressController?.add(DownloadProgress(
+            status: DownloadStatus.moving,
+            progress: 1.0,
+          ));
+        }
+
+        final targetDir =
+            Directory(RomManager.safePath(targetFolder, game.filename));
+        await targetDir.create(recursive: true);
+
+        for (final tempFile in folderTempDir.listSync().whereType<File>()) {
+          if (_isCancelled) { _emitCancelled(); return; }
+          final targetPath =
+              RomManager.safePath(targetDir.path, p.basename(tempFile.path));
+          await moveFile(tempFile, targetPath);
+        }
+
+        if (_progressController?.isClosed == false) {
+          _progressController?.add(DownloadProgress(
+            status: DownloadStatus.completed,
+            progress: 1.0,
+          ));
+          _progressController?.close();
+        }
+      } finally {
+        _folderTempDir = null;
+        _isDownloadInProgress = false;
+        try {
+          if (await folderTempDir.exists()) {
+            await folderTempDir.delete(recursive: true);
+          }
+        } catch (e) {
+          debugPrint('DownloadService: FTP folder temp cleanup: $e');
+        }
       }
     } finally {
       _activeConnectionCleanup = null;
@@ -742,11 +1027,11 @@ class DownloadService {
         if (await targetFile.exists()) {
           await targetFile.delete();
         }
-        await tempFile.copy(targetFile.path);
+        await moveFile(tempFile, targetFile.path);
       } on FileSystemException catch (e) {
-        // Clean up partial target on copy failure
-        try { if (await targetFile.exists()) await targetFile.delete(); } catch (e2) { debugPrint('DownloadService: target cleanup on copy fail: $e2'); }
-        throw Exception('Failed to copy file to target: $e');
+        // Clean up partial target on move failure
+        try { if (await targetFile.exists()) await targetFile.delete(); } catch (e2) { debugPrint('DownloadService: target cleanup on move fail: $e2'); }
+        throw Exception('Failed to move file to target: $e');
       }
       if (_isCancelled) { _cleanupTempFile(tempFile); _emitCancelled(); return; }
       try { if (await tempFile.exists()) await tempFile.delete(); } catch (e) { debugPrint('DownloadService: rom temp delete: $e'); }
@@ -846,7 +1131,7 @@ class DownloadService {
           final fileName = p.basename(file.path);
           final targetPath = RomManager.safePath(subFolder.path, fileName);
           try {
-            await file.copy(targetPath);
+            await moveFile(file, targetPath);
           } on FileSystemException catch (e) {
             try { if (await File(targetPath).exists()) await File(targetPath).delete(); } catch (e2) { debugPrint('DownloadService: extract cleanup: $e2'); }
             throw Exception('Failed to extract file $fileName: $e');
@@ -858,7 +1143,7 @@ class DownloadService {
           final fileName = p.basename(file.path);
           final targetPath = RomManager.safePath(targetFolder, fileName);
           try {
-            await file.copy(targetPath);
+            await moveFile(file, targetPath);
           } on FileSystemException catch (e) {
             try { if (await File(targetPath).exists()) await File(targetPath).delete(); } catch (e2) { debugPrint('DownloadService: extract cleanup: $e2'); }
             throw Exception('Failed to extract file $fileName: $e');
@@ -890,7 +1175,16 @@ class DownloadService {
     final targetPath = RomManager.safePath(targetFolder, p.basename(file.path));
     final targetFile = File(targetPath);
     await targetFile.parent.create(recursive: true);
-    await file.copy(targetFile.path);
+    try {
+      if (await targetFile.exists()) {
+        await targetFile.delete();
+      }
+      await moveFile(file, targetFile.path);
+    } on FileSystemException catch (e) {
+      // Clean up partial target on move failure
+      try { if (await targetFile.exists()) await targetFile.delete(); } catch (e2) { debugPrint('DownloadService: target cleanup on move fail: $e2'); }
+      throw Exception('Failed to move file to target: $e');
+    }
   }
 
   String _getUserFriendlyError(dynamic e) => getUserFriendlyError(e);

@@ -11,6 +11,8 @@ import '../models/system_model.dart';
 import 'download_foreground_service.dart';
 import 'disk_space_service.dart';
 import 'download_service.dart';
+import 'rom_manager.dart';
+import 'native_smb_service.dart';
 import 'storage_service.dart';
 
 class DownloadQueueState {
@@ -88,8 +90,9 @@ class DownloadQueueManager extends ChangeNotifier {
   final Map<String, DownloadService> _downloadServices = {};
   final Map<String, Timer> _retryTimers = {};
   final StorageService _storage;
+  final NativeSmbService _smbService;
 
-  DownloadQueueManager(this._storage) {
+  DownloadQueueManager(this._storage, this._smbService) {
     final maxConcurrent = _storage.getMaxConcurrentDownloads();
     _state = _state.copyWith(maxConcurrent: maxConcurrent);
   }
@@ -325,6 +328,24 @@ class DownloadQueueManager extends ChangeNotifier {
     _updateItem(item.id, status: DownloadItemStatus.downloading);
     _updateForegroundService();
 
+    // Check if file already exists at target location
+    try {
+      final alreadyExists = await RomManager().exists(
+        item.game, item.system, item.targetFolder,
+      );
+      if (_disposed) return;
+      if (alreadyExists) {
+        debugPrint('DownloadQueue: file already exists, skipping: ${item.game.filename}');
+        _updateItem(item.id, status: DownloadItemStatus.completed, clearTempFilePath: true);
+        _persistQueue();
+        _stopForegroundServiceIfIdle();
+        _processQueue();
+        return;
+      }
+    } catch (e) {
+      debugPrint('DownloadQueue: exists check failed (proceeding): $e');
+    }
+
     // Check disk space before starting actual download
     try {
       final storageInfo = await DiskSpaceService.getFreeSpace(item.targetFolder);
@@ -351,7 +372,7 @@ class DownloadQueueManager extends ChangeNotifier {
     final oldService = _downloadServices.remove(item.id);
     oldService?.dispose();
 
-    final downloadService = DownloadService();
+    final downloadService = DownloadService(_smbService);
     _downloadServices[item.id] = downloadService;
 
     final subscription = downloadService
@@ -416,6 +437,7 @@ class DownloadQueueManager extends ChangeNotifier {
   }
 
   void _onDownloadComplete(String id) {
+    debugPrint('DownloadQueue: download complete: $id');
     final item = _state.getDownloadById(id);
     if (item == null) return;
 
@@ -504,8 +526,11 @@ class DownloadQueueManager extends ChangeNotifier {
   void _stopForegroundServiceIfIdle() {
     // Check after current state update: any active or queued left?
     if (!_state.hasActiveDownloads && !_state.hasQueuedItems) {
+      debugPrint('DownloadQueue: no active/queued items, stopping foreground service');
       _notificationThrottle?.cancel();
-      DownloadForegroundService.stop();
+      DownloadForegroundService.stop().catchError((e) {
+        debugPrint('DownloadQueue: foreground service stop error: $e');
+      });
     }
   }
 

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
@@ -425,8 +426,28 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   void setProviderType(ProviderType type) {
     final form = state.providerForm;
     if (form == null) return;
+
+    // Save current fields before switching
+    final saved = Map<ProviderType, Map<String, dynamic>>.from(form.savedFieldsByType);
+    saved[form.type] = Map<String, dynamic>.from(form.fields);
+
+    // Restore saved fields for the new type, or use defaults
+    final restored = saved[type] ?? <String, dynamic>{};
+    final newFields = Map<String, dynamic>.from(restored);
+    if (newFields.isEmpty) {
+      if (type == ProviderType.smb) {
+        newFields['port'] = '445';
+      } else if (type == ProviderType.ftp) {
+        newFields['port'] = '21';
+      }
+    }
+
     state = state.copyWith(
-      providerForm: form.copyWith(type: type, fields: {}),
+      providerForm: form.copyWith(
+        type: type,
+        fields: newFields,
+        savedFieldsByType: saved,
+      ),
       clearConnectionError: true,
       connectionTestSuccess: false,
       clearRommState: true,
@@ -918,11 +939,35 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     nextStep();
   }
 
+  // --- Storage permission ---
+
+  /// Requests storage permission on Android. Returns true if granted or non-Android.
+  Future<bool> _requestStoragePermission() async {
+    if (!Platform.isAndroid) return true;
+    final status = await Permission.manageExternalStorage.status;
+    if (status.isGranted) return true;
+    final result = await Permission.manageExternalStorage.request();
+    return result.isGranted;
+  }
+
   // --- Local setup step methods ---
 
   Future<void> _autoDetectRomFolder() async {
     final ls = state.localSetupState;
     if (ls == null) return;
+
+    final hasPermission = await _requestStoragePermission();
+    if (!mounted) return;
+    if (!hasPermission) {
+      state = state.copyWith(
+        localSetupState: state.localSetupState?.copyWith(
+          isAutoDetecting: false,
+          scanError: 'Storage permission denied. Grant it in Android Settings > Apps > R-Shop > Permissions.',
+        ),
+        canProceed: true,
+      );
+      return;
+    }
 
     const knownPaths = [
       '/storage/emulated/0/ROMs',
@@ -955,6 +1000,18 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   Future<void> _autoDetectRommRomFolder() async {
     final rs = state.rommSetupState;
     if (rs == null) return;
+
+    final hasPermission = await _requestStoragePermission();
+    if (!mounted) return;
+    if (!hasPermission) {
+      state = state.copyWith(
+        rommSetupState: state.rommSetupState?.copyWith(
+          isAutoDetecting: false,
+          scanError: 'Storage permission denied. Grant it in Android Settings > Apps > R-Shop > Permissions.',
+        ),
+      );
+      return;
+    }
 
     const knownPaths = [
       '/storage/emulated/0/ROMs',
@@ -1050,6 +1107,12 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     final ls = state.localSetupState;
     if (ls == null || ls.createSystemIds == null || ls.createSystemIds!.isEmpty) return null;
 
+    final hasPermission = await _requestStoragePermission();
+    if (!mounted) return null;
+    if (!hasPermission) {
+      return 'Storage permission denied. Grant it in Android Settings > Apps > R-Shop > Permissions.';
+    }
+
     final basePath = ls.createBasePath ?? _defaultRomBasePath;
     final requested = ls.createSystemIds!.length;
 
@@ -1116,11 +1179,23 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   Future<void> _scanLocalFolder(String path) async {
     final ls = state.localSetupState ?? const LocalSetupState();
 
+    final hasPermission = await _requestStoragePermission();
+    if (!mounted) return;
+    if (!hasPermission) {
+      state = state.copyWith(
+        localSetupState: ls.copyWith(
+          scanError: 'Storage permission denied. Grant it in Android Settings > Apps > R-Shop > Permissions.',
+        ),
+      );
+      return;
+    }
+
     state = state.copyWith(
       localSetupState: ls.copyWith(
         romBasePath: path,
         isScanning: true,
         clearScannedFolders: true,
+        clearScanError: true,
         folderAssignments: const {},
         enabledSystemIds: const {},
       ),
@@ -1340,6 +1415,15 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         return;
       }
       saveProvider();
+      return;
+    }
+
+    // Show missing fields instead of silently doing nothing
+    if (!state.canTest) {
+      final message = state.missingFieldsMessage;
+      if (message != null) {
+        state = state.copyWith(connectionTestError: message);
+      }
       return;
     }
 

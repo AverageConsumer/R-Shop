@@ -216,6 +216,7 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   void _navigateToCurrentSystem() {
+    if (_configuredSystems.isEmpty) return;
     ref.read(feedbackServiceProvider).confirm();
     if (_isLibraryIndex) {
       _openLibrary();
@@ -483,7 +484,7 @@ class _HomeViewState extends ConsumerState<HomeView>
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Press + for Menu',
+                        'Press Start for Menu',
                         style: TextStyle(color: Colors.grey[600], fontSize: 13),
                       ),
                     ],

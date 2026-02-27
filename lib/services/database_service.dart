@@ -10,7 +10,7 @@ import '../models/game_item.dart';
 class DatabaseService {
   static Future<Database>? _initFuture;
   static const String _tableName = 'games';
-  static const int _dbVersion = 4;
+  static const int _dbVersion = 5;
 
   @visibleForTesting
   static Database? testDatabase;
@@ -50,7 +50,8 @@ class DatabaseService {
         cover_url TEXT,
         provider_config TEXT,
         thumb_hash TEXT,
-        has_thumbnail INTEGER NOT NULL DEFAULT 0
+        has_thumbnail INTEGER NOT NULL DEFAULT 0,
+        is_folder INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -92,6 +93,12 @@ class DatabaseService {
             'ALTER TABLE $_tableName ADD COLUMN has_thumbnail INTEGER NOT NULL DEFAULT 0');
       });
     }
+    if (oldVersion < 5) {
+      await db.transaction((txn) async {
+        await txn.execute(
+            'ALTER TABLE $_tableName ADD COLUMN is_folder INTEGER NOT NULL DEFAULT 0');
+      });
+    }
   }
 
   Future<void> saveGames(String systemSlug, List<GameItem> games) async {
@@ -130,6 +137,7 @@ class DatabaseService {
               : null,
           'has_thumbnail':
               game.hasThumbnail ? 1 : (prev?['has_thumbnail'] ?? 0),
+          'is_folder': game.isFolder ? 1 : 0,
         });
       }
       await batch.commit(noResult: true);
@@ -250,6 +258,7 @@ class DatabaseService {
               providerConfig: _decodeProviderConfig(
                   map['provider_config'] as String?),
               hasThumbnail: (map['has_thumbnail'] as int?) == 1,
+              isFolder: (map['is_folder'] as int?) == 1,
             ))
         .toList();
   }

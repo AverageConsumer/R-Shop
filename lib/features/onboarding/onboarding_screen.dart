@@ -54,6 +54,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final state = ref.read(onboardingControllerProvider);
     final controller = ref.read(onboardingControllerProvider.notifier);
 
+    // Skip typewriter animation on A/Enter/Space when message is still typing
+    if (!state.canProceed &&
+        (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
+         event.logicalKey == LogicalKeyboardKey.enter ||
+         event.logicalKey == LogicalKeyboardKey.space)) {
+      controller.onMessageComplete();
+      ref.read(audioManagerProvider).stopTyping();
+      return KeyEventResult.handled;
+    }
+
+    // Welcome step: left/right cycles controller layout
+    if (state.currentStep == OnboardingStep.welcome &&
+        state.canProceed) {
+      if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+        _cycleControllerLayout(-1);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+        _cycleControllerLayout(1);
+        return KeyEventResult.handled;
+      }
+    }
+
     // RomM setup step — delegate based on sub-step
     if (state.currentStep == OnboardingStep.rommSetup) {
       final rs = state.rommSetupState;
@@ -169,9 +192,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           return KeyEventResult.handled;
         }
         if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-          if (state.canTest &&
-              !state.isTestingConnection &&
-              !isNonLanHttpBlocked(state, ref)) {
+          if (!state.isTestingConnection) {
             controller.testAndSaveProvider();
           }
           return KeyEventResult.handled;
@@ -213,8 +234,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
         event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.space ||
-        event.logicalKey == LogicalKeyboardKey.gameButtonSelect) {
+        event.logicalKey == LogicalKeyboardKey.space) {
       _handleContinue();
       return KeyEventResult.handled;
     }
@@ -269,7 +289,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return;
     } else if (state.currentStep == OnboardingStep.consoleSetup) {
       // Need at least one console configured to proceed
-      if (state.configuredCount == 0) return;
+      if (state.configuredCount == 0) {
+        feedback.cancel();
+        showConsoleNotification(context,
+            message: 'Configure at least one console to continue');
+        return;
+      }
       feedback.tick();
       controller.nextStep();
     } else {
@@ -325,6 +350,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ref.read(onboardingControllerProvider.notifier).loadFromConfig(result.config!);
       showConsoleNotification(context, message: 'Config imported!', isError: false);
     }
+  }
+
+  void _cycleControllerLayout(int delta) {
+    const layouts = ControllerLayout.values;
+    final current = ref.read(controllerLayoutProvider);
+    final index = (layouts.indexOf(current) + delta) % layouts.length;
+    ref.read(controllerLayoutProvider.notifier).setLayout(layouts[index]);
+    ref.read(feedbackServiceProvider).tick();
   }
 
   void _persistRommCredentials(RommSetupState rommState) {
@@ -559,9 +592,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
       // Grid level
       return ConsoleHud(
-        start: state.configuredCount > 0
-            ? HudAction('Continue', onTap: _handleContinue, highlight: true)
-            : null,
+        start: HudAction('Continue',
+            onTap: _handleContinue,
+            highlight: state.configuredCount > 0),
         b: !state.isFirstStep ? HudAction('Back', onTap: _handleBack) : null,
         select: HudAction('Import', onTap: _importConfig),
       );
@@ -629,35 +662,150 @@ class _RadialGlow extends StatelessWidget {
   }
 }
 
-class _WelcomeStep extends StatelessWidget {
+class _WelcomeStep extends ConsumerWidget {
   final VoidCallback onComplete;
   const _WelcomeStep({required this.onComplete});
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final rs = context.rs;
     final labelFontSize = rs.isSmall ? 10.0 : 12.0;
+    final hintFontSize = rs.isSmall ? 11.0 : 13.0;
+    final hintIconSize = rs.isSmall ? 14.0 : 16.0;
+    final layout = ref.watch(controllerLayoutProvider);
     return Column(
       key: const ValueKey('welcome'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ChatBubble(
           message:
-              "Hey there! I'm Pixel, your R-Shop guide! Ready to explore your retro game collection?",
+              "Hey there! I'm Pixel, your R-Shop guide! R-Shop lets you browse and download ROMs from your own servers \u2014 straight to your device. Let's set it up!",
           onComplete: onComplete,
         ),
         SizedBox(height: rs.spacing.md),
         Padding(
           padding: EdgeInsets.only(left: rs.isSmall ? 40 : 60),
-          child: Text(
-            'Welcome to R-Shop',
-            style: TextStyle(
-              color: Colors.grey.shade500,
-              fontSize: labelFontSize,
-              letterSpacing: 2,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _WorkflowHint(
+                icon: Icons.settings,
+                text: 'Configure consoles & sources',
+                fontSize: hintFontSize,
+                iconSize: hintIconSize,
+              ),
+              SizedBox(height: rs.spacing.xs),
+              _WorkflowHint(
+                icon: Icons.search,
+                text: 'Browse your game library',
+                fontSize: hintFontSize,
+                iconSize: hintIconSize,
+              ),
+              SizedBox(height: rs.spacing.xs),
+              _WorkflowHint(
+                icon: Icons.download,
+                text: 'Download ROMs to your device',
+                fontSize: hintFontSize,
+                iconSize: hintIconSize,
+              ),
+              SizedBox(height: rs.spacing.lg),
+              Text(
+                'CONTROLLER',
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: labelFontSize,
+                  letterSpacing: 2,
+                ),
+              ),
+              SizedBox(height: rs.spacing.sm),
+              _ControllerLayoutPicker(layout: layout, ref: ref),
+            ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _WorkflowHint extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final double fontSize;
+  final double iconSize;
+
+  const _WorkflowHint({
+    required this.icon,
+    required this.text,
+    required this.fontSize,
+    required this.iconSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final rs = context.rs;
+    return Row(
+      children: [
+        Icon(icon, color: Colors.grey.shade500, size: iconSize),
+        SizedBox(width: rs.spacing.sm),
+        Text(
+          text,
+          style: TextStyle(
+            color: Colors.grey.shade400,
+            fontSize: fontSize,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ControllerLayoutPicker extends StatelessWidget {
+  final ControllerLayout layout;
+  final WidgetRef ref;
+
+  const _ControllerLayoutPicker({required this.layout, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    final rs = context.rs;
+    final chipFontSize = rs.isSmall ? 11.0 : 13.0;
+    return Wrap(
+      spacing: rs.spacing.sm,
+      children: ControllerLayout.values.map((l) {
+        final selected = layout == l;
+        final label = switch (l) {
+          ControllerLayout.nintendo => 'Nintendo',
+          ControllerLayout.xbox => 'Xbox',
+          ControllerLayout.playstation => 'PlayStation',
+        };
+        return GestureDetector(
+          onTap: () => ref.read(controllerLayoutProvider.notifier).setLayout(l),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: rs.spacing.md,
+              vertical: rs.spacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: selected
+                  ? Colors.redAccent.withValues(alpha: 0.3)
+                  : Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(rs.radius.round),
+              border: Border.all(
+                color: selected
+                    ? Colors.redAccent.withValues(alpha: 0.7)
+                    : Colors.white.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : Colors.white54,
+                fontSize: chipFontSize,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
@@ -767,34 +915,62 @@ class _CompleteStep extends StatelessWidget {
               ),
               SizedBox(height: rs.spacing.md),
               // Export button
-              GestureDetector(
-                onTap: onExport,
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: rs.spacing.lg,
-                    vertical: rs.spacing.sm,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(rs.radius.md),
-                    border: Border.all(
-                      color: Colors.redAccent.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.share, color: Colors.redAccent, size: iconSize),
-                      SizedBox(width: rs.spacing.sm),
-                      Text(
-                        'Export Config',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: buttonFontSize,
+              Focus(
+                onKeyEvent: (node, event) {
+                  if (event is KeyDownEvent &&
+                      (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
+                       event.logicalKey == LogicalKeyboardKey.enter)) {
+                    onExport();
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.ignored;
+                },
+                child: Builder(
+                  builder: (context) {
+                    final hasFocus = Focus.of(context).hasFocus;
+                    return GestureDetector(
+                      onTap: onExport,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: rs.spacing.lg,
+                          vertical: rs.spacing.sm,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(rs.radius.md),
+                          border: Border.all(
+                            color: hasFocus
+                                ? Colors.redAccent
+                                : Colors.redAccent.withValues(alpha: 0.3),
+                            width: hasFocus ? 2 : 1,
+                          ),
+                          boxShadow: hasFocus
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.redAccent.withValues(alpha: 0.3),
+                                    blurRadius: 12,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.share, color: Colors.redAccent, size: iconSize),
+                            SizedBox(width: rs.spacing.sm),
+                            Text(
+                              'Export Config',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: buttonFontSize,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
             ],

@@ -165,5 +165,85 @@ void main() {
         expect(lines[i], startsWith('['));
       }
     });
+
+    test('log() scrubs credentials from messages', () {
+      service.log('ERROR', 'FTP failed: password=secret123 host=nas');
+      final content = logFile.readAsStringSync();
+      expect(content, isNot(contains('secret123')));
+      expect(content, contains('[REDACTED]'));
+    });
+
+    test('log() scrubs Basic auth headers', () {
+      service.log('ERROR', 'Header: Basic dXNlcjpwYXNz');
+      final content = logFile.readAsStringSync();
+      expect(content, isNot(contains('dXNlcjpwYXNz')));
+      expect(content, contains('[REDACTED]'));
+    });
+
+    test('log() scrubs Bearer tokens', () {
+      service.log('ERROR', 'Auth: Bearer eyJhbGciOiJSUzI1NiJ9.payload.sig');
+      final content = logFile.readAsStringSync();
+      expect(content, isNot(contains('eyJhbGciOiJSUzI1NiJ9')));
+    });
+
+    test('log() preserves non-sensitive content', () {
+      service.log('INFO', 'SocketException: Connection refused 192.168.1.1:445');
+      final content = logFile.readAsStringSync();
+      expect(content, contains('SocketException: Connection refused 192.168.1.1:445'));
+    });
+  });
+
+  group('CrashLogService.scrubCredentials (static)', () {
+    test('redacts password= patterns', () {
+      final result = CrashLogService.scrubCredentials('password=mysecret123');
+      expect(result, contains('[REDACTED]'));
+      expect(result, isNot(contains('mysecret123')));
+    });
+
+    test('redacts apiKey= patterns', () {
+      final result = CrashLogService.scrubCredentials('apiKey=abc123def456');
+      expect(result, contains('[REDACTED]'));
+      expect(result, isNot(contains('abc123def456')));
+    });
+
+    test('redacts api_key= patterns', () {
+      final result = CrashLogService.scrubCredentials('api_key=secret_key');
+      expect(result, contains('[REDACTED]'));
+      expect(result, isNot(contains('secret_key')));
+    });
+
+    test('redacts token= patterns', () {
+      final result = CrashLogService.scrubCredentials('token=eyJhbGci');
+      expect(result, contains('[REDACTED]'));
+      expect(result, isNot(contains('eyJhbGci')));
+    });
+
+    test('redacts authorization: header', () {
+      final result = CrashLogService.scrubCredentials('authorization: Bearer abc');
+      expect(result, contains('[REDACTED]'));
+    });
+
+    test('is case insensitive', () {
+      final result = CrashLogService.scrubCredentials('Password=CaseSensitive');
+      expect(result, isNot(contains('CaseSensitive')));
+    });
+
+    test('leaves non-sensitive messages unchanged', () {
+      const message = 'SocketException: Connection refused to 192.168.1.1:445';
+      expect(CrashLogService.scrubCredentials(message), message);
+    });
+
+    test('handles empty string', () {
+      expect(CrashLogService.scrubCredentials(''), '');
+    });
+
+    test('redacts multiple credentials in one message', () {
+      final result = CrashLogService.scrubCredentials(
+        'password=secret token=abc apiKey=def',
+      );
+      expect(result, isNot(contains('secret')));
+      expect(result, isNot(contains('abc')));
+      expect(result, isNot(contains('def')));
+    });
   });
 }

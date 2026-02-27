@@ -48,6 +48,7 @@ class LocalSetupState {
   final Set<String>? createSystemIds; // systems selected for folder creation
   final String? createBasePath; // base path for folder creation
   final bool isAutoDetecting; // true while checking known paths
+  final String? scanError; // error message from failed scan
 
   const LocalSetupState({
     this.romBasePath,
@@ -59,6 +60,7 @@ class LocalSetupState {
     this.createSystemIds,
     this.createBasePath,
     this.isAutoDetecting = false,
+    this.scanError,
   });
 
   LocalSetupState copyWith({
@@ -71,11 +73,13 @@ class LocalSetupState {
     Set<String>? createSystemIds,
     String? createBasePath,
     bool? isAutoDetecting,
+    String? scanError,
     bool clearRomBasePath = false,
     bool clearScannedFolders = false,
     bool clearDetectedPath = false,
     bool clearCreateSystemIds = false,
     bool clearCreateBasePath = false,
+    bool clearScanError = false,
   }) {
     return LocalSetupState(
       romBasePath: clearRomBasePath ? null : (romBasePath ?? this.romBasePath),
@@ -88,6 +92,7 @@ class LocalSetupState {
       createSystemIds: clearCreateSystemIds ? null : (createSystemIds ?? this.createSystemIds),
       createBasePath: clearCreateBasePath ? null : (createBasePath ?? this.createBasePath),
       isAutoDetecting: isAutoDetecting ?? this.isAutoDetecting,
+      scanError: clearScanError ? null : (scanError ?? this.scanError),
     );
   }
 
@@ -113,6 +118,7 @@ class RommSetupState {
   final Set<String> localOnlySystemIds;
   final String? detectedPath;
   final bool isAutoDetecting;
+  final String? scanError;
 
   const RommSetupState({
     this.subStep = RommSetupSubStep.ask,
@@ -130,6 +136,7 @@ class RommSetupState {
     this.localOnlySystemIds = const {},
     this.detectedPath,
     this.isAutoDetecting = false,
+    this.scanError,
   });
 
   RommSetupState copyWith({
@@ -148,9 +155,11 @@ class RommSetupState {
     Set<String>? localOnlySystemIds,
     String? detectedPath,
     bool? isAutoDetecting,
+    String? scanError,
     bool clearRomBasePath = false,
     bool clearScannedFolders = false,
     bool clearDetectedPath = false,
+    bool clearScanError = false,
   }) {
     return RommSetupState(
       subStep: subStep ?? this.subStep,
@@ -168,6 +177,7 @@ class RommSetupState {
       localOnlySystemIds: localOnlySystemIds ?? this.localOnlySystemIds,
       detectedPath: clearDetectedPath ? null : (detectedPath ?? this.detectedPath),
       isAutoDetecting: isAutoDetecting ?? this.isAutoDetecting,
+      scanError: clearScanError ? null : (scanError ?? this.scanError),
     );
   }
 
@@ -193,11 +203,13 @@ class ProviderFormState {
   final ProviderType type;
   final Map<String, dynamic> fields;
   final int? editingIndex;
+  final Map<ProviderType, Map<String, dynamic>> savedFieldsByType;
 
   const ProviderFormState({
     this.type = ProviderType.web,
     this.fields = const {},
     this.editingIndex,
+    this.savedFieldsByType = const {},
   });
 
   ProviderFormState copyWith({
@@ -205,11 +217,13 @@ class ProviderFormState {
     Map<String, dynamic>? fields,
     int? editingIndex,
     bool clearEditingIndex = false,
+    Map<ProviderType, Map<String, dynamic>>? savedFieldsByType,
   }) {
     return ProviderFormState(
       type: type ?? this.type,
       fields: fields ?? this.fields,
       editingIndex: clearEditingIndex ? null : (editingIndex ?? this.editingIndex),
+      savedFieldsByType: savedFieldsByType ?? this.savedFieldsByType,
     );
   }
 
@@ -353,6 +367,30 @@ class OnboardingState {
       case ProviderType.romm:
         return has('url');
     }
+  }
+
+  String? get missingFieldsMessage {
+    final form = providerForm;
+    if (form == null) return null;
+    final fields = form.fields;
+    bool has(String k) => (fields[k]?.toString() ?? '').trim().isNotEmpty;
+    final missing = <String>[];
+    switch (form.type) {
+      case ProviderType.ftp:
+        if (!has('host')) missing.add('Host');
+        if (!has('port')) missing.add('Port');
+        if (!has('path')) missing.add('Path');
+      case ProviderType.smb:
+        if (!has('host')) missing.add('Host');
+        if (!has('port')) missing.add('Port');
+        if (!has('share')) missing.add('Share');
+        if (!has('path')) missing.add('Path');
+      case ProviderType.web:
+      case ProviderType.romm:
+        if (!has('url')) missing.add('URL');
+    }
+    if (missing.isEmpty) return null;
+    return 'Required: ${missing.join(', ')}';
   }
 
   SystemModel? get selectedSystem {

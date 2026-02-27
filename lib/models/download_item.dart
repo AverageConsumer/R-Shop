@@ -143,6 +143,7 @@ class DownloadItem {
       'progress': progress,
       'retryCount': retryCount,
       if (tempFilePath != null) 'tempFilePath': tempFilePath,
+      if (game.isFolder) 'isFolder': true,
       if (game.providerConfig != null)
         'providerConfig': game.providerConfig!.toJsonWithoutAuth(),
     };
@@ -175,6 +176,7 @@ class DownloadItem {
         displayName: json['gameDisplayName'] as String,
         cachedCoverUrl: json['gameCachedCoverUrl'] as String?,
         providerConfig: providerConfig,
+        isFolder: json['isFolder'] as bool? ?? false,
       ),
       system: system,
       targetFolder: (json['targetFolder'] ?? json['romPath']) as String,

@@ -63,7 +63,7 @@ void main() {
     db = await databaseFactoryFfi.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 4,
+        version: 5,
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE games (
@@ -76,7 +76,8 @@ void main() {
               cover_url TEXT,
               provider_config TEXT,
               thumb_hash TEXT,
-              has_thumbnail INTEGER NOT NULL DEFAULT 0
+              has_thumbnail INTEGER NOT NULL DEFAULT 0,
+              is_folder INTEGER NOT NULL DEFAULT 0
             )
           ''');
           await db.execute(

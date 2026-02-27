@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 // Top-level callback required by flutter_foreground_task.
@@ -28,6 +29,7 @@ class DownloadForegroundService {
   static bool _initialized = false;
   static bool _running = false;
   static Completer<void>? _startCompleter;
+  static Completer<void>? _stopCompleter;
 
   /// Call once at app startup.
   static void init() {
@@ -62,6 +64,11 @@ class DownloadForegroundService {
   /// Call when a download becomes active.
   static Future<void> startIfNeeded({required int activeCount, required int queuedCount}) async {
     if (!_initialized) return;
+    // Wait for any pending stop to finish first
+    final pendingStop = _stopCompleter;
+    if (pendingStop != null) {
+      await pendingStop.future;
+    }
     if (_running) {
       await updateProgress(activeCount: activeCount, queuedCount: queuedCount);
       return;
@@ -126,8 +133,15 @@ class DownloadForegroundService {
     }
     if (!_running) return;
 
-    await FlutterForegroundTask.stopService();
+    _stopCompleter = Completer<void>();
+    try {
+      await FlutterForegroundTask.stopService();
+    } catch (e) {
+      debugPrint('DownloadForegroundService: stop failed: $e');
+    }
     _running = false;
+    _stopCompleter!.complete();
+    _stopCompleter = null;
   }
 
   static String _buildNotificationText(int activeCount, int queuedCount) {

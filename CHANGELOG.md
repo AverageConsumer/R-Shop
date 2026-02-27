@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.1.0] — 2026-02-27
+
+### Added
+- **Native SMB** — replaced smb_connect library with Kotlin MethodChannel service (`SmbService.kt`), enabling folder downloads, progress reporting, and reliable timeout handling on Android
+- **Folder downloads** — games stored as multi-file directories (bin/cue, m3u) can now be downloaded as complete folders via SMB and FTP
+- **Gamepad button icons** — SVG icon set (Xbox, PlayStation, Nintendo Switch) for context-aware controller hints
+- **RomM config screen** — full server management (add/edit/remove) with connection test, directly accessible from settings
+- **Network constants** — centralized timeout values (`NetworkTimeouts`) shared across all providers
+- **File utilities** — crash-safe atomic file move (`moveFile`) with staging and cleanup
+
+### Improved
+- **Onboarding rework** — redesigned setup wizard with streamlined console configuration, local folder detection, and RomM integration
+- **FTP provider** — host validation (hostname, IPv4, IPv6), injection protection, configurable timeouts
+- **Web provider** — security hardened directory parsing (path traversal, control chars, oversized hrefs filtered)
+- **Download service** — folder-aware downloads for SMB and FTP protocols with per-file progress
+- **Friendly errors** — expanded user-facing error mapping for network, auth, and provider failures
+- **Console HUD / Quick Menu / Control Button** — simplified rendering with gamepad icon integration
+
+### Internal
+- 1,069 tests (up from 970) — new suites: SMB provider (14), FTP provider (8), Web provider (12), FocusSyncManager (32), OverlayPriorityManager (14), file_utils (5), friendly_error expansions
+- `smb_connect` dependency removed (replaced by native Kotlin implementation)
+- `NativeSmbService` Dart wrapper for `com.retro.rshop/smb` MethodChannel
+- `NativeSmbDownloadHandle` / `NativeSmbFolderDownloadHandle` download handle types
+
+---
+
 ## [1.0.0] — 2026-02-26
 
 ### Highlights

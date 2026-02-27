@@ -1,9 +1,11 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:html/parser.dart';
 
 import '../../models/config/provider_config.dart';
+import '../../utils/network_constants.dart';
 import '../../models/config/system_config.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
@@ -16,11 +18,14 @@ class WebProvider implements SourceProvider {
 
   final Dio _dio;
 
+  static const int _maxScanDepth = 3;
+  static const Duration _scanTimeout = Duration(minutes: 5);
+
   WebProvider(this.config, {Dio? dio})
       : _dio = dio ??
             Dio(BaseOptions(
-              connectTimeout: const Duration(seconds: 15),
-              receiveTimeout: const Duration(seconds: 30),
+              connectTimeout: NetworkTimeouts.apiConnect,
+              receiveTimeout: NetworkTimeouts.apiReceive,
             ));
 
   String get _baseUrl {
@@ -34,14 +39,145 @@ class WebProvider implements SourceProvider {
   @override
   Future<List<GameItem>> fetchGames(SystemConfig system) async {
     final configPath = config.path;
-    final url = configPath != null ? '$_baseUrl${_trimSlashes(configPath)}/' : _baseUrl;
+    final rootUrl = configPath != null ? '$_baseUrl${_trimSlashes(configPath)}/' : _baseUrl;
 
-    final response = await _dio.get<String>(
-      url,
-      options: _authOptions,
-    );
+    final games = <GameItem>[];
+    final folderFiles = <String, List<({String name, String url})>>{};
+    final folderNames = <String, String>{};
+    final visited = <String>{};
 
-    return _parseDirectoryListing(response.data ?? '', url);
+    await _scanDirectory(rootUrl, 0, games, folderFiles, folderNames, visited)
+        .timeout(_scanTimeout, onTimeout: () {
+      debugPrint('WebProvider: scan timed out after $_scanTimeout');
+    });
+
+    // Promote folders: single-file → flat GameItem, multi-file → folder GameItem
+    for (final entry in folderFiles.entries) {
+      final files = entry.value;
+      if (files.length == 1) {
+        final file = files.first;
+        games.add(GameItem(
+          filename: file.name,
+          displayName: GameItem.cleanDisplayName(file.name),
+          url: file.url,
+          providerConfig: config,
+        ));
+      } else {
+        final folderName = folderNames[entry.key]!;
+        games.add(GameItem(
+          filename: folderName,
+          displayName: GameItem.cleanDisplayName(folderName),
+          url: entry.key,
+          providerConfig: config,
+          isFolder: true,
+        ));
+      }
+    }
+
+    return games;
+  }
+
+  Future<void> _scanDirectory(
+    String dirUrl,
+    int depth,
+    List<GameItem> games,
+    Map<String, List<({String name, String url})>> folderFiles,
+    Map<String, String> folderNames,
+    Set<String> visited,
+  ) async {
+    final normalizedUrl = dirUrl.endsWith('/') ? dirUrl : '$dirUrl/';
+    if (visited.contains(normalizedUrl)) return;
+    visited.add(normalizedUrl);
+
+    final Response<String> response;
+    try {
+      response = await _dio.get<String>(normalizedUrl, options: _authOptions);
+    } catch (e) {
+      debugPrint('WebProvider: failed to fetch $normalizedUrl: $e');
+      return;
+    }
+
+    final document = parse(response.data ?? '');
+    final links = document.querySelectorAll('a');
+    final subdirs = <String>[];
+
+    for (final link in links) {
+      final href = link.attributes['href'];
+      if (href == null) continue;
+      if (href.length > 1024) continue;
+
+      final text = link.text.trim();
+      if (text == 'Parent Directory' ||
+          text == '..' ||
+          text.startsWith('/') ||
+          href == '/') {
+        continue;
+      }
+
+      // Skip absolute URLs, absolute paths, and path traversal attempts
+      if (href.startsWith('http://') ||
+          href.startsWith('https://') ||
+          href.startsWith('/') ||
+          href.contains('../')) {
+        continue;
+      }
+
+      if (_containsControlChars(href)) continue;
+
+      final hrefLower = href.toLowerCase();
+
+      // Directory link (ends with /)
+      if (href.endsWith('/') && depth < _maxScanDepth) {
+        final decoded = Uri.decodeFull(href);
+        if (decoded.length <= 512 && !decoded.startsWith('.')) {
+          subdirs.add(href);
+        }
+        continue;
+      }
+
+      if (SystemModel.isGameFile(hrefLower)) {
+        final decodedFilename = Uri.decodeFull(href);
+        if (decodedFilename.length > 512) continue;
+        final fileUrl = '$normalizedUrl$href';
+
+        if (depth == 0) {
+          games.add(GameItem(
+            filename: decodedFilename,
+            displayName: GameItem.cleanDisplayName(decodedFilename),
+            url: fileUrl,
+            providerConfig: config,
+          ));
+        } else {
+          // Nested file → track per parent folder for promotion
+          folderNames.putIfAbsent(normalizedUrl, () => _folderNameFromUrl(normalizedUrl));
+          folderFiles.putIfAbsent(normalizedUrl, () => [])
+              .add((name: decodedFilename, url: fileUrl));
+        }
+      }
+    }
+
+    // Recurse into subdirectories
+    for (final subHref in subdirs) {
+      final subUrl = '$normalizedUrl$subHref';
+      try {
+        await _scanDirectory(subUrl, depth + 1, games, folderFiles, folderNames, visited);
+      } catch (e) {
+        debugPrint('WebProvider: failed to scan subdirectory $subUrl: $e');
+      }
+    }
+  }
+
+  /// Extracts a folder display name from a directory URL.
+  static String _folderNameFromUrl(String url) {
+    var trimmed = url;
+    while (trimmed.endsWith('/')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
+    }
+    final lastSlash = trimmed.lastIndexOf('/');
+    if (lastSlash >= 0) {
+      return Uri.decodeFull(trimmed.substring(lastSlash + 1));
+    }
+    return Uri.decodeFull(trimmed);
   }
 
   @override
@@ -87,53 +223,6 @@ class WebProvider implements SourceProvider {
     final headers = _authHeaders;
     if (headers.isEmpty) return null;
     return Options(headers: headers);
-  }
-
-  List<GameItem> _parseDirectoryListing(String html, String baseUrl) {
-    final document = parse(html);
-    final links = document.querySelectorAll('a');
-    final games = <GameItem>[];
-
-    for (final link in links) {
-      final href = link.attributes['href'];
-      if (href == null) continue;
-
-      // Length validation: skip oversized hrefs (crafted URLs)
-      if (href.length > 1024) continue;
-
-      final text = link.text.trim();
-      if (text == 'Parent Directory' ||
-          text == '..' ||
-          text.startsWith('/') ||
-          href == '/') {
-        continue;
-      }
-
-      // Skip absolute URLs and path traversal attempts
-      if (href.startsWith('http://') ||
-          href.startsWith('https://') ||
-          href.contains('../')) {
-        continue;
-      }
-
-      // Skip hrefs with control characters
-      if (_containsControlChars(href)) continue;
-
-      final hrefLower = href.toLowerCase();
-      if (SystemModel.isGameFile(hrefLower)) {
-        final decodedFilename = Uri.decodeFull(href);
-        // Skip filenames that are too long after decoding
-        if (decodedFilename.length > 512) continue;
-        games.add(GameItem(
-          filename: decodedFilename,
-          displayName: GameItem.cleanDisplayName(decodedFilename),
-          url: '$baseUrl$href',
-          providerConfig: config,
-        ));
-      }
-    }
-
-    return games;
   }
 
   static bool _containsControlChars(String s) {

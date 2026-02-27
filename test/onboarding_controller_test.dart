@@ -712,7 +712,8 @@ void main() {
       );
       c.setProviderType(ProviderType.ftp);
       expect(c.state.providerForm!.type, ProviderType.ftp);
-      expect(c.state.providerForm!.fields, isEmpty);
+      // FTP pre-fills default port
+      expect(c.state.providerForm!.fields, {'port': '21'});
     });
 
     test('setProviderType without form is no-op', () {

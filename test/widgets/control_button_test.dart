@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:retro_eshop/widgets/control_button.dart';
@@ -6,7 +7,7 @@ import '../helpers/pump_helpers.dart';
 
 void main() {
   group('ControlButton', () {
-    testWidgets('renders label text', (tester) async {
+    testWidgets('renders label text (legacy mode)', (tester) async {
       await tester.pumpWidget(createTestApp(
         const ControlButton(label: 'A', action: 'Confirm'),
       ));
@@ -22,26 +23,22 @@ void main() {
       expect(find.text('Confirm'), findsOneWidget);
     });
 
-    testWidgets('face button "A" gets circle shape (borderRadius = buttonSize)', (tester) async {
+    testWidgets('face button "A" gets circle shape (legacy mode)', (tester) async {
       await tester.pumpWidget(createTestApp(
         const ControlButton(label: 'A', action: 'Confirm'),
       ));
 
-      // Find the button container (first Container descendant of ControlButton)
       final containers = tester.widgetList<Container>(
         find.descendant(
           of: find.byType(ControlButton),
           matching: find.byType(Container),
         ),
       ).toList();
-      // The first container is the button shape
       final decoration = containers.first.decoration as BoxDecoration;
-      // For face buttons, borderRadius = buttonSize (circle), not pill
-      // Default medium: buttonSize = 28.0
       expect(decoration.borderRadius, BorderRadius.circular(28.0));
     });
 
-    testWidgets('shoulder button "LB" gets pill shape', (tester) async {
+    testWidgets('shoulder button "LB" gets pill shape (legacy mode)', (tester) async {
       await tester.pumpWidget(createTestApp(
         const ControlButton(label: 'LB', action: 'Prev'),
       ));
@@ -53,12 +50,10 @@ void main() {
         ),
       ).toList();
       final decoration = containers.first.decoration as BoxDecoration;
-      // For pill: borderRadius = buttonSize * 0.35
-      // Default medium: buttonSize = 28.0, pillRadius = 28 * 0.35 = 9.8
       expect(decoration.borderRadius, BorderRadius.circular(28.0 * 0.35));
     });
 
-    testWidgets('highlight=true uses redAccent label color', (tester) async {
+    testWidgets('highlight=true uses redAccent action color', (tester) async {
       await tester.pumpWidget(createTestApp(
         const ControlButton(label: 'B', action: 'Back', highlight: true),
       ));
@@ -70,7 +65,7 @@ void main() {
       );
     });
 
-    testWidgets('custom buttonColor is applied (no highlight)', (tester) async {
+    testWidgets('custom buttonColor is applied (legacy mode)', (tester) async {
       await tester.pumpWidget(createTestApp(
         const ControlButton(
           label: 'A',
@@ -99,7 +94,7 @@ void main() {
       expect(tapped, true);
     });
 
-    testWidgets('onTap null means no Material/InkWell wrapper', (tester) async {
+    testWidgets('onTap null means no InkWell wrapper', (tester) async {
       await tester.pumpWidget(createTestApp(
         const ControlButton(label: 'A', action: 'OK'),
       ));
@@ -107,7 +102,7 @@ void main() {
       expect(find.byType(InkWell), findsNothing);
     });
 
-    testWidgets('onTap non-null wraps in Material + InkWell', (tester) async {
+    testWidgets('onTap non-null wraps in InkWell', (tester) async {
       await tester.pumpWidget(createTestApp(
         ControlButton(label: 'A', action: 'OK', onTap: () {}),
       ));
@@ -125,44 +120,67 @@ void main() {
       ));
 
       expect(find.byIcon(Icons.menu), findsOneWidget);
-      // Label text should not be rendered (icon takes priority)
       expect(find.text('X'), findsNothing);
     });
 
-    testWidgets('shapePainter renders CustomPaint', (tester) async {
+    testWidgets('svgAsset renders SvgPicture instead of label', (tester) async {
       await tester.pumpWidget(createTestApp(
         const ControlButton(
           label: '',
-          action: 'Start',
-          shapePainter: NintendoPlusPainter(),
+          action: 'Confirm',
+          svgAsset: 'assets/gamepad/nintendo/switch_button_a.svg',
         ),
       ));
 
-      final finder = find.byWidgetPredicate(
-        (w) => w is CustomPaint && w.painter is NintendoPlusPainter,
-      );
-      expect(finder, findsOneWidget);
+      expect(find.byType(SvgPicture), findsOneWidget);
+      expect(find.text('Confirm'), findsOneWidget);
     });
 
-    testWidgets('highlight recolors NintendoPlusPainter to redAccent', (tester) async {
+    testWidgets('svgAsset with highlight shows red glow border', (tester) async {
       await tester.pumpWidget(createTestApp(
         const ControlButton(
           label: '',
-          action: 'Start',
-          shapePainter: NintendoPlusPainter(),
+          action: 'Save',
+          svgAsset: 'assets/gamepad/nintendo/switch_button_a.svg',
           highlight: true,
         ),
       ));
 
-      final finder = find.byWidgetPredicate(
-        (w) => w is CustomPaint && w.painter is NintendoPlusPainter,
-      );
-      final customPaint = tester.widget<CustomPaint>(finder);
-      final painter = customPaint.painter as NintendoPlusPainter;
-      expect(painter.color, Colors.redAccent);
+      expect(find.byType(SvgPicture), findsOneWidget);
+      // Highlight wraps SVG in a Container with circle border
+      final containers = tester.widgetList<Container>(
+        find.descendant(
+          of: find.byType(ControlButton),
+          matching: find.byType(Container),
+        ),
+      ).toList();
+      final highlighted = containers.where((c) {
+        final decoration = c.decoration;
+        if (decoration is BoxDecoration && decoration.border != null) {
+          return decoration.shape == BoxShape.circle;
+        }
+        return false;
+      });
+      expect(highlighted, isNotEmpty);
     });
 
-    testWidgets('labelColor is applied to label text', (tester) async {
+    testWidgets('svgAsset with onTap wraps in InkWell', (tester) async {
+      bool tapped = false;
+      await tester.pumpWidget(createTestApp(
+        ControlButton(
+          label: '',
+          action: 'OK',
+          svgAsset: 'assets/gamepad/nintendo/switch_button_a.svg',
+          onTap: () => tapped = true,
+        ),
+      ));
+
+      expect(find.byType(InkWell), findsOneWidget);
+      await tester.tap(find.byType(ControlButton));
+      expect(tapped, true);
+    });
+
+    testWidgets('labelColor is applied to label text (legacy mode)', (tester) async {
       await tester.pumpWidget(createTestApp(
         const ControlButton(
           label: 'A',

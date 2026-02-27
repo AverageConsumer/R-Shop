@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:ftpconnect/ftpconnect.dart';
+import 'package:path/path.dart' as p;
 
 import '../../models/config/provider_config.dart';
+import '../../utils/network_constants.dart';
 import '../../models/config/system_config.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
@@ -44,29 +46,48 @@ class FtpProvider implements SourceProvider {
     );
   }
 
+  static const int _maxScanDepth = 3;
+  static const Duration _scanTimeout = Duration(minutes: 5);
+
   @override
   Future<List<GameItem>> fetchGames(SystemConfig system) async {
     final ftp = _createClient();
-    await ftp.connect().timeout(const Duration(seconds: 30));
+    await ftp.connect().timeout(NetworkTimeouts.ftpConnect);
     try {
-      await ftp.changeDirectory(_remotePath).timeout(const Duration(seconds: 15));
-      final entries = await ftp.listDirectoryContent().timeout(const Duration(seconds: 60));
       final games = <GameItem>[];
+      // Track game files per folder: folderPath → list of (name, path)
+      final folderFiles = <String, List<({String name, String path})>>{};
+      final folderNames = <String, String>{}; // folderPath → display name
 
-      for (final entry in entries) {
-        if (entry.type != FTPEntryType.file) continue;
-        final name = entry.name;
-        if (!SystemModel.isGameFile(name.toLowerCase())) continue;
+      // Wrap recursive scan with overall timeout to prevent runaway recursion
+      await _scanDirectory(ftp, _remotePath, 0, games, folderFiles, folderNames)
+          .timeout(_scanTimeout, onTimeout: () {
+        debugPrint('FtpProvider: scan timed out after $_scanTimeout');
+      });
 
-        final filePath =
-            _remotePath.endsWith('/') ? '$_remotePath$name' : '$_remotePath/$name';
-
-        games.add(GameItem(
-          filename: name,
-          displayName: GameItem.cleanDisplayName(name),
-          url: filePath,
-          providerConfig: config,
-        ));
+      // Promote single-file folders to flat GameItems
+      for (final entry in folderFiles.entries) {
+        final files = entry.value;
+        if (files.length == 1) {
+          // Single file in subfolder → regular flat GameItem
+          final file = files.first;
+          games.add(GameItem(
+            filename: file.name,
+            displayName: GameItem.cleanDisplayName(file.name),
+            url: file.path,
+            providerConfig: config,
+          ));
+        } else {
+          // Multiple files → folder GameItem (existing behavior)
+          final folderName = folderNames[entry.key]!;
+          games.add(GameItem(
+            filename: folderName,
+            displayName: GameItem.cleanDisplayName(folderName),
+            url: entry.key,
+            providerConfig: config,
+            isFolder: true,
+          ));
+        }
       }
 
       return games;
@@ -75,14 +96,118 @@ class FtpProvider implements SourceProvider {
     }
   }
 
+  Future<void> _scanDirectory(
+    FTPConnect ftp,
+    String dirPath,
+    int depth,
+    List<GameItem> games,
+    Map<String, List<({String name, String path})>> folderFiles,
+    Map<String, String> folderNames,
+  ) async {
+    await ftp.changeDirectory(dirPath).timeout(NetworkTimeouts.ftpCommand);
+    final entries = await ftp
+        .listDirectoryContent()
+        .timeout(NetworkTimeouts.ftpList);
+
+    final subdirs = <String>[];
+
+    for (final entry in entries) {
+      final name = entry.name;
+      if (entry.type == FTPEntryType.file) {
+        if (!SystemModel.isGameFile(name.toLowerCase())) continue;
+        final filePath =
+            dirPath.endsWith('/') ? '$dirPath$name' : '$dirPath/$name';
+
+        if (depth == 0) {
+          // Root-level game file
+          games.add(GameItem(
+            filename: name,
+            displayName: GameItem.cleanDisplayName(name),
+            url: filePath,
+            providerConfig: config,
+          ));
+        } else {
+          // File in a subdirectory — track per folder for promotion check
+          final folderName = p.posix.basename(dirPath);
+          folderNames.putIfAbsent(dirPath, () => folderName);
+          folderFiles.putIfAbsent(dirPath, () => []).add((name: name, path: filePath));
+        }
+      } else if (entry.type == FTPEntryType.dir &&
+          !name.startsWith('.') &&
+          depth < _maxScanDepth) {
+        subdirs.add(name);
+      }
+    }
+
+    // Recurse into subdirectories
+    for (final subName in subdirs) {
+      final subPath =
+          dirPath.endsWith('/') ? '$dirPath$subName' : '$dirPath/$subName';
+      try {
+        await _scanDirectory(ftp, subPath, depth + 1, games, folderFiles, folderNames);
+      } catch (e) {
+        debugPrint('FtpProvider: failed to scan subdirectory $subPath: $e');
+      }
+    }
+  }
+
   @override
   Future<DownloadHandle> resolveDownload(GameItem game) async {
+    if (game.isFolder) {
+      FTPConnect? activeClient;
+      return FtpFolderDownloadHandle(
+        listFiles: () async {
+          final ftp = _createClient();
+          activeClient = ftp;
+          await ftp.connect().timeout(NetworkTimeouts.ftpConnect);
+          try {
+            await ftp.changeDirectory(game.url).timeout(NetworkTimeouts.ftpCommand);
+            final entries = await ftp
+                .listDirectoryContent()
+                .timeout(NetworkTimeouts.ftpList);
+            return entries
+                .where((e) => e.type == FTPEntryType.file)
+                .map((e) => e.name)
+                .toList();
+          } finally {
+            activeClient = null;
+            await ftp.disconnect();
+          }
+        },
+        downloadFile: (remotePath, dest, {onProgress}) async {
+          final ftp = _createClient();
+          activeClient = ftp;
+          await ftp.connect().timeout(NetworkTimeouts.ftpConnect);
+          try {
+            final (dir, fileName) = _splitPath(remotePath);
+            if (dir.isNotEmpty) {
+              await ftp.changeDirectory(dir);
+            }
+            await ftp.downloadFile(fileName, dest, onProgress: onProgress);
+          } finally {
+            activeClient = null;
+            await ftp.disconnect();
+          }
+        },
+        disconnect: () async {
+          final client = activeClient;
+          if (client == null) return;
+          activeClient = null;
+          try {
+            await client.disconnect();
+          } catch (e) {
+            debugPrint('FtpProvider: disconnect failed: $e');
+          }
+        },
+      );
+    }
+
     FTPConnect? activeClient;
     return FtpDownloadHandle(
       downloadToFile: (dest, {onProgress}) async {
         final ftp = _createClient();
         activeClient = ftp;
-        await ftp.connect().timeout(const Duration(seconds: 30));
+        await ftp.connect().timeout(NetworkTimeouts.ftpConnect);
         try {
           final (dir, fileName) = _splitPath(game.url);
           if (dir.isNotEmpty) {
@@ -111,8 +236,8 @@ class FtpProvider implements SourceProvider {
   Future<SourceConnectionResult> testConnection() async {
     final ftp = _createClient();
     try {
-      await ftp.connect().timeout(const Duration(seconds: 30));
-      await ftp.changeDirectory(_remotePath).timeout(const Duration(seconds: 15));
+      await ftp.connect().timeout(NetworkTimeouts.ftpConnect);
+      await ftp.changeDirectory(_remotePath).timeout(NetworkTimeouts.ftpCommand);
       return const SourceConnectionResult.ok();
     } catch (e) {
       return SourceConnectionResult.failed(e.toString());
@@ -135,7 +260,7 @@ class FtpProvider implements SourceProvider {
   /// since FTP files can't be fetched via HTTP.
   Future<void> downloadToFile(String remotePath, File destination) async {
     final ftp = _createClient();
-    await ftp.connect().timeout(const Duration(seconds: 30));
+    await ftp.connect().timeout(NetworkTimeouts.ftpConnect);
     try {
       final (dir, fileName) = _splitPath(remotePath);
       if (dir.isNotEmpty) {

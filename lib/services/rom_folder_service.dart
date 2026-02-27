@@ -109,7 +109,32 @@ class RomFolderService {
     '.7z',
   };
 
-  /// Scans all subdirectories of [basePath] and counts ROM files in each.
+  static const int _maxScanDepth = 3;
+
+  /// Counts ROM files recursively within [dir], up to [maxDepth] levels.
+  Future<int> _countGamesRecursive(Directory dir, int depth) async {
+    int count = 0;
+    try {
+      await for (final entity in dir.list()) {
+        if (entity is File) {
+          final lower = entity.path.toLowerCase();
+          if (_allRomExtensions.any((ext) => lower.endsWith(ext))) {
+            count++;
+          }
+        } else if (entity is Directory && depth < _maxScanDepth) {
+          final name = entity.path.split('/').last;
+          if (name.startsWith('.')) continue;
+          count += await _countGamesRecursive(entity, depth + 1);
+        }
+      }
+    } on FileSystemException catch (e) {
+      debugPrint('RomFolderService: cannot list ${dir.path}: $e');
+    }
+    return count;
+  }
+
+  /// Scans all subdirectories of [basePath] and counts ROM files recursively
+  /// within each top-level folder (up to [_maxScanDepth] levels deep).
   Future<List<({String name, int fileCount})>> scanAllSubfolders(
       String basePath) async {
     try {
@@ -121,19 +146,7 @@ class RomFolderService {
         if (entity is Directory) {
           final name = entity.path.split('/').last;
           if (name.startsWith('.')) continue;
-          int count = 0;
-          try {
-            await for (final file in entity.list()) {
-              if (file is File) {
-                final lower = file.path.toLowerCase();
-                if (_allRomExtensions.any((ext) => lower.endsWith(ext))) {
-                  count++;
-                }
-              }
-            }
-          } on FileSystemException catch (e) {
-            debugPrint('RomFolderService: cannot list $name: $e');
-          }
+          final count = await _countGamesRecursive(entity, 1);
           results.add((name: name, fileCount: count));
         }
       }

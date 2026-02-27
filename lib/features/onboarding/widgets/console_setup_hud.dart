@@ -24,14 +24,12 @@ ConsoleHud? buildConsoleSetupHud({
   final controller = ref.read(onboardingControllerProvider.notifier);
 
   if (state.hasProviderForm) {
-    final canAct = state.canTest &&
-        !state.isTestingConnection &&
-        !isNonLanHttpBlocked(state, ref);
+    final isBlocked = state.isTestingConnection || isNonLanHttpBlocked(state, ref);
     return ConsoleHud(
       b: HudAction('Cancel', onTap: controller.cancelProviderForm),
       y: HudAction(
         'Test & Save',
-        onTap: canAct ? controller.testAndSaveProvider : null,
+        onTap: isBlocked ? null : controller.testAndSaveProvider,
       ),
     );
   }

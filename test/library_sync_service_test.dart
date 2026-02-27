@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:retro_eshop/services/library_sync_service.dart';
+import 'package:retro_eshop/utils/friendly_error.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -144,12 +145,11 @@ void main() {
       expect(msg.contains('FTP'), isTrue);
     });
 
-    // Test the actual mapping function behavior
+    // Test the actual mapping function via getUserFriendlyError(returnRawOnNoMatch: true)
     test('error mapping returns human-readable messages', () {
-      // These are the exact patterns from LibrarySyncService._userFriendlyError
       final mappings = <String, String>{
-        'SocketException: OS Error': 'Server unreachable',
-        'Connection refused': 'Server unreachable',
+        'SocketException: OS Error': 'Connection error',
+        'Connection refused': 'Connection error',
         'HandshakeException: cert': 'SSL/TLS error',
         'CERTIFICATE_VERIFY_FAILED': 'SSL/TLS error',
         'TimeoutException': 'Connection timed out',
@@ -161,27 +161,20 @@ void main() {
       };
 
       for (final entry in mappings.entries) {
-        final errorMsg = entry.key;
-        final expectedFragment = entry.value;
-        // Verify pattern matching would work
+        final result = getUserFriendlyError(entry.key, returnRawOnNoMatch: true);
         expect(
-          _matchesErrorPattern(errorMsg),
-          isNotNull,
-          reason: '$errorMsg should match a pattern',
-        );
-        final result = _matchesErrorPattern(errorMsg)!;
-        expect(
-          result.contains(expectedFragment),
+          result.contains(entry.value),
           isTrue,
-          reason: 'Expected "$expectedFragment" in "$result" for input "$errorMsg"',
+          reason: 'Expected "${entry.value}" in "$result" for input "${entry.key}"',
         );
       }
     });
 
     test('long error messages are truncated', () {
       final longMsg = 'A' * 200;
-      // The function truncates at 100 chars if no pattern matches
-      expect(longMsg.length > 100, isTrue);
+      final result = getUserFriendlyError(longMsg, returnRawOnNoMatch: true);
+      expect(result.length, 101); // 100 + ellipsis
+      expect(result, endsWith('…'));
     });
   });
 
@@ -300,32 +293,3 @@ void main() {
   });
 }
 
-/// Mirrors the error pattern matching from LibrarySyncService._userFriendlyError
-String? _matchesErrorPattern(String msg) {
-  if (msg.contains('SocketException') || msg.contains('Connection refused')) {
-    return 'Server unreachable — check your network connection';
-  }
-  if (msg.contains('HandshakeException') || msg.contains('CERTIFICATE_VERIFY')) {
-    return 'SSL/TLS error — check server certificate';
-  }
-  if (msg.contains('TimeoutException') || msg.contains('timed out')) {
-    return 'Connection timed out';
-  }
-  if (msg.contains('401') || msg.contains('Unauthorized')) {
-    return 'Authentication failed — check credentials';
-  }
-  if (msg.contains('403') || msg.contains('Forbidden')) {
-    return 'Access denied — check permissions';
-  }
-  if (msg.contains('404') || msg.contains('Not Found')) {
-    return 'Resource not found — check URL';
-  }
-  if (msg.contains('SMB') || msg.contains('smb')) {
-    return 'SMB connection failed — check share settings';
-  }
-  if (msg.contains('FTP') || msg.contains('ftp')) {
-    return 'FTP connection failed — check host/credentials';
-  }
-  if (msg.length > 100) return '${msg.substring(0, 100)}…';
-  return msg;
-}

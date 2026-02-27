@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../models/config/provider_config.dart';
+import '../utils/network_constants.dart';
 import 'source_provider.dart';
 
 class RommPlatform {
@@ -79,8 +80,8 @@ class RommApiService {
   RommApiService({Dio? dio})
       : _dio = dio ??
             Dio(BaseOptions(
-              connectTimeout: const Duration(seconds: 15),
-              receiveTimeout: const Duration(seconds: 30),
+              connectTimeout: NetworkTimeouts.apiConnect,
+              receiveTimeout: NetworkTimeouts.apiReceive,
             ));
 
   Options? _buildAuthOptions(AuthConfig? auth) {

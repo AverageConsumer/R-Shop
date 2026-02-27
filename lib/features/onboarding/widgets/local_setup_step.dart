@@ -453,13 +453,13 @@ class _LocalResultsView extends ConsumerWidget {
       if (manualSystemId != null) {
         matched.add(folder);
         assignedSystems.add(manualSystemId);
-      } else if (folder.autoMatchedSystemId != null && folder.fileCount > 0) {
+      } else if (folder.autoMatchedSystemId != null) {
         matched.add(folder);
         assignedSystems.add(folder.autoMatchedSystemId!);
-      } else if (folder.fileCount == 0) {
-        ignored.add(folder);
-      } else {
+      } else if (folder.fileCount > 0) {
         unmatched.add(folder);
+      } else {
+        ignored.add(folder);
       }
     }
 
@@ -520,6 +520,75 @@ class _LocalResultsView extends ConsumerWidget {
               child: FocusTraversalGroup(
                 child: ListView(
                   children: [
+                    // Scan error warning
+                    if (localSetup.scanError != null)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: rs.spacing.md),
+                        child: Container(
+                          padding: EdgeInsets.all(rs.spacing.md),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.1),
+                            borderRadius:
+                                BorderRadius.circular(rs.radius.sm),
+                            border: Border.all(
+                              color: Colors.orange.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.warning_amber_rounded,
+                                  color: Colors.orange.shade300, size: 18),
+                              SizedBox(width: rs.spacing.sm),
+                              Expanded(
+                                child: Text(
+                                  localSetup.scanError!,
+                                  style: TextStyle(
+                                    color: Colors.orange.shade300,
+                                    fontSize: rs.isSmall ? 10.0 : 12.0,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    // Permission warning when all folders appear empty
+                    if (scanned.isNotEmpty &&
+                        scanned.every((f) => f.fileCount == 0))
+                      Padding(
+                        padding: EdgeInsets.only(bottom: rs.spacing.md),
+                        child: Container(
+                          padding: EdgeInsets.all(rs.spacing.md),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.1),
+                            borderRadius:
+                                BorderRadius.circular(rs.radius.sm),
+                            border: Border.all(
+                              color: Colors.orange.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.warning_amber_rounded,
+                                  color: Colors.orange.shade300, size: 18),
+                              SizedBox(width: rs.spacing.sm),
+                              Expanded(
+                                child: Text(
+                                  'All folders appear empty. R-Shop may need '
+                                  'storage permission \u2014 check Android '
+                                  'Settings \u203A Apps \u203A R-Shop \u203A Permissions.',
+                                  style: TextStyle(
+                                    color: Colors.orange.shade300,
+                                    fontSize: rs.isSmall ? 10.0 : 12.0,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     // Matched folders
                     for (final (i, folder) in matched.indexed)
                       _MatchedFolderRow(
@@ -660,12 +729,37 @@ class _MatchedFolderRow extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Text(
-                    '${folder.name}/ \u2022 ${folder.fileCount} files',
-                    style: TextStyle(
-                      color: Colors.grey.shade500,
-                      fontSize: detailFontSize,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        '${folder.name}/ \u2022 ${folder.fileCount} files',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: detailFontSize,
+                        ),
+                      ),
+                      if (folder.fileCount == 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'empty',
+                            style: TextStyle(
+                              color: Colors.orange.shade300,
+                              fontSize: detailFontSize,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
@@ -715,7 +809,9 @@ class _UnmatchedFolderRow extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: rs.spacing.xs),
       child: ConsoleFocusableListItem(
-        onSelect: () {},
+        onSelect: availableSystemIds.isNotEmpty
+            ? () => onAssign(availableSystemIds.first)
+            : null,
         borderRadius: rs.radius.sm,
         padding: EdgeInsets.symmetric(
           horizontal: rs.spacing.md,

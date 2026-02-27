@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:retro_eshop/services/download_service.dart';
+import 'package:retro_eshop/services/native_smb_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -111,7 +112,7 @@ void main() {
     late DownloadService service;
 
     setUp(() {
-      service = DownloadService();
+      service = DownloadService(NativeSmbService());
     });
 
     tearDown(() {

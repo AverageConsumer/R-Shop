@@ -112,14 +112,21 @@ class RommSelectView extends ConsumerWidget {
           ),
         ),
         const Spacer(),
-        GestureDetector(
-          onTap: () => controller.toggleAllRommSystems(!allSelected),
-          child: Text(
-            allSelected ? 'Deselect All' : 'Select All',
-            style: TextStyle(
-              color: Colors.blue.shade300,
-              fontSize: fontSize,
-              fontWeight: FontWeight.w600,
+        ConsoleFocusable(
+          onSelect: () => controller.toggleAllRommSystems(!allSelected),
+          borderRadius: 4,
+          child: GestureDetector(
+            onTap: () => controller.toggleAllRommSystems(!allSelected),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+              child: Text(
+                allSelected ? 'Deselect All' : 'Select All',
+                style: TextStyle(
+                  color: Colors.blue.shade300,
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ),

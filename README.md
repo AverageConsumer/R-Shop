@@ -22,7 +22,7 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.1.0-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
   <img src="https://img.shields.io/badge/platform-Android-brightgreen?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/github/stars/averageconsumer/R-Shop?style=flat-square&color=yellow" alt="Stars" />

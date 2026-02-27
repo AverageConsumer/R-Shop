@@ -11,18 +11,23 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.io.*
 import java.util.concurrent.Executors
+import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.retro.rshop/zip"
     private val STORAGE_CHANNEL = "com.retro.rshop/storage"
     private val PROGRESS_CHANNEL = "com.retro.rshop/zip_progress"
+    private val SMB_CHANNEL = "com.retro.rshop/smb"
+    private val SMB_PROGRESS_CHANNEL = "com.retro.rshop/smb_progress"
     private val TAG = "MainActivity"
 
     private val extractorPool = Executors.newFixedThreadPool(2)
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val smbService = SmbService()
 
     private var progressSink: EventChannel.EventSink? = null
+    private var smbProgressSink: EventChannel.EventSink? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,6 +76,77 @@ class MainActivity : FlutterActivity() {
             }
         }
 
+        // SMB Progress EventChannel
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, SMB_PROGRESS_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    smbProgressSink = events
+                }
+                override fun onCancel(arguments: Any?) {
+                    smbProgressSink = null
+                }
+            }
+        )
+
+        // SMB MethodChannel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SMB_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "testConnection" -> {
+                    val args = call.arguments as? Map<*, *>
+                    if (args == null) {
+                        result.error("INVALID_ARGS", "Arguments required", null)
+                        return@setMethodCallHandler
+                    }
+                    smbService.smbPool.execute {
+                        try {
+                            val response = smbService.testConnection(args)
+                            mainHandler.post { result.success(response) }
+                        } catch (e: Exception) {
+                            mainHandler.post { result.error("SMB_ERROR", e.message, null) }
+                        }
+                    }
+                }
+                "listFiles" -> {
+                    val args = call.arguments as? Map<*, *>
+                    if (args == null) {
+                        result.error("INVALID_ARGS", "Arguments required", null)
+                        return@setMethodCallHandler
+                    }
+                    smbService.smbPool.execute {
+                        try {
+                            val files = smbService.listFiles(args)
+                            mainHandler.post { result.success(files) }
+                        } catch (e: Exception) {
+                            mainHandler.post { result.error("SMB_ERROR", e.message, null) }
+                        }
+                    }
+                }
+                "startDownload" -> {
+                    val args = call.arguments as? Map<*, *>
+                    if (args == null) {
+                        result.error("INVALID_ARGS", "Arguments required", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        smbService.startDownload(args, smbProgressSink, mainHandler)
+                        result.success(null)
+                    } catch (e: Exception) {
+                        result.error("SMB_ERROR", e.message, null)
+                    }
+                }
+                "cancelDownload" -> {
+                    val downloadId = call.argument<String>("downloadId")
+                    if (downloadId == null) {
+                        result.error("INVALID_ARGS", "downloadId required", null)
+                        return@setMethodCallHandler
+                    }
+                    smbService.cancelDownload(downloadId)
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, STORAGE_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getFreeSpace" -> {
@@ -105,6 +181,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         extractorPool.shutdown()
+        smbService.shutdown()
         super.onDestroy()
     }
 
@@ -121,24 +198,27 @@ class MainActivity : FlutterActivity() {
 
     private fun extractZip(zipPath: String, targetPath: String): List<String> {
         val extractedFiles = mutableListOf<String>()
-        val buffer = ByteArray(8192)
+        val buffer = ByteArray(65536)
         var totalBytes = 0L
         var extractedBytes = 0L
 
-        // Get total size for progress
-        File(zipPath).inputStream().use { fis ->
-            val zis = ZipInputStream(BufferedInputStream(fis))
-            var entry = zis.nextEntry
-            while (entry != null) {
-                if (entry.size > 0) totalBytes += entry.size
-                entry = zis.nextEntry
+        // Get total size via ZipFile (random-access, reads only central directory)
+        try {
+            ZipFile(zipPath).use { zf ->
+                val entries = zf.entries()
+                while (entries.hasMoreElements()) {
+                    val entry = entries.nextElement()
+                    if (entry.size > 0) totalBytes += entry.size
+                }
             }
-            zis.close()
+        } catch (e: Exception) {
+            Log.w(TAG, "ZipFile size scan failed, progress will be unavailable: ${e.message}")
+            totalBytes = 0
         }
 
         // Extract files
         File(zipPath).inputStream().use { fis ->
-            val zis = ZipInputStream(BufferedInputStream(fis))
+            val zis = ZipInputStream(BufferedInputStream(fis, 65536))
             var entry = zis.nextEntry
 
             val canonicalTarget = File(targetPath).canonicalPath
@@ -159,10 +239,10 @@ class MainActivity : FlutterActivity() {
                 } else {
                     file.parentFile?.mkdirs()
 
-                    FileOutputStream(file).use { fos ->
+                    BufferedOutputStream(FileOutputStream(file), 65536).use { bos ->
                         var len: Int
                         while (zis.read(buffer).also { len = it } > 0) {
-                            fos.write(buffer, 0, len)
+                            bos.write(buffer, 0, len)
                             extractedBytes += len
                             if (extractedBytes > MAX_EXTRACT_BYTES) {
                                 throw IOException("Zip bomb detected: extracted data exceeds ${MAX_EXTRACT_BYTES / (1024 * 1024 * 1024)} GB limit")

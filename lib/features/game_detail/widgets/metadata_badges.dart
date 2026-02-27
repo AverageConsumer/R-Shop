@@ -58,7 +58,8 @@ class LanguageBadges extends StatelessWidget {
     final visible = languages.take(maxVisible).toList();
     final remaining = languages.length - maxVisible;
 
-    return Row(
+    return ClipRect(
+      child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         ...visible.map((lang) => Padding(
@@ -85,6 +86,7 @@ class LanguageBadges extends StatelessWidget {
             ),
           ),
       ],
+      ),
     );
   }
 }

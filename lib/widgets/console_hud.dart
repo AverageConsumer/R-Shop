@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/responsive/responsive.dart';
 import '../providers/app_providers.dart';
 import 'control_button.dart';
+import 'gamepad_icons.dart';
 
 class HudAction {
   const HudAction(this.action, {this.onTap, this.highlight = false});
@@ -17,7 +18,7 @@ class HudAction {
 /// Set [embedded] to true when used inside a modal (no Positioned wrapper).
 ///
 /// Slots are rendered in fixed Switch-convention order (left to right):
-/// [D-pad] [L] [R] [ZL] [ZR] [−] [+] [Y] [X] [B] [A]  [Downloads]
+/// [D-pad] [L] [R] [ZL] [ZR] [-] [+] [Y] [X] [B] [A]  [Downloads]
 class ConsoleHud extends ConsumerWidget {
   final HudAction? a, b, x, y, start, select, lb, rb, lt, rt;
   final ({String label, String action})? dpad;
@@ -51,150 +52,104 @@ class ConsoleHud extends ConsumerWidget {
     final displayX = swapPositions ? y : x;
     final displayY = swapPositions ? x : y;
 
-    final (labelA, labelB, labelX, labelY) = switch (layout) {
-      ControllerLayout.nintendo => ('A', 'B', 'X', 'Y'),
-      ControllerLayout.xbox => ('B', 'A', 'Y', 'X'),
-      ControllerLayout.playstation => ('', '', '', ''),
-    };
+    String svg(String id) => GamepadIcons.assetPath(id, layout);
 
-    // Xbox face button colors
-    const xbGreen = Color(0xFF6DC849);
-    const xbRed = Color(0xFFE24C3A);
-    const xbBlue = Color(0xFF4C87CB);
-    const xbYellow = Color(0xFFF3B735);
-
-    // Per-layout button styling: (colorA, colorB, colorX, colorY, painterA, painterB, painterX, painterY)
-    final (Color? colorA, Color? colorB, Color? colorX, Color? colorY,
-           CustomPainter? painterA, CustomPainter? painterB,
-           CustomPainter? painterX, CustomPainter? painterY) = switch (layout) {
-      ControllerLayout.nintendo => (null, null, null, null, null, null, null, null),
-      ControllerLayout.xbox => (xbGreen, xbRed, xbBlue, xbYellow, null, null, null, null),
-      ControllerLayout.playstation => (
-        const Color(0xFFE8707A), const Color(0xFF6E9FD6),
-        const Color(0xFF7BC8A4), const Color(0xFFA88BC7),
-        const PSCirclePainter(), const PSCrossPainter(),
-        const PSTrianglePainter(), const PSSquarePainter(),
-      ),
-    };
-
-    // Start/Select styling
-    final (IconData? iconStart, String labelStart,
-           CustomPainter? painterStart) = switch (layout) {
-      ControllerLayout.nintendo => (null, '', const NintendoPlusPainter()),
-      ControllerLayout.playstation => (Icons.menu_rounded, '', null),
-      ControllerLayout.xbox => (Icons.menu_rounded, '', null),
-    };
-
-    final (IconData? iconSelect, String labelSelect,
-           CustomPainter? painterSelect) = switch (layout) {
-      ControllerLayout.nintendo => (null, '', const NintendoMinusPainter()),
-      ControllerLayout.playstation => (Icons.share_rounded, '', null),
-      ControllerLayout.xbox => (Icons.filter_none, '', null),
-    };
-
-    final (labelLB, labelRB, labelLT, labelRT) = switch (layout) {
-      ControllerLayout.nintendo => ('L', 'R', 'ZL', 'ZR'),
-      ControllerLayout.xbox => ('LB', 'RB', 'LT', 'RT'),
-      ControllerLayout.playstation => ('L1', 'R1', 'L2', 'R2'),
-    };
-
-    // Fixed order: dpad, LB, RB, select(−), start(+), Y, X, B, A
+    // Fixed order: dpad, LB, RB, LT, RT, select(-), start(+), Y, X, B, A
     if (dpad != null) {
       buttons.add(ControlButton(
         label: dpad!.label,
         action: dpad!.action,
+        svgAsset: svg('dpad'),
       ));
     }
     if (lb != null) {
       buttons.add(ControlButton(
-        label: labelLB,
+        label: '',
         action: lb!.action,
         onTap: lb!.onTap,
         highlight: lb!.highlight,
+        svgAsset: svg('l'),
       ));
     }
     if (rb != null) {
       buttons.add(ControlButton(
-        label: labelRB,
+        label: '',
         action: rb!.action,
         onTap: rb!.onTap,
         highlight: rb!.highlight,
+        svgAsset: svg('r'),
       ));
     }
     if (lt != null) {
       buttons.add(ControlButton(
-        label: labelLT,
+        label: '',
         action: lt!.action,
         onTap: lt!.onTap,
         highlight: lt!.highlight,
+        svgAsset: svg('zl'),
       ));
     }
     if (rt != null) {
       buttons.add(ControlButton(
-        label: labelRT,
+        label: '',
         action: rt!.action,
         onTap: rt!.onTap,
         highlight: rt!.highlight,
+        svgAsset: svg('zr'),
       ));
     }
     if (select != null) {
       buttons.add(ControlButton(
-        label: labelSelect,
-        icon: iconSelect,
-        shapePainter: painterSelect,
+        label: '',
         action: select!.action,
         onTap: select!.onTap,
         highlight: select!.highlight,
+        svgAsset: svg('minus'),
       ));
     }
     if (start != null) {
       buttons.add(ControlButton(
-        label: labelStart,
-        icon: iconStart,
-        shapePainter: painterStart,
+        label: '',
         action: start!.action,
         onTap: start!.onTap,
         highlight: start!.highlight,
+        svgAsset: svg('plus'),
       ));
     }
     if (displayY != null) {
       buttons.add(ControlButton(
-        label: labelY,
+        label: '',
         action: displayY.action,
         onTap: displayY.onTap,
         highlight: displayY.highlight,
-        buttonColor: colorY,
-        shapePainter: painterY,
+        svgAsset: svg('y'),
       ));
     }
     if (displayX != null) {
       buttons.add(ControlButton(
-        label: labelX,
+        label: '',
         action: displayX.action,
         onTap: displayX.onTap,
         highlight: displayX.highlight,
-        buttonColor: colorX,
-        shapePainter: painterX,
+        svgAsset: svg('x'),
       ));
     }
     if (displayB != null) {
       buttons.add(ControlButton(
-        label: labelB,
+        label: '',
         action: displayB.action,
         onTap: displayB.onTap,
         highlight: displayB.highlight,
-        buttonColor: colorB,
-        shapePainter: painterB,
+        svgAsset: svg('b'),
       ));
     }
     if (displayA != null) {
       buttons.add(ControlButton(
-        label: labelA,
+        label: '',
         action: displayA.action,
         onTap: displayA.onTap,
         highlight: displayA.highlight,
-        buttonColor: colorA,
-        shapePainter: painterA,
+        svgAsset: svg('a'),
       ));
     }
 

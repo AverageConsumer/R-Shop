@@ -4,9 +4,31 @@ import 'package:path_provider/path_provider.dart';
 
 /// Local crash log service that persists error logs to disk.
 /// Ring buffer keeps the file under ~500KB by truncating oldest entries.
+/// All log messages are scrubbed for credentials before writing.
 class CrashLogService {
   static const int _maxBytes = 500 * 1024; // 500KB
   static const String _logFileName = 'rshop_crash.log';
+
+  /// Patterns that may contain sensitive credentials in log messages.
+  static final _credentialPatterns = [
+    // Key=value patterns (password=xxx, apiKey=xxx, etc.)
+    RegExp(r'(pass(?:word)?|api[_-]?key|secret|token|authorization|credential)s?\s*[=:]\s*\S+', caseSensitive: false),
+    // HTTP Basic Auth header values
+    RegExp(r'Basic\s+[A-Za-z0-9+/=]{4,}'),
+    // Bearer tokens
+    RegExp(r'Bearer\s+\S+', caseSensitive: false),
+  ];
+
+  static const String _redacted = '[REDACTED]';
+
+  /// Scrubs potential credentials from a log message.
+  static String scrubCredentials(String message) {
+    var result = message;
+    for (final pattern in _credentialPatterns) {
+      result = result.replaceAll(pattern, _redacted);
+    }
+    return result;
+  }
 
   File? _logFile;
   bool _initialized = false;
@@ -26,12 +48,13 @@ class CrashLogService {
     }
   }
 
-  /// Append a timestamped log line.
+  /// Append a timestamped log line. Credentials are scrubbed before writing.
   void log(String level, String message) {
     if (!_initialized || _logFile == null) return;
     try {
+      final scrubbed = scrubCredentials(message);
       final timestamp = DateTime.now().toIso8601String();
-      final line = '[$timestamp] [$level] $message\n';
+      final line = '[$timestamp] [$level] $scrubbed\n';
       _logFile!.writeAsStringSync(line, mode: FileMode.append, flush: true);
       _truncateIfNeeded();
     } catch (e) {

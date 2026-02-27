@@ -136,6 +136,7 @@ class FocusSyncManager {
     final screenHeight = MediaQuery.of(context).size.height;
     final topPadding = MediaQuery.of(context).padding.top + 80 + 16;
     final crossAxisCount = getCrossAxisCount();
+    if (crossAxisCount <= 0) return;
 
     final gridWidth = MediaQuery.of(context).size.width - 48;
     final itemWidth = (gridWidth - (crossAxisCount - 1) * 16) / crossAxisCount;

@@ -1,153 +1,164 @@
-import 'package:smb_connect/smb_connect.dart';
+import 'package:path/path.dart' as p;
 
 import '../../models/config/provider_config.dart';
 import '../../models/config/system_config.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../download_handle.dart';
+import '../native_smb_service.dart';
 import '../source_provider.dart';
 
 class SmbProvider implements SourceProvider {
-  static const _timeout = Duration(seconds: 30);
-
   @override
   final ProviderConfig config;
 
-  SmbProvider(this.config);
+  final NativeSmbService _smbService;
 
-  String get _smbRoot {
+  SmbProvider(this.config, this._smbService);
+
+  String get _shareName {
     final share = config.share;
     if (share == null || share.isEmpty) {
       throw StateError('SMB provider requires a share name');
     }
-    final path = config.path;
-    if (path == null || path.isEmpty) return '/$share';
-    final cleanPath = path.startsWith('/') ? path : '/$path';
-    return '/$share$cleanPath';
+    return share;
   }
 
-  // Matches hostname, IPv4, or bracketed IPv6
-  static final _hostPattern = RegExp(
-    r'^([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$'
-    r'|'
-    r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
-    r'|'
-    r'^\[[:0-9a-fA-F]+\]$',
-  );
-
-  Future<SmbConnect> _connect() async {
+  String get _path => config.path ?? '';
+  String get _host {
     final host = config.host;
     if (host == null || host.isEmpty) {
       throw StateError('SMB provider requires a host');
     }
-    if (!_hostPattern.hasMatch(host)) {
-      throw StateError('Invalid SMB host format: $host');
-    }
-    return SmbConnect.connectAuth(
-      host: host,
-      username: config.auth?.user ?? 'guest',
-      password: config.auth?.pass ?? '',
-      domain: config.auth?.domain ?? '',
-    ).timeout(_timeout);
+    return host;
   }
+
+  int get _port => config.port ?? 445;
+  String get _user => config.auth?.user ?? 'guest';
+  String get _pass => config.auth?.pass ?? '';
+  String get _domain => config.auth?.domain ?? '';
+
+  static const int _maxScanDepth = 3;
 
   @override
   Future<List<GameItem>> fetchGames(SystemConfig system) async {
-    final connection = await _connect();
-    try {
-      final folder = await connection.file(_smbRoot).timeout(_timeout);
-      final files = await connection.listFiles(folder).timeout(_timeout);
-      final games = <GameItem>[];
+    final entries = await _smbService.listFiles(
+      host: _host,
+      port: _port,
+      share: _shareName,
+      path: _path,
+      user: _user,
+      pass: _pass,
+      domain: _domain,
+      maxDepth: _maxScanDepth,
+    );
 
-      for (final file in files) {
-        if (!file.isFile()) continue;
-        final name = file.name;
-        if (!SystemModel.isGameFile(name.toLowerCase())) continue;
+    final games = <GameItem>[];
+    // Track game files per folder: folderPath → list of file entries
+    final folderFiles = <String, List<SmbFileEntry>>{};
+    final folderNames = <String, String>{}; // folderPath → display name
 
+    for (final entry in entries) {
+      if (entry.isDirectory) continue;
+      if (!SystemModel.isGameFile(entry.name.toLowerCase())) continue;
+
+      if (entry.parentPath == null) {
+        // Root-level game file
         games.add(GameItem(
-          filename: name,
-          displayName: GameItem.cleanDisplayName(name),
+          filename: entry.name,
+          displayName: GameItem.cleanDisplayName(entry.name),
+          url: entry.path,
+          providerConfig: config,
+        ));
+      } else {
+        // File inside a subdirectory — extract the immediate parent directory
+        // entry.path is e.g. "root/A/Ace Combat/game.bin"
+        // The game folder is the directory directly containing this file
+        final lastSlash = entry.path.lastIndexOf('/');
+        if (lastSlash > 0) {
+          final folderPath = entry.path.substring(0, lastSlash);
+          final folderName = p.posix.basename(folderPath);
+          folderNames.putIfAbsent(folderPath, () => folderName);
+          folderFiles.putIfAbsent(folderPath, () => []).add(entry);
+        }
+      }
+    }
+
+    // Promote single-file folders to flat GameItems
+    for (final entry in folderFiles.entries) {
+      final files = entry.value;
+      if (files.length == 1) {
+        // Single file in subfolder → regular flat GameItem
+        final file = files.first;
+        games.add(GameItem(
+          filename: file.name,
+          displayName: GameItem.cleanDisplayName(file.name),
           url: file.path,
           providerConfig: config,
         ));
+      } else {
+        // Multiple files → folder GameItem (existing behavior)
+        final folderName = folderNames[entry.key]!;
+        games.add(GameItem(
+          filename: folderName,
+          displayName: GameItem.cleanDisplayName(folderName),
+          url: entry.key,
+          providerConfig: config,
+          isFolder: true,
+        ));
       }
-
-      return games;
-    } finally {
-      await connection.close();
     }
+
+    return games;
   }
 
   @override
   Future<DownloadHandle> resolveDownload(GameItem game) async {
-    return SmbDownloadHandle(openFile: () => openFile(game.url));
+    if (game.isFolder) {
+      return NativeSmbFolderDownloadHandle(
+        host: _host,
+        port: _port,
+        share: _shareName,
+        folderPath: game.url,
+        user: _user,
+        pass: _pass,
+        domain: _domain,
+      );
+    }
+    return NativeSmbDownloadHandle(
+      host: _host,
+      port: _port,
+      share: _shareName,
+      filePath: game.url,
+      user: _user,
+      pass: _pass,
+      domain: _domain,
+    );
   }
 
   @override
   Future<SourceConnectionResult> testConnection() async {
     try {
-      final connection = await _connect();
-      try {
-        final folder = await connection.file(_smbRoot).timeout(_timeout);
-        await connection.listFiles(folder).timeout(_timeout);
-      } finally {
-        await connection.close();
+      final result = await _smbService.testConnection(
+        host: _host,
+        port: _port,
+        share: _shareName,
+        path: _path,
+        user: _user,
+        pass: _pass,
+        domain: _domain,
+      );
+      if (result.success) {
+        return const SourceConnectionResult.ok();
       }
-      if (config.port != null && config.port != 445) {
-        return SourceConnectionResult.ok(
-          warning: 'Connected, but custom port ${config.port} is ignored. '
-              'The SMB library only supports the default port (445).',
-        );
-      }
-      return const SourceConnectionResult.ok();
+      return SourceConnectionResult.failed(
+        result.error ?? 'Connection failed',
+      );
     } catch (e) {
       return SourceConnectionResult.failed(e.toString());
     }
   }
 
   @override
-  String get displayLabel => 'SMB: ${config.host}/${config.share}';
-
-  /// Opens a read stream for the given SMB file path.
-  ///
-  /// This is used by the download layer to stream file contents
-  /// without going through an HTTP URL.
-  Future<SmbFileReader> openFile(String smbPath) async {
-    final connection = await _connect();
-    try {
-      final file = await connection.file(smbPath).timeout(_timeout);
-      final stream = await connection.openRead(file).timeout(_timeout);
-      return SmbFileReader(
-        stream: stream,
-        size: file.size,
-        connection: connection,
-      );
-    } catch (e) {
-      await connection.close();
-      rethrow;
-    }
-  }
-
-}
-
-/// Handle returned by [SmbProvider.openFile] for streaming downloads.
-///
-/// The caller MUST call [close] when done to release the SMB connection.
-class SmbFileReader {
-  final Stream<List<int>> stream;
-  final int size;
-  final SmbConnect connection;
-  bool _closed = false;
-
-  SmbFileReader({
-    required this.stream,
-    required this.size,
-    required this.connection,
-  });
-
-  Future<void> close() async {
-    if (_closed) return;
-    _closed = true;
-    await connection.close();
-  }
+  String get displayLabel => 'SMB: $_host/$_shareName';
 }

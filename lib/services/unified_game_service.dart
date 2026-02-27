@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/config/system_config.dart';
+import '../utils/network_constants.dart';
 import '../models/game_item.dart';
 import 'provider_factory.dart';
 
@@ -37,7 +38,7 @@ class UnifiedGameService {
       try {
         final provider = ProviderFactory.getProvider(providerConfig);
         return await provider.fetchGames(system).timeout(
-              const Duration(seconds: 30),
+              NetworkTimeouts.providerDiscovery,
               onTimeout: () =>
                   throw TimeoutException('Server not responding'),
             );
@@ -58,7 +59,7 @@ class UnifiedGameService {
       try {
         final provider = ProviderFactory.getProvider(providerConfig);
         final games = await provider.fetchGames(system).timeout(
-              const Duration(seconds: 30),
+              NetworkTimeouts.providerDiscovery,
               onTimeout: () =>
                   throw TimeoutException('Server not responding'),
             );

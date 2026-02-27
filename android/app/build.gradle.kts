@@ -61,6 +61,10 @@ android {
     }
 }
 
+dependencies {
+    implementation("com.hierynomus:smbj:0.13.0")
+}
+
 flutter {
     source = "../.."
 }

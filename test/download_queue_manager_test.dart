@@ -339,6 +339,87 @@ void main() {
       expect(restored.targetFolder, original.targetFolder);
       expect(restored.retryCount, original.retryCount);
     });
+
+    test('toJson includes isFolder when true', () {
+      final item = DownloadItem(
+        id: 'ps2_folder',
+        game: GameItem(
+          filename: 'Final Fantasy X',
+          displayName: 'Final Fantasy X',
+          url: '/share/ps2/Final Fantasy X',
+          isFolder: true,
+        ),
+        system: testSystem,
+        targetFolder: '/roms/ps2',
+      );
+
+      final json = item.toJson();
+      expect(json['isFolder'], isTrue);
+    });
+
+    test('toJson omits isFolder when false', () {
+      final item = DownloadItem(
+        id: 'nes_game',
+        game: makeGame('game'),
+        system: testSystem,
+        targetFolder: '/roms/nes',
+      );
+
+      final json = item.toJson();
+      expect(json.containsKey('isFolder'), isFalse);
+    });
+
+    test('fromJson restores isFolder flag', () {
+      final json = {
+        'id': 'ps2_folder',
+        'gameFilename': 'Final Fantasy X',
+        'gameUrl': '/share/ps2/Final Fantasy X',
+        'gameDisplayName': 'Final Fantasy X',
+        'isFolder': true,
+        'targetFolder': '/roms/ps2',
+        'addedAt': DateTime.now().toIso8601String(),
+        'status': 'queued',
+        'progress': 0.0,
+      };
+
+      final item = DownloadItem.fromJson(json, testSystem);
+      expect(item.game.isFolder, isTrue);
+    });
+
+    test('fromJson defaults isFolder to false when absent', () {
+      final json = {
+        'id': 'nes_game',
+        'gameFilename': 'game.nes',
+        'gameUrl': 'https://example.com/game.nes',
+        'gameDisplayName': 'Game',
+        'targetFolder': '/roms/nes',
+        'addedAt': DateTime.now().toIso8601String(),
+        'status': 'queued',
+        'progress': 0.0,
+      };
+
+      final item = DownloadItem.fromJson(json, testSystem);
+      expect(item.game.isFolder, isFalse);
+    });
+
+    test('isFolder round-trip serialization', () {
+      final original = DownloadItem(
+        id: 'ps2_folder',
+        game: GameItem(
+          filename: 'Game Folder',
+          displayName: 'Game Folder',
+          url: '/share/ps2/Game Folder',
+          isFolder: true,
+        ),
+        system: testSystem,
+        targetFolder: '/roms/ps2',
+      );
+
+      final json = original.toJson();
+      final restored = DownloadItem.fromJson(json, testSystem);
+      expect(restored.game.isFolder, isTrue);
+      expect(restored.game.filename, 'Game Folder');
+    });
   });
 
   // ─── DownloadItem model ────────────────────────────────

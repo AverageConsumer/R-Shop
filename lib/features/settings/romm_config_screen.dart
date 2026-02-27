@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
@@ -10,9 +11,12 @@ import '../../core/widgets/console_focusable.dart';
 import '../../core/widgets/screen_layout.dart';
 import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
+import '../../models/config/system_config.dart';
+import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../services/romm_api_service.dart';
+import '../../services/romm_platform_matcher.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../onboarding/widgets/provider_form.dart' show isPrivateNetworkUrl;
@@ -36,6 +40,23 @@ class _RommConsoleInfo {
   });
 }
 
+class _RommBackAction extends Action<BackIntent> {
+  final List<FocusNode> _textFocusNodes;
+  final VoidCallback _onBack;
+
+  _RommBackAction(this._textFocusNodes, this._onBack);
+
+  @override
+  bool isEnabled(BackIntent intent) =>
+      !_textFocusNodes.any((n) => n.hasFocus);
+
+  @override
+  Object? invoke(BackIntent intent) {
+    _onBack();
+    return null;
+  }
+}
+
 class RommConfigScreen extends ConsumerStatefulWidget {
   const RommConfigScreen({super.key});
   @override
@@ -44,6 +65,7 @@ class RommConfigScreen extends ConsumerStatefulWidget {
 
 class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
     with ConsoleScreenMixin {
+  final _scrollController = ScrollController();
   final _urlController = TextEditingController();
   final _userController = TextEditingController();
   final _passController = TextEditingController();
@@ -62,6 +84,9 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
   final _passConsoleFocus = FocusNode(debugLabel: 'romm_pass');
 
   bool _isTesting = false;
+  bool _isDiscovering = false;
+  Map<String, RommPlatform>? _discoveredMatches;
+  Set<String> _selectedNewSystems = {};
 
   String? _originalUrl;
 
@@ -70,10 +95,10 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
 
   @override
   Map<Type, Action<Intent>> get screenActions => {
-        BackIntent: CallbackAction<BackIntent>(onInvoke: (_) {
-          _goBack();
-          return null;
-        }),
+        BackIntent: _RommBackAction(
+          [_urlTextFocus, _apiKeyTextFocus, _userTextFocus, _passTextFocus],
+          _goBack,
+        ),
         SearchIntent: SearchAction(ref, onSearch: _testConnection),
         InfoIntent: InfoAction(ref, onInfo: _clear),
         ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _save),
@@ -104,6 +129,7 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _urlController.dispose();
     _userController.dispose();
     _passController.dispose();
@@ -279,6 +305,99 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
       message: result.success ? 'Connection successful' : result.error ?? 'Connection failed',
       isError: !result.success,
     );
+
+    if (result.success) {
+      await _discoverPlatforms(url, auth);
+    }
+  }
+
+  Future<void> _discoverPlatforms(String url, AuthConfig? auth) async {
+    setState(() => _isDiscovering = true);
+
+    try {
+      final platforms = await RommApiService().fetchPlatforms(url, auth: auth);
+      if (!mounted) return;
+
+      final matches = <String, RommPlatform>{};
+      for (final system in SystemModel.supportedSystems) {
+        final match = RommPlatformMatcher.findMatch(system.id, platforms);
+        if (match != null) matches[system.id] = match;
+      }
+
+      final systemRommUrls = _getSystemRommUrls();
+      final currentNormUrl = _normalizeUrl(url);
+
+      setState(() {
+        _discoveredMatches = matches;
+        // Pre-select systems that don't already have this exact URL
+        _selectedNewSystems = matches.keys
+            .where((id) {
+              final urls = systemRommUrls[id];
+              return urls == null || !urls.contains(currentNormUrl);
+            })
+            .toSet();
+        _isDiscovering = false;
+      });
+
+      // Scroll down to show discovery results
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      });
+    } catch (e) {
+      debugPrint('RommConfigScreen: discovery failed: $e');
+      if (!mounted) return;
+      setState(() => _isDiscovering = false);
+    }
+  }
+
+  /// Returns a map of systemId → set of normalized URLs for all systems with RomM providers.
+  Map<String, Set<String>> _getSystemRommUrls() {
+    final config = ref.read(bootstrappedConfigProvider).value;
+    if (config == null) return {};
+    final result = <String, Set<String>>{};
+    for (final system in config.systems) {
+      final rommUrls = system.providers
+          .where((p) => p.type == ProviderType.romm)
+          .map((p) => _normalizeUrl(p.url))
+          .toSet();
+      if (rommUrls.isNotEmpty) result[system.id] = rommUrls;
+    }
+    return result;
+  }
+
+  void _toggleSystem(String systemId) {
+    setState(() {
+      if (_selectedNewSystems.contains(systemId)) {
+        _selectedNewSystems.remove(systemId);
+      } else {
+        _selectedNewSystems.add(systemId);
+      }
+    });
+  }
+
+  void _toggleAll() {
+    final systemRommUrls = _getSystemRommUrls();
+    final currentNormUrl = _normalizeUrl(_urlController.text.trim());
+    final selectable = _discoveredMatches?.keys
+            .where((id) {
+              final urls = systemRommUrls[id];
+              return urls == null || !urls.contains(currentNormUrl);
+            })
+            .toSet() ??
+        {};
+    setState(() {
+      if (_selectedNewSystems.length == selectable.length) {
+        _selectedNewSystems = {};
+      } else {
+        _selectedNewSystems = Set.from(selectable);
+      }
+    });
   }
 
   AuthConfig? _buildAuth() {
@@ -338,9 +457,95 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
       }
     }
 
+    // Add RomM provider to selected discovered systems
+    if (_discoveredMatches != null && _selectedNewSystems.isNotEmpty) {
+      await _applyRommToSystems(url);
+    }
+
     if (mounted) {
       Navigator.pop(context);
     }
+  }
+
+  Future<void> _applyRommToSystems(String url) async {
+    var config = ref.read(bootstrappedConfigProvider).value;
+    if (config == null || _discoveredMatches == null) return;
+
+    final auth = _buildAuth();
+    final basePath = _deriveBasePath(config);
+    var systems = List<SystemConfig>.from(config.systems);
+
+    for (final systemId in _selectedNewSystems) {
+      final match = _discoveredMatches![systemId];
+      if (match == null) continue;
+
+      final existingIdx = systems.indexWhere((s) => s.id == systemId);
+      if (existingIdx >= 0) {
+        final existing = systems[existingIdx];
+
+        // Skip if a RomM provider with the same URL already exists
+        final alreadyHasThisUrl = existing.providers.any(
+          (p) => p.type == ProviderType.romm && _urlsMatch(p.url, url),
+        );
+        if (alreadyHasThisUrl) continue;
+
+        // Next free priority (after existing providers = fallback)
+        final maxPrio = existing.providers.fold(0,
+            (int m, ProviderConfig p) => p.priority > m ? p.priority : m);
+        final rommProvider = ProviderConfig(
+          type: ProviderType.romm,
+          priority: maxPrio + 1,
+          url: url,
+          auth: auth,
+          platformId: match.id,
+          platformName: match.name,
+        );
+        final providers = [...existing.providers, rommProvider];
+        systems[existingIdx] = existing.copyWith(providers: providers);
+      } else {
+        final rommProvider = ProviderConfig(
+          type: ProviderType.romm,
+          priority: 0,
+          url: url,
+          auth: auth,
+          platformId: match.id,
+          platformName: match.name,
+        );
+        final system = SystemModel.supportedSystems.firstWhere(
+          (s) => s.id == systemId,
+        );
+        systems.add(SystemConfig(
+          id: systemId,
+          name: system.name,
+          targetFolder: '$basePath/$systemId',
+          providers: [rommProvider],
+          autoExtract: system.isZipped,
+          mergeMode: false,
+        ));
+      }
+    }
+
+    final updated = AppConfig(version: config.version, systems: systems);
+    await _persistConfig(updated);
+  }
+
+  String _deriveBasePath(AppConfig config) {
+    if (config.systems.isEmpty) return '/storage/emulated/0/ROMs';
+
+    final folders = config.systems.map((s) => s.targetFolder).toList();
+    final parts = folders.first.split('/');
+    var commonLen = parts.length - 1;
+    for (final folder in folders.skip(1)) {
+      final fParts = folder.split('/');
+      var match = 0;
+      while (match < commonLen &&
+          match < fParts.length &&
+          parts[match] == fParts[match]) {
+        match++;
+      }
+      commonLen = match;
+    }
+    return parts.take(commonLen).join('/');
   }
 
   Future<void> _clear() async {
@@ -352,6 +557,8 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
       _userController.clear();
       _passController.clear();
       _apiKeyController.clear();
+      _discoveredMatches = null;
+      _selectedNewSystems = {};
     });
   }
 
@@ -395,6 +602,7 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
                         constraints: const BoxConstraints(maxWidth: 800),
                         child: FocusTraversalGroup(
                           child: ListView(
+                            controller: _scrollController,
                             padding: EdgeInsets.symmetric(
                               horizontal: rs.spacing.lg,
                               vertical: rs.spacing.md,
@@ -413,6 +621,7 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
                                   _passController, _passTextFocus, _passConsoleFocus,
                                   obscure: true),
                               SizedBox(height: rs.spacing.lg),
+                              _buildDiscoverySection(rs),
                               _buildConsoleSection(rs),
                             ],
                           ),
@@ -565,6 +774,257 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Discovery section
+  // ---------------------------------------------------------------------------
+
+  Widget _buildDiscoverySection(Responsive rs) {
+    if (_isDiscovering) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: rs.spacing.lg),
+        child: Column(
+          children: [
+            SizedBox(height: rs.spacing.md),
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(height: rs.spacing.sm),
+            Text(
+              'Discovering platforms...',
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: rs.isSmall ? 11.0 : 13.0,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final matches = _discoveredMatches;
+    if (matches == null || matches.isEmpty) return const SizedBox.shrink();
+
+    final systemRommUrls = _getSystemRommUrls();
+    final currentNormUrl = _normalizeUrl(_urlController.text.trim());
+    final selectable = matches.keys
+        .where((id) {
+          final urls = systemRommUrls[id];
+          return urls == null || !urls.contains(currentNormUrl);
+        })
+        .toSet();
+    final allSelected = selectable.isNotEmpty &&
+        _selectedNewSystems.length == selectable.length;
+
+    // Sort systems alphabetically by name
+    final sortedEntries = matches.entries.toList()
+      ..sort((a, b) {
+        final sysA = SystemModel.supportedSystems
+            .firstWhere((s) => s.id == a.key);
+        final sysB = SystemModel.supportedSystems
+            .firstWhere((s) => s.id == b.key);
+        return sysA.name.compareTo(sysB.name);
+      });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: rs.spacing.sm),
+          child: Row(
+            children: [
+              Text(
+                'DISCOVERED SYSTEMS',
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: rs.isSmall ? 10.0 : 12.0,
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(width: rs.spacing.sm),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${_selectedNewSystems.length}/${selectable.length}',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontSize: rs.isSmall ? 9.0 : 11.0,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: rs.spacing.sm),
+        if (selectable.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.only(bottom: rs.spacing.xs),
+            child: ConsoleFocusableListItem(
+              onSelect: _toggleAll,
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: rs.spacing.md,
+                  vertical: rs.spacing.sm,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      allSelected
+                          ? Icons.deselect
+                          : Icons.select_all,
+                      color: Colors.grey.shade400,
+                      size: 18,
+                    ),
+                    SizedBox(width: rs.spacing.sm),
+                    Text(
+                      allSelected ? 'Deselect All' : 'Select All',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: rs.isSmall ? 12.0 : 14.0,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ...sortedEntries.map((entry) {
+          final systemId = entry.key;
+          final platform = entry.value;
+          final system = SystemModel.supportedSystems
+              .firstWhere((s) => s.id == systemId);
+          final urls = systemRommUrls[systemId];
+          final hasSameUrl = urls != null && urls.contains(currentNormUrl);
+          final hasOtherServer = urls != null && !hasSameUrl;
+          final isSelected = _selectedNewSystems.contains(systemId);
+
+          return _buildDiscoveryRow(
+            rs, system, platform, isSelected,
+            isAlreadyConnected: hasSameUrl,
+            hasOtherServer: hasOtherServer,
+          );
+        }),
+        SizedBox(height: rs.spacing.lg),
+      ],
+    );
+  }
+
+  Widget _buildDiscoveryRow(Responsive rs, SystemModel system,
+      RommPlatform platform, bool isSelected, {
+      bool isAlreadyConnected = false,
+      bool hasOtherServer = false,
+  }) {
+    final nameFontSize = rs.isSmall ? 12.0 : 14.0;
+    final detailFontSize = rs.isSmall ? 10.0 : 12.0;
+    final iconSize = rs.isSmall ? 24.0 : 30.0;
+    final checkSize = rs.isSmall ? 18.0 : 22.0;
+
+    final String subtitle;
+    if (isAlreadyConnected) {
+      subtitle = 'already connected';
+    } else if (hasOtherServer) {
+      subtitle = '${platform.name} \u2022 ${platform.romCount} ROMs (other server connected)';
+    } else {
+      subtitle = '${platform.name} \u2022 ${platform.romCount} ROMs';
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: rs.spacing.xs),
+      child: ConsoleFocusableListItem(
+        onSelect: isAlreadyConnected ? null : () => _toggleSystem(system.id),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: rs.spacing.md,
+            vertical: rs.spacing.sm,
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(rs.radius.sm),
+                child: SvgPicture.asset(
+                  system.iconAssetPath,
+                  width: iconSize,
+                  height: iconSize,
+                  colorFilter: ColorFilter.mode(
+                    isAlreadyConnected
+                        ? Colors.grey.shade700
+                        : system.iconColor,
+                    BlendMode.srcIn,
+                  ),
+                  placeholderBuilder: (_) => Icon(
+                    Icons.videogame_asset,
+                    color: isAlreadyConnected
+                        ? Colors.grey.shade700
+                        : system.accentColor,
+                    size: iconSize,
+                  ),
+                ),
+              ),
+              SizedBox(width: rs.spacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      system.name,
+                      style: TextStyle(
+                        color: isAlreadyConnected
+                            ? Colors.grey.shade600
+                            : Colors.white,
+                        fontSize: nameFontSize,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: isAlreadyConnected
+                            ? Colors.grey.shade700
+                            : hasOtherServer
+                                ? Colors.orange.shade300
+                                : Colors.grey.shade500,
+                        fontSize: detailFontSize,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isAlreadyConnected)
+                Icon(Icons.link, color: Colors.grey.shade700, size: 16)
+              else
+                Container(
+                  width: checkSize,
+                  height: checkSize,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? Colors.green.withValues(alpha: 0.3)
+                        : Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: isSelected
+                          ? Colors.green.withValues(alpha: 0.7)
+                          : Colors.white.withValues(alpha: 0.15),
+                    ),
+                  ),
+                  child: isSelected
+                      ? const Icon(Icons.check, color: Colors.green, size: 14)
+                      : null,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -20,6 +20,8 @@ import 'services/audio_manager.dart';
 import 'services/database_service.dart';
 import 'services/download_foreground_service.dart';
 import 'services/download_service.dart';
+import 'services/native_smb_service.dart';
+import 'services/provider_factory.dart';
 import 'services/thumbnail_migration_service.dart';
 import 'services/thumbnail_service.dart';
 import 'widgets/download_overlay.dart';
@@ -71,6 +73,10 @@ void main() {
     // Clean orphaned temp files from interrupted downloads (fire-and-forget)
     DownloadService.cleanOrphanedTempFiles();
 
+    // Initialize native SMB service and wire into ProviderFactory
+    final nativeSmbService = NativeSmbService();
+    ProviderFactory.init(smbService: nativeSmbService);
+
     // Configure image cache based on device RAM
     final deviceMemory = await DeviceInfoService.getDeviceMemory();
     RateLimitedFileService.configure(
@@ -99,6 +105,7 @@ void main() {
           hapticServiceProvider.overrideWithValue(hapticService),
           audioManagerProvider.overrideWithValue(audioManager),
           deviceMemoryProvider.overrideWithValue(deviceMemory),
+          nativeSmbServiceProvider.overrideWithValue(nativeSmbService),
         ],
         child: RShopApp(audioManager: audioManager),
       ),

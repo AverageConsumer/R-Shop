@@ -15,6 +15,7 @@ class GameItem {
   final String? cachedCoverUrl;
   final ProviderConfig? providerConfig;
   final bool hasThumbnail;
+  final bool isFolder;
   final List<AlternativeSource> alternativeSources;
 
   const GameItem({
@@ -24,6 +25,7 @@ class GameItem {
     this.cachedCoverUrl,
     this.providerConfig,
     this.hasThumbnail = false,
+    this.isFolder = false,
     this.alternativeSources = const [],
   });
 
@@ -32,6 +34,7 @@ class GameItem {
     String? cachedCoverUrl,
     ProviderConfig? providerConfig,
     bool? hasThumbnail,
+    bool? isFolder,
     List<AlternativeSource>? alternativeSources,
   }) {
     return GameItem(
@@ -41,6 +44,7 @@ class GameItem {
       cachedCoverUrl: cachedCoverUrl ?? this.cachedCoverUrl,
       providerConfig: providerConfig ?? this.providerConfig,
       hasThumbnail: hasThumbnail ?? this.hasThumbnail,
+      isFolder: isFolder ?? this.isFolder,
       alternativeSources: alternativeSources ?? this.alternativeSources,
     );
   }
@@ -56,6 +60,7 @@ class GameItem {
               json['providerConfig'] as Map<String, dynamic>)
           : null,
       hasThumbnail: json['hasThumbnail'] as bool? ?? false,
+      isFolder: json['isFolder'] as bool? ?? false,
     );
   }
 
@@ -66,6 +71,7 @@ class GameItem {
         if (cachedCoverUrl != null) 'cachedCoverUrl': cachedCoverUrl,
         if (providerConfig != null) 'providerConfig': providerConfig!.toJson(),
         if (hasThumbnail) 'hasThumbnail': hasThumbnail,
+        if (isFolder) 'isFolder': isFolder,
       };
 
   /// Re-injects auth credentials from system providers into games loaded
@@ -111,8 +117,11 @@ class GameItem {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is GameItem && filename == other.filename && url == other.url;
+      other is GameItem &&
+          filename == other.filename &&
+          url == other.url &&
+          isFolder == other.isFolder;
 
   @override
-  int get hashCode => Object.hash(filename, url);
+  int get hashCode => Object.hash(filename, url, isFolder);
 }

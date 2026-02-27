@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:retro_eshop/models/config/provider_config.dart';
+import 'package:retro_eshop/services/native_smb_service.dart';
 import 'package:retro_eshop/services/provider_factory.dart';
 import 'package:retro_eshop/services/providers/ftp_provider.dart';
 import 'package:retro_eshop/services/providers/romm_provider.dart';
@@ -8,6 +9,10 @@ import 'package:retro_eshop/services/providers/web_provider.dart';
 
 void main() {
   group('ProviderFactory', () {
+    setUpAll(() {
+      ProviderFactory.init(smbService: NativeSmbService());
+    });
+
     test('returns WebProvider for ProviderType.web', () {
       const config = ProviderConfig(
         type: ProviderType.web,

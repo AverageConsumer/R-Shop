@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/config/app_config.dart';
@@ -58,46 +57,9 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
     final sysConfig = config.systemById(system.id);
     if (sysConfig == null) continue;
 
-    // Has remote providers configured → always visible
-    if (sysConfig.providers.isNotEmpty) {
-      visible.add(system);
-      continue;
-    }
-
-    // Local-only: visible only if targetFolder actually exists and contains ROM files
-    final dir = Directory(sysConfig.targetFolder);
-    if (await dir.exists()) {
-      final romExts = system.romExtensions.map((e) => e.toLowerCase()).toList();
-      
-      // Standard extra extensions for archives
-      romExts.addAll(['.zip', '.rar', '.7z']);
-
-      bool hasRoms = false;
-      try {
-        await for (final entity in dir.list(followLinks: false).timeout(
-          const Duration(seconds: 2),
-          onTimeout: (sink) {
-            debugPrint('visibleSystemsProvider: timeout scanning '
-                '${dir.path}, treating as empty');
-            sink.close();
-          },
-        )) {
-          if (entity is File) {
-            final name = entity.path.toLowerCase();
-            if (romExts.any((ext) => name.endsWith(ext))) {
-              hasRoms = true;
-              break;
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('visibleSystemsProvider: error scanning ${dir.path}: $e');
-      }
-      
-      if (hasRoms) {
-        visible.add(system);
-      }
-    }
+    // User explicitly configured this system — always show it.
+    // An empty game list is better UX than "No consoles configured".
+    visible.add(system);
   }
 
   return visible;

@@ -4,7 +4,7 @@ import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../utils/game_metadata.dart';
 import '../../../widgets/installed_indicator.dart';
-import 'metadata_badges.dart' hide InstalledBadge;
+import 'metadata_badges.dart';
 
 class SingleVersionDisplay extends StatelessWidget {
   final GameItem variant;
@@ -103,10 +103,19 @@ class SingleVersionDisplay extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    RegionBadge(region: metadata.region),
-                    const SizedBox(width: 12),
-                    LanguageBadges(languages: metadata.languages),
-                    const Spacer(),
+                    Expanded(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RegionBadge(region: metadata.region),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: LanguageBadges(
+                                languages: metadata.languages),
+                          ),
+                        ],
+                      ),
+                    ),
                     if (variant.providerConfig != null) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -119,7 +128,7 @@ class SingleVersionDisplay extends StatelessWidget {
                           ),
                         ),
                         child: Text(
-                          variant.providerConfig!.detailLabel,
+                          variant.providerConfig!.shortLabel,
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.5),
                             fontSize: 9,
@@ -138,7 +147,6 @@ class SingleVersionDisplay extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                     ],
-                    if (isInstalled) const InstalledBadge(compact: false),
                   ],
                 ),
                 if (metadata.primaryTags.isNotEmpty) ...[

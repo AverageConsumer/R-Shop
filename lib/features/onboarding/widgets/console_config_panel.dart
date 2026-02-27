@@ -399,7 +399,7 @@ class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
               SizedBox(width: rs.spacing.sm),
               Expanded(
                 child: Text(
-                  sub.targetFolder ?? 'Tap to select folder...',
+                  sub.targetFolder ?? 'Select folder...',
                   style: TextStyle(
                     color: sub.targetFolder != null ? Colors.white : Colors.white38,
                     fontSize: fontSize,

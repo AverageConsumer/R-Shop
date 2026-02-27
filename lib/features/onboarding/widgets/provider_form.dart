@@ -37,6 +37,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
   final Map<String, FocusNode> _focusNodes = {};
   final Map<String, FocusNode> _consoleFocusNodes = {};
   final FocusNode _typeSelectorFocusNode = FocusNode(debugLabel: 'typeSelector');
+  final GlobalKey _testIndicatorKey = GlobalKey();
 
   TextEditingController _getController(String key, String? initialValue) {
     if (!_controllers.containsKey(key)) {
@@ -108,12 +109,37 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
     final currentIndex = types.indexOf(form.type);
     final newIndex = (currentIndex + delta) % types.length;
     ref.read(onboardingControllerProvider.notifier).setProviderType(types[newIndex]);
-    for (final c in _controllers.values) {
-      c.clear();
-    }
-    if (types[newIndex] == ProviderType.romm) {
-      _autoFillRommFromGlobal();
-    }
+    _syncControllersWithForm();
+  }
+
+  /// Updates TextEditingController values from the current form state after a type switch.
+  void _syncControllersWithForm() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final form = ref.read(onboardingControllerProvider).providerForm;
+      if (form == null) return;
+
+      // Clear all controllers first
+      for (final c in _controllers.values) {
+        c.clear();
+      }
+
+      // Restore values from form fields
+      for (final entry in form.fields.entries) {
+        final value = entry.value?.toString() ?? '';
+        if (value.isNotEmpty) {
+          _getController(entry.key, null).text = value;
+        }
+      }
+
+      // Auto-fill RomM from global if empty
+      if (form.type == ProviderType.romm) {
+        final urlField = form.fields['url']?.toString() ?? '';
+        if (urlField.isEmpty) {
+          _autoFillRommFromGlobal();
+        }
+      }
+    });
   }
 
   void _autoFillRommFromGlobal() {
@@ -162,6 +188,23 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
 
     final isRomm = form.type == ProviderType.romm;
 
+    // Auto-scroll to test indicator when error or success appears
+    ref.listen(
+      onboardingControllerProvider.select((s) => (s.connectionTestError, s.connectionTestSuccess, s.isTestingConnection)),
+      (prev, next) {
+        if (next.$1 != null || next.$2 || next.$3) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final ctx = _testIndicatorKey.currentContext;
+            if (ctx != null) {
+              Scrollable.ensureVisible(ctx,
+                  duration: const Duration(milliseconds: 300),
+                  alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd);
+            }
+          });
+        }
+      },
+    );
+
     // Auto-fill from global config on first render if RomM and URL empty
     if (isRomm && !_didAutoFill && !form.isEditing) {
       final urlField = form.fields['url']?.toString() ?? '';
@@ -195,7 +238,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
                   Expanded(
                     child: Text(
                       'HTTP to non-local servers is blocked. '
-                      'Enable in Settings → System.',
+                      'Use HTTPS, or enable after setup in Settings.',
                       style: TextStyle(
                         color: Colors.red.shade300,
                         fontSize: rs.isSmall ? 10 : 12,
@@ -226,6 +269,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
               ),
             ),
           ConnectionTestIndicator(
+            key: _testIndicatorKey,
             isTesting: state.isTestingConnection,
             isSuccess: state.connectionTestSuccess,
             error: state.connectionTestError,
@@ -277,9 +321,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
             return GestureDetector(
               onTap: () {
                 controller.setProviderType(type);
-                for (final c in _controllers.values) {
-                  c.clear();
-                }
+                _syncControllersWithForm();
               },
               child: Container(
                 constraints: const BoxConstraints(minHeight: 48),

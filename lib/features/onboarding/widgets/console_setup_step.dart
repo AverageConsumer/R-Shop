@@ -43,7 +43,7 @@ class ConsoleSetupStep extends ConsumerWidget {
           message = "What kind of source is this? Pick the connection type.";
         }
       } else if (sub != null && sub.providers.isNotEmpty && sub.targetFolder != null) {
-        message = "Looking good! Add more sources or tap Done when you're ready.";
+        message = "Looking good! Add more sources or press Done when you're ready.";
       } else if (sub != null && sub.targetFolder != null && sub.providers.isEmpty) {
         message = "This is a local collection. Add a source to download more, or just hit Done!";
         accentColor = Colors.cyanAccent;
@@ -91,18 +91,18 @@ class ConsoleSetupStep extends ConsumerWidget {
     String message;
     if (configuredCount == 0 && rommCount > 0 && localCount > 0) {
       message =
-          "I found $rommCount RomM and $localCount local ${localCount == 1 ? 'console' : 'consoles'}! Tap one to configure.";
+          "I found $rommCount RomM and $localCount local ${localCount == 1 ? 'console' : 'consoles'}! Select one to configure.";
     } else if (configuredCount == 0 && rommCount > 0) {
       message =
-          "I found $rommCount RomM ${rommCount == 1 ? 'console' : 'consoles'}! Tap one to configure \u2013 I'll pre-fill the RomM source.";
+          "I found $rommCount RomM ${rommCount == 1 ? 'console' : 'consoles'}! Select one to configure \u2013 I'll pre-fill the RomM source.";
     } else if (configuredCount == 0 && localCount > 0) {
       message =
-          "I found $localCount local ${localCount == 1 ? 'collection' : 'collections'}! Tap one to configure.";
+          "I found $localCount local ${localCount == 1 ? 'collection' : 'collections'}! Select one to configure.";
     } else if (configuredCount == 0) {
-      message = "Let's set up your consoles! Tap any system to get started.";
+      message = "Let's set up your consoles! Select any system to get started.";
     } else {
       message =
-          "Nice! $configuredCount ${configuredCount == 1 ? 'console' : 'consoles'} configured. Tap another to add more, or press Start to continue.";
+          "Nice! $configuredCount ${configuredCount == 1 ? 'console' : 'consoles'} configured. Select another to add more, or press Start to continue.";
     }
 
     return FocusScope(
