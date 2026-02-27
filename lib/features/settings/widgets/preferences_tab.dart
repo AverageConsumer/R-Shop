@@ -12,15 +12,18 @@ class SettingsPreferencesTab extends ConsumerWidget {
   final bool isHomeGrid;
   final bool hapticEnabled;
   final bool soundEnabled;
+  final bool hideEmptyConsoles;
   final double bgmVolume;
   final double sfxVolume;
   final FocusNode homeLayoutFocusNode;
   final FocusNode layoutFocusNode;
   final FocusNode hapticFocusNode;
+  final FocusNode hideEmptyFocusNode;
   final VoidCallback onToggleHomeLayout;
   final VoidCallback onCycleLayout;
   final VoidCallback onToggleHaptic;
   final VoidCallback onToggleSound;
+  final VoidCallback onToggleHideEmpty;
   final ValueChanged<double> onAdjustBgmVolume;
   final ValueChanged<double> onAdjustSfxVolume;
   final ValueChanged<double> onSetBgmVolume;
@@ -32,15 +35,18 @@ class SettingsPreferencesTab extends ConsumerWidget {
     required this.isHomeGrid,
     required this.hapticEnabled,
     required this.soundEnabled,
+    required this.hideEmptyConsoles,
     required this.bgmVolume,
     required this.sfxVolume,
     required this.homeLayoutFocusNode,
     required this.layoutFocusNode,
     required this.hapticFocusNode,
+    required this.hideEmptyFocusNode,
     required this.onToggleHomeLayout,
     required this.onCycleLayout,
     required this.onToggleHaptic,
     required this.onToggleSound,
+    required this.onToggleHideEmpty,
     required this.onAdjustBgmVolume,
     required this.onAdjustSfxVolume,
     required this.onSetBgmVolume,
@@ -79,6 +85,25 @@ class SettingsPreferencesTab extends ConsumerWidget {
                       isHomeGrid ? 'Grid View' : 'Horizontal Carousel',
                   trailing: _buildSwitch(isHomeGrid),
                   onTap: onToggleHomeLayout,
+                ),
+              ),
+              SizedBox(height: rs.spacing.md),
+              _buildSettingsItemWrapper(
+                ref: ref,
+                onNavigate: (dir) {
+                  if (dir == GridDirection.left ||
+                      dir == GridDirection.right) {
+                    onToggleHideEmpty();
+                    return true;
+                  }
+                  return false;
+                },
+                child: SettingsItem(
+                  focusNode: hideEmptyFocusNode,
+                  title: 'Hide Empty Consoles',
+                  subtitle: 'Hide systems with no games',
+                  trailing: _buildSwitch(hideEmptyConsoles),
+                  onTap: onToggleHideEmpty,
                 ),
               ),
               SizedBox(height: rs.spacing.md),

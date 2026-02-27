@@ -1001,6 +1001,7 @@ class DownloadService {
             tempFile, targetFolder, system, game);
       } else {
         await _extractZipNative(tempFile, targetFolder);
+        await _renameExtractedRom(targetFolder, system, game);
       }
       if (_isCancelled) { _cleanupTempFile(tempFile); _emitCancelled(); return; }
       try { if (await tempFile.exists()) await tempFile.delete(); } catch (e) { debugPrint('DownloadService: zip temp delete: $e'); }
@@ -1073,6 +1074,42 @@ class DownloadService {
     } finally {
       await _zipProgressSubscription?.cancel();
       _zipProgressSubscription = null;
+    }
+  }
+
+  /// Renames the extracted ROM file to match [RomManager.getTargetFilename].
+  /// ZIP archives often contain files with different names than the archive
+  /// itself (e.g. "4996 - Game.nds" inside "Game.zip"). This rename ensures
+  /// the rest of the codebase can find the file via [RomManager.getTargetPath].
+  Future<void> _renameExtractedRom(
+      String targetFolder, SystemModel system, GameItem game) async {
+    try {
+      final expectedName = RomManager.getTargetFilename(game, system);
+      final expectedPath = RomManager.safePath(targetFolder, expectedName);
+      if (await File(expectedPath).exists()) return; // Already correct name
+
+      final validExts =
+          system.romExtensions.map((e) => e.toLowerCase()).toSet();
+      final dir = Directory(targetFolder);
+      final baseName =
+          RomManager.extractGameName(game.filename)?.toLowerCase();
+
+      await for (final entity in dir.list()) {
+        if (entity is! File) continue;
+        final ext = p.extension(entity.path).toLowerCase();
+        if (!validExts.contains(ext)) continue;
+
+        final fileName =
+            p.basenameWithoutExtension(entity.path).toLowerCase();
+        if (baseName != null &&
+            (fileName.contains(baseName) || baseName.contains(fileName))) {
+          await entity.rename(expectedPath);
+          debugPrint('DownloadService: renamed extracted ROM to $expectedName');
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('DownloadService: rename extracted ROM failed: $e');
     }
   }
 

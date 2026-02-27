@@ -259,6 +259,28 @@ final homeLayoutProvider = StateNotifierProvider<HomeLayoutNotifier, bool>((ref)
   return HomeLayoutNotifier(storage);
 });
 
+// ==========================================
+// Hide Empty Consoles
+// ==========================================
+class HideEmptyConsolesNotifier extends StateNotifier<bool> {
+  final StorageService _storage;
+
+  HideEmptyConsolesNotifier(this._storage)
+      : super(_storage.getHideEmptyConsoles());
+
+  Future<void> toggle() async {
+    final newValue = !state;
+    state = newValue;
+    await _storage.setHideEmptyConsoles(newValue);
+  }
+}
+
+final hideEmptyConsolesProvider =
+    StateNotifierProvider<HideEmptyConsolesNotifier, bool>((ref) {
+  final storage = ref.read(storageServiceProvider);
+  return HideEmptyConsolesNotifier(storage);
+});
+
 final favoriteGamesProvider =
     StateNotifierProvider<FavoriteGamesNotifier, List<String>>((ref) {
   return FavoriteGamesNotifier(ref.read(storageServiceProvider));

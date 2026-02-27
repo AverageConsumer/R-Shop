@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/responsive/responsive.dart';
+import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
+import '../../providers/ra_providers.dart';
 import '../../services/audio_manager.dart';
 import '../../providers/game_providers.dart';
 import '../../widgets/console_hud.dart';
@@ -123,8 +125,21 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
         const JsonEncoder.withIndent('  ').convert(config.toJson());
     await ref.read(configStorageServiceProvider).saveConfig(jsonString);
     ref.invalidate(bootstrappedConfigProvider);
+    _triggerRaSync();
     if (!mounted) return;
     Navigator.pop(context);
+  }
+
+  /// Trigger RA sync for newly added systems after config change.
+  void _triggerRaSync() {
+    final storage = ref.read(storageServiceProvider);
+    if (!storage.isRaConfigured) return;
+    final raSystems = SystemModel.supportedSystems
+        .where((s) => s.raConsoleId != null)
+        .toList();
+    if (raSystems.isNotEmpty) {
+      ref.read(raSyncServiceProvider.notifier).syncAll(raSystems);
+    }
   }
 
   Future<void> _exportConfig() async {

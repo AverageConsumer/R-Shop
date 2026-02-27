@@ -92,6 +92,10 @@ class DownloadQueueManager extends ChangeNotifier {
   final StorageService _storage;
   final NativeSmbService _smbService;
 
+  /// Called after a download completes successfully. Used for post-download
+  /// processing like RA hash verification.
+  void Function(DownloadItem item)? onItemCompleted;
+
   DownloadQueueManager(this._storage, this._smbService) {
     final maxConcurrent = _storage.getMaxConcurrentDownloads();
     _state = _state.copyWith(maxConcurrent: maxConcurrent);
@@ -451,6 +455,13 @@ class DownloadQueueManager extends ChangeNotifier {
     if (item.status != DownloadItemStatus.completed &&
         item.status != DownloadItemStatus.error) {
       _updateItem(id, status: DownloadItemStatus.completed, clearTempFilePath: true);
+    }
+
+    // Notify listener for post-download processing (e.g. RA hash verification)
+    final completedItem = _state.getDownloadById(id);
+    if (completedItem != null &&
+        completedItem.status == DownloadItemStatus.completed) {
+      onItemCompleted?.call(completedItem);
     }
 
     _persistQueue();

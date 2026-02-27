@@ -12,6 +12,7 @@ import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
+import '../../providers/ra_providers.dart';
 import '../../services/config_bootstrap.dart';
 import '../../services/input_debouncer.dart';
 import '../../services/thumbnail_service.dart';
@@ -631,6 +632,8 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         favorites.add(entry.key);
       }
     }
+    final raMatches =
+        ref.watch(raMatchesForSystemProvider(widget.system.id)).value ?? {};
     final deviceMemory = ref.read(deviceMemoryProvider);
     return GameGrid(
       key: const ValueKey('game_grid'),
@@ -668,6 +671,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       hasActiveFilters: state.activeFilters.isNotEmpty,
       isLocalOnly: state.isLocalOnly,
       targetFolder: widget.targetFolder,
+      raMatches: raMatches,
       memCacheWidthMax: deviceMemory.memCacheWidthMax,
       gridCacheExtent: deviceMemory.gridCacheExtent,
     );

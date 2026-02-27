@@ -76,6 +76,39 @@ class RomManager {
     }
   }
 
+  /// Returns the actual file path of an installed ROM, or null if not found.
+  /// Checks direct path first, then subfolder fallback (same logic as [exists]).
+  static Future<String?> resolveInstalledPath(
+      GameItem game, SystemModel system, String targetFolder) async {
+    try {
+      final directPath = getTargetPath(game, system, targetFolder);
+      if (await File(directPath).exists()) return directPath;
+
+      final gameName = extractGameName(game.filename);
+      if (gameName != null) {
+        final subfolderPath = safePath(targetFolder, gameName);
+        final subfolder = Directory(subfolderPath);
+        if (await subfolder.exists()) {
+          final validExts = {
+            ...system.romExtensions.map((e) => e.toLowerCase()),
+            ...?system.multiFileExtensions?.map((e) => e.toLowerCase()),
+          };
+          for (final file in subfolder.listSync()) {
+            if (file is File) {
+              final ext = p.extension(file.path).toLowerCase();
+              if (validExts.contains(ext)) return file.path;
+            }
+          }
+        }
+      }
+
+      return null;
+    } on FileSystemException catch (e) {
+      debugPrint('RomManager: resolveInstalledPath failed for ${game.filename}: $e');
+      return null;
+    }
+  }
+
   Future<bool> exists(
       GameItem game, SystemModel system, String targetFolder) async {
     try {
@@ -217,7 +250,8 @@ class RomManager {
       List<FileSystemEntity> subFiles;
       try {
         subFiles = entity.listSync(recursive: true);
-      } on FileSystemException {
+      } on FileSystemException catch (e) {
+        debugPrint('RomManager: cannot list subdirectory $name: $e');
         continue;
       }
       final hasMatchingFile = subFiles.any((f) =>
@@ -275,7 +309,8 @@ Future<List<GameItem>> _scanLocalGamesIsolateEntry(_ScanParams params) async {
       params.romExtensions,
       params.multiFileExtensions,
     );
-  } on FileSystemException {
+  } on FileSystemException catch (e) {
+    debugPrint('RomManager: isolate scan failed: $e');
     return [];
   }
 }

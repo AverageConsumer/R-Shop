@@ -34,6 +34,9 @@ class GameDetailController extends ChangeNotifier {
     if (!_disposed) super.notifyListeners();
   }
 
+  /// Called when an item is successfully added to the download queue.
+  VoidCallback? onAddedToQueue;
+
   GameDetailController({
     required this.game,
     required this.variants,
@@ -43,6 +46,7 @@ class GameDetailController extends ChangeNotifier {
     bool showFullFilename = false,
     RomManager? romManager,
     required DownloadQueueManager queueManager,
+    this.onAddedToQueue,
   })  : _romManager = romManager ?? RomManager(),
         _queueManager = queueManager {
     _state = GameDetailState(showFullFilename: showFullFilename);
@@ -66,19 +70,23 @@ class GameDetailController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addToQueue() async {
-    if (_state.isAddingToQueue) return;
+  Future<bool> addToQueue() async {
+    if (_state.isAddingToQueue) return false;
 
     _state = _state.copyWith(isAddingToQueue: true, clearError: true);
     notifyListeners();
 
     try {
+      final queueSizeBefore = _queueManager.state.queue.length;
       _queueManager.addToQueue(selectedVariant, system, targetFolder);
+      final actuallyAdded = _queueManager.state.queue.length > queueSizeBefore;
       await Future.delayed(const Duration(milliseconds: 300));
       await checkInstallationStatus();
+      return actuallyAdded;
     } catch (e) {
       _state = _state.copyWith(error: getUserFriendlyError(e));
       notifyListeners();
+      return false;
     } finally {
       _state = _state.copyWith(isAddingToQueue: false);
       notifyListeners();
@@ -139,13 +147,14 @@ class GameDetailController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void performAction() {
+  Future<void> performAction() async {
     if (_state.isOverlayOpen) return;
     if (_state.isVariantInstalled) {
       showDeleteDialog();
     } else {
       if (isLocalOnly) return;
-      addToQueue();
+      final success = await addToQueue();
+      if (success) onAddedToQueue?.call();
     }
   }
 }

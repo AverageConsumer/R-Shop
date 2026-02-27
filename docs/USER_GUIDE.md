@@ -15,19 +15,20 @@ R-Shop is a retro game manager with a console-style UI. It organizes, downloads,
 3. [Browsing Games](#browsing-games)
 4. [Game Detail](#game-detail)
 5. [Library](#library)
-6. [Provider Setup Guide](#provider-setup-guide)
-7. [Downloads](#downloads)
-8. [Settings Reference](#settings-reference)
-9. [Controls Reference](#controls-reference)
-10. [Supported Systems](#supported-systems)
-11. [Troubleshooting & FAQ](#troubleshooting--faq)
-12. [Legal Notice](#legal-notice)
+6. [RetroAchievements](#retroachievements)
+7. [Provider Setup Guide](#provider-setup-guide)
+8. [Downloads](#downloads)
+9. [Settings Reference](#settings-reference)
+10. [Controls Reference](#controls-reference)
+11. [Supported Systems](#supported-systems)
+12. [Troubleshooting & FAQ](#troubleshooting--faq)
+13. [Legal Notice](#legal-notice)
 
 ---
 
 ## Getting Started
 
-On first launch, R-Shop walks you through a 6-step onboarding process to configure your game sources.
+On first launch, R-Shop walks you through a 7-step onboarding process to configure your game sources.
 
 ### Step 1: Welcome
 
@@ -72,7 +73,18 @@ Press Y to add a new provider, then fill in the type-specific fields and test th
 
 At least one console must be configured before you can proceed.
 
-### Step 6: Complete
+### Step 6: RetroAchievements (Optional)
+
+If you have a [RetroAchievements](https://retroachievements.org) account, you can connect it to track achievement progress and verify your ROMs:
+
+1. Select "Yes, connect my account" (or "No, skip" to proceed without RA)
+2. Enter your RA username
+3. Enter your API key (found at retroachievements.org/controlpanel.php)
+4. Press Y to test the connection
+
+On success, R-Shop will sync achievement data for supported systems in the background. You can always set this up later in Settings.
+
+### Step 7: Complete
 
 A summary of your configured consoles. Press Select to export your configuration as a JSON backup file, then press A to enter the app.
 
@@ -154,6 +166,10 @@ The detail screen shows a game's cover art, title, and metadata including region
 
 If multiple versions of a game exist (different regions, languages, or releases), they appear in a carousel. Use left/right on the D-pad to switch between variants.
 
+### RetroAchievements Info
+
+If the game has a RetroAchievements match, an info section appears below the metadata showing the match type (name match or hash verified), achievement count, and your progress. Press Start and select "Achievements" from the quick menu to open the full achievements screen.
+
 ### Actions
 
 | Action | Button | Condition |
@@ -163,6 +179,7 @@ If multiple versions of a game exist (different regions, languages, or releases)
 | Favorite | Select | Toggle anytime |
 | Tag Info | Y | Show region/language metadata |
 | Full Filename | X | Toggle between clean title and raw filename |
+| Achievements | Start > Achievements | Game has RA match |
 
 ### Download
 
@@ -202,6 +219,65 @@ Press Y to open the search bar. Type to filter by game name in real time.
 ### Grid
 
 Navigate the game grid with the D-pad. Adjust columns with L1/R1 (range: 3-8). Press A to open a game's detail screen.
+
+---
+
+## RetroAchievements
+
+R-Shop integrates with [RetroAchievements](https://retroachievements.org) to display achievement data, verify ROMs, and track your progress.
+
+### Setup
+
+Connect your RA account during onboarding or later via Settings > RetroAchievements. You need your username and API key (found at retroachievements.org/controlpanel.php).
+
+### How It Works
+
+After connecting, R-Shop runs a background sync in three phases:
+
+1. **Catalog fetch** — downloads the RA game catalog for each supported system (cached for 24 hours)
+2. **Name matching** — matches your local games to RA entries by title (exact, contains, No-Intro filename, or fuzzy matching)
+3. **Hash verification** — computes ROM hashes for installed games and verifies them against the RA database
+
+When you download a new ROM, it is automatically hashed and matched after the download completes.
+
+### Game Cards
+
+Games with RA matches display a badge on their card:
+
+| Badge Color | Meaning |
+|-------------|---------|
+| Gold | Name-matched (title matched, ROM not yet hash-verified) |
+| Green | Hash-verified (ROM confirmed via MD5 hash) |
+| Green outline | Mastered (all achievements earned) |
+
+The badge shows the number of achievements available for the game.
+
+### Achievements Screen
+
+Open the achievements screen from a game's detail view via the quick menu (Start > Achievements). The screen shows:
+
+- Game icon and title with completion percentage
+- Progress bar (earned / total achievements)
+- "MASTERED" label when all achievements are earned
+- Full achievement list with badge icons, descriptions, point values, and earn dates
+- Navigate with D-pad up/down, press B to go back
+
+### Supported Systems
+
+RetroAchievements data is available for: NES, SNES, N64, Game Boy, Game Boy Color, Game Boy Advance, NDS, Mega Drive, Master System, Game Gear, Sega 32X, Atari 2600, Atari 7800, and Atari Lynx.
+
+### Settings
+
+The RA config screen (Settings > RetroAchievements) provides:
+
+| Action | Description |
+|--------|-------------|
+| Test Connection (Y) | Verify credentials against the RA API |
+| Enable/Disable | Toggle RA data display on game cards |
+| Refresh Database | Force a full RA catalog re-sync |
+| Clear Cache | Remove all cached RA data |
+| Save (Start) | Persist credential changes |
+| Clear (X) | Reset all fields |
 
 ---
 
@@ -344,6 +420,7 @@ Open Settings from the quick menu (Start) on the home screen.
 | Controller Layout | Nintendo / Xbox / PlayStation | Nintendo | Button label and mapping scheme |
 | Haptic Feedback | On / Off | On | Vibration on button presses |
 | Sound Effects | On / Off | On | Audio feedback for UI actions |
+| Hide Empty Consoles | On / Off | Off | Hide systems with no games from the home screen |
 
 ### Audio
 
@@ -372,6 +449,8 @@ Adjust audio sliders with left/right on the D-pad (steps of 5%).
 |---------|-------------|
 | Edit Consoles | Add, remove, or reconfigure console systems and providers |
 | Scan Library | Rescan all console folders to discover games |
+| RetroAchievements | Configure RA credentials, test connection, sync database, and clear cache |
+| Export Error Log | Share the crash log file for bug reporting (only visible when log contains data) |
 | Reset Application | Factory reset: clears all settings, database, and cache |
 
 ### About

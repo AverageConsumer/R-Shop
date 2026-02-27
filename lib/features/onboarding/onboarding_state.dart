@@ -11,6 +11,7 @@ enum OnboardingStep {
   rommSetup,
   localSetup,
   consoleSetup,
+  raSetup,
   complete,
 }
 
@@ -199,6 +200,50 @@ class RommSetupState {
   }
 }
 
+class RaSetupState {
+  final String username;
+  final String apiKey;
+  final bool isTestingConnection;
+  final bool connectionSuccess;
+  final String? connectionError;
+  final bool skipped;
+  final bool wantsSetup;
+
+  const RaSetupState({
+    this.username = '',
+    this.apiKey = '',
+    this.isTestingConnection = false,
+    this.connectionSuccess = false,
+    this.connectionError,
+    this.skipped = false,
+    this.wantsSetup = false,
+  });
+
+  RaSetupState copyWith({
+    String? username,
+    String? apiKey,
+    bool? isTestingConnection,
+    bool? connectionSuccess,
+    String? connectionError,
+    bool? skipped,
+    bool? wantsSetup,
+    bool clearError = false,
+  }) {
+    return RaSetupState(
+      username: username ?? this.username,
+      apiKey: apiKey ?? this.apiKey,
+      isTestingConnection: isTestingConnection ?? this.isTestingConnection,
+      connectionSuccess: connectionSuccess ?? this.connectionSuccess,
+      connectionError: clearError ? null : (connectionError ?? this.connectionError),
+      skipped: skipped ?? this.skipped,
+      wantsSetup: wantsSetup ?? this.wantsSetup,
+    );
+  }
+
+  bool get hasCredentials =>
+      username.trim().isNotEmpty && apiKey.trim().isNotEmpty;
+}
+
 class ProviderFormState {
   final ProviderType type;
   final Map<String, dynamic> fields;
@@ -276,6 +321,7 @@ class OnboardingState {
   final bool isFetchingRommPlatforms;
   final RommSetupState? rommSetupState;
   final LocalSetupState? localSetupState;
+  final RaSetupState? raSetupState;
 
   const OnboardingState({
     this.currentStep = OnboardingStep.welcome,
@@ -293,6 +339,7 @@ class OnboardingState {
     this.isFetchingRommPlatforms = false,
     this.rommSetupState,
     this.localSetupState,
+    this.raSetupState,
   });
 
   OnboardingState copyWith({
@@ -311,6 +358,7 @@ class OnboardingState {
     bool? isFetchingRommPlatforms,
     RommSetupState? rommSetupState,
     LocalSetupState? localSetupState,
+    RaSetupState? raSetupState,
     bool clearSelectedConsole = false,
     bool clearConsoleSubState = false,
     bool clearProviderForm = false,
@@ -318,6 +366,7 @@ class OnboardingState {
     bool clearRommState = false,
     bool clearRommSetupState = false,
     bool clearLocalSetupState = false,
+    bool clearRaSetupState = false,
   }) {
     return OnboardingState(
       currentStep: currentStep ?? this.currentStep,
@@ -335,6 +384,7 @@ class OnboardingState {
       isFetchingRommPlatforms: isFetchingRommPlatforms ?? this.isFetchingRommPlatforms,
       rommSetupState: clearRommSetupState ? null : (rommSetupState ?? this.rommSetupState),
       localSetupState: clearLocalSetupState ? null : (localSetupState ?? this.localSetupState),
+      raSetupState: clearRaSetupState ? null : (raSetupState ?? this.raSetupState),
     );
   }
 

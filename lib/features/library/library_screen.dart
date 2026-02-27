@@ -17,6 +17,7 @@ import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
 import '../../providers/installed_files_provider.dart';
+import '../../models/ra_models.dart';
 import '../../providers/game_providers.dart';
 import '../../providers/shelf_providers.dart';
 import '../../services/config_bootstrap.dart';
@@ -85,6 +86,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   Set<String> _favoriteIds = {};
   // Filtered/sorted view
   List<LibraryEntry> _filteredGames = [];
+  // RA match data keyed by filename
+  Map<String, RaMatchResult> _raMatches = {};
   // Pre-computed cover URLs per filtered index
   Map<int, List<String>> _coverUrlCache = {};
 
@@ -311,9 +314,24 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     ref.read(favoriteGamesProvider.notifier).migrateIfNeeded(allGameItems);
     final migratedFavorites = ref.read(favoriteGamesProvider).toSet();
 
+    // Load RA matches for all systems represented in the library
+    final raMatches = <String, RaMatchResult>{};
+    final storage = ref.read(storageServiceProvider);
+    if (storage.getRaEnabled()) {
+      final systemSlugs = entries.map((e) => e.systemSlug).toSet();
+      final db = DatabaseService();
+      for (final slug in systemSlugs) {
+        final matches = await db.getRaMatchesForSystem(slug);
+        raMatches.addAll(matches);
+      }
+    }
+
+    if (!mounted) return;
+
     setState(() {
       _allGames = entries;
       _favoriteIds = migratedFavorites;
+      _raMatches = raMatches;
       _isLoading = false;
     });
 
@@ -1281,6 +1299,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         final systemColor =
             systemModel?.accentColor ?? Colors.grey;
 
+        final raMatch = _raMatches[entry.filename];
         final isGrabbed = _reorderState == ReorderState.grabbed && _grabbedIndex == index;
         final isReordering = _reorderState != ReorderState.none;
 
@@ -1301,6 +1320,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
               isInstalled: isInstalled,
               isSelected: isSelected,
               isFavorite: isFavorite,
+              raAchievementCount: raMatch?.achievementCount,
+              raMatchType: raMatch?.type ?? RaMatchType.none,
+              isMastered: raMatch?.isMastered ?? false,
               onCoverFound: (url) => _onCoverFound(url, entry),
               onThumbnailNeeded: (url) => _onThumbnailNeeded(url, entry),
               onTap: () {

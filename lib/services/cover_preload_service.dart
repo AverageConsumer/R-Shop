@@ -5,6 +5,7 @@ import '../models/system_model.dart';
 import '../utils/image_helper.dart';
 import 'database_service.dart';
 import 'image_cache_service.dart';
+import 'ra_api_service.dart';
 import 'thumbnail_index_service.dart';
 import 'thumbnail_service.dart';
 
@@ -243,10 +244,18 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
       }
 
       // Fuzzy fallback: try matching against system thumbnail index
-      return _tryFuzzyMatch(
+      final fuzzyResult = await _tryFuzzyMatch(
         db: db,
         filename: filename,
         system: system,
+      );
+      if (fuzzyResult) return true;
+
+      // Last resort: use RA game icon as cover art
+      return _tryRaCover(
+        db: db,
+        filename: filename,
+        systemSlug: systemSlug,
       );
     } catch (e) {
       debugPrint('Cover URL resolution failed for $filename: $e');
@@ -288,6 +297,43 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
       return true;
     } catch (e) {
       debugPrint('CoverPreload: fuzzy match fetch failed for $url: $e');
+      FailedUrlsCache.instance.markFailed(url);
+      return false;
+    }
+  }
+
+  /// Last-resort fallback: use the RA game icon as cover art.
+  Future<bool> _tryRaCover({
+    required DatabaseService db,
+    required String filename,
+    required String systemSlug,
+  }) async {
+    final imageIcon = await db.getRaImageIconForGame(filename, systemSlug);
+    if (imageIcon == null) return false;
+
+    final url = RetroAchievementsService.gameIconUrl(imageIcon);
+    if (FailedUrlsCache.instance.hasFailed(url)) return false;
+
+    try {
+      final file = await GameCoverCacheManager.instance.getSingleFile(url);
+      if (!isValidImageFile(file)) {
+        await GameCoverCacheManager.instance.removeFile(url);
+        FailedUrlsCache.instance.markFailed(url);
+        return false;
+      }
+
+      await db.updateGameCover(filename, url);
+
+      ThumbnailService.generateThumbnail(url).then((result) {
+        if (result.success) {
+          db.updateGameThumbnailData(filename, hasThumbnail: true);
+        }
+      }).catchError((e) {
+        debugPrint('Thumbnail generation failed for $filename: $e');
+      });
+      return true;
+    } catch (e) {
+      debugPrint('CoverPreload: RA icon fetch failed for $url: $e');
       FailedUrlsCache.instance.markFailed(url);
       return false;
     }

@@ -11,6 +11,7 @@ class SystemModel {
   final String iconName;
   final Color accentColor;
   final List<String>? multiFileExtensions;
+  final int? raConsoleId;
 
   const SystemModel({
     required this.id,
@@ -23,7 +24,11 @@ class SystemModel {
     this.iconName = '',
     this.accentColor = Colors.redAccent,
     this.multiFileExtensions,
+    this.raConsoleId,
   });
+
+  /// Whether this system has RetroAchievements support.
+  bool get hasRetroAchievements => raConsoleId != null;
 
   /// Returns the local asset path for this system's icon.
   String get iconAssetPath => 'assets/platform_icons/$iconName';
@@ -49,6 +54,7 @@ class SystemModel {
       romExtensions: ['.nes'],
       iconName: 'nintendo_nes.svg',
       accentColor: Color(0xFFE11D48),
+      raConsoleId: 7,
     ),
     SystemModel(
       id: 'snes',
@@ -60,6 +66,7 @@ class SystemModel {
       romExtensions: ['.sfc', '.smc'],
       iconName: 'nintendo_snes.svg',
       accentColor: Color(0xFF9333EA),
+      raConsoleId: 3,
     ),
     SystemModel(
       id: 'n64',
@@ -71,6 +78,7 @@ class SystemModel {
       romExtensions: ['.z64', '.n64', '.v64'],
       iconName: 'nintendo_64.svg',
       accentColor: Color(0xFFF97316),
+      raConsoleId: 2,
     ),
     SystemModel(
       id: 'gc',
@@ -126,6 +134,7 @@ class SystemModel {
       romExtensions: ['.gb'],
       iconName: 'nintendo_gameboy.svg',
       accentColor: Color(0xFF8BAC0F),
+      raConsoleId: 4,
     ),
     SystemModel(
       id: 'gbc',
@@ -137,6 +146,7 @@ class SystemModel {
       romExtensions: ['.gbc', '.gb'],
       iconName: 'nintendo_gameboy_color.svg',
       accentColor: Color(0xFF06B6D4),
+      raConsoleId: 6,
     ),
     SystemModel(
       id: 'gba',
@@ -148,6 +158,7 @@ class SystemModel {
       romExtensions: ['.gba'],
       iconName: 'nintendo_gameboy_advance.svg',
       accentColor: Color(0xFF4F46E5),
+      raConsoleId: 5,
     ),
     SystemModel(
       id: 'nds',
@@ -159,6 +170,7 @@ class SystemModel {
       romExtensions: ['.nds'],
       iconName: 'nintendo_ds.svg',
       accentColor: Color(0xFF6B7280),
+      raConsoleId: 18,
     ),
     SystemModel(
       id: 'n3ds',
@@ -183,6 +195,7 @@ class SystemModel {
       iconName: 'playstation_flat.svg',
       accentColor: Color(0xFF5B21B6),
       multiFileExtensions: ['.bin', '.cue'],
+      raConsoleId: 12,
     ),
     SystemModel(
       id: 'ps2',
@@ -195,6 +208,7 @@ class SystemModel {
       iconName: 'playstation_ps2.svg',
       accentColor: Color(0xFF1E3A8A),
       multiFileExtensions: ['.bin', '.cue'],
+      raConsoleId: 21,
     ),
     SystemModel(
       id: 'ps3',
@@ -217,6 +231,7 @@ class SystemModel {
       romExtensions: ['.iso', '.cso', '.pbp', '.chd'],
       iconName: 'playstation_psp.svg',
       accentColor: Color(0xFF475569),
+      raConsoleId: 41,
     ),
     SystemModel(
       id: 'psvita',
@@ -240,6 +255,7 @@ class SystemModel {
       romExtensions: ['.sms'],
       iconName: 'sega_master_system.svg',
       accentColor: Color(0xFF1D4ED8),
+      raConsoleId: 11,
     ),
     SystemModel(
       id: 'megadrive',
@@ -251,6 +267,7 @@ class SystemModel {
       romExtensions: ['.md', '.gen', '.bin', '.smd'],
       iconName: 'sega_megadrive.svg',
       accentColor: Color(0xFF374151),
+      raConsoleId: 1,
     ),
     SystemModel(
       id: 'gamegear',
@@ -262,6 +279,7 @@ class SystemModel {
       romExtensions: ['.gg'],
       iconName: 'sega_gamegear.svg',
       accentColor: Color(0xFF0F766E),
+      raConsoleId: 15,
     ),
     SystemModel(
       id: 'segacd',
@@ -274,6 +292,7 @@ class SystemModel {
       iconName: 'sega_cd.svg',
       accentColor: Color(0xFF0369A1),
       multiFileExtensions: ['.bin', '.cue'],
+      raConsoleId: 9,
     ),
     SystemModel(
       id: 'sega32x',
@@ -285,6 +304,7 @@ class SystemModel {
       romExtensions: ['.32x'],
       iconName: 'sega_32x.svg',
       accentColor: Color(0xFF991B1B),
+      raConsoleId: 10,
     ),
     SystemModel(
       id: 'dreamcast',
@@ -296,6 +316,7 @@ class SystemModel {
       romExtensions: ['.chd', '.cdi', '.gdi'],
       iconName: 'sega_dreamcast.svg',
       accentColor: Color(0xFFDC2626),
+      raConsoleId: 40,
     ),
     SystemModel(
       id: 'saturn',
@@ -308,6 +329,7 @@ class SystemModel {
       iconName: 'sega_saturn.svg',
       accentColor: Color(0xFF64748B),
       multiFileExtensions: ['.bin', '.cue'],
+      raConsoleId: 39,
     ),
     // ===== ATARI =====
     SystemModel(
@@ -320,6 +342,7 @@ class SystemModel {
       romExtensions: ['.a26', '.bin'],
       iconName: 'atari_2600.svg',
       accentColor: Color(0xFFD97706),
+      raConsoleId: 25,
     ),
     SystemModel(
       id: 'atari5200',
@@ -342,6 +365,7 @@ class SystemModel {
       romExtensions: ['.a78', '.bin'],
       iconName: 'atari_7800.svg',
       accentColor: Color(0xFF6B7280),
+      raConsoleId: 51,
     ),
     SystemModel(
       id: 'lynx',
@@ -353,6 +377,7 @@ class SystemModel {
       romExtensions: ['.lnx'],
       iconName: 'atari_lynx.svg',
       accentColor: Color(0xFF059669),
+      raConsoleId: 13,
     ),
     // ===== OTHER =====
     SystemModel(

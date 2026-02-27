@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/responsive/responsive.dart';
+import '../models/ra_models.dart';
 import 'installed_indicator.dart';
 import 'smart_cover_image.dart';
 
@@ -18,6 +19,9 @@ class BaseGameCard extends StatelessWidget {
   final String? systemLabel;
   final int variantCount;
   final String? providerLabel;
+  final int? raAchievementCount;
+  final RaMatchType raMatchType;
+  final bool isMastered;
 
   // Thumbnail pipeline
   final bool hasThumbnail;
@@ -46,6 +50,9 @@ class BaseGameCard extends StatelessWidget {
     this.systemLabel,
     this.variantCount = 0,
     this.providerLabel,
+    this.raAchievementCount,
+    this.raMatchType = RaMatchType.none,
+    this.isMastered = false,
     this.hasThumbnail = false,
     this.onThumbnailNeeded,
     this.memCacheWidth = 500,
@@ -131,18 +138,7 @@ class BaseGameCard extends StatelessWidget {
                         if (isInstalled) ...[
                           if (systemLabel != null)
                             SizedBox(height: rs.isSmall ? 2.0 : 3.0),
-                          Container(
-                            padding: EdgeInsets.all(rs.isSmall ? 3.0 : 4.0),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.check_circle,
-                              size: rs.isSmall ? 10.0 : 14.0,
-                              color: Colors.greenAccent,
-                            ),
-                          ),
+                          _InstalledBadge(isSmall: rs.isSmall),
                         ],
                       ],
                     ),
@@ -163,6 +159,22 @@ class BaseGameCard extends StatelessWidget {
                         size: rs.isSmall ? 10.0 : 14.0,
                         color: Colors.redAccent,
                       ),
+                    ),
+                  ),
+                // RA achievement badge — top right (below favorite)
+                if (raAchievementCount != null &&
+                    raAchievementCount! > 0 &&
+                    raMatchType != RaMatchType.none)
+                  Positioned(
+                    top: isFavorite
+                        ? padding + (rs.isSmall ? 22.0 : 28.0)
+                        : padding,
+                    right: padding,
+                    child: _RaBadge(
+                      count: raAchievementCount!,
+                      matchType: raMatchType,
+                      isMastered: isMastered,
+                      isSmall: rs.isSmall,
                     ),
                   ),
                 // Title gradient overlay
@@ -293,5 +305,134 @@ class BaseGameCard extends StatelessWidget {
     }
 
     return card;
+  }
+}
+
+class _InstalledBadge extends StatelessWidget {
+  final bool isSmall;
+  const _InstalledBadge({required this.isSmall});
+
+  @override
+  Widget build(BuildContext context) {
+    final iconSize = isSmall ? 10.0 : 13.0;
+    final fontSize = isSmall ? 6.0 : 7.5;
+    final hPad = isSmall ? 4.0 : 5.0;
+    final vPad = isSmall ? 2.0 : 3.0;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+      decoration: BoxDecoration(
+        color: const Color(0xCC0A3A0A),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: Colors.greenAccent.withValues(alpha: 0.5),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.greenAccent.withValues(alpha: 0.25),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.check_circle,
+            size: iconSize,
+            color: Colors.greenAccent,
+          ),
+          SizedBox(width: isSmall ? 2 : 3),
+          Text(
+            'INSTALLED',
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w700,
+              color: Colors.greenAccent,
+              letterSpacing: 0.5,
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RaBadge extends StatelessWidget {
+  final int count;
+  final RaMatchType matchType;
+  final bool isMastered;
+  final bool isSmall;
+
+  const _RaBadge({
+    required this.count,
+    required this.matchType,
+    this.isMastered = false,
+    required this.isSmall,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final (Color bg, Color accent, Color border) = switch ((matchType, isMastered)) {
+      (RaMatchType.hashIncompatible, _) => (
+          const Color(0xCC424242),
+          Colors.grey,
+          Colors.grey.withValues(alpha: 0.3),
+        ),
+      (_, true) => (
+          const Color(0xCC0A3A0A),
+          Colors.greenAccent,
+          Colors.greenAccent.withValues(alpha: 0.4),
+        ),
+      _ => (
+          const Color(0xDD5D4200),
+          const Color(0xFFFFD54F),
+          const Color(0xFFFFD54F).withValues(alpha: 0.4),
+        ),
+    };
+
+    final fontSize = isSmall ? 8.0 : 10.0;
+    final iconSize = isSmall ? 11.0 : 14.0;
+    final hPad = isSmall ? 4.0 : 5.0;
+    final vPad = isSmall ? 3.0 : 4.0;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.3),
+            blurRadius: isMastered ? 12 : 8,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            matchType == RaMatchType.hashIncompatible
+                ? Icons.emoji_events_outlined
+                : Icons.emoji_events,
+            size: iconSize,
+            color: accent,
+          ),
+          SizedBox(width: isSmall ? 2 : 3),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

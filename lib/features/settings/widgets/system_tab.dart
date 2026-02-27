@@ -13,6 +13,7 @@ class SettingsSystemTab extends ConsumerWidget {
   final bool allowNonLanHttp;
   final String coverSubtitle;
   final VoidCallback onOpenRommConfig;
+  final VoidCallback onOpenRaConfig;
   final VoidCallback onOpenConfigMode;
   final VoidCallback onOpenLibraryScan;
   final VoidCallback onStartCoverPreload;
@@ -27,6 +28,7 @@ class SettingsSystemTab extends ConsumerWidget {
     required this.allowNonLanHttp,
     required this.coverSubtitle,
     required this.onOpenRommConfig,
+    required this.onOpenRaConfig,
     required this.onOpenConfigMode,
     required this.onOpenLibraryScan,
     required this.onStartCoverPreload,
@@ -57,6 +59,14 @@ class SettingsSystemTab extends ConsumerWidget {
                 trailing:
                     const Icon(Icons.dns_outlined, color: Colors.white70),
                 onTap: onOpenRommConfig,
+              ),
+              SizedBox(height: rs.spacing.md),
+              SettingsItem(
+                title: 'RetroAchievements',
+                subtitle: 'Achievement tracking and ROM verification',
+                trailing:
+                    const Icon(Icons.emoji_events_outlined, color: Colors.white70),
+                onTap: onOpenRaConfig,
               ),
               SizedBox(height: rs.spacing.md),
               _buildSettingsItemWrapper(

@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.2.0] — 2026-02-27
+
+### Added
+- **RetroAchievements integration** — connect your RA account to track achievements, verify ROMs via hash matching, and view per-game progress directly in R-Shop
+- **Achievements screen** — dedicated viewer with earned/locked badges, points, progress bar, mastery status, and full D-pad navigation
+- **RA onboarding step** — optional setup during first-run wizard with connection test and skip option
+- **RA config screen** — manage credentials (encrypted via SecureStorage) from Settings with connection testing
+- **Post-download hash verification** — downloaded ROMs are automatically hashed and matched against the RA database in the background
+- **RA sync service** — 3-phase background sync (catalog fetch → name matching → hash verification) with 24h freshness cache and cancellation support
+- **RA badges on game cards** — achievement count and match type (gold for name match, green for hash verified) displayed on every card; mastery outline when fully completed
+- **Add-to-queue toast** — animated bottom-right notification when a game is added to the download queue
+- **Hide empty consoles** — new toggle in Settings → Preferences to hide systems with no games from the home screen
+
+### Improved
+- **Sync badge** — now shows dual pills for library sync (cyan) and RA sync (gold) with independent progress tracking
+- **Game detail screen** — RA info section below metadata showing match status, progress bar, and "View Achievements" button; quick menu gains "Achievements" option
+- **Download overlay** — visual refinements and better state display
+- **SystemModel** — 15+ systems now carry RA console IDs (NES, SNES, N64, GB, GBC, GBA, Mega Drive, SMS, Game Gear, 32X, Atari 2600/7800, Lynx, NDS)
+- **Library screen** — deduplication of installed entries when same game exists in multiple formats
+- **Cover preload service** — improved reliability and error handling
+
+### Internal
+- Database schema v7 — new tables: `ra_games` (catalog cache), `ra_hashes` (hash index), `ra_matches` (match results)
+- Hash computation for 10+ systems: simple MD5, NES (iNES header strip), SNES (copier header), NDS (multi-section), Lynx, Atari 7800
+- `RaNameMatcher` with 4-tier fallback: exact → contains → No-Intro filename → fuzzy (Levenshtein)
+- New providers: `raGameProgressProvider`, `raRefreshSignalProvider`, `raMatchResultProvider`, `raSyncServiceProvider`
+- 1,209 tests (up from 1,069) — new suites: RA hash service, RA models, RA name matcher, expanded database and onboarding tests
+
+---
+
 ## [1.1.0] — 2026-02-27
 
 ### Added

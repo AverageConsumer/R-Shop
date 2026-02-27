@@ -196,12 +196,16 @@ void main() {
       expect(c.state.configuredSystems['snes']!.targetFolder, '/roms/SNES');
     });
 
-    test('consoleSetup → complete', () {
+    test('consoleSetup → raSetup → complete', () {
       final c = _createController();
       c.state = c.state.copyWith(
         currentStep: OnboardingStep.consoleSetup,
         configuredSystems: {'nes': _systemConfig('nes')},
       );
+      c.nextStep();
+      expect(c.state.currentStep, OnboardingStep.raSetup);
+      expect(c.state.raSetupState, isNotNull);
+      // raSetup → complete
       c.nextStep();
       expect(c.state.currentStep, OnboardingStep.complete);
     });
@@ -313,6 +317,126 @@ void main() {
       final c = _createController();
       c.previousStep();
       expect(c.state.currentStep, OnboardingStep.welcome);
+    });
+
+    test('raSetup → consoleSetup', () {
+      final c = _createController();
+      c.state = c.state.copyWith(
+        currentStep: OnboardingStep.raSetup,
+        configuredSystems: {'nes': _systemConfig('nes')},
+      );
+      c.previousStep();
+      expect(c.state.currentStep, OnboardingStep.consoleSetup);
+      expect(c.state.canProceed, true);
+    });
+
+    test('complete → raSetup', () {
+      final c = _createController();
+      c.state = c.state.copyWith(
+        currentStep: OnboardingStep.complete,
+      );
+      c.previousStep();
+      expect(c.state.currentStep, OnboardingStep.raSetup);
+      expect(c.state.raSetupState, isNotNull);
+      expect(c.state.canProceed, true);
+    });
+  });
+
+  // =========================================================================
+  // RA Setup
+  // =========================================================================
+  group('RA setup', () {
+    test('raSetupAnswer(false) skips to complete', () {
+      final c = _createController();
+      c.state = c.state.copyWith(
+        currentStep: OnboardingStep.raSetup,
+        raSetupState: const RaSetupState(),
+      );
+      c.raSetupAnswer(false);
+      expect(c.state.raSetupState!.skipped, true);
+      expect(c.state.currentStep, OnboardingStep.complete);
+    });
+
+    test('raSetupAnswer(true) initializes state with wantsSetup', () {
+      final c = _createController();
+      c.state = c.state.copyWith(
+        currentStep: OnboardingStep.raSetup,
+        raSetupState: const RaSetupState(),
+      );
+      c.raSetupAnswer(true);
+      expect(c.state.raSetupState, isNotNull);
+      expect(c.state.raSetupState!.skipped, false);
+      expect(c.state.raSetupState!.wantsSetup, true);
+      expect(c.state.canProceed, false);
+    });
+
+    test('updateRaField updates username', () {
+      final c = _createController();
+      c.state = c.state.copyWith(
+        currentStep: OnboardingStep.raSetup,
+        raSetupState: const RaSetupState(),
+      );
+      c.updateRaField('username', 'testuser');
+      expect(c.state.raSetupState!.username, 'testuser');
+    });
+
+    test('updateRaField updates apiKey', () {
+      final c = _createController();
+      c.state = c.state.copyWith(
+        currentStep: OnboardingStep.raSetup,
+        raSetupState: const RaSetupState(),
+      );
+      c.updateRaField('apiKey', 'secret123');
+      expect(c.state.raSetupState!.apiKey, 'secret123');
+    });
+
+    test('skipRaSetup marks as skipped and moves to complete', () {
+      final c = _createController();
+      c.state = c.state.copyWith(
+        currentStep: OnboardingStep.raSetup,
+        raSetupState: const RaSetupState(),
+      );
+      c.skipRaSetup();
+      expect(c.state.raSetupState!.skipped, true);
+      expect(c.state.currentStep, OnboardingStep.complete);
+    });
+
+    test('raSetupBack from connect view goes to ask phase', () {
+      final c = _createController();
+      c.state = c.state.copyWith(
+        currentStep: OnboardingStep.raSetup,
+        raSetupState: const RaSetupState(
+          wantsSetup: true,
+          username: 'user',
+          apiKey: 'key',
+        ),
+      );
+      c.raSetupBack();
+      expect(c.state.currentStep, OnboardingStep.raSetup);
+      expect(c.state.raSetupState!.wantsSetup, false);
+      expect(c.state.raSetupState!.username, '');
+    });
+
+    test('raSetupBack from ask view goes to consoleSetup', () {
+      final c = _createController();
+      c.state = c.state.copyWith(
+        currentStep: OnboardingStep.raSetup,
+        raSetupState: const RaSetupState(),
+      );
+      c.raSetupBack();
+      expect(c.state.currentStep, OnboardingStep.consoleSetup);
+    });
+
+    test('RaSetupState.hasCredentials', () {
+      expect(const RaSetupState().hasCredentials, false);
+      expect(
+        const RaSetupState(username: 'u', apiKey: 'k').hasCredentials,
+        true,
+      );
+      expect(
+        const RaSetupState(username: '  ', apiKey: 'k').hasCredentials,
+        false,
+      );
     });
   });
 

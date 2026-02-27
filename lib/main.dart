@@ -8,6 +8,7 @@ import 'models/system_model.dart';
 import 'providers/app_providers.dart';
 import 'providers/download_providers.dart';
 import 'providers/game_providers.dart';
+import 'providers/ra_providers.dart';
 import 'providers/rom_status_providers.dart';
 import 'features/home/home_view.dart';
 import 'features/onboarding/onboarding_screen.dart';
@@ -24,6 +25,7 @@ import 'services/native_smb_service.dart';
 import 'services/provider_factory.dart';
 import 'services/thumbnail_migration_service.dart';
 import 'services/thumbnail_service.dart';
+import 'widgets/add_to_queue_toast.dart';
 import 'widgets/download_overlay.dart';
 
 class NoGlowScrollBehavior extends ScrollBehavior {
@@ -151,6 +153,15 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
       Future.delayed(const Duration(seconds: 3), () {
         ThumbnailMigrationService.migrateIfNeeded(DatabaseService());
       });
+
+      // Deferred RA sync — only if RA is configured
+      Future.delayed(const Duration(seconds: 5), () {
+        if (!mounted) return;
+        triggerRaSync(
+          ref.read(raSyncServiceProvider.notifier),
+          ref.read(storageServiceProvider),
+        );
+      });
     });
   }
 
@@ -211,6 +222,7 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
                 Builder(
                   builder: (context) => const DownloadOverlay(),
                 ),
+                const AddToQueueToast(),
               ],
             ),
           );

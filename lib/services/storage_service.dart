@@ -29,6 +29,11 @@ class StorageService {
   static const _customShelvesKey = 'custom_shelves';
   static const _secureAuthMigratedKey = 'secure_auth_migrated';
   static const _allowNonLanHttpKey = 'allow_non_lan_http';
+  static const _raUsernameKey = 'ra_username';
+  static const _raApiKeyKey = 'ra_api_key';
+  static const _raEnabledKey = 'ra_enabled';
+  static const _raLastSyncKey = 'ra_last_sync';
+  static const _hideEmptyConsolesKey = 'hide_empty_consoles';
   SharedPreferences? _prefs;
   final FlutterSecureStorage _secureStorage;
 
@@ -41,6 +46,8 @@ class StorageService {
   // In-memory cache for secure values (avoid async reads on every access)
   String? _cachedRommUrl;
   String? _cachedRommAuth;
+  String? _cachedRaUsername;
+  String? _cachedRaApiKey;
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
@@ -75,13 +82,15 @@ class StorageService {
     try {
       _cachedRommUrl = await _secureStorage.read(key: _rommUrlKey);
       _cachedRommAuth = await _secureStorage.read(key: _rommAuthKey);
-
+      _cachedRaUsername = await _secureStorage.read(key: _raUsernameKey);
+      _cachedRaApiKey = await _secureStorage.read(key: _raApiKeyKey);
     } catch (e) {
       debugPrint('StorageService: failed to read secure storage: $e');
       // Fallback: try plain SharedPreferences (pre-migration or migration failure)
       _cachedRommUrl = _prefs!.getString(_rommUrlKey);
       _cachedRommAuth = _prefs!.getString(_rommAuthKey);
-
+      _cachedRaUsername = _prefs!.getString(_raUsernameKey);
+      _cachedRaApiKey = _prefs!.getString(_raApiKeyKey);
     }
   }
 
@@ -134,6 +143,8 @@ class StorageService {
       await _secureStorage.deleteAll();
       _cachedRommUrl = null;
       _cachedRommAuth = null;
+      _cachedRaUsername = null;
+      _cachedRaApiKey = null;
     } catch (e) {
       debugPrint('StorageService: failed to clear secure storage: $e');
     }
@@ -338,6 +349,17 @@ class StorageService {
     await _prefs!.setBool(_homeLayoutKey, value);
   }
 
+  // Hide Empty Consoles
+  bool getHideEmptyConsoles() {
+    _ensureInitialized();
+    return _prefs!.getBool(_hideEmptyConsolesKey) ?? false;
+  }
+
+  Future<void> setHideEmptyConsoles(bool value) async {
+    _ensureInitialized();
+    await _prefs!.setBool(_hideEmptyConsolesKey, value);
+  }
+
   // --- Custom Shelves ---
 
   List<CustomShelf> getCustomShelves() {
@@ -374,4 +396,64 @@ class StorageService {
     _ensureInitialized();
     await _prefs!.setBool(_allowNonLanHttpKey, allowed);
   }
+
+  // --- RetroAchievements (encrypted via SecureStorage) ---
+
+  String? getRaUsername() {
+    _ensureInitialized();
+    return _cachedRaUsername;
+  }
+
+  Future<void> setRaUsername(String? username) async {
+    _ensureInitialized();
+    if (username == null || username.isEmpty) {
+      await _secureStorage.delete(key: _raUsernameKey);
+      _cachedRaUsername = null;
+    } else {
+      await _secureStorage.write(key: _raUsernameKey, value: username);
+      _cachedRaUsername = username;
+    }
+  }
+
+  String? getRaApiKey() {
+    _ensureInitialized();
+    return _cachedRaApiKey;
+  }
+
+  Future<void> setRaApiKey(String? key) async {
+    _ensureInitialized();
+    if (key == null || key.isEmpty) {
+      await _secureStorage.delete(key: _raApiKeyKey);
+      _cachedRaApiKey = null;
+    } else {
+      await _secureStorage.write(key: _raApiKeyKey, value: key);
+      _cachedRaApiKey = key;
+    }
+  }
+
+  bool getRaEnabled() {
+    _ensureInitialized();
+    return _prefs!.getBool(_raEnabledKey) ?? false;
+  }
+
+  Future<void> setRaEnabled(bool enabled) async {
+    _ensureInitialized();
+    await _prefs!.setBool(_raEnabledKey, enabled);
+  }
+
+  DateTime? getRaLastSync() {
+    _ensureInitialized();
+    final iso = _prefs!.getString(_raLastSyncKey);
+    if (iso == null) return null;
+    return DateTime.tryParse(iso);
+  }
+
+  Future<void> setRaLastSync(DateTime time) async {
+    _ensureInitialized();
+    await _prefs!.setString(_raLastSyncKey, time.toIso8601String());
+  }
+
+  /// Whether RA is fully configured (has credentials + enabled).
+  bool get isRaConfigured =>
+      getRaEnabled() && _cachedRaApiKey != null && _cachedRaApiKey!.isNotEmpty;
 }

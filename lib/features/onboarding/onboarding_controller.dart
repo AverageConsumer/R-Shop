@@ -14,6 +14,7 @@ import '../../services/config_storage_service.dart';
 import '../../services/local_folder_matcher.dart';
 import '../../services/provider_factory.dart';
 import '../../services/rom_folder_service.dart';
+import '../../services/ra_api_service.dart';
 import '../../services/romm_api_service.dart';
 import '../../services/romm_platform_matcher.dart';
 
@@ -77,6 +78,15 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       return;
     }
 
+    // raSetup → complete
+    if (state.currentStep == OnboardingStep.raSetup) {
+      state = state.copyWith(
+        currentStep: OnboardingStep.complete,
+        canProceed: false,
+      );
+      return;
+    }
+
     const steps = OnboardingStep.values;
     final currentIndex = steps.indexOf(state.currentStep);
     if (currentIndex < steps.length - 1) {
@@ -106,6 +116,15 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         state = state.copyWith(
           currentStep: nextStepValue,
           canProceed: state.configuredSystems.isNotEmpty,
+        );
+        return;
+      }
+
+      if (nextStepValue == OnboardingStep.raSetup) {
+        state = state.copyWith(
+          currentStep: nextStepValue,
+          raSetupState: state.raSetupState ?? const RaSetupState(),
+          canProceed: false,
         );
         return;
       }
@@ -249,6 +268,25 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   }
 
   void previousStep() {
+    // raSetup → consoleSetup
+    if (state.currentStep == OnboardingStep.raSetup) {
+      state = state.copyWith(
+        currentStep: OnboardingStep.consoleSetup,
+        canProceed: state.configuredSystems.isNotEmpty,
+      );
+      return;
+    }
+
+    // complete → raSetup
+    if (state.currentStep == OnboardingStep.complete) {
+      state = state.copyWith(
+        currentStep: OnboardingStep.raSetup,
+        raSetupState: state.raSetupState ?? const RaSetupState(),
+        canProceed: true,
+      );
+      return;
+    }
+
     // consoleSetup → back: if RomM user, skip localSetup to rommSetup
     if (state.currentStep == OnboardingStep.consoleSetup) {
       if (state.rommSetupState != null) {
@@ -286,6 +324,104 @@ class OnboardingController extends StateNotifier<OnboardingState> {
 
   void onMessageComplete() {
     state = state.copyWith(canProceed: true);
+  }
+
+  // --- RetroAchievements setup ---
+
+  void raSetupAnswer(bool hasAccount) {
+    if (hasAccount) {
+      state = state.copyWith(
+        raSetupState: const RaSetupState(wantsSetup: true),
+        canProceed: false,
+      );
+    } else {
+      state = state.copyWith(
+        raSetupState: const RaSetupState(skipped: true),
+      );
+      nextStep();
+    }
+  }
+
+  void updateRaField(String key, String value) {
+    final ra = state.raSetupState ?? const RaSetupState();
+    switch (key) {
+      case 'username':
+        state = state.copyWith(
+          raSetupState: ra.copyWith(username: value, clearError: true),
+        );
+      case 'apiKey':
+        state = state.copyWith(
+          raSetupState: ra.copyWith(apiKey: value, clearError: true),
+        );
+    }
+  }
+
+  Future<void> testRaConnection() async {
+    final ra = state.raSetupState;
+    if (ra == null || !ra.hasCredentials) return;
+    if (ra.isTestingConnection) return;
+
+    state = state.copyWith(
+      raSetupState: ra.copyWith(
+        isTestingConnection: true,
+        connectionSuccess: false,
+        clearError: true,
+      ),
+    );
+
+    try {
+      final service = RetroAchievementsService();
+      final result = await service.testConnection(
+        username: ra.username.trim(),
+        apiKey: ra.apiKey.trim(),
+      );
+      if (!mounted) return;
+      if (!result.success) {
+        state = state.copyWith(
+          raSetupState: state.raSetupState?.copyWith(
+            isTestingConnection: false,
+            connectionError: result.error ?? 'Connection failed',
+          ),
+        );
+        return;
+      }
+      if (!mounted) return;
+      state = state.copyWith(
+        raSetupState: state.raSetupState?.copyWith(
+          isTestingConnection: false,
+          connectionSuccess: true,
+        ),
+      );
+    } catch (e) {
+      debugPrint('RA onboarding test failed: $e');
+      if (!mounted) return;
+      state = state.copyWith(
+        raSetupState: state.raSetupState?.copyWith(
+          isTestingConnection: false,
+          connectionError: e.toString(),
+        ),
+      );
+    }
+  }
+
+  void skipRaSetup() {
+    state = state.copyWith(
+      raSetupState: const RaSetupState(skipped: true),
+    );
+    nextStep();
+  }
+
+  void raSetupBack() {
+    final ra = state.raSetupState;
+    if (ra != null && ra.wantsSetup) {
+      // Back from connect view to ask view
+      state = state.copyWith(
+        raSetupState: const RaSetupState(),
+        canProceed: false,
+      );
+      return;
+    }
+    previousStep();
   }
 
   // --- Console selection ---

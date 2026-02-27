@@ -22,7 +22,7 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.2.0-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
   <img src="https://img.shields.io/badge/platform-Android-brightgreen?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/github/stars/averageconsumer/R-Shop?style=flat-square&color=yellow" alt="Stars" />
@@ -47,6 +47,7 @@ It bridges the gap between your self-hosted storage (**RomM, SMB, FTP, Web**) an
 * **📚 Library Screen** – Unified cross-system browser with All/Installed/Favorites tabs, search, and adjustable grid zoom.
 * **📥 Hardened Download Engine** – Background-ready downloads via Android Foreground Service. Features auto-extraction (ZIP/7z) and queue persistence.
 * **🖼️ Automatic Box Art** – Metadata and covers are fetched automatically via libretro-thumbnails.
+* **🏆 RetroAchievements** – Link your RA account to track achievements, verify ROMs via hash matching, and view per-game progress with mastery badges.
 * **⚡ Quick Menu (Start Button)** – Instant access to Search, Settings, Zoom, and Downloads from any screen.
 * **🔄 Background Sync** – Automatic provider sync on launch with live progress indicators.
 * **🧭 Smart Onboarding** – Auto-detection of existing ROM folders and guided setup for remote sources.

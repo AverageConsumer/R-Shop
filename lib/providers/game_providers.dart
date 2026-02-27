@@ -11,6 +11,7 @@ import '../models/system_model.dart';
 import '../services/config_parser.dart';
 import '../services/unified_game_service.dart';
 import 'app_providers.dart';
+import 'library_providers.dart';
 
 /// Whether the config was recovered from a backup (corrupt primary).
 final configRecoveredProvider = StateProvider<bool>((ref) => false);
@@ -38,12 +39,11 @@ final gamesProvider =
 
 /// Systems visible on the home screen.
 ///
-/// Hides consoles that have no providers configured (local-only systems)
-/// AND have no local files in their target folder. They reappear once a
-/// provider is added or a file is placed in the folder.
+/// When [hideEmptyConsolesProvider] is enabled, systems whose game list is
+/// empty are filtered out. Otherwise all configured systems are shown.
 final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
   final config = await ref.watch(bootstrappedConfigProvider.future);
-  
+
   // If no systems configured at all, return empty
   if (config.systems.isEmpty) return [];
 
@@ -52,13 +52,19 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
       .where((s) => configuredIds.contains(s.id))
       .toList();
 
+  final hideEmpty = ref.watch(hideEmptyConsolesProvider);
+
   final visible = <SystemModel>[];
   for (final system in configured) {
     final sysConfig = config.systemById(system.id);
     if (sysConfig == null) continue;
 
-    // User explicitly configured this system — always show it.
-    // An empty game list is better UX than "No consoles configured".
+    if (hideEmpty) {
+      final db = ref.read(libraryDbProvider);
+      final hasGames = await db.hasCache(system.id);
+      if (!hasGames) continue;
+    }
+
     visible.add(system);
   }
 

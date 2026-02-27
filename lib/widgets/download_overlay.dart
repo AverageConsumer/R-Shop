@@ -102,9 +102,15 @@ class _DownloadBadge extends ConsumerStatefulWidget {
 }
 
 class _DownloadBadgeState extends ConsumerState<_DownloadBadge>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+
+  // Burst animation for "added to queue" feedback
+  late AnimationController _burstController;
+  late Animation<double> _burstScaleAnimation;
+  late Animation<double> _burstRingScale;
+  late Animation<double> _burstRingOpacity;
 
   @override
   void initState() {
@@ -115,6 +121,25 @@ class _DownloadBadgeState extends ConsumerState<_DownloadBadge>
     );
     _pulseAnimation = Tween<double>(begin: 0.4, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    // Burst: scale up then settle back
+    _burstController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _burstScaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.25), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 1.25, end: 1.0), weight: 60),
+    ]).animate(CurvedAnimation(
+      parent: _burstController,
+      curve: Curves.easeOutCubic,
+    ));
+    _burstRingScale = Tween<double>(begin: 1.0, end: 2.0).animate(
+      CurvedAnimation(parent: _burstController, curve: Curves.easeOut),
+    );
+    _burstRingOpacity = Tween<double>(begin: 0.6, end: 0.0).animate(
+      CurvedAnimation(parent: _burstController, curve: Curves.easeOut),
     );
 
     if (widget.activeDownloads.isNotEmpty) {
@@ -135,12 +160,22 @@ class _DownloadBadgeState extends ConsumerState<_DownloadBadge>
 
   @override
   void dispose() {
+    _burstController.dispose();
     _pulseController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Listen for "added to queue" events to trigger burst
+    ref.listen<AddToQueueEvent?>(addToQueueEventProvider, (prev, next) {
+      if (next != null && (prev == null || prev.timestamp != next.timestamp)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _burstController.forward(from: 0);
+        });
+      }
+    });
+
     final rs = context.rs;
     final hasActive = widget.activeDownloads.isNotEmpty;
     final totalActive = widget.activeDownloads.length + widget.queuedItems.length;
@@ -157,76 +192,105 @@ class _DownloadBadgeState extends ConsumerState<_DownloadBadge>
       child: GestureDetector(
         onTap: () => toggleDownloadOverlay(ref),
         child: AnimatedBuilder(
-          animation: _pulseAnimation,
+          animation: Listenable.merge([_pulseAnimation, _burstController]),
           builder: (context, child) {
             final glowAlpha = hasActive ? _pulseAnimation.value * 0.5 : 0.0;
-            return Container(
-              width: badgeSize,
-              height: badgeSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF0D0D0D),
-                border: Border.all(
-                  color: hasActive
-                      ? Colors.green.withValues(alpha: 0.5 + _pulseAnimation.value * 0.3)
-                      : Colors.white.withValues(alpha: 0.15),
-                  width: 2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.7),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                  if (hasActive)
-                    BoxShadow(
-                      color: Colors.green.withValues(alpha: glowAlpha),
-                      blurRadius: 24,
-                      spreadRadius: 4,
-                    ),
-                ],
-              ),
+            final burstActive = _burstController.isAnimating;
+            return SizedBox(
+              width: badgeSize * 2,
+              height: badgeSize * 2,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  if (hasActive)
-                    SizedBox(
-                      width: badgeSize - 8,
-                      height: badgeSize - 8,
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: avgProgress),
-                        duration: const Duration(milliseconds: 600),
-                        curve: Curves.easeInOut,
-                        builder: (context, value, _) => CircularProgressIndicator(
-                          value: value,
-                          strokeWidth: 2.5,
-                          backgroundColor: Colors.white.withValues(alpha: 0.08),
-                          valueColor: AlwaysStoppedAnimation(
-                            Colors.green.withValues(alpha: 0.8),
+                  // Expanding burst ring
+                  if (burstActive)
+                    Container(
+                      width: badgeSize * _burstRingScale.value,
+                      height: badgeSize * _burstRingScale.value,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.green.withValues(
+                            alpha: _burstRingOpacity.value,
                           ),
+                          width: 2,
                         ),
                       ),
                     ),
-                  Material(
-                    type: MaterialType.transparency,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          hasActive ? Icons.downloading_rounded : Icons.download_done_rounded,
-                          size: rs.isSmall ? 18 : 22,
-                          color: hasActive ? Colors.green : Colors.white54,
+                  // Badge with scale burst
+                  Transform.scale(
+                    scale: burstActive ? _burstScaleAnimation.value : 1.0,
+                    child: Container(
+                      width: badgeSize,
+                      height: badgeSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF0D0D0D),
+                        border: Border.all(
+                          color: hasActive
+                              ? Colors.green.withValues(alpha: 0.5 + _pulseAnimation.value * 0.3)
+                              : Colors.white.withValues(alpha: 0.15),
+                          width: 2,
                         ),
-                        Text(
-                          '$totalActive',
-                          style: TextStyle(
-                            color: hasActive ? Colors.green : Colors.white70,
-                            fontSize: rs.isSmall ? 10 : 12,
-                            fontWeight: FontWeight.w700,
-                            height: 1.0,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.7),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
                           ),
-                        ),
-                      ],
+                          if (hasActive)
+                            BoxShadow(
+                              color: Colors.green.withValues(alpha: glowAlpha),
+                              blurRadius: 24,
+                              spreadRadius: 4,
+                            ),
+                        ],
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (hasActive)
+                            SizedBox(
+                              width: badgeSize - 8,
+                              height: badgeSize - 8,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0, end: avgProgress),
+                                duration: const Duration(milliseconds: 600),
+                                curve: Curves.easeInOut,
+                                builder: (context, value, _) => CircularProgressIndicator(
+                                  value: value,
+                                  strokeWidth: 2.5,
+                                  backgroundColor: Colors.white.withValues(alpha: 0.08),
+                                  valueColor: AlwaysStoppedAnimation(
+                                    Colors.green.withValues(alpha: 0.8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          Material(
+                            type: MaterialType.transparency,
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  hasActive ? Icons.downloading_rounded : Icons.download_done_rounded,
+                                  size: rs.isSmall ? 18 : 22,
+                                  color: hasActive ? Colors.green : Colors.white54,
+                                ),
+                                Text(
+                                  '$totalActive',
+                                  style: TextStyle(
+                                    color: hasActive ? Colors.green : Colors.white70,
+                                    fontSize: rs.isSmall ? 10 : 12,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

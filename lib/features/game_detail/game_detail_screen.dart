@@ -6,8 +6,10 @@ import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
+import '../../models/ra_models.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
+import '../../providers/ra_providers.dart';
 import '../../providers/rom_status_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../providers/shelf_providers.dart';
@@ -24,10 +26,12 @@ import '../../widgets/quick_menu.dart';
 import '../game_list/widgets/dynamic_background.dart';
 import '../game_list/widgets/tinted_overlay.dart';
 import '../library/widgets/shelf_picker_dialog.dart';
+import 'achievements_screen.dart';
 import 'game_detail_controller.dart';
 import 'game_detail_state.dart';
 import 'widgets/cover_section.dart';
 import 'widgets/metadata_badges.dart' hide InstalledBadge;
+import 'widgets/ra_info_section.dart';
 import 'widgets/tag_info_overlay.dart';
 import 'widgets/version_card.dart';
 import 'widgets/version_carousel.dart';
@@ -111,6 +115,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       isLocalOnly: widget.isLocalOnly,
       showFullFilename: storage.getShowFullFilename(),
       queueManager: queueManager,
+      onAddedToQueue: _fireAddToQueueAnimation,
     );
     _controller!.addListener(_onControllerChanged);
 
@@ -235,6 +240,31 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     ref.read(favoriteGamesProvider.notifier).toggleFavorite(controller.selectedVariant.filename);
   }
 
+  void _navigateToAchievements(RaMatchResult match) {
+    if (match.raGameId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AchievementsScreen(
+          raGameId: match.raGameId!,
+          raTitle: match.raTitle,
+          imageIcon: match.imageIcon,
+          accentColor: widget.system.accentColor,
+        ),
+      ),
+    );
+  }
+
+  void _fireAddToQueueAnimation() {
+    final controller = _controller;
+    if (controller == null) return;
+    ref.read(addToQueueEventProvider.notifier).state = AddToQueueEvent(
+      gameTitle: controller.cleanTitle,
+      accentColor: widget.system.accentColor,
+      timestamp: DateTime.now(),
+    );
+  }
+
   void _downloadFromSource(AlternativeSource source) {
     final controller = _controller;
     if (controller == null) return;
@@ -246,7 +276,11 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     );
 
     final queueManager = ref.read(downloadQueueManagerProvider);
+    final sizeBefore = queueManager.state.queue.length;
     queueManager.addToQueue(modifiedGame, widget.system, widget.targetFolder);
+    if (queueManager.state.queue.length > sizeBefore) {
+      _fireAddToQueueAnimation();
+    }
   }
 
   List<QuickMenuItem?> _buildQuickMenuItems() {
@@ -257,6 +291,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final isFavorite = ref.read(favoriteGamesProvider).contains(variant.filename);
     final hasDownloads = ref.read(hasQueueItemsProvider);
     final hasAlternatives = variant.alternativeSources.isNotEmpty;
+    final raMatches =
+        ref.read(raMatchesForSystemProvider(widget.system.id)).value ?? {};
+    final raMatch = raMatches[variant.filename];
     return [
       QuickMenuItem(
         label: isFavorite ? 'Unfavorite' : 'Favorite',
@@ -271,6 +308,12 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           icon: Icons.label_rounded,
           shortcutHint: 'Y',
           onSelect: _handleTagInfo,
+        ),
+      if (raMatch != null && raMatch.hasMatch && raMatch.raGameId != null)
+        QuickMenuItem(
+          label: 'Achievements',
+          icon: Icons.emoji_events_rounded,
+          onSelect: () => _navigateToAchievements(raMatch),
         ),
       QuickMenuItem(
         label: controller.state.showFullFilename ? 'Show Title' : 'Show Filename',
@@ -437,6 +480,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final isMultiRom = widget.variants.length > 1;
     final favoriteFilenames = ref.watch(favoriteGamesProvider).toSet();
     final isFavorite = favoriteFilenames.contains(controller.selectedVariant.filename);
+    final raMatches =
+        ref.watch(raMatchesForSystemProvider(widget.system.id)).value ?? {};
+    final raMatch = raMatches[selectedVariant.filename];
     return buildWithActions(
       PopScope(
         canPop: false,
@@ -459,9 +505,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               bottom: false,
               child: rs.isPortrait
                   ? _buildPortraitLayout(rs, state, controller, metadata,
-                      isMultiRom, coverUrls, selectedVariant, isFavorite, favoriteFilenames)
+                      isMultiRom, coverUrls, selectedVariant, isFavorite, favoriteFilenames, raMatch)
                   : _buildLandscapeLayout(rs, state, controller, metadata,
-                      isMultiRom, coverUrls, selectedVariant, isFavorite, favoriteFilenames),
+                      isMultiRom, coverUrls, selectedVariant, isFavorite, favoriteFilenames, raMatch),
             ),
             _buildControls(state, metadata),
             if (showQuickMenu)
@@ -514,6 +560,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     GameItem selectedVariant,
     bool isFavorite,
     Set<String> favoriteFilenames,
+    RaMatchResult? raMatch,
   ) {
     return Padding(
       padding: EdgeInsets.fromLTRB(
@@ -541,7 +588,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           Expanded(
             flex: isMultiRom ? 65 : 60,
             child:
-                _buildInfoSection(rs, state, controller, metadata, isMultiRom, isFavorite, favoriteFilenames),
+                _buildInfoSection(rs, state, controller, metadata, isMultiRom, isFavorite, favoriteFilenames, raMatch),
           ),
         ],
       ),
@@ -558,6 +605,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     GameItem selectedVariant,
     bool isFavorite,
     Set<String> favoriteFilenames,
+    RaMatchResult? raMatch,
   ) {
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: rs.spacing.md),
@@ -581,6 +629,15 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           _buildTitleSection(rs, controller),
           SizedBox(height: rs.spacing.sm),
           _buildMetadataRow(rs, metadata),
+          if (raMatch != null && raMatch.hasMatch) ...[
+            SizedBox(height: rs.spacing.md),
+            RaInfoSection(
+              match: raMatch,
+              filename: selectedVariant.filename,
+              systemSlug: widget.system.id,
+              onViewAchievements: () => _navigateToAchievements(raMatch),
+            ),
+          ],
           SizedBox(height: rs.spacing.lg),
           if (isMultiRom)
             VersionCarousel(
@@ -650,6 +707,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     bool isMultiRom,
     bool isFavorite,
     Set<String> favoriteFilenames,
+    RaMatchResult? raMatch,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -657,6 +715,14 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         _buildTitleSection(rs, controller),
         SizedBox(height: rs.spacing.md),
         _buildMetadataRow(rs, metadata),
+        if (raMatch != null && raMatch.hasMatch) ...[
+          SizedBox(height: rs.spacing.md),
+          RaInfoSection(
+            match: raMatch,
+            filename: controller.selectedVariant.filename,
+            systemSlug: widget.system.id,
+          ),
+        ],
         SizedBox(height: rs.spacing.lg),
         if (isMultiRom)
           Expanded(

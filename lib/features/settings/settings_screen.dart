@@ -22,6 +22,7 @@ import '../../widgets/quick_menu.dart';
 import '../onboarding/onboarding_controller.dart';
 import 'config_mode_screen.dart';
 import 'library_scan_screen.dart';
+import 'ra_config_screen.dart';
 import 'romm_config_screen.dart';
 import 'widgets/about_tab.dart';
 import 'widgets/preferences_tab.dart';
@@ -43,6 +44,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   late double _sfxVolume;
   late int _maxDownloads;
   late bool _allowNonLanHttp;
+  late bool _hideEmptyConsoles;
   bool _showResetConfirm = false;
   ProviderSubscription<CoverPreloadState>? _coverPreloadSub;
   ThumbnailDiskUsage? _thumbnailUsage;
@@ -50,6 +52,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   final FocusNode _hapticFocusNode = FocusNode();
   final FocusNode _layoutFocusNode = FocusNode();
   final FocusNode _homeLayoutFocusNode = FocusNode();
+  final FocusNode _hideEmptyFocusNode = FocusNode();
   final FocusNode _firstSystemTabNode = FocusNode();
   final FocusNode _firstAboutTabNode = FocusNode();
   late final ConfettiController _confettiController;
@@ -89,6 +92,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     _hapticEnabled = storage.getHapticEnabled();
     _maxDownloads = storage.getMaxConcurrentDownloads();
     _allowNonLanHttp = storage.getAllowNonLanHttp();
+    _hideEmptyConsoles = storage.getHideEmptyConsoles();
     final soundSettings = ref.read(soundSettingsProvider);
     _soundEnabled = soundSettings.enabled;
     _bgmVolume = soundSettings.bgmVolume;
@@ -115,6 +119,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     _hapticFocusNode.dispose();
     _layoutFocusNode.dispose();
     _homeLayoutFocusNode.dispose();
+    _hideEmptyFocusNode.dispose();
     _firstSystemTabNode.dispose();
     _firstAboutTabNode.dispose();
     super.dispose();
@@ -162,6 +167,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   // ---------------------------------------------------------------------------
   // Settings actions
   // ---------------------------------------------------------------------------
+
+  void _toggleHideEmpty() {
+    ref.read(hideEmptyConsolesProvider.notifier).toggle();
+    setState(() => _hideEmptyConsoles = !_hideEmptyConsoles);
+    ref.read(feedbackServiceProvider).tick();
+  }
 
   Future<void> _toggleHaptic() async {
     final value = !_hapticEnabled;
@@ -218,6 +229,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     await ref.read(storageServiceProvider).setAllowNonLanHttp(value);
     setState(() => _allowNonLanHttp = value);
     ref.read(feedbackServiceProvider).tick();
+  }
+
+  void _openRaConfig() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const RaConfigScreen()),
+    );
   }
 
   void _openRommConfig() {
@@ -463,15 +481,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             isHomeGrid: isHomeGrid,
                             hapticEnabled: _hapticEnabled,
                             soundEnabled: _soundEnabled,
+                            hideEmptyConsoles: _hideEmptyConsoles,
                             bgmVolume: _bgmVolume,
                             sfxVolume: _sfxVolume,
                             homeLayoutFocusNode: _homeLayoutFocusNode,
                             layoutFocusNode: _layoutFocusNode,
                             hapticFocusNode: _hapticFocusNode,
+                            hideEmptyFocusNode: _hideEmptyFocusNode,
                             onToggleHomeLayout: _toggleHomeLayout,
                             onCycleLayout: _cycleLayout,
                             onToggleHaptic: _toggleHaptic,
                             onToggleSound: _toggleSound,
+                            onToggleHideEmpty: _toggleHideEmpty,
                             onAdjustBgmVolume: _adjustBgmVolume,
                             onAdjustSfxVolume: _adjustSfxVolume,
                             onSetBgmVolume: _setBgmVolume,
@@ -483,6 +504,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             allowNonLanHttp: _allowNonLanHttp,
                             coverSubtitle: _buildCoverSubtitle(),
                             onOpenRommConfig: _openRommConfig,
+                            onOpenRaConfig: _openRaConfig,
                             onOpenConfigMode: _openConfigMode,
                             onOpenLibraryScan: _openLibraryScan,
                             onStartCoverPreload: _startCoverPreload,

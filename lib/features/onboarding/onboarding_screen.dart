@@ -7,6 +7,7 @@ import '../../core/responsive/responsive.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
+import '../../providers/ra_providers.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../../widgets/download_overlay.dart';
@@ -16,6 +17,7 @@ import 'widgets/chat_bubble.dart';
 import 'widgets/console_setup_step.dart';
 import 'widgets/pixel_mascot.dart';
 import 'widgets/local_setup_step.dart';
+import 'widgets/ra_setup_step.dart';
 import 'widgets/romm_setup_step.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -54,8 +56,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final state = ref.read(onboardingControllerProvider);
     final controller = ref.read(onboardingControllerProvider.notifier);
 
-    // Skip typewriter animation on A/Enter/Space when message is still typing
+    // Skip typewriter animation on A/Enter/Space when message is still typing.
+    // Only for non-interactive steps — interactive steps (romm/local/ra/console)
+    // need A to reach their ConsoleFocusable buttons.
+    final isInteractiveStep =
+        state.currentStep == OnboardingStep.rommSetup ||
+        state.currentStep == OnboardingStep.localSetup ||
+        state.currentStep == OnboardingStep.raSetup ||
+        state.currentStep == OnboardingStep.consoleSetup;
     if (!state.canProceed &&
+        !isInteractiveStep &&
         (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
          event.logicalKey == LogicalKeyboardKey.enter ||
          event.logicalKey == LogicalKeyboardKey.space)) {
@@ -182,6 +192,41 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       }
     }
 
+    // RA setup step
+    if (state.currentStep == OnboardingStep.raSetup) {
+      final ra = state.raSetupState;
+      if (ra != null) {
+        // In ask phase — buttons handle A/Enter; only handle B here
+        if (!ra.wantsSetup) {
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+              event.logicalKey == LogicalKeyboardKey.escape) {
+            _handleBack();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        }
+        // In connect phase
+        if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+            event.logicalKey == LogicalKeyboardKey.escape) {
+          controller.raSetupBack();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
+          if (ra.hasCredentials && !ra.isTestingConnection) {
+            controller.testRaConnection();
+          }
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
+          if (ra.connectionSuccess) {
+            _handleContinue();
+          }
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      }
+    }
+
     // Console setup step — delegate based on sub-state
     if (state.currentStep == OnboardingStep.consoleSetup) {
       // Provider form is open
@@ -232,17 +277,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return KeyEventResult.handled;
     }
 
-    if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-        event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.space) {
-      _handleContinue();
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-        event.logicalKey == LogicalKeyboardKey.backspace ||
-        event.logicalKey == LogicalKeyboardKey.escape) {
-      _handleBack();
-      return KeyEventResult.handled;
+    // Catch-all A/B only for non-interactive steps (welcome, legal, complete).
+    // Interactive steps return ignored above so events reach child widgets.
+    if (!isInteractiveStep) {
+      if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
+          event.logicalKey == LogicalKeyboardKey.enter ||
+          event.logicalKey == LogicalKeyboardKey.space) {
+        _handleContinue();
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+          event.logicalKey == LogicalKeyboardKey.backspace ||
+          event.logicalKey == LogicalKeyboardKey.escape) {
+        _handleBack();
+        return KeyEventResult.handled;
+      }
     }
     return KeyEventResult.ignored;
   }
@@ -287,6 +336,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         });
       }
       return;
+    } else if (state.currentStep == OnboardingStep.raSetup) {
+      final ra = state.raSetupState;
+      if (ra != null && ra.connectionSuccess) {
+        _persistRaCredentials(ra);
+        feedback.tick();
+        controller.nextStep();
+      }
+      return;
     } else if (state.currentStep == OnboardingStep.consoleSetup) {
       // Need at least one console configured to proceed
       if (state.configuredCount == 0) {
@@ -320,6 +377,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       audioManager.stopTyping();
       feedback.cancel();
       controller.localSetupBack();
+      return;
+    }
+
+    if (state.currentStep == OnboardingStep.raSetup) {
+      audioManager.stopTyping();
+      feedback.cancel();
+      controller.raSetupBack();
       return;
     }
 
@@ -360,6 +424,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ref.read(feedbackServiceProvider).tick();
   }
 
+  void _persistRaCredentials(RaSetupState raState) {
+    final storage = ref.read(storageServiceProvider);
+    if (raState.hasCredentials && raState.connectionSuccess) {
+      storage.setRaUsername(raState.username.trim());
+      storage.setRaApiKey(raState.apiKey.trim());
+      storage.setRaEnabled(true);
+    }
+  }
+
   void _persistRommCredentials(RommSetupState rommState) {
     final storage = ref.read(storageServiceProvider);
     if (rommState.hasConnection) {
@@ -392,7 +465,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return;
     }
     if (!mounted) return;
+
+    // Capture provider references before navigation disposes this widget
+    final syncNotifier = ref.read(raSyncServiceProvider.notifier);
+
     Navigator.of(context).pushReplacementNamed('/home');
+
+    // Trigger RA sync after onboarding if RA was configured.
+    // Deferred to let HomeView settle and avoid contention with config bootstrap.
+    Future.delayed(const Duration(seconds: 3), () {
+      triggerRaSync(syncNotifier, storage);
+    });
   }
 
   @override
@@ -401,12 +484,31 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final rs = context.rs;
     ref.listen(onboardingControllerProvider.select((s) => s.currentStep), (prev, next) {
       if (next == OnboardingStep.consoleSetup) return;
-      if (next == OnboardingStep.rommSetup) return;
       if (next == OnboardingStep.localSetup) return;
+      // Interactive steps with ConsoleFocusable buttons: move focus to first child
+      if (next == OnboardingStep.rommSetup || next == OnboardingStep.raSetup) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _focusNode.nextFocus();
+        });
+        return;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_focusNode.hasFocus) {
           _focusNode.requestFocus();
         }
+      });
+    });
+    // Re-focus first child when sub-views change within interactive steps
+    ref.listen(onboardingControllerProvider.select((s) => s.rommSetupState?.subStep), (prev, next) {
+      if (prev == null || next == null || prev == next) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.nextFocus();
+      });
+    });
+    ref.listen(onboardingControllerProvider.select((s) => s.raSetupState?.wantsSetup), (prev, next) {
+      if (prev == next) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.nextFocus();
       });
     });
     return Focus(
@@ -497,6 +599,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         return LocalSetupStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.consoleSetup:
         return ConsoleSetupStep(onComplete: controller.onMessageComplete);
+      case OnboardingStep.raSetup:
+        return RaSetupStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.complete:
         return _CompleteStep(
           configuredCount: state.configuredCount,
@@ -584,6 +688,33 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return ConsoleHud(
         b: HudAction('Back', onTap: _handleBack),
       );
+    }
+
+    if (state.currentStep == OnboardingStep.raSetup) {
+      final ra = state.raSetupState;
+      if (ra != null) {
+        // Ask phase — A selects focused button, B goes back
+        if (!ra.wantsSetup) {
+          return ConsoleHud(
+            a: HudAction('Select'),
+            b: HudAction('Back', onTap: _handleBack),
+          );
+        }
+        // Connect phase
+        final controller = ref.read(onboardingControllerProvider.notifier);
+        return ConsoleHud(
+          start: ra.connectionSuccess
+              ? HudAction('Continue', onTap: _handleContinue, highlight: true)
+              : null,
+          b: HudAction('Back', onTap: () => controller.raSetupBack()),
+          y: HudAction(
+            'Test',
+            onTap: ra.hasCredentials && !ra.isTestingConnection
+                ? controller.testRaConnection
+                : null,
+          ),
+        );
+      }
     }
 
     if (state.currentStep == OnboardingStep.consoleSetup) {

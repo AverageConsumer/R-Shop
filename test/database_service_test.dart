@@ -401,4 +401,151 @@ void main() {
       expect(loaded.first.cachedCoverUrl, isNull);
     });
   });
+
+  // ─── getRaImageIconForGame ─────────────────────────────
+
+  group('getRaImageIconForGame', () {
+    setUp(() async {
+      // Add RA tables to the existing test DB
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS ra_games (
+          ra_game_id INTEGER PRIMARY KEY,
+          console_id INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          num_achievements INTEGER NOT NULL DEFAULT 0,
+          points INTEGER NOT NULL DEFAULT 0,
+          image_icon TEXT,
+          normalized_title TEXT NOT NULL,
+          last_updated INTEGER NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS ra_matches (
+          game_filename TEXT NOT NULL,
+          system_slug TEXT NOT NULL,
+          ra_game_id INTEGER,
+          match_type TEXT NOT NULL,
+          is_mastered INTEGER NOT NULL DEFAULT 0,
+          last_updated INTEGER NOT NULL,
+          PRIMARY KEY (game_filename, system_slug)
+        )
+      ''');
+    });
+
+    tearDown(() async {
+      await db.execute('DROP TABLE IF EXISTS ra_matches');
+      await db.execute('DROP TABLE IF EXISTS ra_games');
+    });
+
+    test('returns image_icon when match and game exist', () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await db.insert('ra_games', {
+        'ra_game_id': 1234,
+        'console_id': 1,
+        'title': 'Super Mario World',
+        'normalized_title': 'supermarioworld',
+        'image_icon': '/Images/001234.png',
+        'last_updated': now,
+      });
+      await db.insert('ra_matches', {
+        'game_filename': 'Super Mario World (USA).sfc',
+        'system_slug': 'snes',
+        'ra_game_id': 1234,
+        'match_type': 'nameMatch',
+        'is_mastered': 0,
+        'last_updated': now,
+      });
+
+      final icon = await service.getRaImageIconForGame(
+        'Super Mario World (USA).sfc',
+        'snes',
+      );
+      expect(icon, '/Images/001234.png');
+    });
+
+    test('returns null when no match exists', () async {
+      final icon = await service.getRaImageIconForGame(
+        'Unknown Game.sfc',
+        'snes',
+      );
+      expect(icon, isNull);
+    });
+
+    test('returns null when match_type is none', () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await db.insert('ra_games', {
+        'ra_game_id': 5678,
+        'console_id': 1,
+        'title': 'Test Game',
+        'normalized_title': 'testgame',
+        'image_icon': '/Images/005678.png',
+        'last_updated': now,
+      });
+      await db.insert('ra_matches', {
+        'game_filename': 'Test Game.sfc',
+        'system_slug': 'snes',
+        'ra_game_id': 5678,
+        'match_type': 'none',
+        'is_mastered': 0,
+        'last_updated': now,
+      });
+
+      final icon = await service.getRaImageIconForGame(
+        'Test Game.sfc',
+        'snes',
+      );
+      expect(icon, isNull);
+    });
+
+    test('returns null when image_icon is empty', () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await db.insert('ra_games', {
+        'ra_game_id': 9999,
+        'console_id': 1,
+        'title': 'No Icon Game',
+        'normalized_title': 'noicongame',
+        'image_icon': '',
+        'last_updated': now,
+      });
+      await db.insert('ra_matches', {
+        'game_filename': 'No Icon Game.sfc',
+        'system_slug': 'snes',
+        'ra_game_id': 9999,
+        'match_type': 'hashVerified',
+        'is_mastered': 0,
+        'last_updated': now,
+      });
+
+      final icon = await service.getRaImageIconForGame(
+        'No Icon Game.sfc',
+        'snes',
+      );
+      expect(icon, isNull);
+    });
+
+    test('returns null when image_icon is null', () async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await db.insert('ra_games', {
+        'ra_game_id': 7777,
+        'console_id': 1,
+        'title': 'Null Icon Game',
+        'normalized_title': 'nullicongame',
+        'last_updated': now,
+      });
+      await db.insert('ra_matches', {
+        'game_filename': 'Null Icon Game.sfc',
+        'system_slug': 'snes',
+        'ra_game_id': 7777,
+        'match_type': 'nameMatch',
+        'is_mastered': 0,
+        'last_updated': now,
+      });
+
+      final icon = await service.getRaImageIconForGame(
+        'Null Icon Game.sfc',
+        'snes',
+      );
+      expect(icon, isNull);
+    });
+  });
 }

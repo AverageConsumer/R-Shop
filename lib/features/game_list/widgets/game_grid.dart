@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/responsive/responsive.dart';
 import '../../../models/game_item.dart';
+import '../../../models/ra_models.dart';
 import '../../../models/system_model.dart';
 import '../../../utils/image_helper.dart';
 import '../../../widgets/base_game_card.dart';
@@ -27,6 +28,7 @@ class GameGrid extends StatefulWidget {
   final bool hasActiveFilters;
   final bool isLocalOnly;
   final String targetFolder;
+  final Map<String, RaMatchResult> raMatches;
   final ValueNotifier<bool>? scrollSuppression;
   final int memCacheWidthMax;
   final double gridCacheExtent;
@@ -52,6 +54,7 @@ class GameGrid extends StatefulWidget {
     this.hasActiveFilters = false,
     this.isLocalOnly = false,
     this.targetFolder = '',
+    this.raMatches = const {},
     this.scrollSuppression,
     this.memCacheWidthMax = 500,
     this.gridCacheExtent = 400,
@@ -199,6 +202,7 @@ class _GameGridState extends State<GameGrid> {
     final isInstalled = widget.installedCache[displayName] ?? false;
     final isFavorite = widget.favorites.contains(displayName);
     final providerLabel = first.providerConfig?.shortLabel;
+    final raMatch = widget.raMatches[first.filename];
 
     return RepaintBoundary(
       key: widget.itemKeys[index],
@@ -215,6 +219,9 @@ class _GameGridState extends State<GameGrid> {
           isFavorite: isFavorite,
           accentColor: widget.system.accentColor,
           providerLabel: providerLabel,
+          raAchievementCount: raMatch?.achievementCount,
+          raMatchType: raMatch?.type ?? RaMatchType.none,
+          isMastered: raMatch?.isMastered ?? false,
           hasThumbnail: first.hasThumbnail,
           memCacheWidth: _optimalCacheWidth,
           scrollSuppression: widget.scrollSuppression,
