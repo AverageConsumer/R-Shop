@@ -115,6 +115,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 800);
     });
 
+    // Skip wizard — jump straight to finale (downloads)
+    document.getElementById('skipBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        bootScreen.classList.add('done');
+        setTimeout(() => {
+            experience.classList.add('active');
+            dom.finale.classList.add('active');
+        }, 800);
+    });
+
     // ===================== STORY ENGINE =====================
     const dom = {
         chatArea: document.getElementById('chatArea'),

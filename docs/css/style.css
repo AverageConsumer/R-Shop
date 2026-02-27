@@ -175,6 +175,21 @@ body {
     letter-spacing: 0.1em;
 }
 
+.boot-skip {
+    display: block;
+    margin-top: 1.2rem;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    color: var(--text-dim);
+    text-decoration: none;
+    letter-spacing: 0.05em;
+    transition: color 0.2s ease;
+}
+
+.boot-skip:hover {
+    color: var(--primary);
+}
+
 @keyframes mascotBounce {
     0% {
         transform: translateY(0);
