@@ -147,9 +147,56 @@ class GameDetailController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void openDescription() {
+    _state = _state.copyWith(showDescription: true);
+    notifyListeners();
+  }
+
+  void closeDescription() {
+    _state = _state.copyWith(clearDescription: true);
+    notifyListeners();
+  }
+
+  void openVariantPicker() {
+    _state = _state.copyWith(showVariantPicker: true);
+    notifyListeners();
+  }
+
+  void closeVariantPicker() {
+    _state = _state.copyWith(clearVariantPicker: true);
+    notifyListeners();
+  }
+
+  Future<bool> addVariantToQueue(int index) async {
+    if (_state.isAddingToQueue) return false;
+    if (index < 0 || index >= variants.length) return false;
+
+    _state = _state.copyWith(isAddingToQueue: true, clearError: true);
+    notifyListeners();
+
+    try {
+      final variant = variants[index];
+      final queueSizeBefore = _queueManager.state.queue.length;
+      _queueManager.addToQueue(variant, system, targetFolder);
+      final actuallyAdded = _queueManager.state.queue.length > queueSizeBefore;
+      await Future.delayed(const Duration(milliseconds: 300));
+      await checkInstallationStatus();
+      return actuallyAdded;
+    } catch (e) {
+      _state = _state.copyWith(error: getUserFriendlyError(e));
+      notifyListeners();
+      return false;
+    } finally {
+      _state = _state.copyWith(isAddingToQueue: false);
+      notifyListeners();
+    }
+  }
+
   Future<void> performAction() async {
     if (_state.isOverlayOpen) return;
-    if (_state.isVariantInstalled) {
+    if (variants.length > 1) {
+      openVariantPicker();
+    } else if (_state.isVariantInstalled) {
       showDeleteDialog();
     } else {
       if (isLocalOnly) return;

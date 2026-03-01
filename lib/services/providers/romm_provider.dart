@@ -1,8 +1,12 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 import '../../models/config/provider_config.dart';
 import '../../models/config/system_config.dart';
 import '../../models/game_item.dart';
+import '../../models/game_metadata_info.dart';
+import '../database_service.dart';
 import '../download_handle.dart';
 import '../romm_api_service.dart';
 import '../source_provider.dart';
@@ -50,12 +54,15 @@ class RommProvider implements SourceProvider {
     }
 
     final roms = await _api.fetchRoms(_baseUrl, platformId, auth: _auth);
+    final games = <GameItem>[];
+    final metadata = <GameMetadataInfo>[];
+    final now = DateTime.now().millisecondsSinceEpoch;
 
-    return roms.map((rom) {
+    for (final rom in roms) {
       final downloadUrl = _api.buildRomDownloadUrl(_baseUrl, rom);
       final coverUrl = _api.buildCoverUrl(_baseUrl, rom);
 
-      return GameItem(
+      games.add(GameItem(
         filename: rom.fileName,
         displayName: rom.name.isNotEmpty
             ? rom.name
@@ -63,8 +70,40 @@ class RommProvider implements SourceProvider {
         url: downloadUrl,
         cachedCoverUrl: coverUrl,
         providerConfig: config,
-      );
-    }).toList();
+      ));
+
+      final releaseYear = rom.firstReleaseDate != null
+          ? DateTime.fromMillisecondsSinceEpoch(
+                  rom.firstReleaseDate! * 1000)
+              .year
+          : null;
+
+      if (rom.summary != null ||
+          rom.genres != null ||
+          rom.developer != null ||
+          releaseYear != null) {
+        metadata.add(GameMetadataInfo(
+          filename: rom.fileName,
+          systemSlug: system.id,
+          summary: rom.summary,
+          genres: rom.genres,
+          developer: rom.developer,
+          releaseYear: releaseYear,
+          gameModes: rom.gameModes,
+          rating: rom.averageRating,
+          lastUpdated: now,
+        ));
+      }
+    }
+
+    // Persist metadata as side effect (non-blocking)
+    if (metadata.isNotEmpty) {
+      DatabaseService().saveGameMetadata(system.id, metadata).catchError((e) {
+        debugPrint('RommProvider: failed to save metadata: $e');
+      });
+    }
+
+    return games;
   }
 
   @override

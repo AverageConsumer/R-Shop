@@ -8,6 +8,8 @@ class GameDetailState {
   final bool showTagInfo;
   final bool isAddingToQueue;
   final bool showFullFilename;
+  final bool showVariantPicker;
+  final bool showDescription;
 
   const GameDetailState({
     this.selectedIndex = 0,
@@ -19,6 +21,8 @@ class GameDetailState {
     this.showTagInfo = false,
     this.isAddingToQueue = false,
     this.showFullFilename = false,
+    this.showVariantPicker = false,
+    this.showDescription = false,
   });
 
   GameDetailState copyWith({
@@ -34,6 +38,10 @@ class GameDetailState {
     bool clearTagInfo = false,
     bool? isAddingToQueue,
     bool? showFullFilename,
+    bool? showVariantPicker,
+    bool clearVariantPicker = false,
+    bool? showDescription,
+    bool clearDescription = false,
   }) {
     return GameDetailState(
       selectedIndex: selectedIndex ?? this.selectedIndex,
@@ -46,6 +54,12 @@ class GameDetailState {
       showTagInfo: clearTagInfo ? false : (showTagInfo ?? this.showTagInfo),
       isAddingToQueue: isAddingToQueue ?? this.isAddingToQueue,
       showFullFilename: showFullFilename ?? this.showFullFilename,
+      showVariantPicker: clearVariantPicker
+          ? false
+          : (showVariantPicker ?? this.showVariantPicker),
+      showDescription: clearDescription
+          ? false
+          : (showDescription ?? this.showDescription),
     );
   }
 
@@ -53,5 +67,5 @@ class GameDetailState {
 
   bool get isDialogOpen => showDeleteDialog;
 
-  bool get isOverlayOpen => showDeleteDialog || showTagInfo;
+  bool get isOverlayOpen => showDeleteDialog || showTagInfo || showVariantPicker || showDescription;
 }

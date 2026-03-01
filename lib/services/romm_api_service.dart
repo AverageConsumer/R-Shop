@@ -44,6 +44,12 @@ class RommRom {
   final String? pathCoverSmall;
   final String? pathCoverLarge;
   final List<String> mergedScreenshots;
+  final String? summary;
+  final String? genres;
+  final String? developer;
+  final int? firstReleaseDate;
+  final String? gameModes;
+  final double? averageRating;
 
   const RommRom({
     required this.id,
@@ -54,10 +60,29 @@ class RommRom {
     this.pathCoverSmall,
     this.pathCoverLarge,
     this.mergedScreenshots = const [],
+    this.summary,
+    this.genres,
+    this.developer,
+    this.firstReleaseDate,
+    this.gameModes,
+    this.averageRating,
   });
 
   factory RommRom.fromJson(Map<String, dynamic> json) {
     final screenshots = json['merged_screenshots'];
+
+    // Parse metadata defensively — malformed fields must not break game listing
+    String? parsedGenres;
+    String? parsedDeveloper;
+    String? parsedGameModes;
+    try {
+      parsedGenres = _joinListField(json['genres']);
+      parsedDeveloper = _extractFirstName(json['companies']);
+      parsedGameModes = _joinListField(json['game_modes']);
+    } catch (e) {
+      debugPrint('RommApiService: metadata parsing skipped: $e');
+    }
+
     return RommRom(
       id: json['id'] as int,
       name: json['name'] as String? ?? '',
@@ -69,7 +94,32 @@ class RommRom {
       mergedScreenshots: screenshots is List
           ? screenshots.whereType<String>().toList()
           : const [],
+      summary: json['summary'] as String?,
+      genres: parsedGenres,
+      developer: parsedDeveloper,
+      firstReleaseDate: json['first_release_date'] as int?,
+      gameModes: parsedGameModes,
+      averageRating: (json['average_rating'] as num?)?.toDouble(),
     );
+  }
+
+  /// Joins a list field that may be `List<String>` or `List<Map>` with a `name` key.
+  static String? _joinListField(dynamic field) {
+    if (field is! List || field.isEmpty) return null;
+    final names = field
+        .map((e) => e is Map ? e['name']?.toString() : e?.toString())
+        .whereType<String>()
+        .where((s) => s.isNotEmpty)
+        .toList();
+    return names.isEmpty ? null : names.join(', ');
+  }
+
+  /// Extracts the first company name from a list of company objects or strings.
+  static String? _extractFirstName(dynamic field) {
+    if (field is! List || field.isEmpty) return null;
+    final first = field.first;
+    if (first is Map) return first['name']?.toString();
+    return first?.toString();
   }
 }
 

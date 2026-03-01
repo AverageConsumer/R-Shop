@@ -6,13 +6,14 @@ import 'package:sqflite/sqflite.dart';
 
 import '../models/config/provider_config.dart';
 import '../models/game_item.dart';
+import '../models/game_metadata_info.dart';
 import '../models/ra_models.dart';
 import '../utils/ra_name_matcher.dart';
 
 class DatabaseService {
   static Future<Database>? _initFuture;
   static const String _tableName = 'games';
-  static const int _dbVersion = 7;
+  static const int _dbVersion = 8;
 
   @visibleForTesting
   static Database? testDatabase;
@@ -106,6 +107,22 @@ class DatabaseService {
         PRIMARY KEY (game_filename, system_slug)
       )
     ''');
+
+    // Game metadata from RomM/IGDB
+    await db.execute('''
+      CREATE TABLE game_metadata (
+        filename TEXT NOT NULL,
+        system_slug TEXT NOT NULL,
+        summary TEXT,
+        genres TEXT,
+        developer TEXT,
+        release_year INTEGER,
+        game_modes TEXT,
+        rating REAL,
+        last_updated INTEGER NOT NULL,
+        PRIMARY KEY (filename, system_slug)
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -183,6 +200,24 @@ class DatabaseService {
         await txn.execute(
           'ALTER TABLE ra_matches ADD COLUMN is_mastered INTEGER NOT NULL DEFAULT 0',
         );
+      });
+    }
+    if (oldVersion < 8) {
+      await db.transaction((txn) async {
+        await txn.execute('''
+          CREATE TABLE game_metadata (
+            filename TEXT NOT NULL,
+            system_slug TEXT NOT NULL,
+            summary TEXT,
+            genres TEXT,
+            developer TEXT,
+            release_year INTEGER,
+            game_modes TEXT,
+            rating REAL,
+            last_updated INTEGER NOT NULL,
+            PRIMARY KEY (filename, system_slug)
+          )
+        ''');
       });
     }
   }
@@ -429,6 +464,51 @@ class DatabaseService {
     if (filename.contains('(Italy)')) return 'Italy';
     if (filename.contains('(World)')) return 'World';
     return 'Unknown';
+  }
+
+  // ---------------------------------------------------------------------------
+  // Game metadata (RomM / IGDB)
+  // ---------------------------------------------------------------------------
+
+  Future<void> saveGameMetadata(
+      String systemSlug, List<GameMetadataInfo> metadata) async {
+    if (metadata.isEmpty) return;
+    final db = await database;
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (final m in metadata) {
+        batch.insert('game_metadata', m.toDbRow(),
+            conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
+  Future<GameMetadataInfo?> getGameMetadata(
+      String filename, String systemSlug) async {
+    final db = await database;
+    final rows = await db.query(
+      'game_metadata',
+      where: 'filename = ? AND system_slug = ?',
+      whereArgs: [filename, systemSlug],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return GameMetadataInfo.fromDbRow(rows.first);
+  }
+
+  Future<Map<String, GameMetadataInfo>> getMetadataForSystem(
+      String systemSlug) async {
+    final db = await database;
+    final rows = await db.query(
+      'game_metadata',
+      where: 'system_slug = ?',
+      whereArgs: [systemSlug],
+    );
+    return {
+      for (final row in rows)
+        row['filename'] as String: GameMetadataInfo.fromDbRow(row),
+    };
   }
 
   // ---------------------------------------------------------------------------

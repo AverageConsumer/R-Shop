@@ -7,8 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/config/app_config.dart';
 import '../models/config/system_config.dart';
 import '../models/game_item.dart';
+import '../models/game_metadata_info.dart';
 import '../models/system_model.dart';
 import '../services/config_parser.dart';
+import '../services/database_service.dart';
 import '../services/unified_game_service.dart';
 import 'app_providers.dart';
 import 'library_providers.dart';
@@ -70,6 +72,19 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
 
   return visible;
 });
+
+// ---------------------------------------------------------------------------
+// Game metadata (RomM / IGDB)
+// ---------------------------------------------------------------------------
+
+/// Cached game metadata lookup for the detail screen.
+final gameMetadataProvider = FutureProvider.family<GameMetadataInfo?,
+    ({String filename, String systemSlug})>(
+  (ref, params) async {
+    final db = DatabaseService();
+    return db.getGameMetadata(params.filename, params.systemSlug);
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Config import helper

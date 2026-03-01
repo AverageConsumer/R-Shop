@@ -4,7 +4,7 @@ import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../utils/game_metadata.dart';
 import '../../../widgets/installed_indicator.dart';
-import 'metadata_badges.dart';
+import 'metadata_badges.dart' hide InstalledBadge;
 
 class SingleVersionDisplay extends StatelessWidget {
   final GameItem variant;
@@ -114,33 +114,71 @@ class SingleVersionDisplay extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (variant.providerConfig != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.1),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08),
+                            ),
+                          ),
+                          child: Text(
+                            metadata.fileType.toUpperCase(),
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
-                        child: Text(
-                          variant.providerConfig!.shortLabel,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
+                        if (variant.providerConfig != null) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: Text(
+                              variant.providerConfig!.shortLabel,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.5),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
+                        ],
+                      ],
+                    ),
                   ],
                 ),
-                if (metadata.primaryTags.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  TagBadges(tags: metadata.primaryTags, maxVisible: 5),
+                if (metadata.primaryTags.isNotEmpty || isInstalled) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (metadata.primaryTags.isNotEmpty)
+                        Expanded(
+                          child: TagBadges(tags: metadata.primaryTags, maxVisible: 5),
+                        ),
+                      if (isInstalled) ...[
+                        if (metadata.primaryTags.isNotEmpty)
+                          const SizedBox(width: 8),
+                        const InstalledBadge(compact: true),
+                      ],
+                    ],
+                  ),
                 ],
               ],
             ),

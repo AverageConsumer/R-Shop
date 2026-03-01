@@ -275,6 +275,200 @@ void main() {
   });
 
   // ═══════════════════════════════════════════════════════
+  group('RommRom.fromJson — metadata fields', () {
+    test('parses summary field', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'summary': 'A great platformer game.',
+      });
+
+      expect(r.summary, 'A great platformer game.');
+    });
+
+    test('parses genres as list of strings', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'genres': ['Platformer', 'Action'],
+      });
+
+      expect(r.genres, 'Platformer, Action');
+    });
+
+    test('parses genres as list of maps with name key', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'genres': [
+          {'name': 'RPG'},
+          {'name': 'Strategy'},
+        ],
+      });
+
+      expect(r.genres, 'RPG, Strategy');
+    });
+
+    test('genres null for empty list', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'genres': [],
+      });
+
+      expect(r.genres, isNull);
+    });
+
+    test('parses companies — takes first entry', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'companies': [
+          {'name': 'Nintendo'},
+          {'name': 'HAL Laboratory'},
+        ],
+      });
+
+      expect(r.developer, 'Nintendo');
+    });
+
+    test('parses companies as list of strings', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'companies': ['Capcom'],
+      });
+
+      expect(r.developer, 'Capcom');
+    });
+
+    test('developer null for empty companies', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'companies': [],
+      });
+
+      expect(r.developer, isNull);
+    });
+
+    test('parses first_release_date', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'first_release_date': 599616000,
+      });
+
+      expect(r.firstReleaseDate, 599616000);
+    });
+
+    test('parses game_modes as list of strings', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'game_modes': ['Single Player', 'Co-op'],
+      });
+
+      expect(r.gameModes, 'Single Player, Co-op');
+    });
+
+    test('parses game_modes as list of maps', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'game_modes': [
+          {'name': 'Multiplayer'},
+        ],
+      });
+
+      expect(r.gameModes, 'Multiplayer');
+    });
+
+    test('parses average_rating as double', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'average_rating': 85.5,
+      });
+
+      expect(r.averageRating, 85.5);
+    });
+
+    test('parses average_rating from int', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+        'average_rating': 90,
+      });
+
+      expect(r.averageRating, 90.0);
+    });
+
+    test('all metadata fields null when absent', () {
+      final r = RommRom.fromJson({
+        'id': 1,
+        'name': 'Test',
+        'file_name': 'test.rom',
+        'platform_id': 1,
+      });
+
+      expect(r.summary, isNull);
+      expect(r.genres, isNull);
+      expect(r.developer, isNull);
+      expect(r.firstReleaseDate, isNull);
+      expect(r.gameModes, isNull);
+      expect(r.averageRating, isNull);
+    });
+
+    test('full metadata round-trip', () {
+      final r = RommRom.fromJson({
+        'id': 99,
+        'name': 'Zelda',
+        'file_name': 'zelda.sfc',
+        'platform_id': 4,
+        'url_cover': 'https://images.igdb.com/cover.png',
+        'summary': 'An epic adventure.',
+        'genres': [{'name': 'Action'}, {'name': 'Adventure'}],
+        'companies': [{'name': 'Nintendo EAD'}],
+        'first_release_date': 690768000,
+        'game_modes': ['Single Player'],
+        'average_rating': 95.2,
+      });
+
+      expect(r.summary, 'An epic adventure.');
+      expect(r.genres, 'Action, Adventure');
+      expect(r.developer, 'Nintendo EAD');
+      expect(r.firstReleaseDate, 690768000);
+      expect(r.gameModes, 'Single Player');
+      expect(r.averageRating, 95.2);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════
   group('fetchPlatforms', () {
     test('returns platforms from array response', () async {
       fakeDio.enqueue([

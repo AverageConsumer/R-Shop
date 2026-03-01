@@ -29,10 +29,13 @@ import 'achievements_screen.dart';
 import 'game_detail_controller.dart';
 import 'game_detail_state.dart';
 import 'widgets/cover_section.dart';
+import 'widgets/game_info_card.dart';
 import 'widgets/metadata_badges.dart';
 import 'widgets/ra_info_section.dart';
+import 'widgets/download_action_button.dart';
+import 'widgets/description_overlay.dart';
 import 'widgets/tag_info_overlay.dart';
-import 'widgets/version_carousel.dart';
+import 'widgets/variant_picker_overlay.dart';
 
 class GameDetailScreen extends ConsumerStatefulWidget {
   final GameItem game;
@@ -59,7 +62,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   GameDetailController? _controller;
   late InputDebouncer _debouncer;
   ProviderSubscription? _romChangeSubscription;
-  bool _variantNavHeld = false;
 
   @override
   String get routeId => 'game_detail_${widget.game.filename}';
@@ -67,7 +69,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   bool _dialogOrNoOverlay(dynamic _) {
     final priority = ref.read(overlayPriorityProvider);
     if (priority == OverlayPriority.none) return true;
-    return _controller?.state.isDialogOpen == true;
+    final state = _controller?.state;
+    return state?.isDialogOpen == true || state?.showVariantPicker == true;
   }
 
   @override
@@ -148,6 +151,18 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final controller = _controller;
     if (controller == null) return;
 
+    if (controller.state.showVariantPicker) {
+      ref.read(feedbackServiceProvider).cancel();
+      controller.closeVariantPicker();
+      return;
+    }
+
+    if (controller.state.showDescription) {
+      ref.read(feedbackServiceProvider).cancel();
+      controller.closeDescription();
+      return;
+    }
+
     if (controller.state.showTagInfo) {
       ref.read(feedbackServiceProvider).cancel();
       controller.closeTagInfo();
@@ -168,6 +183,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final controller = _controller;
     if (controller == null) return;
 
+    // Variant picker handles its own A-button input
+    if (controller.state.showVariantPicker) return;
+
     if (controller.state.isDialogOpen) {
       final selection = controller.state.dialogSelection;
       if (selection == 0) {
@@ -185,11 +203,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       return;
     }
 
-    if (controller.state.isVariantInstalled) {
-      ref.read(feedbackServiceProvider).warning();
-    } else {
-      ref.read(feedbackServiceProvider).confirm();
-    }
+    ref.read(feedbackServiceProvider).confirm();
     controller.performAction();
   }
 
@@ -283,6 +297,10 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final isFavorite = ref.read(favoriteGamesProvider).contains(variant.filename);
     final hasDownloads = ref.read(hasQueueItemsProvider);
     final hasAlternatives = variant.alternativeSources.isNotEmpty;
+    final richMetadata = ref.read(gameMetadataProvider(
+      (filename: variant.filename, systemSlug: widget.system.id),
+    )).valueOrNull;
+    final hasSummary = richMetadata?.summary != null;
     final raMatches =
         ref.read(raMatchesForSystemProvider(widget.system.id)).value ?? {};
     final raMatch = raMatches[variant.filename];
@@ -299,6 +317,12 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           label: 'Tags',
           icon: Icons.label_rounded,
           onSelect: _handleTagInfo,
+        ),
+      if (hasSummary)
+        QuickMenuItem(
+          label: 'Description',
+          icon: Icons.description_outlined,
+          onSelect: () => controller.openDescription(),
         ),
       if (raMatch != null && raMatch.hasMatch && raMatch.raGameId != null)
         QuickMenuItem(
@@ -365,39 +389,14 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final controller = _controller;
     if (controller == null) return;
 
-    if (controller.state.showTagInfo || controller.state.isDialogOpen) {
-      if (controller.state.isDialogOpen) {
-        if (direction == GridDirection.left) {
-          ref.read(feedbackServiceProvider).tick();
-          controller.selectDialogOption(1);
-        } else if (direction == GridDirection.right) {
-          ref.read(feedbackServiceProvider).tick();
-          controller.selectDialogOption(0);
-        }
+    if (controller.state.isDialogOpen) {
+      if (direction == GridDirection.left) {
+        ref.read(feedbackServiceProvider).tick();
+        controller.selectDialogOption(1);
+      } else if (direction == GridDirection.right) {
+        ref.read(feedbackServiceProvider).tick();
+        controller.selectDialogOption(0);
       }
-      return;
-    }
-
-    if (widget.variants.length <= 1) return;
-
-    if (direction == GridDirection.up) {
-      if (_variantNavHeld) return;
-      _variantNavHeld = true;
-      if (controller.selectedIndex <= 0) {
-        ref.read(feedbackServiceProvider).error();
-        return;
-      }
-      ref.read(feedbackServiceProvider).tick();
-      controller.selectVariant(controller.selectedIndex - 1);
-    } else if (direction == GridDirection.down) {
-      if (_variantNavHeld) return;
-      _variantNavHeld = true;
-      if (controller.selectedIndex >= widget.variants.length - 1) {
-        ref.read(feedbackServiceProvider).error();
-        return;
-      }
-      ref.read(feedbackServiceProvider).tick();
-      controller.selectVariant(controller.selectedIndex + 1);
     }
   }
 
@@ -416,12 +415,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent) {
-      _variantNavHeld = false;
       _debouncer.stopHold();
       return KeyEventResult.ignored;
     }
-
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     return KeyEventResult.ignored;
   }
@@ -531,6 +527,46 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                 onClose: controller.closeTagInfo,
               ),
             ),
+            if (state.showDescription)
+              OverlayFocusScope(
+                priority: OverlayPriority.dialog,
+                isVisible: state.showDescription,
+                onClose: controller.closeDescription,
+                child: Builder(
+                  builder: (context) {
+                    final richMetadata = ref.read(gameMetadataProvider(
+                      (filename: selectedVariant.filename, systemSlug: widget.system.id),
+                    )).valueOrNull;
+                    if (richMetadata == null) return const SizedBox.shrink();
+                    return DescriptionOverlay(
+                      metadata: richMetadata,
+                      gameTitle: controller.cleanTitle,
+                      accentColor: widget.system.accentColor,
+                      onClose: controller.closeDescription,
+                    );
+                  },
+                ),
+              ),
+            if (state.showVariantPicker && isMultiRom)
+              VariantPickerOverlay(
+                variants: widget.variants,
+                system: widget.system,
+                installedStatus: state.installedStatus,
+                onDownload: (index) async {
+                  final success = await controller.addVariantToQueue(index);
+                  if (success) _fireAddToQueueAnimation();
+                  return success;
+                },
+                onDelete: (index) {
+                  controller.selectVariant(index);
+                  controller.closeVariantPicker();
+                  controller.showDeleteDialog();
+                },
+                onClose: () {
+                  controller.closeVariantPicker();
+                  requestScreenFocus();
+                },
+              ),
           ],
         ),
       ),
@@ -561,7 +597,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            flex: isMultiRom ? 35 : 40,
+            flex: 40,
             child: CoverSection(
               game: widget.game,
               system: widget.system,
@@ -575,9 +611,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           ),
           SizedBox(width: rs.spacing.lg),
           Expanded(
-            flex: isMultiRom ? 65 : 60,
+            flex: 60,
             child:
-                _buildInfoSection(rs, state, controller, metadata, isMultiRom, raMatch),
+                _buildInfoSection(rs, state, controller, metadata, raMatch),
           ),
         ],
       ),
@@ -595,6 +631,12 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     bool isFavorite,
     RaMatchResult? raMatch,
   ) {
+    final gameMetadata = ref.watch(gameMetadataProvider(
+      (filename: selectedVariant.filename, systemSlug: widget.system.id),
+    ));
+    final richMetadata = gameMetadata.valueOrNull;
+    final hasRichMetadata = richMetadata?.hasContent ?? false;
+
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: rs.spacing.md),
       child: Column(
@@ -602,7 +644,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         children: [
           SizedBox(height: rs.spacing.md),
           AspectRatio(
-            aspectRatio: 0.75,
+            aspectRatio: hasRichMetadata ? 0.85 : 0.75,
             child: CoverSection(
               game: widget.game,
               system: widget.system,
@@ -616,29 +658,26 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           ),
           SizedBox(height: rs.spacing.md),
           _buildTitleSection(rs, controller),
+          if (hasRichMetadata) ...[
+            _buildSectionHeader('About This Game', rs),
+            GameInfoCard(
+              metadata: richMetadata!,
+              accentColor: widget.system.accentColor,
+            ),
+          ],
+          SizedBox(height: rs.spacing.lg),
+          _buildDownloadArea(rs, state, controller, isMultiRom),
           if (!isMultiRom) ...[
-            SizedBox(height: rs.spacing.sm),
-            _buildSingleRomMetadata(rs, metadata),
+            _buildSectionHeader('Details', rs),
+            _buildStructuredDetails(rs, metadata),
           ],
           if (raMatch != null && raMatch.hasMatch) ...[
-            SizedBox(height: rs.spacing.md),
+            _buildSectionHeader('Achievements', rs),
             RaInfoSection(
               match: raMatch,
               filename: selectedVariant.filename,
               systemSlug: widget.system.id,
               onViewAchievements: () => _navigateToAchievements(raMatch),
-            ),
-          ],
-          if (isMultiRom) ...[
-            SizedBox(height: rs.spacing.lg),
-            VersionCarousel(
-              variants: widget.variants,
-              system: widget.system,
-              selectedIndex: state.selectedIndex,
-              installedStatus: state.installedStatus,
-              onSelectionChanged: (index) {
-                controller.selectVariant(index);
-              },
             ),
           ],
           SizedBox(height: rs.spacing.xxl),
@@ -649,23 +688,10 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
   Widget _buildControls(
       GameDetailState state, GameMetadataFull metadata) {
-    final controller = _controller;
-    if (controller == null) return const SizedBox.shrink();
-
-    final String actionLabel;
-    final VoidCallback? actionCallback;
-    if (widget.isLocalOnly && !state.isVariantInstalled) {
-      actionLabel = 'Deleted';
-      actionCallback = null;
-    } else {
-      actionLabel = state.isVariantInstalled ? 'Delete' : 'Download';
-      actionCallback = controller.performAction;
-    }
-
+    if (_controller == null) return const SizedBox.shrink();
     if (showQuickMenu) return const SizedBox.shrink();
 
     return ConsoleHud(
-      a: HudAction(actionLabel, onTap: actionCallback),
       b: HudAction('Back', onTap: () => Navigator.pop(context)),
       start: HudAction('Menu', onTap: toggleQuickMenu),
     );
@@ -676,16 +702,35 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     GameDetailState state,
     GameDetailController controller,
     GameMetadataFull metadata,
-    bool isMultiRom,
     RaMatchResult? raMatch,
   ) {
+    final isMultiRom = widget.variants.length > 1;
+    final gameMetadata = ref.watch(gameMetadataProvider(
+      (filename: controller.selectedVariant.filename, systemSlug: widget.system.id),
+    ));
+    final richMetadata = gameMetadata.valueOrNull;
+    final hasRichMetadata = richMetadata?.hasContent ?? false;
+
+    // Landscape: compact layout without section headers or scroll —
+    // gamepad can't scroll here since nothing is focused.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildTitleSection(rs, controller),
+        if (hasRichMetadata) ...[
+          SizedBox(height: rs.spacing.sm),
+          Expanded(
+            child: GameInfoCard(
+              metadata: richMetadata!,
+              accentColor: widget.system.accentColor,
+            ),
+          ),
+        ],
+        SizedBox(height: rs.spacing.md),
+        _buildDownloadButton(state, controller, isMultiRom),
         if (!isMultiRom) ...[
           SizedBox(height: rs.spacing.md),
-          _buildSingleRomMetadata(rs, metadata),
+          _buildStructuredDetails(rs, metadata),
         ],
         if (raMatch != null && raMatch.hasMatch) ...[
           SizedBox(height: rs.spacing.md),
@@ -695,23 +740,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
             systemSlug: widget.system.id,
           ),
         ],
-        if (isMultiRom) ...[
-          SizedBox(height: rs.spacing.lg),
-          Expanded(
-            child: SingleChildScrollView(
-              child: VersionCarousel(
-                variants: widget.variants,
-                system: widget.system,
-                selectedIndex: state.selectedIndex,
-                installedStatus: state.installedStatus,
-                onSelectionChanged: (index) {
-                  controller.selectVariant(index);
-                },
-              ),
-            ),
-          ),
-        ] else
-          const Spacer(),
+        if (!hasRichMetadata) const Spacer(),
       ],
     );
   }
@@ -800,24 +829,191 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     );
   }
 
-  Widget _buildSingleRomMetadata(Responsive rs, GameMetadataFull metadata) {
-    final badgeFontSize = rs.isSmall ? 12.0 : 16.0;
+  Widget _buildDownloadButton(
+    GameDetailState state,
+    GameDetailController controller,
+    bool isMultiRom,
+  ) {
+    final DownloadButtonState buttonState;
+    if (state.isAddingToQueue) {
+      buttonState = DownloadButtonState.adding;
+    } else if (widget.isLocalOnly && !state.isVariantInstalled) {
+      buttonState = DownloadButtonState.unavailable;
+    } else if (isMultiRom) {
+      final allInstalled = state.installedStatus.length == widget.variants.length &&
+          state.installedStatus.values.every((v) => v);
+      buttonState = allInstalled
+          ? DownloadButtonState.installed
+          : DownloadButtonState.download;
+    } else if (state.isVariantInstalled) {
+      buttonState = DownloadButtonState.delete;
+    } else {
+      buttonState = DownloadButtonState.download;
+    }
 
-    return Wrap(
-      spacing: rs.spacing.sm,
-      runSpacing: rs.spacing.sm,
-      children: [
-        RegionBadge(region: metadata.region, fontSize: badgeFontSize),
-        if (metadata.languages.isNotEmpty)
-          LanguageBadges(
-            languages: metadata.languages,
-            maxVisible: rs.isSmall ? 3 : 4,
+    return DownloadActionButton(
+      state: buttonState,
+      accentColor: widget.system.accentColor,
+      variantCount: isMultiRom ? widget.variants.length : null,
+      onTap: controller.performAction,
+    );
+  }
+
+  Widget _buildSectionHeader(String label, Responsive rs) {
+    return Padding(
+      padding: EdgeInsets.only(
+        top: rs.spacing.lg,
+        bottom: rs.spacing.sm,
+        left: rs.spacing.xs,
+      ),
+      child: Row(
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.35),
+              fontSize: rs.isSmall ? 10 : 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 2,
+            ),
           ),
-        FileTypeBadge(fileType: metadata.fileType),
-        if (metadata.primaryTags.isNotEmpty)
-          TagBadges(tags: metadata.primaryTags, maxVisible: 3),
+          SizedBox(width: rs.spacing.md),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: Colors.white.withValues(alpha: 0.06),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStructuredDetails(Responsive rs, GameMetadataFull metadata) {
+    final labelStyle = TextStyle(
+      color: Colors.white.withValues(alpha: 0.4),
+      fontSize: rs.isSmall ? 10 : 12,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.5,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(rs.spacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(rs.radius.md),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          _detailRow(
+            rs,
+            label: 'Region',
+            labelStyle: labelStyle,
+            child: RegionBadge(region: metadata.region, fontSize: rs.isSmall ? 12 : 14),
+          ),
+          if (metadata.languages.isNotEmpty) ...[
+            Divider(color: Colors.white.withValues(alpha: 0.04), height: rs.spacing.md),
+            _detailRow(
+              rs,
+              label: 'Languages',
+              labelStyle: labelStyle,
+              child: LanguageBadges(
+                languages: metadata.languages,
+                maxVisible: rs.isSmall ? 4 : 6,
+              ),
+            ),
+          ],
+          Divider(color: Colors.white.withValues(alpha: 0.04), height: rs.spacing.md),
+          _detailRow(
+            rs,
+            label: 'Format',
+            labelStyle: labelStyle,
+            child: FileTypeBadge(fileType: metadata.fileType),
+          ),
+          if (metadata.primaryTags.isNotEmpty) ...[
+            Divider(color: Colors.white.withValues(alpha: 0.04), height: rs.spacing.md),
+            _detailRow(
+              rs,
+              label: 'Tags',
+              labelStyle: labelStyle,
+              child: TagBadges(tags: metadata.primaryTags, maxVisible: 4),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(
+    Responsive rs, {
+    required String label,
+    required TextStyle labelStyle,
+    required Widget child,
+  }) {
+    return Row(
+      children: [
+        SizedBox(
+          width: rs.isSmall ? 70 : 85,
+          child: Text(label, style: labelStyle),
+        ),
+        SizedBox(width: rs.spacing.sm),
+        Expanded(child: child),
       ],
     );
+  }
+
+  Widget _buildDownloadArea(
+    Responsive rs,
+    GameDetailState state,
+    GameDetailController controller,
+    bool isMultiRom,
+  ) {
+    final accentColor = widget.system.accentColor;
+
+    return Container(
+      padding: EdgeInsets.all(rs.spacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(rs.radius.md),
+        border: Border.all(
+          color: accentColor.withValues(alpha: 0.15),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.08),
+            blurRadius: 16,
+            spreadRadius: -2,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          _buildDownloadButton(state, controller, isMultiRom),
+          SizedBox(height: rs.spacing.xs),
+          Text(
+            _getButtonHintText(state, isMultiRom),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.25),
+              fontSize: rs.isSmall ? 9 : 10,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getButtonHintText(GameDetailState state, bool isMultiRom) {
+    if (state.isAddingToQueue) return '';
+    if (isMultiRom) return 'Press A to pick a version';
+    if (state.isVariantInstalled) return 'Press A to manage';
+    return 'Press A to download';
   }
 }
 
