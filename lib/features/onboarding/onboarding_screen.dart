@@ -473,8 +473,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     // Trigger RA sync after onboarding if RA was configured.
     // Deferred to let HomeView settle and avoid contention with config bootstrap.
+    // Note: no mounted check — syncNotifier and storage are captured above,
+    // and this callback doesn't access context or ref.
     Future.delayed(const Duration(seconds: 3), () {
-      if (!mounted) return;
       triggerRaSync(syncNotifier, storage);
     });
   }
