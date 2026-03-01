@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.3.0] — 2026-03-01
+
+### Added
+- **Console store-style game detail** — redesigned detail screen with structured layout, section headers, and download area inspired by digital storefronts
+- **IGDB metadata** — RomM games now display genre, developer, release year, game modes, and summary via a glassmorphic "About This Game" card (fetched from RomM's IGDB data)
+- **Description overlay** — full game summary accessible from the quick menu when metadata is available
+- **Variant picker overlay** — pressing A on multi-version games opens a dedicated picker with all variants, install status, and per-variant download/delete actions
+- **Game metadata database** — new `game_metadata` table (DB v8) stores IGDB metadata separately from game entries, surviving library re-syncs
+
+### Improved
+- **Quick menu consolidation** — Tags, Description, Filename toggle, and Achievements are now accessible from the quick menu instead of dedicated button shortcuts
+- **Detail screen layout** — portrait mode uses scrollable layout with adaptive cover aspect ratio; landscape uses two-column layout with expandable info card
+- **Download action button** — redesigned as a standalone widget with distinct states (download, delete, installed, adding, unavailable) and variant count badge
+
+### Internal
+- `GameMetadataInfo` model with `hasContent`, `genreList`, `averageRating` helpers
+- `gameMetadataProvider` (`FutureProvider.family`) for async metadata loading
+- `RommRom` extended to parse `summary`, `genres`, `companies`, `first_release_date`, `game_modes`, `average_rating`
+- `RommProvider.fetchGames()` saves metadata as fire-and-forget side effect
+- 194 new API service tests covering metadata parsing edge cases
+
+---
+
 ## [1.2.0] — 2026-02-27
 
 ### Added

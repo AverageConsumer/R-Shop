@@ -160,11 +160,15 @@ Games with the same name but different versions (e.g. USA, Europe, Japan) are gr
 
 ## Game Detail
 
-The detail screen shows a game's cover art, title, and metadata including region, language, genre, and year.
+The detail screen shows a game's cover art, title, system badge, and — for RomM sources — rich metadata including genre, developer, release year, and summary in an "About This Game" card.
+
+### About This Game
+
+When a game has IGDB metadata (available via RomM), a glassmorphic info card displays genre pills, developer, release year, and a short summary. Open the full description from the quick menu (Start > Description).
 
 ### Variants
 
-If multiple versions of a game exist (different regions, languages, or releases), they appear in a carousel. Use left/right on the D-pad to switch between variants.
+If multiple versions of a game exist (different regions, languages, or releases), pressing A opens a **variant picker overlay** listing all versions with their region, language, format, and install status. Navigate with D-pad up/down, press A to download or delete a specific variant, press B to close.
 
 ### RetroAchievements Info
 
@@ -174,20 +178,19 @@ If the game has a RetroAchievements match, an info section appears below the met
 
 | Action | Button | Condition |
 |--------|--------|-----------|
-| Download | A | Game not installed |
-| Delete | A | Game installed |
+| Download | A | Single variant, not installed |
+| Delete | A | Single variant, installed |
+| Pick Version | A | Multiple variants |
 | Favorite | Select | Toggle anytime |
-| Tag Info | Y | Show region/language metadata |
-| Full Filename | X | Toggle between clean title and raw filename |
-| Achievements | Start > Achievements | Game has RA match |
+| Quick Menu | Start | Tags, Description, Filename, Achievements, Download sources |
 
 ### Download
 
-Pressing A on an uninstalled game adds it to the download queue. The game begins downloading based on queue availability.
+Pressing A on an uninstalled single-variant game adds it to the download queue. For multi-variant games, A opens the variant picker where you can download individual versions.
 
 ### Delete
 
-Pressing A on an installed game opens a confirmation dialog. The dialog defaults to **Cancel** to prevent accidental deletion. Navigate to Delete and press A to confirm.
+Pressing A on an installed single-variant game opens a confirmation dialog. The dialog defaults to **Cancel** to prevent accidental deletion. For multi-variant games, select a variant in the picker and press A to delete it.
 
 ---
 
@@ -534,7 +537,7 @@ The PlayStation layout uses symbol buttons:
 
 **Game List:** Y opens search. X toggles filters. L1/R1 adjust columns.
 
-**Game Detail:** A downloads or deletes. Y shows tag info. X toggles filename display. Select favorites. Left/right switches variants.
+**Game Detail:** A downloads, deletes, or opens variant picker (multi-version). Select favorites. Start opens quick menu with Tags, Description, Filename toggle, and Achievements.
 
 **Library:** L2/R2 switch tabs. X cycles sort mode. Y opens search. L1/R1 adjust columns.
 
