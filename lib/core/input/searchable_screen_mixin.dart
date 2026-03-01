@@ -135,14 +135,9 @@ mixin SearchableScreenMixin<T extends ConsumerStatefulWidget>
     });
   }
 
-  /// Two-step back: if the text field is focused → unfocus only;
-  /// otherwise → close search entirely.
+  /// Close search entirely on B press — no intermediate unfocus step.
   void handleSearchBack() {
-    if (searchFieldNode.hasFocus) {
-      unfocusSearch();
-    } else {
-      closeSearch();
-    }
+    closeSearch();
   }
 
   void refocusSearchField() {
@@ -215,7 +210,7 @@ mixin SearchableScreenMixin<T extends ConsumerStatefulWidget>
       if (key == LogicalKeyboardKey.gameButtonB ||
           key == LogicalKeyboardKey.escape ||
           key == LogicalKeyboardKey.goBack) {
-        unfocusSearch();
+        closeSearch();
         return KeyEventResult.handled;
       }
     }
@@ -255,8 +250,7 @@ mixin SearchableScreenMixin<T extends ConsumerStatefulWidget>
     return ConsoleHud(
       a: aAction,
       b: HudAction(
-        _isSearchFocused ? 'Keyboard' : 'Close',
-        highlight: _isSearchFocused,
+        'Close',
         onTap: handleSearchBack,
       ),
     );

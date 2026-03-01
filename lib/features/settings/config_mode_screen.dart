@@ -138,7 +138,7 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
         .where((s) => s.raConsoleId != null)
         .toList();
     if (raSystems.isNotEmpty) {
-      ref.read(raSyncServiceProvider.notifier).syncAll(raSystems);
+      ref.read(raSyncServiceProvider.notifier).syncAll(raSystems, force: true);
     }
   }
 

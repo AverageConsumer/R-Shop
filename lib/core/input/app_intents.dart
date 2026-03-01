@@ -28,10 +28,6 @@ class AdjustColumnsIntent extends Intent {
   const AdjustColumnsIntent({required this.increase});
 }
 
-class InfoIntent extends Intent {
-  const InfoIntent();
-}
-
 class MenuIntent extends Intent {
   const MenuIntent();
 }

@@ -92,7 +92,6 @@ class _HomeViewState extends ConsumerState<HomeView>
         }),
         ConfirmIntent: ConfirmAction(ref, onConfirm: _navigateToCurrentSystem),
         SearchIntent: SearchAction(ref, onSearch: _openLibrarySearch),
-        InfoIntent: InfoAction(ref, onInfo: _openSettings),
         AdjustColumnsIntent: CallbackAction<AdjustColumnsIntent>(
           onInvoke: (intent) {
             if (intent.increase) { _zoomOut(); } else { _zoomIn(); }
@@ -125,7 +124,6 @@ class _HomeViewState extends ConsumerState<HomeView>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
-          screenFocusNode.requestFocus();
           ref.read(audioManagerProvider).startBgm();
         }
       });
@@ -424,7 +422,6 @@ class _HomeViewState extends ConsumerState<HomeView>
       QuickMenuItem(
         label: 'Settings',
         icon: Icons.settings_rounded,
-        shortcutHint: 'X',
         onSelect: _openSettings,
       ),
       if (hasDownloads) ...[

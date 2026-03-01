@@ -9,7 +9,6 @@ class VersionCarousel extends StatefulWidget {
   final SystemModel system;
   final int selectedIndex;
   final Map<int, bool> installedStatus;
-  final Set<String> favoriteFilenames;
   final FocusNode? parentFocusNode;
   final void Function(int index) onSelectionChanged;
 
@@ -19,7 +18,6 @@ class VersionCarousel extends StatefulWidget {
     required this.system,
     required this.selectedIndex,
     required this.installedStatus,
-    this.favoriteFilenames = const {},
     this.parentFocusNode,
     required this.onSelectionChanged,
   });
@@ -137,7 +135,6 @@ class _VersionCarouselState extends State<VersionCarousel> {
               isInstalled: isInstalled,
               isSelected: isSelected,
               isFocused: isSelected,
-              isFavorite: widget.favoriteFilenames.contains(variant.filename),
               onTap: () => widget.onSelectionChanged(index),
             ),
           );

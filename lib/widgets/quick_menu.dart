@@ -158,6 +158,7 @@ class _QuickMenuOverlayState extends ConsumerState<QuickMenuOverlay>
   static const _hintToButtonId = {
     'A': 'a', 'B': 'b', 'X': 'x', 'Y': 'y',
     'L': 'l', 'R': 'r', 'ZL': 'zl', 'ZR': 'zr',
+    '−': 'minus',
   };
 
   /// Returns the SVG asset path for a shortcut hint, or null if no SVG available.

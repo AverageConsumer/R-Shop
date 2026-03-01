@@ -12,7 +12,6 @@ class SingleVersionDisplay extends StatelessWidget {
   final bool isInstalled;
   final bool isSelected;
   final bool isFocused;
-  final bool isFavorite;
   final FocusNode? focusNode;
   final VoidCallback? onTap;
 
@@ -23,7 +22,6 @@ class SingleVersionDisplay extends StatelessWidget {
     required this.isInstalled,
     this.isSelected = false,
     this.isFocused = false,
-    this.isFavorite = false,
     this.focusNode,
     this.onTap,
   });
@@ -137,15 +135,6 @@ class SingleVersionDisplay extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                    ],
-                    if (isFavorite) ...[
-                      Icon(
-                        Icons.favorite_rounded,
-                        size: 14,
-                        color: Colors.redAccent.withValues(alpha: 0.8),
-                      ),
-                      const SizedBox(width: 8),
                     ],
                   ],
                 ),

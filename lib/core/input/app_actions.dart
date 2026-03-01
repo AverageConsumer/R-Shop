@@ -176,24 +176,6 @@ class AdjustColumnsAction extends Action<AdjustColumnsIntent> {
   }
 }
 
-class InfoAction extends Action<InfoIntent> {
-  final WidgetRef ref;
-  final VoidCallback? onInfo;
-
-  InfoAction(this.ref, {this.onInfo});
-
-  @override
-  bool isEnabled(InfoIntent intent) => _noOverlayActive(ref);
-
-  @override
-  Object? invoke(InfoIntent intent) {
-    if (!ref.read(inputDebouncerProvider).canPerformAction()) return null;
-
-    onInfo?.call();
-    return null;
-  }
-}
-
 class MenuAction extends Action<MenuIntent> {
   final WidgetRef ref;
   final VoidCallback? onMenu;
@@ -308,11 +290,7 @@ class AppShortcuts {
     const SingleActivator(LogicalKeyboardKey.bracketLeft, includeRepeats: false): const TabLeftIntent(),
     const SingleActivator(LogicalKeyboardKey.bracketRight, includeRepeats: false): const TabRightIntent(),
 
-    // Info (no repeat)
-    const SingleActivator(LogicalKeyboardKey.gameButtonX, includeRepeats: false): const InfoIntent(),
-
     // Favorite (no repeat)
-    const SingleActivator(LogicalKeyboardKey.gameButtonRight2, includeRepeats: false): const FavoriteIntent(),
     const SingleActivator(LogicalKeyboardKey.keyF, includeRepeats: false): const FavoriteIntent(),
   };
 }

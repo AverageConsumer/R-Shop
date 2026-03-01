@@ -34,6 +34,19 @@ class MainActivity : FlutterActivity() {
         Log.d(TAG, "MainActivity onCreate")
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            // Ensure the Flutter view receives D-pad/gamepad events immediately
+            // without needing an initial button press to "activate" the controller.
+            // Android doesn't give the content view input focus by default.
+            window.decorView.let { view ->
+                view.isFocusableInTouchMode = true
+                view.requestFocus()
+            }
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: io.flutter.embedding.engine.FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 

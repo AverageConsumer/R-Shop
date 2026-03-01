@@ -90,7 +90,11 @@ Future<void> persistMasteredStatus(
 /// Triggers RA sync if RA is configured and not already syncing.
 /// Safe to call multiple times — freshness cache and isSyncing guard prevent
 /// redundant work.
-void triggerRaSync(RaSyncService syncNotifier, StorageService storage) {
+void triggerRaSync(
+  RaSyncService syncNotifier,
+  StorageService storage, {
+  bool force = false,
+}) {
   if (!storage.getRaEnabled()) return;
   final apiKey = storage.getRaApiKey();
   if (apiKey == null || apiKey.isEmpty) return;
@@ -99,6 +103,6 @@ void triggerRaSync(RaSyncService syncNotifier, StorageService storage) {
       .where((s) => s.raConsoleId != null)
       .toList();
   if (raSystems.isNotEmpty) {
-    syncNotifier.syncAll(raSystems);
+    syncNotifier.syncAll(raSystems, force: force);
   }
 }

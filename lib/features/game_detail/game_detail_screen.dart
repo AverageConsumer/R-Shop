@@ -21,7 +21,6 @@ import '../../widgets/confirm_dialog.dart';
 import '../../widgets/console_notification.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/download_overlay.dart';
-import '../../widgets/installed_indicator.dart';
 import '../../widgets/quick_menu.dart';
 import '../game_list/widgets/dynamic_background.dart';
 import '../game_list/widgets/tinted_overlay.dart';
@@ -30,10 +29,9 @@ import 'achievements_screen.dart';
 import 'game_detail_controller.dart';
 import 'game_detail_state.dart';
 import 'widgets/cover_section.dart';
-import 'widgets/metadata_badges.dart' hide InstalledBadge;
+import 'widgets/metadata_badges.dart';
 import 'widgets/ra_info_section.dart';
 import 'widgets/tag_info_overlay.dart';
-import 'widgets/version_card.dart';
 import 'widgets/version_carousel.dart';
 
 class GameDetailScreen extends ConsumerStatefulWidget {
@@ -80,12 +78,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         ConfirmIntent: OverlayGuardedAction<ConfirmIntent>(ref,
           onInvoke: (_) { _handleConfirm(); return null; },
           isEnabledOverride: _dialogOrNoOverlay,
-        ),
-        InfoIntent: OverlayGuardedAction<InfoIntent>(ref,
-          onInvoke: (_) { _handleFilenameToggle(); return null; },
-        ),
-        SearchIntent: OverlayGuardedAction<SearchIntent>(ref,
-          onInvoke: (_) { _handleTagInfo(); return null; },
         ),
         NavigateIntent: OverlayGuardedAction<NavigateIntent>(ref,
           onInvoke: (intent) { _handleNavigate(intent.direction); return null; },
@@ -306,7 +298,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         QuickMenuItem(
           label: 'Tags',
           icon: Icons.label_rounded,
-          shortcutHint: 'Y',
           onSelect: _handleTagInfo,
         ),
       if (raMatch != null && raMatch.hasMatch && raMatch.raGameId != null)
@@ -318,7 +309,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       QuickMenuItem(
         label: controller.state.showFullFilename ? 'Show Title' : 'Show Filename',
         icon: Icons.text_fields_rounded,
-        shortcutHint: 'X',
         onSelect: _handleFilenameToggle,
       ),
       if (hasAlternatives && !controller.state.isVariantInstalled) ...[
@@ -478,8 +468,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final GameMetadataFull metadata =
         GameMetadata.parse(selectedVariant.filename);
     final isMultiRom = widget.variants.length > 1;
-    final favoriteFilenames = ref.watch(favoriteGamesProvider).toSet();
-    final isFavorite = favoriteFilenames.contains(controller.selectedVariant.filename);
+    final isFavorite = ref.watch(favoriteGamesProvider).contains(controller.selectedVariant.filename);
     final raMatches =
         ref.watch(raMatchesForSystemProvider(widget.system.id)).value ?? {};
     final raMatch = raMatches[selectedVariant.filename];
@@ -505,9 +494,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               bottom: false,
               child: rs.isPortrait
                   ? _buildPortraitLayout(rs, state, controller, metadata,
-                      isMultiRom, coverUrls, selectedVariant, isFavorite, favoriteFilenames, raMatch)
+                      isMultiRom, coverUrls, selectedVariant, isFavorite, raMatch)
                   : _buildLandscapeLayout(rs, state, controller, metadata,
-                      isMultiRom, coverUrls, selectedVariant, isFavorite, favoriteFilenames, raMatch),
+                      isMultiRom, coverUrls, selectedVariant, isFavorite, raMatch),
             ),
             _buildControls(state, metadata),
             if (showQuickMenu)
@@ -559,7 +548,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     List<String> coverUrls,
     GameItem selectedVariant,
     bool isFavorite,
-    Set<String> favoriteFilenames,
     RaMatchResult? raMatch,
   ) {
     return Padding(
@@ -581,6 +569,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               cachedUrl: selectedVariant.cachedCoverUrl,
               metadata: metadata,
               isFavorite: isFavorite,
+              isInstalled: state.isVariantInstalled,
               hasThumbnail: selectedVariant.hasThumbnail,
             ),
           ),
@@ -588,7 +577,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           Expanded(
             flex: isMultiRom ? 65 : 60,
             child:
-                _buildInfoSection(rs, state, controller, metadata, isMultiRom, isFavorite, favoriteFilenames, raMatch),
+                _buildInfoSection(rs, state, controller, metadata, isMultiRom, raMatch),
           ),
         ],
       ),
@@ -604,7 +593,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     List<String> coverUrls,
     GameItem selectedVariant,
     bool isFavorite,
-    Set<String> favoriteFilenames,
     RaMatchResult? raMatch,
   ) {
     return SingleChildScrollView(
@@ -622,13 +610,16 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               cachedUrl: selectedVariant.cachedCoverUrl,
               metadata: metadata,
               isFavorite: isFavorite,
+              isInstalled: state.isVariantInstalled,
               hasThumbnail: selectedVariant.hasThumbnail,
             ),
           ),
           SizedBox(height: rs.spacing.md),
           _buildTitleSection(rs, controller),
-          SizedBox(height: rs.spacing.sm),
-          _buildMetadataRow(rs, metadata),
+          if (!isMultiRom) ...[
+            SizedBox(height: rs.spacing.sm),
+            _buildSingleRomMetadata(rs, metadata),
+          ],
           if (raMatch != null && raMatch.hasMatch) ...[
             SizedBox(height: rs.spacing.md),
             RaInfoSection(
@@ -638,34 +629,16 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               onViewAchievements: () => _navigateToAchievements(raMatch),
             ),
           ],
-          SizedBox(height: rs.spacing.lg),
-          if (isMultiRom)
+          if (isMultiRom) ...[
+            SizedBox(height: rs.spacing.lg),
             VersionCarousel(
               variants: widget.variants,
               system: widget.system,
               selectedIndex: state.selectedIndex,
               installedStatus: state.installedStatus,
-              favoriteFilenames: favoriteFilenames,
               onSelectionChanged: (index) {
                 controller.selectVariant(index);
               },
-            )
-          else ...[
-            Text(
-              'VERSION INFO',
-              style: TextStyle(
-                color: Colors.grey.shade500,
-                fontSize: rs.isSmall ? 9 : 11,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.5,
-              ),
-            ),
-            SizedBox(height: rs.spacing.sm),
-            SingleVersionDisplay(
-              variant: controller.selectedVariant,
-              system: widget.system,
-              isInstalled: state.isVariantInstalled,
-              isFavorite: isFavorite,
             ),
           ],
           SizedBox(height: rs.spacing.xxl),
@@ -692,7 +665,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     if (showQuickMenu) return const SizedBox.shrink();
 
     return ConsoleHud(
-      dpad: widget.variants.length > 1 ? (label: '\u2191\u2193', action: 'Navigate') : null,
       a: HudAction(actionLabel, onTap: actionCallback),
       b: HudAction('Back', onTap: () => Navigator.pop(context)),
       start: HudAction('Menu', onTap: toggleQuickMenu),
@@ -705,16 +677,16 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     GameDetailController controller,
     GameMetadataFull metadata,
     bool isMultiRom,
-    bool isFavorite,
-    Set<String> favoriteFilenames,
     RaMatchResult? raMatch,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildTitleSection(rs, controller),
-        SizedBox(height: rs.spacing.md),
-        _buildMetadataRow(rs, metadata),
+        if (!isMultiRom) ...[
+          SizedBox(height: rs.spacing.md),
+          _buildSingleRomMetadata(rs, metadata),
+        ],
         if (raMatch != null && raMatch.hasMatch) ...[
           SizedBox(height: rs.spacing.md),
           RaInfoSection(
@@ -723,8 +695,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
             systemSlug: widget.system.id,
           ),
         ],
-        SizedBox(height: rs.spacing.lg),
-        if (isMultiRom)
+        if (isMultiRom) ...[
+          SizedBox(height: rs.spacing.lg),
           Expanded(
             child: SingleChildScrollView(
               child: VersionCarousel(
@@ -732,33 +704,14 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                 system: widget.system,
                 selectedIndex: state.selectedIndex,
                 installedStatus: state.installedStatus,
-                favoriteFilenames: favoriteFilenames,
                 onSelectionChanged: (index) {
                   controller.selectVariant(index);
                 },
-                ),
-            ),
-          )
-        else ...[
-          SizedBox(height: rs.spacing.sm),
-          Text(
-            'VERSION INFO',
-            style: TextStyle(
-              color: Colors.grey.shade500,
-              fontSize: rs.isSmall ? 9 : 11,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
+              ),
             ),
           ),
-          SizedBox(height: rs.spacing.sm),
-          SingleVersionDisplay(
-            variant: controller.selectedVariant,
-            system: widget.system,
-            isInstalled: state.isVariantInstalled,
-            isFavorite: isFavorite,
-          ),
+        ] else
           const Spacer(),
-        ],
       ],
     );
   }
@@ -843,15 +796,11 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
             ],
           ),
         ),
-        if (controller.state.isVariantInstalled) ...[
-          SizedBox(height: rs.spacing.xs),
-          const InstalledBadge(compact: false),
-        ],
       ],
     );
   }
 
-  Widget _buildMetadataRow(Responsive rs, GameMetadataFull metadata) {
+  Widget _buildSingleRomMetadata(Responsive rs, GameMetadataFull metadata) {
     final badgeFontSize = rs.isSmall ? 12.0 : 16.0;
 
     return Wrap(
@@ -865,6 +814,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
             maxVisible: rs.isSmall ? 3 : 4,
           ),
         FileTypeBadge(fileType: metadata.fileType),
+        if (metadata.primaryTags.isNotEmpty)
+          TagBadges(tags: metadata.primaryTags, maxVisible: 3),
       ],
     );
   }

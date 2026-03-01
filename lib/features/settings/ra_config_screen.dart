@@ -58,14 +58,21 @@ class _RaConfigScreenState extends ConsumerState<RaConfigScreen>
   String get routeId => 'ra_config';
 
   @override
+  Map<ShortcutActivator, Intent>? get additionalShortcuts => {
+        const SingleActivator(LogicalKeyboardKey.gameButtonX,
+                includeRepeats: false):
+            const MenuIntent(),
+      };
+
+  @override
   Map<Type, Action<Intent>> get screenActions => {
         BackIntent: _RaBackAction(
           [_usernameTextFocus, _apiKeyTextFocus],
           _goBack,
         ),
         SearchIntent: SearchAction(ref, onSearch: _testConnection),
+        MenuIntent: MenuAction(ref, onMenu: _clear),
         ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _save),
-        InfoIntent: InfoAction(ref, onInfo: _clear),
       };
 
   @override
@@ -182,7 +189,7 @@ class _RaConfigScreenState extends ConsumerState<RaConfigScreen>
     final raSystems = SystemModel.supportedSystems
         .where((s) => s.hasRetroAchievements)
         .toList();
-    syncService.syncAll(raSystems);
+    syncService.syncAll(raSystems, force: true);
   }
 
   Future<void> _clearCache() async {

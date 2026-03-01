@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../utils/game_metadata.dart';
+import '../../../widgets/installed_indicator.dart';
 import '../../../widgets/smart_cover_image.dart';
-import 'metadata_badges.dart';
 
 class CoverSection extends StatelessWidget {
   final GameItem game;
@@ -13,6 +13,7 @@ class CoverSection extends StatelessWidget {
   final String? cachedUrl;
   final GameMetadataFull metadata;
   final bool isFavorite;
+  final bool isInstalled;
   final bool hasThumbnail;
 
   const CoverSection({
@@ -23,6 +24,7 @@ class CoverSection extends StatelessWidget {
     this.cachedUrl,
     required this.metadata,
     this.isFavorite = false,
+    this.isInstalled = false,
     this.hasThumbnail = false,
   });
 
@@ -96,12 +98,21 @@ class CoverSection extends StatelessWidget {
                     ),
                   ),
                 ),
+              if (isInstalled)
+                const Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: InstalledLedStrip(
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(12),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        FileTypeBadge(fileType: metadata.fileType),
-        const SizedBox(height: 16),
       ],
     );
   }

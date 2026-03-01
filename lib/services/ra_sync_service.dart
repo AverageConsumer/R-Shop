@@ -59,7 +59,7 @@ class RaSyncService extends StateNotifier<RaSyncState> {
 
   /// Syncs RA game catalogs for all RA-enabled configured systems.
   /// Skips systems whose cache is still fresh (< 24h old).
-  Future<void> syncAll(List<SystemModel> systems) async {
+  Future<void> syncAll(List<SystemModel> systems, {bool force = false}) async {
     if (state.isSyncing) return;
 
     final apiKey = _storage.getRaApiKey();
@@ -69,6 +69,17 @@ class RaSyncService extends StateNotifier<RaSyncState> {
         systems.where((s) => s.raConsoleId != null).toList();
     if (raSystems.isEmpty) return;
 
+    // Outer gate: skip entire sync if last run was recent
+    if (!force) {
+      final lastSync = _storage.getRaLastSync();
+      if (lastSync != null &&
+          DateTime.now().difference(lastSync) < _freshnessDuration) {
+        debugPrint('RetroAchievements: last sync '
+            '${DateTime.now().difference(lastSync).inHours}h ago, skipping');
+        return;
+      }
+    }
+
     _isCancelled = false;
     state = RaSyncState(
       isSyncing: true,
@@ -77,6 +88,7 @@ class RaSyncService extends StateNotifier<RaSyncState> {
 
     try {
       // Phase 1: Fetch RA game catalogs from API
+      bool didFetchNew = false;
       for (var i = 0; i < raSystems.length; i++) {
         if (_isCancelled || !mounted) break;
 
@@ -94,27 +106,34 @@ class RaSyncService extends StateNotifier<RaSyncState> {
         }
 
         await _syncSystem(system.raConsoleId!, apiKey);
+        didFetchNew = true;
         // Yield to event loop between systems for UI responsiveness
         await Future.delayed(Duration.zero);
       }
 
-      // Phase 2: Match local games against RA catalog
-      for (final system in raSystems) {
-        if (_isCancelled || !mounted) break;
+      // Inner gate: skip Phase 2+3 if API data hasn't changed
+      if (!didFetchNew && !force) {
+        debugPrint('RetroAchievements: no new catalog data, '
+            'skipping matching & hash verification');
+      } else {
+        // Phase 2: Match local games against RA catalog
+        for (final system in raSystems) {
+          if (_isCancelled || !mounted) break;
 
-        state = state.copyWith(currentSystem: '${system.name} (matching)');
-        final localGames = await _db.getGames(system.id);
-        if (localGames.isNotEmpty) {
-          await matchGamesForSystem(
-            system.id,
-            system.raConsoleId!,
-            localGames,
-          );
+          state = state.copyWith(currentSystem: '${system.name} (matching)');
+          final localGames = await _db.getGames(system.id);
+          if (localGames.isNotEmpty) {
+            await matchGamesForSystem(
+              system.id,
+              system.raConsoleId!,
+              localGames,
+            );
+          }
         }
-      }
 
-      // Phase 3: Hash-verify installed ROMs (upgrades nameMatch → hashVerified)
-      await _hashVerifyInstalled(raSystems, apiKey);
+        // Phase 3: Hash-verify installed ROMs (upgrades nameMatch → hashVerified)
+        await _hashVerifyInstalled(raSystems, apiKey);
+      }
 
       await _storage.setRaLastSync(DateTime.now());
     } catch (e) {

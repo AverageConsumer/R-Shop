@@ -94,13 +94,20 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
   String get routeId => 'romm_config';
 
   @override
+  Map<ShortcutActivator, Intent>? get additionalShortcuts => {
+        const SingleActivator(LogicalKeyboardKey.gameButtonX,
+                includeRepeats: false):
+            const MenuIntent(),
+      };
+
+  @override
   Map<Type, Action<Intent>> get screenActions => {
         BackIntent: _RommBackAction(
           [_urlTextFocus, _apiKeyTextFocus, _userTextFocus, _passTextFocus],
           _goBack,
         ),
         SearchIntent: SearchAction(ref, onSearch: _testConnection),
-        InfoIntent: InfoAction(ref, onInfo: _clear),
+        MenuIntent: MenuAction(ref, onMenu: _clear),
         ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: _save),
       };
 

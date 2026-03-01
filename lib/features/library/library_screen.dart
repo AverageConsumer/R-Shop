@@ -172,12 +172,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         ),
         TabLeftIntent: TabLeftAction(ref, onTabLeft: _prevTab),
         TabRightIntent: TabRightAction(ref, onTabRight: _nextTab),
-        InfoIntent: CallbackAction<InfoIntent>(
-          onInvoke: (_) {
-            _cycleSortMode();
-            return null;
-          },
-        ),
         FavoriteIntent: OverlayGuardedAction<FavoriteIntent>(ref,
           onInvoke: (_) { _handleFavorite(); return null; },
         ),
@@ -917,6 +911,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     final shelf = _activeShelf;
     return [
       QuickMenuItem(
+        label: 'Zoom In',
+        icon: Icons.zoom_in_rounded,
+        shortcutHint: 'L',
+        onSelect: () => _adjustColumns(true),
+      ),
+      QuickMenuItem(
+        label: 'Zoom Out',
+        icon: Icons.zoom_out_rounded,
+        shortcutHint: 'R',
+        onSelect: () => _adjustColumns(false),
+      ),
+      QuickMenuItem(
         label: 'Search',
         icon: Icons.search_rounded,
         shortcutHint: 'Y',
@@ -935,7 +941,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       QuickMenuItem(
         label: sortLabel,
         icon: Icons.sort_rounded,
-        shortcutHint: 'X',
         onSelect: _cycleSortMode,
       ),
       // --- Shelf management ---

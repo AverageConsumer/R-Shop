@@ -10,6 +10,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/screen_layout.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
+import '../../providers/game_providers.dart';
 import '../../widgets/download_overlay.dart';
 import '../../services/cover_preload_service.dart';
 import '../../services/database_service.dart';
@@ -78,7 +79,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           _exitSettings();
           return null;
         }),
-        InfoIntent: InfoAction(ref, onInfo: _showResetDialog),
         ToggleOverlayIntent:
             ToggleOverlayAction(ref, onToggle: toggleQuickMenu),
         TabLeftIntent: TabLeftAction(ref, onTabLeft: _prevTab),
@@ -266,6 +266,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       await GameCoverCacheManager.instance.emptyCache();
       FailedUrlsCache.instance.clear();
       ref.invalidate(onboardingControllerProvider);
+      ref.invalidate(bootstrappedConfigProvider);
+      ref.invalidate(hideEmptyConsolesProvider);
+      ref.invalidate(favoriteGamesProvider);
       _hideResetDialog();
       widget.onResetOnboarding?.call();
     } catch (e) {
@@ -400,22 +403,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final hasDownloads = ref.read(hasQueueItemsProvider);
     return [
       QuickMenuItem(
-        label: 'Prev Tab',
-        icon: Icons.chevron_left_rounded,
-        shortcutHint: 'ZL',
+        label: 'Previous Tab',
+        icon: Icons.arrow_back_rounded,
+        shortcutHint: 'L',
         onSelect: _prevTab,
       ),
       QuickMenuItem(
         label: 'Next Tab',
-        icon: Icons.chevron_right_rounded,
-        shortcutHint: 'ZR',
+        icon: Icons.arrow_forward_rounded,
+        shortcutHint: 'R',
         onSelect: _nextTab,
       ),
       null,
       QuickMenuItem(
         label: 'Reset App',
         icon: Icons.restart_alt_rounded,
-        shortcutHint: 'X',
         onSelect: _showResetDialog,
       ),
       if (hasDownloads)
