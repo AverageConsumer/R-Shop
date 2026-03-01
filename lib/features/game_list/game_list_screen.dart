@@ -414,7 +414,8 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final state = _controller.state;
     final idx = _focusManager.selectedIndex;
     final variants = state.filteredGroupedGames[state.filteredGroups[idx]];
-    final game = variants!.first;
+    if (variants == null || variants.isEmpty) return false;
+    final game = variants.first;
     return shelves.any((s) => !s.containsGame(game.filename, game.displayName, widget.system.id));
   }
 
