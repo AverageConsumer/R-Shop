@@ -20,13 +20,19 @@ class FtpProvider implements SourceProvider {
 
   String get _remotePath => config.path ?? '/';
 
+  /// Returns true if a name contains path traversal sequences.
+  @visibleForTesting
+  static bool isTraversalName(String name) {
+    return name.contains('..') || name.contains('/') || name.contains('\\');
+  }
+
   // Matches hostname, IPv4, or bracketed IPv6
   static final _hostPattern = RegExp(
     r'^([a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?$'
     r'|'
     r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
     r'|'
-    r'^\[[:0-9a-fA-F]+\]$',
+    r'^\[[0-9a-fA-F]*:[0-9a-fA-F:.]*[0-9a-fA-F](%[a-zA-Z0-9._~-]+)?\]$',
   );
 
   FTPConnect _createClient() {
@@ -113,6 +119,10 @@ class FtpProvider implements SourceProvider {
 
     for (final entry in entries) {
       final name = entry.name;
+      if (isTraversalName(name)) {
+        debugPrint('FtpProvider: skipping suspicious entry: $name');
+        continue;
+      }
       if (entry.type == FTPEntryType.file) {
         if (!SystemModel.isGameFile(name.toLowerCase())) continue;
         final filePath =

@@ -2,7 +2,7 @@ import '../models/config/provider_config.dart';
 import 'game_item.dart';
 import 'system_model.dart';
 
-enum DownloadItemStatus {
+enum DownloadStatus {
   queued,
   downloading,
   extracting,
@@ -19,7 +19,7 @@ class DownloadItem {
   final String targetFolder;
   final DateTime addedAt;
 
-  final DownloadItemStatus status;
+  final DownloadStatus status;
   final double progress;
   final int receivedBytes;
   final int? totalBytes;
@@ -34,7 +34,7 @@ class DownloadItem {
     required this.system,
     required this.targetFolder,
     DateTime? addedAt,
-    this.status = DownloadItemStatus.queued,
+    this.status = DownloadStatus.queued,
     this.progress = 0.0,
     this.receivedBytes = 0,
     this.totalBytes,
@@ -54,18 +54,18 @@ class DownloadItem {
 
   String get displayText {
     switch (status) {
-      case DownloadItemStatus.queued:
+      case DownloadStatus.queued:
         if (retryCount > 0) return 'Retrying ($retryCount/3)...';
         return 'Queued';
-      case DownloadItemStatus.extracting:
+      case DownloadStatus.extracting:
         return 'Extracting...';
-      case DownloadItemStatus.moving:
+      case DownloadStatus.moving:
         return 'Moving...';
-      case DownloadItemStatus.completed:
+      case DownloadStatus.completed:
         return 'Completed';
-      case DownloadItemStatus.cancelled:
+      case DownloadStatus.cancelled:
         return 'Cancelled';
-      case DownloadItemStatus.error:
+      case DownloadStatus.error:
         return error ?? 'Error';
       default:
         if (totalBytes != null && totalBytes! > 0) {
@@ -86,21 +86,21 @@ class DownloadItem {
   }
 
   bool get isActive =>
-      status == DownloadItemStatus.downloading ||
-      status == DownloadItemStatus.extracting ||
-      status == DownloadItemStatus.moving;
+      status == DownloadStatus.downloading ||
+      status == DownloadStatus.extracting ||
+      status == DownloadStatus.moving;
 
-  bool get isComplete => status == DownloadItemStatus.completed;
+  bool get isComplete => status == DownloadStatus.completed;
 
-  bool get isFailed => status == DownloadItemStatus.error;
+  bool get isFailed => status == DownloadStatus.error;
 
-  bool get isCancelled => status == DownloadItemStatus.cancelled;
+  bool get isCancelled => status == DownloadStatus.cancelled;
 
   bool get isFinished => isComplete || isFailed || isCancelled;
 
   DownloadItem copyWith({
     GameItem? game,
-    DownloadItemStatus? status,
+    DownloadStatus? status,
     double? progress,
     int? receivedBytes,
     int? totalBytes,
@@ -149,17 +149,17 @@ class DownloadItem {
     };
   }
 
-  static DownloadItemStatus _parseStatus(dynamic value) {
+  static DownloadStatus _parseStatus(dynamic value) {
     if (value is String) {
-      return DownloadItemStatus.values.firstWhere(
+      return DownloadStatus.values.firstWhere(
         (e) => e.name == value,
-        orElse: () => DownloadItemStatus.queued,
+        orElse: () => DownloadStatus.queued,
       );
     }
-    if (value is int && value < DownloadItemStatus.values.length) {
-      return DownloadItemStatus.values[value];
+    if (value is int && value < DownloadStatus.values.length) {
+      return DownloadStatus.values[value];
     }
-    return DownloadItemStatus.queued;
+    return DownloadStatus.queued;
   }
 
   factory DownloadItem.fromJson(Map<String, dynamic> json, SystemModel system) {

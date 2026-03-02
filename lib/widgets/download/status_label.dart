@@ -49,19 +49,19 @@ class StatusLabel extends StatelessWidget {
 
   (String, Color, IconData) _getInfo() {
     switch (item.status) {
-      case DownloadItemStatus.downloading:
+      case DownloadStatus.downloading:
         return ('Downloading...', Colors.green, Icons.arrow_downward_rounded);
-      case DownloadItemStatus.extracting:
+      case DownloadStatus.extracting:
         return ('Extracting...', Colors.amber, Icons.unarchive_rounded);
-      case DownloadItemStatus.moving:
+      case DownloadStatus.moving:
         return ('Installing...', Colors.amber, Icons.drive_file_move_rounded);
-      case DownloadItemStatus.queued:
+      case DownloadStatus.queued:
         return ('Waiting...', Colors.white38, Icons.schedule_rounded);
-      case DownloadItemStatus.completed:
+      case DownloadStatus.completed:
         return ('Complete', Colors.green, Icons.check_circle_rounded);
-      case DownloadItemStatus.cancelled:
+      case DownloadStatus.cancelled:
         return ('Cancelled', Colors.grey, Icons.cancel_rounded);
-      case DownloadItemStatus.error:
+      case DownloadStatus.error:
         return ('Failed', Colors.red, Icons.error_rounded);
     }
   }

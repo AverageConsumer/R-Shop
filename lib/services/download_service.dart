@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import '../models/download_item.dart';
 import '../models/game_item.dart';
 import '../models/system_model.dart';
 import '../utils/file_utils.dart';
@@ -14,16 +15,6 @@ import 'download_handle.dart';
 import 'native_smb_service.dart';
 import 'provider_factory.dart';
 import 'rom_manager.dart';
-
-enum DownloadStatus {
-  idle,
-  downloading,
-  extracting,
-  moving,
-  completed,
-  error,
-  cancelled,
-}
 
 class DownloadProgress {
   final DownloadStatus status;

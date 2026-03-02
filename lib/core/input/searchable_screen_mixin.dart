@@ -248,6 +248,7 @@ mixin SearchableScreenMixin<T extends ConsumerStatefulWidget>
   /// Returns the HUD shown while search is active.
   Widget buildSearchHud({required HudAction aAction}) {
     return ConsoleHud(
+      dpad: isSearchFieldFocused ? (label: '↓', action: 'Grid') : null,
       a: aAction,
       b: HudAction(
         'Close',

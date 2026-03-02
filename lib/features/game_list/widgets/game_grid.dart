@@ -117,7 +117,7 @@ class _GameGridState extends State<GameGrid> {
     final rs = context.rs;
 
     if (widget.filteredGroups.isEmpty) {
-      final (icon, message) = _emptyStateContent();
+      final (icon, message, hint) = _emptyStateContent();
       return Center(
         child: Container(
           padding: EdgeInsets.all(rs.spacing.xl),
@@ -145,6 +145,17 @@ class _GameGridState extends State<GameGrid> {
                 ),
                 textAlign: TextAlign.center,
               ),
+              if (hint != null) ...[
+                SizedBox(height: rs.spacing.sm),
+                Text(
+                  hint,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    fontSize: rs.isSmall ? 11 : 13,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ],
           ),
         ),
@@ -180,17 +191,17 @@ class _GameGridState extends State<GameGrid> {
     );
   }
 
-  (IconData, String) _emptyStateContent() {
+  (IconData, String, String?) _emptyStateContent() {
     if (widget.searchQuery.isNotEmpty) {
-      return (Icons.search_off, "No games match '${widget.searchQuery}'");
+      return (Icons.search_off, "No games match '${widget.searchQuery}'", 'Try a shorter search term');
     }
     if (widget.hasActiveFilters) {
-      return (Icons.filter_list_off, 'No games match current filters');
+      return (Icons.filter_list_off, 'No games match current filters', 'Change or reset filters in the menu');
     }
     if (widget.isLocalOnly) {
-      return (Icons.folder_open, 'No ROMs found in ${widget.targetFolder}');
+      return (Icons.folder_open, 'No ROMs found in ${widget.targetFolder}', 'Add ROM files to this folder and refresh');
     }
-    return (Icons.cloud_off, 'Could not load games \u2014 check your connection');
+    return (Icons.cloud_off, 'Could not load games', 'Check your connection and try again');
   }
 
   Widget _buildItem(BuildContext context, int index) {
@@ -236,28 +247,155 @@ class _GameGridState extends State<GameGrid> {
   }
 }
 
-class GameGridLoading extends StatelessWidget {
+class GameGridLoading extends StatefulWidget {
   final Color accentColor;
+  final int crossAxisCount;
 
-  const GameGridLoading({super.key, required this.accentColor});
+  const GameGridLoading({
+    super.key,
+    required this.accentColor,
+    required this.crossAxisCount,
+  });
+
+  @override
+  State<GameGridLoading> createState() => _GameGridLoadingState();
+}
+
+class _GameGridLoadingState extends State<GameGridLoading>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shimmerController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _shimmerController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
-    final fontSize = rs.isSmall ? 12.0 : 14.0;
+    final spacing = rs.isSmall ? 10.0 : 16.0;
+    final borderRadius = rs.isSmall ? 8.0 : 10.0;
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(color: accentColor),
-          SizedBox(height: rs.spacing.md),
-          Text(
-            'Loading Games...',
-            style: TextStyle(color: Colors.grey[500], fontSize: fontSize),
-          ),
-        ],
+    return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.only(
+        left: rs.spacing.lg,
+        right: rs.spacing.lg,
+        top: rs.spacing.md,
+        bottom: rs.isPortrait ? 80 : 100,
       ),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: widget.crossAxisCount,
+        mainAxisSpacing: spacing,
+        crossAxisSpacing: spacing,
+        childAspectRatio: 1.0,
+      ),
+      itemCount: widget.crossAxisCount * 3,
+      itemBuilder: (context, index) {
+        return AnimatedBuilder(
+          animation: _shimmerController,
+          builder: (context, child) {
+            final shimmerValue = _shimmerController.value;
+            final begin = Alignment.lerp(
+              const Alignment(-1.5, -0.3),
+              const Alignment(0.5, -0.1),
+              shimmerValue,
+            )!;
+            final end = Alignment.lerp(
+              const Alignment(-0.5, 0.1),
+              const Alignment(1.5, 0.3),
+              shimmerValue,
+            )!;
+
+            return Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(borderRadius),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.05),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(borderRadius - 1),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Shimmer sweep
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: begin,
+                          end: end,
+                          colors: [
+                            Colors.transparent,
+                            Colors.white.withValues(alpha: 0.06),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
+                      ),
+                    ),
+                    // Bottom title placeholder
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 40,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Colors.black87],
+                          ),
+                        ),
+                        padding: const EdgeInsets.fromLTRB(8, 12, 8, 6),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            FractionallySizedBox(
+                              widthFactor: 0.6,
+                              child: Container(
+                                height: rs.isSmall ? 8 : 10,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            FractionallySizedBox(
+                              widthFactor: 0.35,
+                              child: Container(
+                                height: rs.isSmall ? 6 : 8,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.05),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

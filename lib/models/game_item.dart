@@ -85,29 +85,10 @@ class GameItem {
     return games.map((game) {
       final pc = game.providerConfig;
       if (pc == null || pc.auth != null) return game;
-      final match = _findMatchingProvider(pc, providers);
+      final match = pc.findMatchIn(providers);
       if (match?.auth == null) return game;
       return game.copyWith(providerConfig: pc.copyWith(auth: match!.auth));
     }).toList();
-  }
-
-  static ProviderConfig? _findMatchingProvider(
-    ProviderConfig target,
-    List<ProviderConfig> providers,
-  ) {
-    for (final p in providers) {
-      if (p.type != target.type) continue;
-      switch (target.type) {
-        case ProviderType.web:
-        case ProviderType.romm:
-          if (p.url == target.url) return p;
-        case ProviderType.smb:
-          if (p.host == target.host && p.share == target.share) return p;
-        case ProviderType.ftp:
-          if (p.host == target.host) return p;
-      }
-    }
-    return null;
   }
 
   static String cleanDisplayName(String filename) {

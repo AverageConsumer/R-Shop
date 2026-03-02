@@ -601,7 +601,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
           ? 'Cancel'
           : targetItem.isFailed
               ? 'Retry'
-              : targetItem.status == DownloadItemStatus.queued
+              : targetItem.status == DownloadStatus.queued
                   ? 'Remove'
                   : 'Clear';
       aAction = HudAction(label, onTap: () => _performAction(targetItem));
@@ -861,7 +861,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
       ref.read(downloadQueueManagerProvider).cancelDownload(item.id);
     } else if (item.isFailed) {
       ref.read(downloadQueueManagerProvider).retryDownload(item.id);
-    } else if (item.status == DownloadItemStatus.queued) {
+    } else if (item.status == DownloadStatus.queued) {
       ref.read(downloadQueueManagerProvider).removeDownload(item.id);
     } else if (item.isFinished) {
       ref.read(downloadQueueManagerProvider).removeDownload(item.id);

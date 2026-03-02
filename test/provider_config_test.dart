@@ -389,4 +389,277 @@ void main() {
       expect(copy.path, '/roms');
     });
   });
+
+  // ─── needsAuth ──────────────────────────────────────────────────
+
+  group('ProviderConfig needsAuth', () {
+    test('returns true when auth is null', () {
+      const config = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'https://romm.local',
+      );
+      expect(config.needsAuth, isTrue);
+    });
+
+    test('returns true when auth has only empty strings', () {
+      const config = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'https://romm.local',
+        auth: AuthConfig(user: '', pass: '', apiKey: ''),
+      );
+      expect(config.needsAuth, isTrue);
+    });
+
+    test('returns true when auth has only domain (no actual credentials)', () {
+      const config = ProviderConfig(
+        type: ProviderType.smb,
+        priority: 1,
+        host: 'nas',
+        share: 'roms',
+        auth: AuthConfig(domain: 'WORKGROUP'),
+      );
+      expect(config.needsAuth, isTrue);
+    });
+
+    test('returns false when apiKey is set', () {
+      const config = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'https://romm.local',
+        auth: AuthConfig(apiKey: 'key123'),
+      );
+      expect(config.needsAuth, isFalse);
+    });
+
+    test('returns false when user and pass are set', () {
+      const config = ProviderConfig(
+        type: ProviderType.ftp,
+        priority: 1,
+        host: 'ftp.local',
+        auth: AuthConfig(user: 'alice', pass: 'secret'),
+      );
+      expect(config.needsAuth, isFalse);
+    });
+
+    test('returns false when only user is set', () {
+      const config = ProviderConfig(
+        type: ProviderType.smb,
+        priority: 1,
+        host: 'nas',
+        share: 'roms',
+        auth: AuthConfig(user: 'bob'),
+      );
+      expect(config.needsAuth, isFalse);
+    });
+  });
+
+  // ─── findMatchIn ─────────────────────────────────────────────────
+
+  group('ProviderConfig findMatchIn', () {
+    final providers = [
+      const ProviderConfig(
+        type: ProviderType.web,
+        priority: 1,
+        url: 'https://roms.example.com',
+        auth: AuthConfig(user: 'admin', pass: 'secret'),
+      ),
+      const ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'https://romm.local:8080',
+        auth: AuthConfig(apiKey: 'key123'),
+      ),
+      const ProviderConfig(
+        type: ProviderType.smb,
+        priority: 2,
+        host: '192.168.1.100',
+        share: 'roms',
+        auth: AuthConfig(user: 'bob', pass: 'pw'),
+      ),
+      const ProviderConfig(
+        type: ProviderType.ftp,
+        priority: 3,
+        host: 'ftp.example.com',
+        auth: AuthConfig(user: 'anon', pass: 'anon'),
+      ),
+    ];
+
+    test('matches web provider by URL', () {
+      const target = ProviderConfig(
+        type: ProviderType.web,
+        priority: 1,
+        url: 'https://roms.example.com',
+      );
+      final match = target.findMatchIn(providers);
+      expect(match, isNotNull);
+      expect(match!.auth!.user, 'admin');
+    });
+
+    test('matches romm provider by URL', () {
+      const target = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'https://romm.local:8080',
+      );
+      final match = target.findMatchIn(providers);
+      expect(match, isNotNull);
+      expect(match!.auth!.apiKey, 'key123');
+    });
+
+    test('matches SMB provider by host and share', () {
+      const target = ProviderConfig(
+        type: ProviderType.smb,
+        priority: 1,
+        host: '192.168.1.100',
+        share: 'roms',
+      );
+      final match = target.findMatchIn(providers);
+      expect(match, isNotNull);
+      expect(match!.auth!.user, 'bob');
+    });
+
+    test('matches FTP provider by host', () {
+      const target = ProviderConfig(
+        type: ProviderType.ftp,
+        priority: 1,
+        host: 'ftp.example.com',
+      );
+      final match = target.findMatchIn(providers);
+      expect(match, isNotNull);
+      expect(match!.auth!.user, 'anon');
+    });
+
+    test('returns null when no match found', () {
+      const target = ProviderConfig(
+        type: ProviderType.web,
+        priority: 1,
+        url: 'https://unknown.com',
+      );
+      expect(target.findMatchIn(providers), isNull);
+    });
+
+    test('returns null on type mismatch despite same URL', () {
+      const target = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'https://roms.example.com',
+      );
+      expect(target.findMatchIn(providers), isNull);
+    });
+
+    test('SMB does not match on host alone without share', () {
+      const target = ProviderConfig(
+        type: ProviderType.smb,
+        priority: 1,
+        host: '192.168.1.100',
+        share: 'different_share',
+      );
+      expect(target.findMatchIn(providers), isNull);
+    });
+
+    test('returns null for empty provider list', () {
+      const target = ProviderConfig(
+        type: ProviderType.web,
+        priority: 1,
+        url: 'https://roms.example.com',
+      );
+      expect(target.findMatchIn([]), isNull);
+    });
+  });
+
+  // ─── insecureWarning ──────────────────────────────────────────────
+
+  group('ProviderConfig insecureWarning', () {
+    test('returns null for HTTPS URL', () {
+      const config = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'https://romm.example.com',
+        auth: AuthConfig(apiKey: 'key123'),
+      );
+      expect(config.insecureWarning, isNull);
+    });
+
+    test('returns null for HTTP on private network', () {
+      const config = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'http://192.168.1.50:8080',
+        auth: AuthConfig(apiKey: 'key123'),
+      );
+      expect(config.insecureWarning, isNull);
+    });
+
+    test('returns warning for public HTTP with credentials', () {
+      const config = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'http://romm.example.com',
+        auth: AuthConfig(apiKey: 'key123'),
+      );
+      expect(config.insecureWarning, isNotNull);
+      expect(config.insecureWarning, contains('unencrypted'));
+    });
+
+    test('returns null for public HTTP without credentials', () {
+      const config = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'http://romm.example.com',
+      );
+      expect(config.insecureWarning, isNull);
+    });
+
+    test('returns null for FTP type', () {
+      const config = ProviderConfig(
+        type: ProviderType.ftp,
+        priority: 1,
+        host: 'ftp.example.com',
+        auth: AuthConfig(user: 'user', pass: 'pass'),
+      );
+      expect(config.insecureWarning, isNull);
+    });
+
+    test('returns null for localhost HTTP', () {
+      const config = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'http://localhost:8080',
+        auth: AuthConfig(user: 'admin', pass: 'pass'),
+      );
+      expect(config.insecureWarning, isNull);
+    });
+
+    test('returns null for 10.x.x.x private network', () {
+      const config = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'http://10.0.0.1:3000',
+        auth: AuthConfig(apiKey: 'key'),
+      );
+      expect(config.insecureWarning, isNull);
+    });
+
+    test('returns null for 127.0.0.1', () {
+      const config = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'http://127.0.0.1:8080',
+        auth: AuthConfig(apiKey: 'key'),
+      );
+      expect(config.insecureWarning, isNull);
+    });
+
+    test('returns warning for web type with public HTTP', () {
+      const config = ProviderConfig(
+        type: ProviderType.web,
+        priority: 1,
+        url: 'http://public.example.com/roms',
+        auth: AuthConfig(user: 'user'),
+      );
+      expect(config.insecureWarning, isNotNull);
+    });
+  });
 }

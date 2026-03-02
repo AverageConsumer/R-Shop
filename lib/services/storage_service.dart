@@ -34,6 +34,7 @@ class StorageService {
   static const _raEnabledKey = 'ra_enabled';
   static const _raLastSyncKey = 'ra_last_sync';
   static const _hideEmptyConsolesKey = 'hide_empty_consoles';
+  static const _startHintShownKey = 'start_hint_shown';
   SharedPreferences? _prefs;
   final FlutterSecureStorage _secureStorage;
 
@@ -128,6 +129,16 @@ class StorageService {
   Future<void> setOnboardingCompleted(bool completed) async {
     _ensureInitialized();
     await _prefs!.setBool(_onboardingCompletedKey, completed);
+  }
+
+  bool getStartHintShown() {
+    _ensureInitialized();
+    return _prefs!.getBool(_startHintShownKey) ?? false;
+  }
+
+  Future<void> setStartHintShown() async {
+    _ensureInitialized();
+    await _prefs!.setBool(_startHintShownKey, true);
   }
 
   Future<void> resetOnboarding() async {

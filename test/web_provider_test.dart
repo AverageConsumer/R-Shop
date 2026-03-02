@@ -129,6 +129,23 @@ void main() {
         expect(games[0].filename, 'legit.gba');
       });
 
+      test('skips URL-encoded path traversal attempts', () async {
+        const config = ProviderConfig(type: ProviderType.web, priority: 1, url: 'https://example.com');
+        final provider = WebProvider(config, dio: dio);
+
+        adapter.onGet('https://example.com/', statusCode: 200, body: '''
+<html><body>
+<a href="%2e%2e/%2e%2e/etc/passwd">encoded traversal</a>
+<a href="%2e%2e%2fgame.gba">encoded dotdot slash</a>
+<a href="legit.gba">legit.gba</a>
+</body></html>
+''');
+
+        final games = await provider.fetchGames(systemConfig);
+        expect(games.length, 1);
+        expect(games[0].filename, 'legit.gba');
+      });
+
       test('skips oversized hrefs', () async {
         const config = ProviderConfig(type: ProviderType.web, priority: 1, url: 'https://example.com');
         final provider = WebProvider(config, dio: dio);

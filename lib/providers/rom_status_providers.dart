@@ -31,7 +31,7 @@ final romWatcherProvider = Provider<void>((ref) {
   // Seed with already-completed items to avoid false triggers on init
   final initialQueue = ref.read(downloadQueueManagerProvider).state.queue;
   for (final item in initialQueue) {
-    if (item.status == DownloadItemStatus.completed) {
+    if (item.status == DownloadStatus.completed) {
       seenCompleted.add(item.id);
     }
   }
@@ -42,7 +42,7 @@ final romWatcherProvider = Provider<void>((ref) {
 
     for (final item in next.state.queue) {
       currentIds.add(item.id);
-      if (item.status == DownloadItemStatus.completed &&
+      if (item.status == DownloadStatus.completed &&
           seenCompleted.add(item.id)) {
         foundNew = true;
       }

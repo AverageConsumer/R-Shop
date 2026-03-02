@@ -161,7 +161,17 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     } else {
       // Reload controller from freshly imported config
       ref.read(onboardingControllerProvider.notifier).loadFromConfig(result.config!);
-      showConsoleNotification(context, message: 'Config imported!', isError: false);
+      final count = result.config!.systems
+          .expand((s) => s.providers)
+          .where((p) => p.needsAuth)
+          .length;
+      showConsoleNotification(
+        context,
+        message: count > 0
+            ? 'Config imported — $count provider${count > 1 ? 's' : ''} need credentials'
+            : 'Config imported!',
+        isError: false,
+      );
     }
   }
 

@@ -13,6 +13,7 @@ import '../../providers/app_providers.dart';
 import '../../services/config_storage_service.dart';
 import '../../services/local_folder_matcher.dart';
 import '../../services/provider_factory.dart';
+import '../../services/remote_folder_scanner.dart';
 import '../../services/rom_folder_service.dart';
 import '../../services/ra_api_service.dart';
 import '../../services/romm_api_service.dart';
@@ -57,20 +58,31 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         _autoDetectRommRomFolder();
         return;
       }
-      // folder → skip localSetup, go directly to consoleSetup
+      // folder → skip localSetup, go to remoteSetup
       if (rs != null && rs.subStep == RommSetupSubStep.folder) {
         _autoConfigureRommSystems();
         state = state.copyWith(
-          currentStep: OnboardingStep.consoleSetup,
-          canProceed: state.configuredSystems.isNotEmpty,
+          currentStep: OnboardingStep.remoteSetup,
+          remoteSetupState: state.remoteSetupState ?? const RemoteSetupState(),
+          canProceed: true,
         );
         return;
       }
     }
 
-    // localSetup → consoleSetup
+    // localSetup → remoteSetup
     if (state.currentStep == OnboardingStep.localSetup) {
       _autoConfigureLocalSystems();
+      state = state.copyWith(
+        currentStep: OnboardingStep.remoteSetup,
+        remoteSetupState: state.remoteSetupState ?? const RemoteSetupState(),
+        canProceed: true,
+      );
+      return;
+    }
+
+    // remoteSetup → consoleSetup
+    if (state.currentStep == OnboardingStep.remoteSetup) {
       state = state.copyWith(
         currentStep: OnboardingStep.consoleSetup,
         canProceed: state.configuredSystems.isNotEmpty,
@@ -108,6 +120,15 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           canProceed: false,
         );
         _autoDetectRomFolder();
+        return;
+      }
+
+      if (nextStepValue == OnboardingStep.remoteSetup) {
+        state = state.copyWith(
+          currentStep: nextStepValue,
+          remoteSetupState: state.remoteSetupState ?? const RemoteSetupState(),
+          canProceed: true,
+        );
         return;
       }
 
@@ -287,8 +308,24 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       return;
     }
 
-    // consoleSetup → back: if RomM user, skip localSetup to rommSetup
+    // consoleSetup → remoteSetup
     if (state.currentStep == OnboardingStep.consoleSetup) {
+      final existingRemote = state.remoteSetupState;
+      // If user already scanned folders, go back to results (not ask)
+      final restoredRemote = existingRemote != null &&
+              existingRemote.scannedFolders != null
+          ? existingRemote.copyWith(subStep: RemoteSetupSubStep.results)
+          : existingRemote ?? const RemoteSetupState();
+      state = state.copyWith(
+        currentStep: OnboardingStep.remoteSetup,
+        remoteSetupState: restoredRemote,
+        canProceed: true,
+      );
+      return;
+    }
+
+    // remoteSetup → back to rommSetup (if used) or localSetup
+    if (state.currentStep == OnboardingStep.remoteSetup) {
       if (state.rommSetupState != null) {
         state = state.copyWith(
           currentStep: OnboardingStep.rommSetup,
@@ -297,7 +334,6 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         );
         return;
       }
-      // Non-RomM user → back to localSetup
       state = state.copyWith(
         currentStep: OnboardingStep.localSetup,
         localSetupState: state.localSetupState ?? const LocalSetupState(),
@@ -989,7 +1025,16 @@ class OnboardingController extends StateNotifier<OnboardingState> {
 
     try {
       final service = RomFolderService();
-      final subfolders = await service.scanAllSubfolders(path);
+      final subfolders = await service.scanAllSubfolders(path,
+        onProgress: (count) {
+          if (!mounted) return;
+          state = state.copyWith(
+            rommSetupState: state.rommSetupState!.copyWith(
+              scanProgress: count,
+            ),
+          );
+        },
+      );
       if (!mounted) return;
 
       // Match against ALL supported systems, not just RomM-selected ones
@@ -1024,6 +1069,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           scannedFolders: scanned,
           isScanning: false,
           localOnlySystemIds: localOnlyIds,
+          scanProgress: 0,
         ),
       );
     } catch (e) {
@@ -1034,6 +1080,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           isScanning: false,
           scannedFolders: const [],
           localOnlySystemIds: const {},
+          scanProgress: 0,
         ),
       );
     }
@@ -1339,7 +1386,16 @@ class OnboardingController extends StateNotifier<OnboardingState> {
 
     try {
       final service = RomFolderService();
-      final subfolders = await service.scanAllSubfolders(path);
+      final subfolders = await service.scanAllSubfolders(path,
+        onProgress: (count) {
+          if (!mounted) return;
+          state = state.copyWith(
+            localSetupState: state.localSetupState!.copyWith(
+              scanProgress: count,
+            ),
+          );
+        },
+      );
       if (!mounted) return;
 
       const allSystems = SystemModel.supportedSystems;
@@ -1368,6 +1424,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           scannedFolders: scanned,
           isScanning: false,
           enabledSystemIds: enabledIds,
+          scanProgress: 0,
         ),
       );
     } catch (e) {
@@ -1378,6 +1435,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           isScanning: false,
           scannedFolders: const [],
           enabledSystemIds: const {},
+          scanProgress: 0,
         ),
       );
     }
@@ -1542,6 +1600,358 @@ class OnboardingController extends StateNotifier<OnboardingState> {
 
     // 3. Default: system.id
     return systemId;
+  }
+
+  // --- Remote setup step methods ---
+
+  void remoteSetupAnswer(bool wantsSetup) {
+    if (wantsSetup) {
+      state = state.copyWith(
+        remoteSetupState: (state.remoteSetupState ?? const RemoteSetupState()).copyWith(
+          subStep: RemoteSetupSubStep.connect,
+        ),
+        canProceed: false,
+      );
+    } else {
+      nextStep();
+    }
+  }
+
+  void setRemoteProviderType(ProviderType type) {
+    final rs = state.remoteSetupState;
+    if (rs == null) return;
+    // Reset all fields when switching type to avoid stale values
+    state = state.copyWith(
+      remoteSetupState: RemoteSetupState(
+        subStep: rs.subStep,
+        providerType: type,
+      ),
+    );
+  }
+
+  void updateRemoteField(String key, String value) {
+    final rs = state.remoteSetupState;
+    if (rs == null) return;
+    RemoteSetupState updated;
+    switch (key) {
+      case 'host':
+        updated = rs.copyWith(host: value, clearConnectionError: true, clearScanError: true);
+      case 'url':
+        updated = rs.copyWith(url: value, clearConnectionError: true, clearScanError: true);
+      case 'port':
+        updated = rs.copyWith(port: value, clearConnectionError: true, clearScanError: true);
+      case 'share':
+        updated = rs.copyWith(share: value, clearConnectionError: true, clearScanError: true);
+      case 'path':
+        updated = rs.copyWith(path: value, clearConnectionError: true, clearScanError: true);
+      case 'user':
+        updated = rs.copyWith(user: value, clearConnectionError: true, clearScanError: true);
+      case 'pass':
+        updated = rs.copyWith(pass: value, clearConnectionError: true, clearScanError: true);
+      case 'domain':
+        updated = rs.copyWith(domain: value, clearConnectionError: true, clearScanError: true);
+      default:
+        return;
+    }
+    state = state.copyWith(remoteSetupState: updated);
+  }
+
+  Future<void> testAndScanRemote() async {
+    final rs = state.remoteSetupState;
+    if (rs == null || !rs.hasConnection) return;
+    if (rs.isTestingConnection || rs.isScanning) return;
+
+    state = state.copyWith(
+      remoteSetupState: rs.copyWith(
+        isTestingConnection: true,
+        connectionTestSuccess: false,
+        clearConnectionError: true,
+        clearScanError: true,
+      ),
+    );
+
+    final config = rs.buildConfig();
+
+    // Test connection first
+    try {
+      final provider = ProviderFactory.getProvider(config);
+      final testResult = await provider.testConnection();
+      if (!mounted) return;
+
+      if (!testResult.success) {
+        state = state.copyWith(
+          remoteSetupState: state.remoteSetupState?.copyWith(
+            isTestingConnection: false,
+            connectionError: testResult.error ?? 'Connection failed',
+          ),
+        );
+        return;
+      }
+    } catch (e) {
+      if (!mounted) return;
+      state = state.copyWith(
+        remoteSetupState: state.remoteSetupState?.copyWith(
+          isTestingConnection: false,
+          connectionError: e.toString(),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    // Connection OK — start scanning
+    state = state.copyWith(
+      remoteSetupState: state.remoteSetupState?.copyWith(
+        isTestingConnection: false,
+        connectionTestSuccess: true,
+        isScanning: true,
+        subStep: RemoteSetupSubStep.scanning,
+      ),
+    );
+
+    try {
+      final entries = await RemoteFolderScanner.scanTopLevel(config);
+      if (!mounted) return;
+
+      final allSystems = SystemModel.supportedSystems;
+      final scannedFolders = <ScannedFolder>[];
+      final enabledIds = <String>{};
+
+      // Filter out common non-ROM directories
+      const ignoredFolders = {
+        'bios', 'saves', 'cheats', 'media', 'screenshots', 'config',
+        'retroarch', 'overlays', 'shaders', 'thumbnails', 'states',
+        'system', 'firmware', 'covers', 'logs', 'backup', 'savestates',
+      };
+      final filtered = entries.where((e) =>
+          !e.name.startsWith('.') &&
+          !ignoredFolders.contains(e.name.toLowerCase()));
+
+      for (final entry in filtered) {
+        final matchedId = LocalFolderMatcher.matchFolder(
+          entry.name,
+          allSystems,
+          const [], // no RomM platforms
+        );
+        scannedFolders.add(ScannedFolder(
+          name: entry.name,
+          fileCount: -1, // unknown for remote
+          autoMatchedSystemId: matchedId,
+        ));
+        if (matchedId != null) {
+          enabledIds.add(matchedId);
+        }
+      }
+
+      state = state.copyWith(
+        remoteSetupState: state.remoteSetupState?.copyWith(
+          isScanning: false,
+          scannedFolders: scannedFolders,
+          enabledSystemIds: enabledIds,
+          subStep: RemoteSetupSubStep.results,
+        ),
+        canProceed: true,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      state = state.copyWith(
+        remoteSetupState: state.remoteSetupState?.copyWith(
+          isScanning: false,
+          scanError: 'Scan failed: $e',
+          subStep: RemoteSetupSubStep.connect,
+        ),
+      );
+    }
+  }
+
+  void toggleRemoteSystem(String systemId) {
+    final rs = state.remoteSetupState;
+    if (rs == null) return;
+    final enabled = Set<String>.from(rs.enabledSystemIds);
+    final assignments = Map<String, String>.from(rs.folderAssignments);
+    if (enabled.contains(systemId)) {
+      enabled.remove(systemId);
+      // If this was manually assigned, unassign it (moves back to unmatched)
+      assignments.remove(systemId);
+    } else {
+      enabled.add(systemId);
+    }
+    state = state.copyWith(
+      remoteSetupState: rs.copyWith(
+        enabledSystemIds: enabled,
+        folderAssignments: assignments,
+      ),
+    );
+  }
+
+  void toggleAllRemoteSystems(bool selectAll) {
+    final rs = state.remoteSetupState;
+    if (rs == null) return;
+    final scanned = rs.scannedFolders ?? [];
+    final allMatchedIds = scanned
+        .where((f) => f.autoMatchedSystemId != null)
+        .map((f) => f.autoMatchedSystemId!)
+        .toSet();
+    // Include manually assigned systems
+    allMatchedIds.addAll(rs.folderAssignments.keys);
+    final updated = selectAll ? allMatchedIds : <String>{};
+    state = state.copyWith(
+      remoteSetupState: rs.copyWith(enabledSystemIds: updated),
+    );
+  }
+
+  void assignRemoteFolder(String folderName, String? systemId) {
+    final rs = state.remoteSetupState;
+    if (rs == null) return;
+    final assignments = Map<String, String>.from(rs.folderAssignments);
+    if (systemId == null) {
+      assignments.removeWhere((k, v) => v == folderName);
+    } else {
+      assignments[systemId] = folderName;
+    }
+    state = state.copyWith(
+      remoteSetupState: rs.copyWith(folderAssignments: assignments),
+    );
+  }
+
+  void unassignRemoteFolder(String folderName) {
+    final rs = state.remoteSetupState;
+    if (rs == null) return;
+    final assignments = Map<String, String>.from(rs.folderAssignments);
+    assignments.removeWhere((k, v) => v == folderName);
+    state = state.copyWith(
+      remoteSetupState: rs.copyWith(folderAssignments: assignments),
+    );
+  }
+
+  void remoteSetupBack() {
+    final rs = state.remoteSetupState;
+    if (rs == null) {
+      previousStep();
+      return;
+    }
+    switch (rs.subStep) {
+      case RemoteSetupSubStep.ask:
+        previousStep();
+      case RemoteSetupSubStep.connect:
+        state = state.copyWith(
+          remoteSetupState: rs.copyWith(subStep: RemoteSetupSubStep.ask),
+          canProceed: true,
+        );
+      case RemoteSetupSubStep.scanning:
+        cancelRemoteScan();
+      case RemoteSetupSubStep.results:
+        // Preserve scan results so the user doesn't have to rescan
+        // after changing a field — results get replaced on next scan
+        state = state.copyWith(
+          remoteSetupState: rs.copyWith(
+            subStep: RemoteSetupSubStep.connect,
+            connectionTestSuccess: false,
+            clearScanError: true,
+          ),
+          canProceed: false,
+        );
+    }
+  }
+
+  void cancelRemoteScan() {
+    final rs = state.remoteSetupState;
+    if (rs == null) return;
+    state = state.copyWith(
+      remoteSetupState: rs.copyWith(
+        subStep: RemoteSetupSubStep.connect,
+        isScanning: false,
+        isTestingConnection: false,
+        connectionTestSuccess: false,
+        clearScanError: true,
+      ),
+      canProceed: false,
+    );
+  }
+
+  void remoteSetupConfirm() {
+    _applyRemoteProviders();
+    nextStep();
+  }
+
+  void addAnotherRemoteProvider() {
+    _applyRemoteProviders();
+    // Reset to connect sub-step with clean fields
+    state = state.copyWith(
+      remoteSetupState: const RemoteSetupState(
+        subStep: RemoteSetupSubStep.connect,
+      ),
+      canProceed: false,
+    );
+  }
+
+  void _applyRemoteProviders() {
+    final rs = state.remoteSetupState;
+    if (rs == null || rs.scannedFolders == null) return;
+
+    final basePath = state.localSetupState?.romBasePath ??
+        state.rommSetupState?.romBasePath ??
+        _defaultRomBasePath;
+    final updated = Map<String, SystemConfig>.from(state.configuredSystems);
+    final baseConfig = rs.buildConfig();
+
+    for (final folder in rs.scannedFolders!) {
+      // Determine system ID from manual assignment or auto-match
+      final manualSystemId = rs.folderAssignments.entries
+          .where((e) => e.value == folder.name)
+          .map((e) => e.key)
+          .firstOrNull;
+      final systemId = manualSystemId ?? folder.autoMatchedSystemId;
+      if (systemId == null) continue;
+
+      // Check if this system is enabled (auto-matched) or manually assigned
+      if (manualSystemId == null && !rs.enabledSystemIds.contains(systemId)) {
+        continue;
+      }
+
+      final system = SystemModel.supportedSystems
+          .where((s) => s.id == systemId)
+          .firstOrNull;
+      if (system == null) continue;
+
+      // Build provider config with folder-specific path
+      final folderPath = baseConfig.path != null && baseConfig.path!.isNotEmpty
+          ? '${baseConfig.path}/${folder.name}'
+          : folder.name;
+      final providerConfig = baseConfig.copyWith(
+        path: folderPath,
+        priority: 0, // will be adjusted below
+      );
+
+      if (updated.containsKey(systemId)) {
+        // Append provider to existing system
+        final existing = updated[systemId]!;
+        final providers = List<ProviderConfig>.from(existing.providers);
+        final newProvider = providerConfig.copyWith(priority: providers.length);
+        providers.add(newProvider);
+        updated[systemId] = SystemConfig(
+          id: existing.id,
+          name: existing.name,
+          targetFolder: existing.targetFolder,
+          providers: providers,
+          autoExtract: existing.autoExtract,
+          mergeMode: providers.length > 1,
+        );
+      } else {
+        // Create new system config
+        updated[systemId] = SystemConfig(
+          id: systemId,
+          name: system.name,
+          targetFolder: '$basePath/${folder.name}',
+          providers: [providerConfig.copyWith(priority: 0)],
+          autoExtract: system.isZipped,
+          mergeMode: false,
+        );
+      }
+    }
+
+    state = state.copyWith(configuredSystems: updated);
   }
 
   Future<void> testAndSaveProvider() async {

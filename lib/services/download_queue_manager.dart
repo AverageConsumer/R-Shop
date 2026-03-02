@@ -4,7 +4,6 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import '../models/config/app_config.dart';
-import '../models/config/provider_config.dart';
 import '../models/download_item.dart';
 import '../models/game_item.dart';
 import '../models/system_model.dart';
@@ -28,7 +27,7 @@ class DownloadQueueState {
       queue.where((item) => item.isActive).toList();
 
   List<DownloadItem> get queuedItems =>
-      queue.where((item) => item.status == DownloadItemStatus.queued).toList();
+      queue.where((item) => item.status == DownloadStatus.queued).toList();
 
   List<DownloadItem> get completedItems =>
       queue.where((item) => item.isComplete).toList();
@@ -131,11 +130,11 @@ class DownloadQueueManager extends ChangeNotifier {
       _retryTimers.remove(id);
       if (_disposed) return;
       final item = _state.getDownloadById(id);
-      if (item == null || item.status != DownloadItemStatus.error) return;
+      if (item == null || item.status != DownloadStatus.error) return;
 
       _updateItem(
         id,
-        status: DownloadItemStatus.queued,
+        status: DownloadStatus.queued,
         progress: 0,
         receivedBytes: 0,
         retryCount: retryCount + 1,
@@ -174,7 +173,7 @@ class DownloadQueueManager extends ChangeNotifier {
 
     _updateItem(
       id,
-      status: DownloadItemStatus.queued,
+      status: DownloadStatus.queued,
       progress: 0,
       receivedBytes: 0,
       retryCount: 0,
@@ -257,7 +256,7 @@ class DownloadQueueManager extends ChangeNotifier {
     await _downloadServices[id]?.cancelDownload(preserveTempFile: false);
     _downloadServices.remove(id);
 
-    _updateItem(id, status: DownloadItemStatus.cancelled, clearTempFilePath: true);
+    _updateItem(id, status: DownloadStatus.cancelled, clearTempFilePath: true);
     _persistQueue();
     _stopForegroundServiceIfIdle();
     _processQueue();
@@ -294,7 +293,7 @@ class DownloadQueueManager extends ChangeNotifier {
 
     _updateItem(
       id,
-      status: DownloadItemStatus.queued,
+      status: DownloadStatus.queued,
       progress: 0,
       receivedBytes: 0,
       retryCount: 0,
@@ -320,7 +319,7 @@ class DownloadQueueManager extends ChangeNotifier {
       for (final item in itemsToStart) {
         // Re-check item is still queued before starting
         final current = _state.getDownloadById(item.id);
-        if (current == null || current.status != DownloadItemStatus.queued) continue;
+        if (current == null || current.status != DownloadStatus.queued) continue;
         _startDownload(item);
       }
     } finally {
@@ -329,7 +328,7 @@ class DownloadQueueManager extends ChangeNotifier {
   }
 
   Future<void> _startDownload(DownloadItem item) async {
-    _updateItem(item.id, status: DownloadItemStatus.downloading);
+    _updateItem(item.id, status: DownloadStatus.downloading);
     _updateForegroundService();
 
     // Check if file already exists at target location
@@ -340,7 +339,7 @@ class DownloadQueueManager extends ChangeNotifier {
       if (_disposed) return;
       if (alreadyExists) {
         debugPrint('DownloadQueue: file already exists, skipping: ${item.game.filename}');
-        _updateItem(item.id, status: DownloadItemStatus.completed, clearTempFilePath: true);
+        _updateItem(item.id, status: DownloadStatus.completed, clearTempFilePath: true);
         _persistQueue();
         _stopForegroundServiceIfIdle();
         _processQueue();
@@ -357,7 +356,7 @@ class DownloadQueueManager extends ChangeNotifier {
       if (storageInfo != null && storageInfo.isLow) {
         _updateItem(
           item.id,
-          status: DownloadItemStatus.error,
+          status: DownloadStatus.error,
           error: 'Not enough disk space (${storageInfo.freeSpaceText})',
         );
         _stopForegroundServiceIfIdle();
@@ -390,7 +389,7 @@ class DownloadQueueManager extends ChangeNotifier {
       (progress) {
         _updateItem(
           item.id,
-          status: _mapStatus(progress.status),
+          status: progress.status,
           progress: progress.progress,
           receivedBytes: progress.receivedBytes,
           totalBytes: progress.totalBytes,
@@ -413,7 +412,7 @@ class DownloadQueueManager extends ChangeNotifier {
         final errorMsg = error.toString();
         _updateItem(
           item.id,
-          status: DownloadItemStatus.error,
+          status: DownloadStatus.error,
           error: errorMsg,
           tempFilePath: tempPath,
         );
@@ -445,22 +444,22 @@ class DownloadQueueManager extends ChangeNotifier {
     final item = _state.getDownloadById(id);
     if (item == null) return;
 
-    if (item.status == DownloadItemStatus.error) {
+    if (item.status == DownloadStatus.error) {
       if (item.retryCount < _maxRetries && _isRetryableError(item.error)) {
         _scheduleRetry(id, item.retryCount);
         return; // Keep foreground service alive for pending retry
       }
     }
 
-    if (item.status != DownloadItemStatus.completed &&
-        item.status != DownloadItemStatus.error) {
-      _updateItem(id, status: DownloadItemStatus.completed, clearTempFilePath: true);
+    if (item.status != DownloadStatus.completed &&
+        item.status != DownloadStatus.error) {
+      _updateItem(id, status: DownloadStatus.completed, clearTempFilePath: true);
     }
 
     // Notify listener for post-download processing (e.g. RA hash verification)
     final completedItem = _state.getDownloadById(id);
     if (completedItem != null &&
-        completedItem.status == DownloadItemStatus.completed) {
+        completedItem.status == DownloadStatus.completed) {
       onItemCompleted?.call(completedItem);
     }
 
@@ -471,7 +470,7 @@ class DownloadQueueManager extends ChangeNotifier {
 
   void _updateItem(
     String id, {
-    DownloadItemStatus? status,
+    DownloadStatus? status,
     double? progress,
     int? receivedBytes,
     int? totalBytes,
@@ -545,16 +544,6 @@ class DownloadQueueManager extends ChangeNotifier {
     }
   }
 
-  DownloadItemStatus _mapStatus(DownloadStatus status) => switch (status) {
-    DownloadStatus.downloading => DownloadItemStatus.downloading,
-    DownloadStatus.extracting => DownloadItemStatus.extracting,
-    DownloadStatus.moving => DownloadItemStatus.moving,
-    DownloadStatus.completed => DownloadItemStatus.completed,
-    DownloadStatus.cancelled => DownloadItemStatus.cancelled,
-    DownloadStatus.error => DownloadItemStatus.error,
-    DownloadStatus.idle => DownloadItemStatus.queued,
-  };
-
   String _generateId(GameItem game, SystemModel system) {
     return '${system.name}_${game.filename}';
   }
@@ -573,8 +562,8 @@ class DownloadQueueManager extends ChangeNotifier {
     try {
       final persistable = _state.queue
           .where((item) =>
-              item.status == DownloadItemStatus.queued ||
-              item.status == DownloadItemStatus.error)
+              item.status == DownloadStatus.queued ||
+              item.status == DownloadStatus.error)
           .map((item) => item.toJson())
           .toList();
       if (persistable.isEmpty) {
@@ -627,7 +616,7 @@ class DownloadQueueManager extends ChangeNotifier {
 
         // Reset to queued so they can be restarted
         restored.add(restoredItem.copyWith(
-          status: DownloadItemStatus.queued,
+          status: DownloadStatus.queued,
           progress: 0,
           receivedBytes: 0,
           clearError: true,
@@ -658,33 +647,12 @@ class DownloadQueueManager extends ChangeNotifier {
     final systemConfig = appConfig.systemById(item.system.id);
     if (systemConfig == null) return item;
 
-    final match = _findMatchingProvider(pc, systemConfig.providers);
+    final match = pc.findMatchIn(systemConfig.providers);
     if (match?.auth == null) return item;
 
     final rehydrated = pc.copyWith(auth: match!.auth);
     final updatedGame = item.game.copyWith(providerConfig: rehydrated);
     return item.copyWith(game: updatedGame);
-  }
-
-  /// Finds a ProviderConfig in [providers] that matches [target] by type and
-  /// connection details (host/url/share), ignoring auth.
-  static ProviderConfig? _findMatchingProvider(
-    ProviderConfig target,
-    List<ProviderConfig> providers,
-  ) {
-    for (final p in providers) {
-      if (p.type != target.type) continue;
-      switch (target.type) {
-        case ProviderType.web:
-        case ProviderType.romm:
-          if (p.url == target.url) return p;
-        case ProviderType.smb:
-          if (p.host == target.host && p.share == target.share) return p;
-        case ProviderType.ftp:
-          if (p.host == target.host) return p;
-      }
-    }
-    return null;
   }
 
   @override

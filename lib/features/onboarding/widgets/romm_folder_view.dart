@@ -63,9 +63,23 @@ class RommFolderView extends ConsumerWidget {
             SizedBox(height: rs.spacing.lg),
             Padding(
               padding: EdgeInsets.only(left: rs.isSmall ? 40 : 60),
-              child: const CircularProgressIndicator(
-                color: Colors.redAccent,
-                strokeWidth: 2,
+              child: Row(
+                children: [
+                  const CircularProgressIndicator(
+                    color: Colors.redAccent,
+                    strokeWidth: 2,
+                  ),
+                  if (rommSetup.scanProgress > 0) ...[
+                    SizedBox(width: rs.spacing.md),
+                    Text(
+                      'Found ${rommSetup.scanProgress} folder${rommSetup.scanProgress == 1 ? '' : 's'}...',
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: rs.isSmall ? 11 : 13,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],

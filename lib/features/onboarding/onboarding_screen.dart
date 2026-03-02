@@ -18,6 +18,7 @@ import 'widgets/console_setup_step.dart';
 import 'widgets/pixel_mascot.dart';
 import 'widgets/local_setup_step.dart';
 import 'widgets/ra_setup_step.dart';
+import 'widgets/remote_setup_step.dart';
 import 'widgets/romm_setup_step.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -43,6 +44,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
+  bool _areAllRemoteSystemsEnabled(RemoteSetupState rms) {
+    final scanned = rms.scannedFolders ?? [];
+    final matchedIds = scanned
+        .where((f) => f.autoMatchedSystemId != null)
+        .map((f) => f.autoMatchedSystemId!)
+        .toSet()
+      ..addAll(rms.folderAssignments.keys);
+    return matchedIds.isNotEmpty &&
+        matchedIds.every((id) => rms.enabledSystemIds.contains(id));
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (!mounted) return KeyEventResult.ignored;
     final isOverlayExpanded = ref.read(downloadOverlayExpandedProvider);
@@ -62,6 +74,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final isInteractiveStep =
         state.currentStep == OnboardingStep.rommSetup ||
         state.currentStep == OnboardingStep.localSetup ||
+        state.currentStep == OnboardingStep.remoteSetup ||
         state.currentStep == OnboardingStep.raSetup ||
         state.currentStep == OnboardingStep.consoleSetup;
     if (!state.canProceed &&
@@ -189,6 +202,60 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           return KeyEventResult.handled;
         }
         return KeyEventResult.ignored;
+      }
+    }
+
+    // Remote setup step — delegate based on sub-step
+    if (state.currentStep == OnboardingStep.remoteSetup) {
+      final rms = state.remoteSetupState;
+      if (rms != null) {
+        if (rms.subStep == RemoteSetupSubStep.scanning) {
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+              event.logicalKey == LogicalKeyboardKey.escape) {
+            controller.cancelRemoteScan();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.handled;
+        }
+        if (rms.subStep == RemoteSetupSubStep.ask) {
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+              event.logicalKey == LogicalKeyboardKey.escape) {
+            _handleBack();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        }
+        if (rms.subStep == RemoteSetupSubStep.connect) {
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+              event.logicalKey == LogicalKeyboardKey.escape) {
+            controller.remoteSetupBack();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
+            if (rms.hasConnection && !rms.isTestingConnection && !rms.isScanning) {
+              controller.testAndScanRemote();
+            }
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        }
+        if (rms.subStep == RemoteSetupSubStep.results) {
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
+              event.logicalKey == LogicalKeyboardKey.escape) {
+            controller.remoteSetupBack();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
+            final allEnabled = _areAllRemoteSystemsEnabled(rms);
+            controller.toggleAllRemoteSystems(!allEnabled);
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
+            _handleContinue();
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        }
       }
     }
 
@@ -336,6 +403,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         });
       }
       return;
+    } else if (state.currentStep == OnboardingStep.remoteSetup) {
+      final rms = state.remoteSetupState;
+      if (rms != null && rms.subStep == RemoteSetupSubStep.results) {
+        feedback.tick();
+        controller.remoteSetupConfirm();
+      }
+      return;
     } else if (state.currentStep == OnboardingStep.raSetup) {
       final ra = state.raSetupState;
       if (ra != null && ra.connectionSuccess) {
@@ -377,6 +451,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       audioManager.stopTyping();
       feedback.cancel();
       controller.localSetupBack();
+      return;
+    }
+
+    if (state.currentStep == OnboardingStep.remoteSetup) {
+      audioManager.stopTyping();
+      feedback.cancel();
+      controller.remoteSetupBack();
       return;
     }
 
@@ -488,7 +569,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       if (next == OnboardingStep.consoleSetup) return;
       if (next == OnboardingStep.localSetup) return;
       // Interactive steps with ConsoleFocusable buttons: move focus to first child
-      if (next == OnboardingStep.rommSetup || next == OnboardingStep.raSetup) {
+      if (next == OnboardingStep.rommSetup || next == OnboardingStep.raSetup ||
+          next == OnboardingStep.remoteSetup) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _focusNode.nextFocus();
         });
@@ -502,6 +584,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     });
     // Re-focus first child when sub-views change within interactive steps
     ref.listen(onboardingControllerProvider.select((s) => s.rommSetupState?.subStep), (prev, next) {
+      if (prev == null || next == null || prev == next) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.nextFocus();
+      });
+    });
+    ref.listen(onboardingControllerProvider.select((s) => s.remoteSetupState?.subStep), (prev, next) {
       if (prev == null || next == null || prev == next) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _focusNode.nextFocus();
@@ -559,7 +647,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PixelMascot(size: rs.isSmall ? 36 : 48),
+          Column(
+            children: [
+              PixelMascot(size: rs.isSmall ? 36 : 48),
+              SizedBox(height: rs.spacing.sm),
+              _StepIndicator(
+                currentStep: state.currentStep,
+                isSmall: rs.isSmall,
+                vertical: true,
+              ),
+            ],
+          ),
           Expanded(
             child: _buildContent(state),
           ),
@@ -573,7 +671,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PixelMascot(size: rs.isSmall ? 28 : 40),
+          Row(
+            children: [
+              PixelMascot(size: rs.isSmall ? 28 : 40),
+              SizedBox(width: rs.spacing.md),
+              _StepIndicator(
+                currentStep: state.currentStep,
+                isSmall: rs.isSmall,
+              ),
+            ],
+          ),
           SizedBox(height: rs.spacing.sm),
           Expanded(child: _buildContent(state)),
         ],
@@ -599,6 +706,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         return RommSetupStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.localSetup:
         return LocalSetupStep(onComplete: controller.onMessageComplete);
+      case OnboardingStep.remoteSetup:
+        return RemoteSetupStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.consoleSetup:
         return ConsoleSetupStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.raSetup:
@@ -690,6 +799,49 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return ConsoleHud(
         b: HudAction('Back', onTap: _handleBack),
       );
+    }
+
+    if (state.currentStep == OnboardingStep.remoteSetup) {
+      final rms = state.remoteSetupState;
+      if (rms != null) {
+        switch (rms.subStep) {
+          case RemoteSetupSubStep.ask:
+            return ConsoleHud(
+              b: HudAction('Back', onTap: _handleBack),
+            );
+          case RemoteSetupSubStep.connect:
+            final controller =
+                ref.read(onboardingControllerProvider.notifier);
+            return ConsoleHud(
+              b: HudAction('Back', onTap: () => controller.remoteSetupBack()),
+              y: HudAction(
+                'Test & Scan',
+                onTap: rms.hasConnection && !rms.isTestingConnection && !rms.isScanning
+                    ? controller.testAndScanRemote
+                    : null,
+              ),
+            );
+          case RemoteSetupSubStep.scanning:
+            final controller =
+                ref.read(onboardingControllerProvider.notifier);
+            return ConsoleHud(
+              b: HudAction('Cancel', onTap: controller.cancelRemoteScan),
+            );
+          case RemoteSetupSubStep.results:
+            final controller =
+                ref.read(onboardingControllerProvider.notifier);
+            final allEnabled = _areAllRemoteSystemsEnabled(rms);
+            return ConsoleHud(
+              start: HudAction('Continue', onTap: _handleContinue,
+                  highlight: true),
+              b: HudAction('Back', onTap: () => controller.remoteSetupBack()),
+              y: HudAction(
+                allEnabled ? 'Deselect All' : 'Select All',
+                onTap: () => controller.toggleAllRemoteSystems(!allEnabled),
+              ),
+            );
+        }
+      }
     }
 
     if (state.currentStep == OnboardingStep.raSetup) {
@@ -1109,6 +1261,77 @@ class _CompleteStep extends StatelessWidget {
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _StepIndicator extends StatelessWidget {
+  const _StepIndicator({
+    required this.currentStep,
+    required this.isSmall,
+    this.vertical = false,
+  });
+
+  final OnboardingStep currentStep;
+  final bool isSmall;
+  final bool vertical;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentIndex = OnboardingStep.values.indexOf(currentStep);
+    final dotSize = isSmall ? 6.0 : 8.0;
+    final spacing = isSmall ? 4.0 : 6.0;
+    final steps = OnboardingStep.values;
+
+    final dots = List.generate(steps.length, (i) {
+      final Color color;
+      final Border? border;
+      if (i < currentIndex) {
+        color = Colors.white.withValues(alpha: 0.4);
+        border = null;
+      } else if (i == currentIndex) {
+        color = Colors.white;
+        border = null;
+      } else {
+        color = Colors.transparent;
+        border = Border.all(
+          color: Colors.white.withValues(alpha: 0.2),
+          width: 1,
+        );
+      }
+
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: dotSize,
+        height: dotSize,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: border,
+        ),
+      );
+    });
+
+    if (vertical) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < dots.length; i++) ...[
+            dots[i],
+            if (i < dots.length - 1) SizedBox(height: spacing),
+          ],
+        ],
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (int i = 0; i < dots.length; i++) ...[
+          dots[i],
+          if (i < dots.length - 1) SizedBox(width: spacing),
+        ],
       ],
     );
   }

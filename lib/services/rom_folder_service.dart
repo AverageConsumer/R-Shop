@@ -136,7 +136,9 @@ class RomFolderService {
   /// Scans all subdirectories of [basePath] and counts ROM files recursively
   /// within each top-level folder (up to [_maxScanDepth] levels deep).
   Future<List<({String name, int fileCount})>> scanAllSubfolders(
-      String basePath) async {
+    String basePath, {
+    void Function(int count)? onProgress,
+  }) async {
     try {
       final baseDir = Directory(basePath);
       if (!await baseDir.exists()) return [];
@@ -148,6 +150,7 @@ class RomFolderService {
           if (name.startsWith('.')) continue;
           final count = await _countGamesRecursive(entity, 1);
           results.add((name: name, fileCount: count));
+          onProgress?.call(results.length);
         }
       }
       results.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));

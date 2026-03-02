@@ -10,6 +10,7 @@ import '../../../providers/app_providers.dart';
 import '../onboarding_controller.dart';
 import 'chat_bubble.dart';
 import 'connection_test_indicator.dart';
+import 'provider_form.dart' show isPrivateNetworkUrl;
 
 class RommConnectView extends ConsumerStatefulWidget {
   final VoidCallback onComplete;
@@ -104,6 +105,14 @@ class _RommConnectViewState extends ConsumerState<RommConnectView> {
     }
   }
 
+  bool _isHttpWithCredentials(RommSetupState rommSetup) {
+    final url = rommSetup.url;
+    if (!url.startsWith('http://') || isPrivateNetworkUrl(url)) return false;
+    return rommSetup.apiKey.isNotEmpty ||
+        rommSetup.user.isNotEmpty ||
+        rommSetup.pass.isNotEmpty;
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(onboardingControllerProvider);
@@ -162,6 +171,25 @@ class _RommConnectViewState extends ConsumerState<RommConnectView> {
                       _buildTextField(rs, 'pass', 'Password', '(optional)',
                           rommSetup.pass, controller,
                           obscure: true),
+                      if (_isHttpWithCredentials(rommSetup)) ...[
+                        SizedBox(height: rs.spacing.sm),
+                        Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded,
+                                color: Colors.orange.shade300, size: 16),
+                            SizedBox(width: rs.spacing.xs),
+                            Expanded(
+                              child: Text(
+                                'Credentials will be sent unencrypted over HTTP',
+                                style: TextStyle(
+                                  color: Colors.orange.shade300,
+                                  fontSize: rs.isSmall ? 10 : 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       SizedBox(height: rs.spacing.md),
                       ConnectionTestIndicator(
                         isTesting: state.isTestingConnection,

@@ -157,6 +157,49 @@ class ProviderConfig {
     return null;
   }
 
+  /// Returns a warning if credentials are sent over HTTP to a non-private host.
+  String? get insecureWarning {
+    if (type != ProviderType.web && type != ProviderType.romm) return null;
+    if (url == null || !url!.startsWith('http://')) return null;
+    final uri = Uri.tryParse(url!);
+    if (uri == null) return null;
+    final host = uri.host;
+    if (host == 'localhost' || host == '127.0.0.1') return null;
+    final privateIp = RegExp(
+      r'^(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$',
+    );
+    if (privateIp.hasMatch(host)) return null;
+    final hasAuth = auth != null &&
+        ((auth!.user != null && auth!.user!.isNotEmpty) ||
+            (auth!.apiKey != null && auth!.apiKey!.isNotEmpty));
+    if (!hasAuth) return null;
+    return 'Credentials will be sent unencrypted over HTTP';
+  }
+
+  /// True if this provider has no credentials configured.
+  bool get needsAuth => auth == null ||
+      ((auth!.user?.isEmpty ?? true) &&
+       (auth!.pass?.isEmpty ?? true) &&
+       (auth!.apiKey?.isEmpty ?? true));
+
+  /// Finds a [ProviderConfig] in [providers] that matches this config's type
+  /// and connection details (host/url/share), ignoring auth credentials.
+  ProviderConfig? findMatchIn(List<ProviderConfig> providers) {
+    for (final p in providers) {
+      if (p.type != type) continue;
+      switch (type) {
+        case ProviderType.web:
+        case ProviderType.romm:
+          if (p.url == url) return p;
+        case ProviderType.smb:
+          if (p.host == host && p.share == share) return p;
+        case ProviderType.ftp:
+          if (p.host == host) return p;
+      }
+    }
+    return null;
+  }
+
   ProviderConfig copyWith({
     ProviderType? type,
     int? priority,

@@ -67,14 +67,14 @@ void main() {
             game: makeGame('a'),
             system: testSystem,
             targetFolder: '/roms',
-            status: DownloadItemStatus.downloading,
+            status: DownloadStatus.downloading,
           ),
           DownloadItem(
             id: 'b',
             game: makeGame('b'),
             system: testSystem,
             targetFolder: '/roms',
-            status: DownloadItemStatus.downloading,
+            status: DownloadStatus.downloading,
           ),
         ],
       );
@@ -104,28 +104,28 @@ void main() {
             game: makeGame('a'),
             system: testSystem,
             targetFolder: '/roms',
-            status: DownloadItemStatus.downloading,
+            status: DownloadStatus.downloading,
           ),
           DownloadItem(
             id: 'b',
             game: makeGame('b'),
             system: testSystem,
             targetFolder: '/roms',
-            status: DownloadItemStatus.extracting,
+            status: DownloadStatus.extracting,
           ),
           DownloadItem(
             id: 'c',
             game: makeGame('c'),
             system: testSystem,
             targetFolder: '/roms',
-            status: DownloadItemStatus.queued,
+            status: DownloadStatus.queued,
           ),
           DownloadItem(
             id: 'd',
             game: makeGame('d'),
             system: testSystem,
             targetFolder: '/roms',
-            status: DownloadItemStatus.completed,
+            status: DownloadStatus.completed,
           ),
         ],
       );
@@ -142,14 +142,14 @@ void main() {
             game: makeGame('done'),
             system: testSystem,
             targetFolder: '/roms',
-            status: DownloadItemStatus.completed,
+            status: DownloadStatus.completed,
           ),
           DownloadItem(
             id: 'active',
             game: makeGame('active'),
             system: testSystem,
             targetFolder: '/roms',
-            status: DownloadItemStatus.downloading,
+            status: DownloadStatus.downloading,
           ),
         ],
       );
@@ -174,7 +174,7 @@ void main() {
             game: makeGame('a'),
             system: testSystem,
             targetFolder: '/roms',
-            status: DownloadItemStatus.error,
+            status: DownloadStatus.error,
             error: 'Network timeout',
           ),
           DownloadItem(
@@ -182,7 +182,7 @@ void main() {
             game: makeGame('b'),
             system: testSystem,
             targetFolder: '/roms',
-            status: DownloadItemStatus.completed,
+            status: DownloadStatus.completed,
           ),
         ],
       );
@@ -303,7 +303,7 @@ void main() {
       };
 
       final item = DownloadItem.fromJson(json, testSystem);
-      expect(item.status, DownloadItemStatus.error);
+      expect(item.status, DownloadStatus.error);
     });
 
     test('fromJson defaults unknown status to queued', () {
@@ -318,7 +318,7 @@ void main() {
       };
 
       final item = DownloadItem.fromJson(json, testSystem);
-      expect(item.status, DownloadItemStatus.queued);
+      expect(item.status, DownloadStatus.queued);
     });
 
     test('round-trip JSON serialization preserves data', () {
@@ -443,9 +443,9 @@ void main() {
 
     test('isActive for downloading/extracting/moving', () {
       for (final status in [
-        DownloadItemStatus.downloading,
-        DownloadItemStatus.extracting,
-        DownloadItemStatus.moving,
+        DownloadStatus.downloading,
+        DownloadStatus.extracting,
+        DownloadStatus.moving,
       ]) {
         final item = DownloadItem(
           id: 'test',
@@ -460,9 +460,9 @@ void main() {
 
     test('isFinished for completed/error/cancelled', () {
       for (final status in [
-        DownloadItemStatus.completed,
-        DownloadItemStatus.error,
-        DownloadItemStatus.cancelled,
+        DownloadStatus.completed,
+        DownloadStatus.error,
+        DownloadStatus.cancelled,
       ]) {
         final item = DownloadItem(
           id: 'test',
@@ -477,10 +477,10 @@ void main() {
 
     test('isFinished is false for queued/active statuses', () {
       for (final status in [
-        DownloadItemStatus.queued,
-        DownloadItemStatus.downloading,
-        DownloadItemStatus.extracting,
-        DownloadItemStatus.moving,
+        DownloadStatus.queued,
+        DownloadStatus.downloading,
+        DownloadStatus.extracting,
+        DownloadStatus.moving,
       ]) {
         final item = DownloadItem(
           id: 'test',
@@ -499,7 +499,7 @@ void main() {
         game: makeGame('test'),
         system: testSystem,
         targetFolder: '/roms',
-        status: DownloadItemStatus.queued,
+        status: DownloadStatus.queued,
         retryCount: 2,
       );
       expect(item.displayText, 'Retrying (2/3)...');
@@ -511,7 +511,7 @@ void main() {
         game: makeGame('test'),
         system: testSystem,
         targetFolder: '/roms',
-        status: DownloadItemStatus.error,
+        status: DownloadStatus.error,
         error: 'Connection refused',
       );
       expect(item.displayText, 'Connection refused');
@@ -523,16 +523,16 @@ void main() {
         game: makeGame('test'),
         system: testSystem,
         targetFolder: '/roms',
-        status: DownloadItemStatus.error,
+        status: DownloadStatus.error,
         error: 'some error',
       );
 
       final cleared = item.copyWith(
-        status: DownloadItemStatus.queued,
+        status: DownloadStatus.queued,
         clearError: true,
       );
       expect(cleared.error, isNull);
-      expect(cleared.status, DownloadItemStatus.queued);
+      expect(cleared.status, DownloadStatus.queued);
     });
 
     test('copyWith clears speed when clearSpeed is true', () {
@@ -622,21 +622,21 @@ void main() {
           game: makeGame('queued'),
           system: testSystem,
           targetFolder: '/roms',
-          status: DownloadItemStatus.queued,
+          status: DownloadStatus.queued,
         ),
         DownloadItem(
           id: 'downloading',
           game: makeGame('downloading'),
           system: testSystem,
           targetFolder: '/roms',
-          status: DownloadItemStatus.downloading,
+          status: DownloadStatus.downloading,
         ),
         DownloadItem(
           id: 'error',
           game: makeGame('error'),
           system: testSystem,
           targetFolder: '/roms',
-          status: DownloadItemStatus.error,
+          status: DownloadStatus.error,
           error: 'Timeout',
         ),
         DownloadItem(
@@ -644,21 +644,21 @@ void main() {
           game: makeGame('completed'),
           system: testSystem,
           targetFolder: '/roms',
-          status: DownloadItemStatus.completed,
+          status: DownloadStatus.completed,
         ),
         DownloadItem(
           id: 'cancelled',
           game: makeGame('cancelled'),
           system: testSystem,
           targetFolder: '/roms',
-          status: DownloadItemStatus.cancelled,
+          status: DownloadStatus.cancelled,
         ),
       ];
 
       final persistable = queue
           .where((item) =>
-              item.status == DownloadItemStatus.queued ||
-              item.status == DownloadItemStatus.error)
+              item.status == DownloadStatus.queued ||
+              item.status == DownloadStatus.error)
           .toList();
 
       expect(persistable, hasLength(2));
@@ -748,8 +748,8 @@ void main() {
           system: testSystem,
           targetFolder: '/roms',
           status: i < 50
-              ? DownloadItemStatus.queued
-              : DownloadItemStatus.completed,
+              ? DownloadStatus.queued
+              : DownloadStatus.completed,
         ),
       );
 
@@ -890,20 +890,20 @@ void main() {
   // ─── Status mapping ────────────────────────────────────
 
   group('Status mapping', () {
-    test('all DownloadItemStatus values are distinct', () {
-      const values = DownloadItemStatus.values;
+    test('all DownloadStatus values are distinct', () {
+      const values = DownloadStatus.values;
       expect(values.toSet().length, values.length);
     });
 
-    test('DownloadItemStatus has expected values', () {
-      expect(DownloadItemStatus.values, containsAll([
-        DownloadItemStatus.queued,
-        DownloadItemStatus.downloading,
-        DownloadItemStatus.extracting,
-        DownloadItemStatus.moving,
-        DownloadItemStatus.completed,
-        DownloadItemStatus.cancelled,
-        DownloadItemStatus.error,
+    test('DownloadStatus has expected values', () {
+      expect(DownloadStatus.values, containsAll([
+        DownloadStatus.queued,
+        DownloadStatus.downloading,
+        DownloadStatus.extracting,
+        DownloadStatus.moving,
+        DownloadStatus.completed,
+        DownloadStatus.cancelled,
+        DownloadStatus.error,
       ]));
     });
   });

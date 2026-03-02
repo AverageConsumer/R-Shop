@@ -9,9 +9,9 @@ class DownloadProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accentColor = item.system.accentColor;
-    final isQueued = item.status == DownloadItemStatus.queued;
-    final isIndeterminate = item.status == DownloadItemStatus.extracting ||
-        item.status == DownloadItemStatus.moving;
+    final isQueued = item.status == DownloadStatus.queued;
+    final isIndeterminate = item.status == DownloadStatus.extracting ||
+        item.status == DownloadStatus.moving;
 
     if (isQueued) {
       return ClipRRect(

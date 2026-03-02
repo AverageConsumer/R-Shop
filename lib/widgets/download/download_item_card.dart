@@ -148,7 +148,7 @@ class DownloadItemCard extends StatelessWidget {
                 ],
               ),
               // Progress bar under everything
-              if (item.isActive || item.status == DownloadItemStatus.queued)
+              if (item.isActive || item.status == DownloadStatus.queued)
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: DownloadProgressBar(item: item),

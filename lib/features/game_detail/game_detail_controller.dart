@@ -55,7 +55,12 @@ class GameDetailController extends ChangeNotifier {
 
   void selectVariant(int index) {
     if (index >= 0 && index < variants.length) {
-      _state = _state.copyWith(selectedIndex: index, clearTagInfo: true);
+      _state = _state.copyWith(
+        selectedIndex: index,
+        activeOverlay: _state.activeOverlay == ActiveOverlay.tagInfo
+            ? ActiveOverlay.none
+            : null,
+      );
       notifyListeners();
     }
   }
@@ -119,9 +124,16 @@ class GameDetailController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- Overlay management ---
+
+  void closeOverlay() {
+    _state = _state.copyWith(activeOverlay: ActiveOverlay.none);
+    notifyListeners();
+  }
+
   void showDeleteDialog() {
     _state = _state.copyWith(
-      showDeleteDialog: true,
+      activeOverlay: ActiveOverlay.deleteDialog,
       dialogSelection: 1,
     );
     notifyListeners();
@@ -133,37 +145,39 @@ class GameDetailController extends ChangeNotifier {
   }
 
   void cancelDialog() {
-    _state = _state.copyWith(clearDialog: true);
+    _state = _state.copyWith(activeOverlay: ActiveOverlay.none);
     notifyListeners();
   }
 
   void toggleTagInfo() {
-    _state = _state.copyWith(showTagInfo: !_state.showTagInfo);
+    _state = _state.copyWith(
+      activeOverlay: _state.showTagInfo ? ActiveOverlay.none : ActiveOverlay.tagInfo,
+    );
     notifyListeners();
   }
 
   void closeTagInfo() {
-    _state = _state.copyWith(clearTagInfo: true);
+    _state = _state.copyWith(activeOverlay: ActiveOverlay.none);
     notifyListeners();
   }
 
   void openDescription() {
-    _state = _state.copyWith(showDescription: true);
+    _state = _state.copyWith(activeOverlay: ActiveOverlay.description);
     notifyListeners();
   }
 
   void closeDescription() {
-    _state = _state.copyWith(clearDescription: true);
+    _state = _state.copyWith(activeOverlay: ActiveOverlay.none);
     notifyListeners();
   }
 
   void openVariantPicker() {
-    _state = _state.copyWith(showVariantPicker: true);
+    _state = _state.copyWith(activeOverlay: ActiveOverlay.variantPicker);
     notifyListeners();
   }
 
   void closeVariantPicker() {
-    _state = _state.copyWith(clearVariantPicker: true);
+    _state = _state.copyWith(activeOverlay: ActiveOverlay.none);
     notifyListeners();
   }
 

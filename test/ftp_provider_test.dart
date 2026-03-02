@@ -139,5 +139,110 @@ void main() {
         expect(provider.config, config);
       });
     });
+
+    group('path traversal protection', () {
+      test('blocks ".." (parent directory)', () {
+        expect(FtpProvider.isTraversalName('..'), isTrue);
+      });
+
+      test('blocks "..." (triple dots)', () {
+        expect(FtpProvider.isTraversalName('...'), isTrue);
+      });
+
+      test('blocks names containing ".."', () {
+        expect(FtpProvider.isTraversalName('foo/../bar'), isTrue);
+      });
+
+      test('blocks names with forward slash', () {
+        expect(FtpProvider.isTraversalName('foo/bar'), isTrue);
+      });
+
+      test('blocks names with backslash', () {
+        expect(FtpProvider.isTraversalName('foo\\bar'), isTrue);
+      });
+
+      test('allows normal directory name', () {
+        expect(FtpProvider.isTraversalName('Pokemon Emerald'), isFalse);
+      });
+
+      test('allows name with single dot', () {
+        expect(FtpProvider.isTraversalName('game.v2'), isFalse);
+      });
+
+      test('allows dotfile name (blocked separately)', () {
+        expect(FtpProvider.isTraversalName('.hidden'), isFalse);
+      });
+    });
+
+    group('IPv6 host validation', () {
+      test('accepts [::1] (loopback)', () {
+        final provider = FtpProvider(const ProviderConfig(
+          type: ProviderType.ftp, priority: 1, host: '[::1]',
+        ));
+        expect(provider.displayLabel, contains('[::1]'));
+      });
+
+      test('accepts [2001:db8::1]', () {
+        final provider = FtpProvider(const ProviderConfig(
+          type: ProviderType.ftp, priority: 1, host: '[2001:db8::1]',
+        ));
+        expect(provider.displayLabel, contains('[2001:db8::1]'));
+      });
+
+      test('accepts full IPv6', () {
+        final provider = FtpProvider(const ProviderConfig(
+          type: ProviderType.ftp,
+          priority: 1,
+          host: '[2001:0db8:85a3:0000:0000:8a2e:0370:7334]',
+        ));
+        expect(provider.displayLabel, contains('2001:'));
+      });
+
+      test('accepts link-local with zone ID', () {
+        final provider = FtpProvider(const ProviderConfig(
+          type: ProviderType.ftp, priority: 1, host: '[fe80::1%eth0]',
+        ));
+        expect(provider.displayLabel, contains('fe80'));
+      });
+
+      test('accepts IPv4-mapped IPv6', () {
+        final provider = FtpProvider(const ProviderConfig(
+          type: ProviderType.ftp,
+          priority: 1,
+          host: '[::ffff:192.168.1.1]',
+        ));
+        expect(provider.displayLabel, contains('ffff'));
+      });
+
+      test('rejects [:] (single colon)', () {
+        final provider = FtpProvider(const ProviderConfig(
+          type: ProviderType.ftp, priority: 1, host: '[:]',
+        ));
+        expect(
+          () => provider.testConnection(),
+          throwsA(isA<StateError>()),
+        );
+      });
+
+      test('rejects [ABCD1234] (no colons)', () {
+        final provider = FtpProvider(const ProviderConfig(
+          type: ProviderType.ftp, priority: 1, host: '[ABCD1234]',
+        ));
+        expect(
+          () => provider.testConnection(),
+          throwsA(isA<StateError>()),
+        );
+      });
+
+      test('rejects [] (empty brackets)', () {
+        final provider = FtpProvider(const ProviderConfig(
+          type: ProviderType.ftp, priority: 1, host: '[]',
+        ));
+        expect(
+          () => provider.testConnection(),
+          throwsA(isA<StateError>()),
+        );
+      });
+    });
   });
 }

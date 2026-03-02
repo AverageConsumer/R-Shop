@@ -78,6 +78,10 @@ class DeviceInfoService {
   static const _channel = MethodChannel('com.retro.rshop/storage');
   static DeviceMemoryInfo? _cached;
 
+  /// Test hook: clears cached result so tests can re-query.
+  @visibleForTesting
+  static void resetForTesting() => _cached = null;
+
   static MemoryTier _classify(int totalBytes) {
     final gb = totalBytes / (1024 * 1024 * 1024);
     if (gb <= 4.5) return MemoryTier.low;

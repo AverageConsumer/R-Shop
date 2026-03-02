@@ -93,7 +93,7 @@ class DownloadForegroundService {
 
       final result = await FlutterForegroundTask.startService(
         notificationTitle: 'R-Shop',
-        notificationText: _buildNotificationText(activeCount, queuedCount),
+        notificationText: buildNotificationText(activeCount, queuedCount),
         callback: _startCallback,
       );
 
@@ -114,7 +114,7 @@ class DownloadForegroundService {
   }) async {
     if (!_running) return;
 
-    var text = _buildNotificationText(activeCount, queuedCount);
+    var text = buildNotificationText(activeCount, queuedCount);
     if (progressDetail != null) {
       text = '$text — $progressDetail';
     }
@@ -144,7 +144,8 @@ class DownloadForegroundService {
     _stopCompleter = null;
   }
 
-  static String _buildNotificationText(int activeCount, int queuedCount) {
+  @visibleForTesting
+  static String buildNotificationText(int activeCount, int queuedCount) {
     if (activeCount == 0 && queuedCount == 0) {
       return 'Downloads complete';
     }

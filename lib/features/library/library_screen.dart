@@ -1227,6 +1227,24 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     }
 
     if (_filteredGames.isEmpty) {
+      final String title;
+      final String? subtitle;
+      if (_searchQuery.isNotEmpty) {
+        title = 'No results for "$_searchQuery"';
+        subtitle = 'Try a shorter search term';
+      } else if (_selectedTab == 1) {
+        title = 'No installed games';
+        subtitle = 'Download games to see them here';
+      } else if (_selectedTab == 2) {
+        title = 'No favorites yet';
+        subtitle = 'Press SELECT on a game to favorite it';
+      } else if (_isShelfTab) {
+        title = 'No games in this shelf';
+        subtitle = 'Add games via the shelf editor';
+      } else {
+        title = 'No games in library';
+        subtitle = _allGames.isEmpty ? 'Games will appear after sync completes' : null;
+      }
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1235,23 +1253,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 size: 64, color: Colors.grey[700]),
             const SizedBox(height: 16),
             Text(
-              _selectedTab == 1
-                  ? 'No installed games'
-                  : _selectedTab == 2
-                      ? 'No favorites yet'
-                      : _isShelfTab
-                          ? (_searchQuery.isNotEmpty
-                              ? 'No results for "$_searchQuery"'
-                              : 'No games in this shelf')
-                          : _searchQuery.isNotEmpty
-                              ? 'No results for "$_searchQuery"'
-                              : 'No games in library',
+              title,
               style: TextStyle(color: Colors.grey[500], fontSize: 16),
             ),
-            if (_allGames.isEmpty) ...[
+            if (subtitle != null) ...[
               const SizedBox(height: 8),
               Text(
-                'Games will appear after sync completes',
+                subtitle,
                 style: TextStyle(color: Colors.grey[600], fontSize: 12),
               ),
             ],

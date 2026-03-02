@@ -151,31 +151,13 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final controller = _controller;
     if (controller == null) return;
 
-    if (controller.state.showVariantPicker) {
-      ref.read(feedbackServiceProvider).cancel();
-      controller.closeVariantPicker();
-      return;
-    }
-
-    if (controller.state.showDescription) {
-      ref.read(feedbackServiceProvider).cancel();
-      controller.closeDescription();
-      return;
-    }
-
-    if (controller.state.showTagInfo) {
-      ref.read(feedbackServiceProvider).cancel();
-      controller.closeTagInfo();
-      return;
-    }
-
-    if (controller.state.isDialogOpen) {
-      ref.read(feedbackServiceProvider).cancel();
-      controller.cancelDialog();
-      return;
-    }
-
     ref.read(feedbackServiceProvider).cancel();
+
+    if (controller.state.isOverlayOpen) {
+      controller.closeOverlay();
+      return;
+    }
+
     Navigator.pop(context);
   }
 

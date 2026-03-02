@@ -91,6 +91,12 @@ class ProviderListItem extends StatelessWidget {
               ],
             ),
           ),
+          if (provider.needsAuth)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: rs.spacing.xs),
+              child: Icon(Icons.warning_amber_rounded,
+                  color: Colors.amber.shade300, size: iconSize),
+            ),
           if (onMoveUp != null)
             GestureDetector(
               behavior: HitTestBehavior.opaque,

@@ -13,7 +13,7 @@ class LowSpaceWarning extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Find the target folder from the first active or queued download
     final activeOrQueued = items
-        .where((i) => i.isActive || i.status == DownloadItemStatus.queued)
+        .where((i) => i.isActive || i.status == DownloadStatus.queued)
         .toList();
     if (activeOrQueued.isEmpty) return const SizedBox.shrink();
 

@@ -377,7 +377,7 @@ class _SmartCoverImageState extends State<SmartCoverImage> {
         height: widget.height,
         fit: widget.fit,
         memCacheWidth: widget.memCacheWidth,
-        fadeInDuration: Duration.zero,
+        fadeInDuration: const Duration(milliseconds: 200),
         fadeOutDuration: Duration.zero,
         placeholder: (context, url) =>
             widget.placeholder ?? _buildDefaultPlaceholder(),
@@ -447,7 +447,7 @@ class _SmartCoverImageState extends State<SmartCoverImage> {
       height: widget.height,
       fit: widget.fit,
       memCacheWidth: widget.memCacheWidth,
-      fadeInDuration: Duration.zero,
+      fadeInDuration: const Duration(milliseconds: 200),
       fadeOutDuration: Duration.zero,
       placeholder: (context, url) =>
           widget.placeholder ?? _buildDefaultPlaceholder(),

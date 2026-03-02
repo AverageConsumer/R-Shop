@@ -53,6 +53,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   final Map<int, GlobalKey> _itemKeys = {};
 
   bool _isFiltering = false;
+  bool _showStartHint = false;
   ProviderSubscription? _installedFilesSubscription;
 
   late int _columns;
@@ -155,7 +156,10 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         FavoriteIntent: OverlayGuardedAction<FavoriteIntent>(ref,
           onInvoke: (_) { _handleFavorite(); return null; },
         ),
-        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: toggleQuickMenu),
+        ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: () {
+          _dismissStartHint();
+          toggleQuickMenu();
+        }),
       };
   }
 
@@ -202,7 +206,20 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
           );
         }
       });
+
+      final storage = ref.read(storageServiceProvider);
+      if (!storage.getStartHintShown()) {
+        storage.setStartHintShown();
+        setState(() => _showStartHint = true);
+        Future.delayed(const Duration(seconds: 4), () {
+          if (mounted) setState(() => _showStartHint = false);
+        });
+      }
     });
+  }
+
+  void _dismissStartHint() {
+    if (_showStartHint) setState(() => _showStartHint = false);
   }
 
   void _restoreSavedIndex() {
@@ -586,13 +603,17 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
                 ConsoleHud(
                   a: HudAction('Select', onTap: _openSelectedGame),
                   b: HudAction('Back', onTap: () => Navigator.pop(context)),
-                  start: HudAction('Menu', onTap: toggleQuickMenu),
+                  start: HudAction('Menu', onTap: () {
+                    _dismissStartHint();
+                    toggleQuickMenu();
+                  }),
                 ),
               if (showQuickMenu)
                 QuickMenuOverlay(
                   items: _buildQuickMenuItems(),
                   onClose: closeQuickMenu,
                 ),
+              if (_showStartHint) _buildStartHint(context),
             ],
           ),
         ),
@@ -622,7 +643,10 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
   Widget _buildGridOrStatus(GameListState state) {
     if (state.isLoading) {
-      return GameGridLoading(accentColor: widget.system.accentColor);
+      return GameGridLoading(
+        accentColor: widget.system.accentColor,
+        crossAxisCount: _columns,
+      );
     }
     if (state.error != null) {
       return GameGridError(
@@ -726,6 +750,41 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
           setState(() {});
         },
         onClose: _closeFilter,
+      ),
+    );
+  }
+
+  Widget _buildStartHint(BuildContext context) {
+    final rs = context.rs;
+    return Positioned(
+      bottom: rs.isPortrait ? 56 : 48,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: AnimatedOpacity(
+          opacity: _showStartHint ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 300),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: rs.spacing.md,
+              vertical: rs.spacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(rs.radius.md),
+              border: Border.all(
+                color: widget.system.accentColor.withValues(alpha: 0.4),
+              ),
+            ),
+            child: Text(
+              'Press  +  for menu',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: rs.isSmall ? 11 : 13,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

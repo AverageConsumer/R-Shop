@@ -24,6 +24,7 @@ class LocalSetupStep extends ConsumerWidget {
         message: ls.isAutoDetecting
             ? "Checking for ROM folders..."
             : "Scanning your ROM folder...",
+        scanProgress: ls.scanProgress,
         onComplete: onComplete,
       );
     }
@@ -384,9 +385,11 @@ class _CreateSystemRow extends StatelessWidget {
 
 class _LocalScanningView extends StatelessWidget {
   final String message;
+  final int scanProgress;
   final VoidCallback onComplete;
   const _LocalScanningView({
     required this.message,
+    required this.scanProgress,
     required this.onComplete,
   });
 
@@ -406,9 +409,23 @@ class _LocalScanningView extends StatelessWidget {
           SizedBox(height: rs.spacing.lg),
           Padding(
             padding: EdgeInsets.only(left: rs.isSmall ? 40 : 60),
-            child: const CircularProgressIndicator(
-              color: Colors.redAccent,
-              strokeWidth: 2,
+            child: Row(
+              children: [
+                const CircularProgressIndicator(
+                  color: Colors.redAccent,
+                  strokeWidth: 2,
+                ),
+                if (scanProgress > 0) ...[
+                  SizedBox(width: rs.spacing.md),
+                  Text(
+                    'Found $scanProgress folder${scanProgress == 1 ? '' : 's'}...',
+                    style: TextStyle(
+                      color: Colors.grey[500],
+                      fontSize: rs.isSmall ? 11 : 13,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],

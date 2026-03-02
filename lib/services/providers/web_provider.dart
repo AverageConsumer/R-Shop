@@ -114,11 +114,14 @@ class WebProvider implements SourceProvider {
         continue;
       }
 
-      // Skip absolute URLs, absolute paths, and path traversal attempts
+      // Skip absolute URLs, absolute paths, and path traversal attempts.
+      // Decode first to catch encoded traversal like %2e%2e%2f
+      final decodedHref = Uri.decodeFull(href);
       if (href.startsWith('http://') ||
           href.startsWith('https://') ||
           href.startsWith('/') ||
-          href.contains('../')) {
+          decodedHref.contains('../') ||
+          decodedHref.startsWith('/')) {
         continue;
       }
 

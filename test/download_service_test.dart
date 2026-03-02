@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:retro_eshop/models/download_item.dart';
 import 'package:retro_eshop/services/download_service.dart';
 import 'package:retro_eshop/services/native_smb_service.dart';
 
@@ -164,7 +165,7 @@ void main() {
   group('DownloadStatus', () {
     test('has all expected values', () {
       expect(DownloadStatus.values, containsAll([
-        DownloadStatus.idle,
+        DownloadStatus.queued,
         DownloadStatus.downloading,
         DownloadStatus.extracting,
         DownloadStatus.moving,
