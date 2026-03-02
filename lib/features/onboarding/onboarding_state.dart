@@ -10,6 +10,7 @@ enum OnboardingStep {
   legalNotice,
   rommSetup,
   localSetup,
+  remoteSetup,
   consoleSetup,
   raSetup,
   complete,
@@ -24,6 +25,8 @@ enum ConsoleSubStep {
 enum LocalSetupAction { scanDetected, pickFolder, createFolders, skip }
 
 enum RommSetupSubStep { ask, connect, select, folder }
+
+enum RemoteSetupSubStep { ask, connect, scanning, results }
 
 class ScannedFolder {
   final String name;
@@ -50,6 +53,7 @@ class LocalSetupState {
   final String? createBasePath; // base path for folder creation
   final bool isAutoDetecting; // true while checking known paths
   final String? scanError; // error message from failed scan
+  final int scanProgress; // folders found so far during scan
 
   const LocalSetupState({
     this.romBasePath,
@@ -62,6 +66,7 @@ class LocalSetupState {
     this.createBasePath,
     this.isAutoDetecting = false,
     this.scanError,
+    this.scanProgress = 0,
   });
 
   LocalSetupState copyWith({
@@ -75,6 +80,7 @@ class LocalSetupState {
     String? createBasePath,
     bool? isAutoDetecting,
     String? scanError,
+    int? scanProgress,
     bool clearRomBasePath = false,
     bool clearScannedFolders = false,
     bool clearDetectedPath = false,
@@ -94,6 +100,7 @@ class LocalSetupState {
       createBasePath: clearCreateBasePath ? null : (createBasePath ?? this.createBasePath),
       isAutoDetecting: isAutoDetecting ?? this.isAutoDetecting,
       scanError: clearScanError ? null : (scanError ?? this.scanError),
+      scanProgress: scanProgress ?? this.scanProgress,
     );
   }
 
@@ -120,6 +127,7 @@ class RommSetupState {
   final String? detectedPath;
   final bool isAutoDetecting;
   final String? scanError;
+  final int scanProgress;
 
   const RommSetupState({
     this.subStep = RommSetupSubStep.ask,
@@ -138,6 +146,7 @@ class RommSetupState {
     this.detectedPath,
     this.isAutoDetecting = false,
     this.scanError,
+    this.scanProgress = 0,
   });
 
   RommSetupState copyWith({
@@ -157,6 +166,7 @@ class RommSetupState {
     String? detectedPath,
     bool? isAutoDetecting,
     String? scanError,
+    int? scanProgress,
     bool clearRomBasePath = false,
     bool clearScannedFolders = false,
     bool clearDetectedPath = false,
@@ -179,6 +189,7 @@ class RommSetupState {
       detectedPath: clearDetectedPath ? null : (detectedPath ?? this.detectedPath),
       isAutoDetecting: isAutoDetecting ?? this.isAutoDetecting,
       scanError: clearScanError ? null : (scanError ?? this.scanError),
+      scanProgress: scanProgress ?? this.scanProgress,
     );
   }
 
@@ -196,6 +207,131 @@ class RommSetupState {
       apiKey: hasApiKey ? apiKey.trim() : null,
       user: hasUser ? user.trim() : null,
       pass: hasPass ? pass.trim() : null,
+    );
+  }
+}
+
+class RemoteSetupState {
+  final RemoteSetupSubStep subStep;
+  final ProviderType providerType;
+  final String host;
+  final String url;
+  final String port;
+  final String share;
+  final String path;
+  final String user;
+  final String pass;
+  final String domain;
+  final bool isScanning;
+  final bool isTestingConnection;
+  final bool connectionTestSuccess;
+  final String? connectionError;
+  final List<ScannedFolder>? scannedFolders;
+  final Map<String, String> folderAssignments; // systemId → folderName
+  final Set<String> enabledSystemIds;
+  final String? scanError;
+
+  const RemoteSetupState({
+    this.subStep = RemoteSetupSubStep.ask,
+    this.providerType = ProviderType.ftp,
+    this.host = '',
+    this.url = '',
+    this.port = '',
+    this.share = '',
+    this.path = '',
+    this.user = '',
+    this.pass = '',
+    this.domain = '',
+    this.isScanning = false,
+    this.isTestingConnection = false,
+    this.connectionTestSuccess = false,
+    this.connectionError,
+    this.scannedFolders,
+    this.folderAssignments = const {},
+    this.enabledSystemIds = const {},
+    this.scanError,
+  });
+
+  RemoteSetupState copyWith({
+    RemoteSetupSubStep? subStep,
+    ProviderType? providerType,
+    String? host,
+    String? url,
+    String? port,
+    String? share,
+    String? path,
+    String? user,
+    String? pass,
+    String? domain,
+    bool? isScanning,
+    bool? isTestingConnection,
+    bool? connectionTestSuccess,
+    String? connectionError,
+    List<ScannedFolder>? scannedFolders,
+    Map<String, String>? folderAssignments,
+    Set<String>? enabledSystemIds,
+    String? scanError,
+    bool clearConnectionError = false,
+    bool clearScannedFolders = false,
+    bool clearScanError = false,
+  }) {
+    return RemoteSetupState(
+      subStep: subStep ?? this.subStep,
+      providerType: providerType ?? this.providerType,
+      host: host ?? this.host,
+      url: url ?? this.url,
+      port: port ?? this.port,
+      share: share ?? this.share,
+      path: path ?? this.path,
+      user: user ?? this.user,
+      pass: pass ?? this.pass,
+      domain: domain ?? this.domain,
+      isScanning: isScanning ?? this.isScanning,
+      isTestingConnection: isTestingConnection ?? this.isTestingConnection,
+      connectionTestSuccess: connectionTestSuccess ?? this.connectionTestSuccess,
+      connectionError: clearConnectionError ? null : (connectionError ?? this.connectionError),
+      scannedFolders: clearScannedFolders ? null : (scannedFolders ?? this.scannedFolders),
+      folderAssignments: folderAssignments ?? this.folderAssignments,
+      enabledSystemIds: enabledSystemIds ?? this.enabledSystemIds,
+      scanError: clearScanError ? null : (scanError ?? this.scanError),
+    );
+  }
+
+  bool get hasConnection {
+    switch (providerType) {
+      case ProviderType.ftp:
+        return host.trim().isNotEmpty;
+      case ProviderType.smb:
+        return host.trim().isNotEmpty && share.trim().isNotEmpty;
+      case ProviderType.web:
+        return url.trim().isNotEmpty;
+      case ProviderType.romm:
+        return false; // not used here
+    }
+  }
+
+  ProviderConfig buildConfig() {
+    AuthConfig? auth;
+    final hasUser = user.trim().isNotEmpty;
+    final hasPass = pass.trim().isNotEmpty;
+    final hasDomain = domain.trim().isNotEmpty;
+    if (hasUser || hasPass || hasDomain) {
+      auth = AuthConfig(
+        user: hasUser ? user.trim() : null,
+        pass: hasPass ? pass.trim() : null,
+        domain: hasDomain ? domain.trim() : null,
+      );
+    }
+
+    return ProviderConfig(
+      type: providerType,
+      priority: 0,
+      url: providerType == ProviderType.web ? url.trim() : null,
+      host: providerType != ProviderType.web ? host.trim() : null,
+      port: port.trim().isNotEmpty ? int.tryParse(port.trim()) : null,
+      share: providerType == ProviderType.smb ? share.trim() : null,
+      path: path.trim().isNotEmpty ? path.trim() : null,
+      auth: auth,
     );
   }
 }
@@ -305,6 +441,20 @@ class ConsoleSetupState {
   bool get isComplete => targetFolder != null;
 }
 
+class ConfiguredServerSummary {
+  final ProviderType type;
+  final String hostLabel;
+  final String detailLabel;
+  final int systemCount;
+
+  const ConfiguredServerSummary({
+    required this.type,
+    required this.hostLabel,
+    required this.detailLabel,
+    required this.systemCount,
+  });
+}
+
 class OnboardingState {
   final OnboardingStep currentStep;
   final Map<String, SystemConfig> configuredSystems;
@@ -321,6 +471,7 @@ class OnboardingState {
   final bool isFetchingRommPlatforms;
   final RommSetupState? rommSetupState;
   final LocalSetupState? localSetupState;
+  final RemoteSetupState? remoteSetupState;
   final RaSetupState? raSetupState;
 
   const OnboardingState({
@@ -339,6 +490,7 @@ class OnboardingState {
     this.isFetchingRommPlatforms = false,
     this.rommSetupState,
     this.localSetupState,
+    this.remoteSetupState,
     this.raSetupState,
   });
 
@@ -358,6 +510,7 @@ class OnboardingState {
     bool? isFetchingRommPlatforms,
     RommSetupState? rommSetupState,
     LocalSetupState? localSetupState,
+    RemoteSetupState? remoteSetupState,
     RaSetupState? raSetupState,
     bool clearSelectedConsole = false,
     bool clearConsoleSubState = false,
@@ -366,6 +519,7 @@ class OnboardingState {
     bool clearRommState = false,
     bool clearRommSetupState = false,
     bool clearLocalSetupState = false,
+    bool clearRemoteSetupState = false,
     bool clearRaSetupState = false,
   }) {
     return OnboardingState(
@@ -384,6 +538,7 @@ class OnboardingState {
       isFetchingRommPlatforms: isFetchingRommPlatforms ?? this.isFetchingRommPlatforms,
       rommSetupState: clearRommSetupState ? null : (rommSetupState ?? this.rommSetupState),
       localSetupState: clearLocalSetupState ? null : (localSetupState ?? this.localSetupState),
+      remoteSetupState: clearRemoteSetupState ? null : (remoteSetupState ?? this.remoteSetupState),
       raSetupState: clearRaSetupState ? null : (raSetupState ?? this.raSetupState),
     );
   }
@@ -453,5 +608,37 @@ class OnboardingState {
       debugPrint('OnboardingState: system lookup failed for $selectedConsoleId: $e');
       return null;
     }
+  }
+
+  /// Deduplicated list of remote servers already configured across all systems.
+  List<ConfiguredServerSummary> get configuredRemoteServers {
+    final serverMap = <String, ({ProviderType type, String hostLabel, String detailLabel, Set<String> systemIds})>{};
+
+    for (final system in configuredSystems.values) {
+      for (final provider in system.providers) {
+        if (provider.type == ProviderType.romm) continue;
+        final key = '${provider.type.name}:${provider.hostLabel}';
+        final existing = serverMap[key];
+        if (existing != null) {
+          existing.systemIds.add(system.id);
+        } else {
+          serverMap[key] = (
+            type: provider.type,
+            hostLabel: provider.hostLabel,
+            detailLabel: provider.detailLabel,
+            systemIds: {system.id},
+          );
+        }
+      }
+    }
+
+    return serverMap.values
+        .map((e) => ConfiguredServerSummary(
+              type: e.type,
+              hostLabel: e.hostLabel,
+              detailLabel: e.detailLabel,
+              systemCount: e.systemIds.length,
+            ))
+        .toList();
   }
 }
