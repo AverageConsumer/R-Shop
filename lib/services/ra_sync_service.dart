@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game_item.dart';
 import '../models/ra_models.dart';
 import '../models/system_model.dart';
+import '../utils/friendly_error.dart';
 import '../utils/ra_name_matcher.dart';
 import 'config_storage_service.dart';
 import 'database_service.dart';
@@ -139,7 +140,7 @@ class RaSyncService extends StateNotifier<RaSyncState> {
     } catch (e) {
       debugPrint('RetroAchievements: sync failed: $e');
       if (mounted) {
-        state = state.copyWith(error: e.toString());
+        state = state.copyWith(error: getUserFriendlyError(e));
       }
     } finally {
       if (mounted) {

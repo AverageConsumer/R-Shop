@@ -9,6 +9,7 @@ import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/screen_layout.dart';
 import '../../providers/app_providers.dart';
+import '../../utils/friendly_error.dart';
 import '../../providers/download_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../widgets/download_overlay.dart';
@@ -274,7 +275,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     } catch (e) {
       _hideResetDialog();
       if (mounted) {
-        showConsoleNotification(context, message: 'Reset error: $e');
+        showErrorNotification(context, ref, message: 'Reset error: ${getUserFriendlyError(e)}');
       }
     }
   }
@@ -346,16 +347,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
         if (!mounted) return;
         _loadCoverStats();
         if (next.failed > 0) {
-          showConsoleNotification(
+          showErrorNotification(
             context,
+            ref,
             message: 'Covers: ${next.succeeded} ok, ${next.failed} failed',
-            isError: true,
           );
         } else {
-          showConsoleNotification(
+          showSuccessNotification(
             context,
+            ref,
             message: '${next.succeeded} covers loaded!',
-            isError: false,
           );
         }
       }
@@ -393,8 +394,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       await Share.shareXFiles([XFile(logFile.path)]);
     } catch (e) {
       if (mounted) {
-        showConsoleNotification(context,
-            message: 'Share failed: $e', isError: true);
+        showErrorNotification(context, ref,
+            message: 'Share failed: ${getUserFriendlyError(e)}');
       }
     }
   }

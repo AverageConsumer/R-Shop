@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/responsive/responsive.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
+import '../../utils/friendly_error.dart';
 import '../../providers/ra_providers.dart';
 import '../../services/audio_manager.dart';
 import '../../providers/game_providers.dart';
@@ -148,7 +149,7 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
       await controller.exportConfig();
     } catch (e) {
       if (!mounted) return;
-      showConsoleNotification(context, message: 'Export failed: $e');
+      showErrorNotification(context, ref, message: 'Export failed: ${getUserFriendlyError(e)}');
     }
   }
 
@@ -157,7 +158,7 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     if (!mounted) return;
     if (result.cancelled) return;
     if (result.error != null) {
-      showConsoleNotification(context, message: 'Invalid config: ${result.error}');
+      showErrorNotification(context, ref, message: 'Invalid config: ${result.error}');
     } else {
       // Reload controller from freshly imported config
       ref.read(onboardingControllerProvider.notifier).loadFromConfig(result.config!);
@@ -165,12 +166,12 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
           .expand((s) => s.providers)
           .where((p) => p.needsAuth)
           .length;
-      showConsoleNotification(
+      showSuccessNotification(
         context,
+        ref,
         message: count > 0
             ? 'Config imported — $count provider${count > 1 ? 's' : ''} need credentials'
             : 'Config imported!',
-        isError: false,
       );
     }
   }

@@ -113,8 +113,7 @@ class _RaConfigScreenState extends ConsumerState<RaConfigScreen>
     await storage.setRaEnabled(_enabled);
 
     if (!mounted) return;
-    ref.read(feedbackServiceProvider).confirm();
-    showConsoleNotification(context, message: 'Settings saved');
+    showSuccessNotification(context, ref, message: 'Settings saved');
     Navigator.pop(context);
   }
 
@@ -134,10 +133,8 @@ class _RaConfigScreenState extends ConsumerState<RaConfigScreen>
     final apiKey = _apiKeyController.text.trim();
 
     if (username.isEmpty || apiKey.isEmpty) {
-      showConsoleNotification(
-        context,
-        message: 'Enter username and API key first',
-      );
+      showErrorNotification(context, ref,
+          message: 'Enter username and API key first');
       return;
     }
 
@@ -166,19 +163,17 @@ class _RaConfigScreenState extends ConsumerState<RaConfigScreen>
       storage.setRaApiKey(apiKey);
       storage.setRaEnabled(true);
 
-      ref.read(feedbackServiceProvider).confirm();
-      showConsoleNotification(context, message: 'Connected to RetroAchievements');
+      showSuccessNotification(context, ref, message: 'Connected to RetroAchievements');
       setState(() => _enabled = true);
     } else {
-      ref.read(feedbackServiceProvider).error();
-      showConsoleNotification(context, message: result.error ?? 'Connection failed');
+      showErrorNotification(context, ref, message: result.error ?? 'Connection failed');
     }
   }
 
   Future<void> _refreshDatabase() async {
     final storage = ref.read(storageServiceProvider);
     if (!storage.isRaConfigured) {
-      showConsoleNotification(context, message: 'Configure and test credentials first');
+      showErrorNotification(context, ref, message: 'Configure and test credentials first');
       return;
     }
 
@@ -197,7 +192,7 @@ class _RaConfigScreenState extends ConsumerState<RaConfigScreen>
     final db = DatabaseService();
     await db.clearRaCache();
     if (!mounted) return;
-    showConsoleNotification(context, message: 'RA cache cleared');
+    showSuccessNotification(context, ref, message: 'RA cache cleared');
     ref.read(raRefreshSignalProvider.notifier).state++;
   }
 

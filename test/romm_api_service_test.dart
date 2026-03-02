@@ -687,7 +687,6 @@ void main() {
       final result = await service.testConnection('https://romm.local');
 
       expect(result.success, isFalse);
-      expect(result.error, contains('Server error'));
       expect(result.error, contains('503'));
     });
 

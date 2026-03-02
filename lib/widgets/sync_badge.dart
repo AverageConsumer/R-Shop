@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/responsive/responsive.dart';
+import '../providers/app_providers.dart';
 import '../providers/library_providers.dart';
 import '../providers/ra_providers.dart';
 import '../services/library_sync_service.dart';
@@ -45,6 +46,7 @@ class _LibrarySyncPill extends ConsumerStatefulWidget {
 
 class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
   bool _showOffline = false;
+  String? _lastError;
   Timer? _dismissTimer;
 
   @override
@@ -68,9 +70,13 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
           prev.isSyncing &&
           !next.isSyncing &&
           next.hadFailures) {
-        setState(() => _showOffline = true);
+        ref.read(feedbackServiceProvider).warning();
+        setState(() {
+          _showOffline = true;
+          _lastError = next.error;
+        });
         _dismissTimer?.cancel();
-        _dismissTimer = Timer(const Duration(seconds: 3), () {
+        _dismissTimer = Timer(const Duration(seconds: 6), () {
           if (mounted) setState(() => _showOffline = false);
         });
       }
@@ -93,6 +99,16 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
         ),
         label: 'Syncing ${state.completedSystems}/${state.totalSystems}',
         systemName: state.currentSystem,
+      );
+    }
+
+    if (_lastError != null) {
+      return _SyncPillContent(
+        key: const ValueKey('library-error'),
+        accentColor: Colors.redAccent,
+        leadingIcon:
+            Icon(Icons.error_outline, size: iconSize, color: Colors.redAccent),
+        label: _lastError!,
       );
     }
 
@@ -120,6 +136,7 @@ class _RaSyncPill extends ConsumerStatefulWidget {
 
 class _RaSyncPillState extends ConsumerState<_RaSyncPill> {
   bool _showError = false;
+  String? _lastError;
   Timer? _dismissTimer;
 
   @override
@@ -146,9 +163,13 @@ class _RaSyncPillState extends ConsumerState<_RaSyncPill> {
           prev.isSyncing &&
           !next.isSyncing &&
           next.error != null) {
-        setState(() => _showError = true);
+        ref.read(feedbackServiceProvider).warning();
+        setState(() {
+          _showError = true;
+          _lastError = next.error;
+        });
         _dismissTimer?.cancel();
-        _dismissTimer = Timer(const Duration(seconds: 3), () {
+        _dismissTimer = Timer(const Duration(seconds: 6), () {
           if (mounted) setState(() => _showError = false);
         });
       }
@@ -177,10 +198,10 @@ class _RaSyncPillState extends ConsumerState<_RaSyncPill> {
     } else {
       pill = _SyncPillContent(
         key: const ValueKey('ra-error'),
-        accentColor: Colors.amber,
+        accentColor: Colors.redAccent,
         leadingIcon:
-            Icon(Icons.cloud_off, size: iconSize, color: Colors.amber),
-        label: 'RA sync failed',
+            Icon(Icons.error_outline, size: iconSize, color: Colors.redAccent),
+        label: _lastError ?? 'RA sync failed',
       );
     }
 
@@ -238,12 +259,18 @@ class _SyncPillContent extends StatelessWidget {
         children: [
           leadingIcon,
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: fontSize,
-              fontWeight: FontWeight.w600,
-              color: accentColor,
+          ConstrainedBox(
+            constraints:
+                BoxConstraints(maxWidth: rs.isSmall ? 200 : 300),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+                color: accentColor,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           if (systemName != null) ...[

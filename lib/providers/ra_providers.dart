@@ -71,6 +71,12 @@ final raSyncServiceProvider =
   );
 });
 
+/// Whether the last RA sync had an error (and is not currently syncing).
+final lastRaSyncHadErrorProvider = Provider<bool>((ref) {
+  final state = ref.watch(raSyncServiceProvider);
+  return !state.isSyncing && state.error != null;
+});
+
 /// Signal provider to trigger RA match refresh.
 final raRefreshSignalProvider = StateProvider<int>((ref) => 0);
 

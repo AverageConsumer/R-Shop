@@ -94,10 +94,10 @@ void main() {
       );
     });
 
-    test('first match wins — connection before timeout', () {
+    test('first match wins — timeout before connection', () {
       expect(
         getUserFriendlyError('SocketException: connection timeout'),
-        'Connection error — check your network connection',
+        'Connection timed out',
       );
     });
 

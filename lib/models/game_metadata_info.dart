@@ -25,7 +25,8 @@ class GameMetadataInfo {
       summary != null ||
       genres != null ||
       developer != null ||
-      releaseYear != null;
+      releaseYear != null ||
+      rating != null;
 
   List<String> get genreList =>
       genres

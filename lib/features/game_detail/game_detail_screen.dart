@@ -133,8 +133,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
     final error = _controller?.state.error;
     if (error != null) {
-      ref.read(feedbackServiceProvider).error();
-      showConsoleNotification(context, message: 'Error: $error');
+      showErrorNotification(context, ref, message: 'Error: $error');
     }
   }
 

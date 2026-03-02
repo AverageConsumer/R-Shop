@@ -81,7 +81,7 @@ class ControlButton extends StatelessWidget {
         ],
       );
 
-      if (onTap == null) return content;
+      if (onTap == null) return Opacity(opacity: 0.35, child: content);
 
       return Material(
         color: Colors.transparent,
@@ -166,7 +166,7 @@ class ControlButton extends StatelessWidget {
       ],
     );
 
-    if (onTap == null) return content;
+    if (onTap == null) return Opacity(opacity: 0.35, child: content);
 
     return Material(
       color: Colors.transparent,

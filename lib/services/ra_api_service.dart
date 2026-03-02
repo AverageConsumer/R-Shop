@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/ra_models.dart';
+import '../utils/friendly_error.dart';
 import '../utils/network_constants.dart';
 import 'source_provider.dart';
 
@@ -271,30 +272,14 @@ class RetroAchievementsService {
   }
 
   String _getUserFriendlyError(DioException e) {
-    if (e.response != null) {
-      final code = e.response!.statusCode ?? 0;
-      switch (code) {
-        case 401:
-          return 'Invalid API key — check your RetroAchievements credentials';
-        case 403:
-          return 'Access denied — your API key may be expired or revoked';
-        case 429:
-          return 'Rate limited — please wait a moment and try again';
-        case >= 500:
-          return 'RetroAchievements server error ($code) — try again later';
-      }
+    final code = e.response?.statusCode;
+    if (code == 401) {
+      return 'Invalid API key — check your RetroAchievements credentials';
     }
-
-    if (e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.receiveTimeout) {
-      return 'Connection timed out — check your internet connection';
+    if (code == 403) {
+      return 'Access denied — your API key may be expired or revoked';
     }
-
-    if (e.type == DioExceptionType.connectionError) {
-      return 'Could not reach retroachievements.org — check your connection';
-    }
-
-    return 'Connection failed: ${e.message ?? 'unknown error'}';
+    return getUserFriendlyError(e);
   }
 }
 
@@ -321,53 +306,23 @@ class _AsyncLock {
 
 class _RateLimiter {
   static const _minInterval = Duration(milliseconds: 500);
-  static const _backoffBase = Duration(seconds: 2);
-  static const _maxBackoff = Duration(seconds: 30);
 
   DateTime _lastRequest = DateTime(0);
-  int _consecutiveRateLimits = 0;
   final _lock = _AsyncLock();
 
   /// Serializes [action] with a minimum interval between requests.
-  /// On 429, backs off exponentially and retries once.
   Future<T> throttle<T>(Future<T> Function() action) async {
     return _lock.run(() async {
       await _waitForSlot();
       _lastRequest = DateTime.now();
-      try {
-        final result = await action();
-        _consecutiveRateLimits = 0;
-        return result;
-      } on DioException catch (e) {
-        if (e.response?.statusCode == 429) {
-          _consecutiveRateLimits++;
-          final backoff = _calculateBackoff();
-          debugPrint(
-            'RetroAchievements: rate limited, backing off ${backoff.inSeconds}s',
-          );
-          await Future<void>.delayed(backoff);
-          _lastRequest = DateTime.now();
-          final result = await action();
-          _consecutiveRateLimits = 0;
-          return result;
-        }
-        rethrow;
-      }
+      return await action();
     });
   }
 
   Future<void> _waitForSlot() async {
     final elapsed = DateTime.now().difference(_lastRequest);
-    final interval =
-        _consecutiveRateLimits > 0 ? _calculateBackoff() : _minInterval;
-    if (elapsed < interval) {
-      await Future<void>.delayed(interval - elapsed);
+    if (elapsed < _minInterval) {
+      await Future<void>.delayed(_minInterval - elapsed);
     }
-  }
-
-  Duration _calculateBackoff() {
-    final multiplier = 1 << _consecutiveRateLimits.clamp(0, 5);
-    final backoff = _backoffBase * multiplier;
-    return backoff > _maxBackoff ? _maxBackoff : backoff;
   }
 }

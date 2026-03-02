@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/responsive/responsive.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
+import '../../utils/friendly_error.dart';
 import '../../providers/game_providers.dart';
 import '../../providers/ra_providers.dart';
 import '../../widgets/console_hud.dart';
@@ -398,7 +399,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         feedback.tick();
         controller.confirmCreateFolders().then((error) {
           if (error != null && mounted) {
-            showConsoleNotification(context, message: error);
+            showErrorNotification(context, ref, message: error);
           }
         });
       }
@@ -422,7 +423,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       // Need at least one console configured to proceed
       if (state.configuredCount == 0) {
         feedback.cancel();
-        showConsoleNotification(context,
+        showErrorNotification(context, ref,
             message: 'Configure at least one console to continue');
         return;
       }
@@ -481,7 +482,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       await controller.exportConfig();
     } catch (e) {
       if (!mounted) return;
-      showConsoleNotification(context, message: 'Export failed: $e');
+      showErrorNotification(context, ref, message: 'Export failed: ${getUserFriendlyError(e)}');
     }
   }
 
@@ -490,10 +491,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (!mounted) return;
     if (result.cancelled) return;
     if (result.error != null) {
-      showConsoleNotification(context, message: 'Invalid config: ${result.error}');
+      showErrorNotification(context, ref, message: 'Invalid config: ${result.error}');
     } else {
       ref.read(onboardingControllerProvider.notifier).loadFromConfig(result.config!);
-      showConsoleNotification(context, message: 'Config imported!', isError: false);
+      showSuccessNotification(context, ref, message: 'Config imported!');
     }
   }
 
@@ -542,7 +543,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ref.invalidate(bootstrappedConfigProvider);
     } catch (e) {
       if (!mounted) return;
-      showConsoleNotification(context, message: 'Failed to save: $e');
+      showErrorNotification(context, ref, message: 'Failed to save: ${getUserFriendlyError(e)}');
       return;
     }
     if (!mounted) return;
@@ -878,7 +879,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       // Grid level
       return ConsoleHud(
         start: HudAction('Continue',
-            onTap: _handleContinue,
+            onTap: state.configuredCount > 0 ? _handleContinue : null,
             highlight: state.configuredCount > 0),
         b: !state.isFirstStep ? HudAction('Back', onTap: _handleBack) : null,
         select: HudAction('Import', onTap: _importConfig),

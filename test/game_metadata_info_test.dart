@@ -43,6 +43,16 @@ void main() {
       expect(info.hasContent, isTrue);
     });
 
+    test('hasContent returns true when only rating is set', () {
+      final info = GameMetadataInfo(
+        filename: 'game.rom',
+        systemSlug: 'nes',
+        rating: 85.0,
+        lastUpdated: 0,
+      );
+      expect(info.hasContent, isTrue);
+    });
+
     test('hasContent returns false when all fields null', () {
       final info = GameMetadataInfo(
         filename: 'game.rom',

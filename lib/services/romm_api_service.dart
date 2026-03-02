@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/config/provider_config.dart';
+import '../utils/friendly_error.dart';
 import '../utils/network_constants.dart';
 import 'source_provider.dart';
 
@@ -244,24 +245,9 @@ class RommApiService {
       );
       return const SourceConnectionResult.ok();
     } on DioException catch (e) {
-      final statusCode = e.response?.statusCode;
-      final String message;
-      if (statusCode == 401) {
-        message = 'Authentication failed — check your credentials';
-      } else if (statusCode == 403) {
-        message = 'Access denied — insufficient permissions';
-      } else if (statusCode == 429) {
-        message = 'Rate limited — try again later';
-      } else if (statusCode != null && statusCode >= 500) {
-        message = 'Server error (HTTP $statusCode)';
-      } else if (statusCode != null) {
-        message = 'HTTP $statusCode';
-      } else {
-        message = e.message ?? 'Connection failed';
-      }
-      return SourceConnectionResult.failed(message);
+      return SourceConnectionResult.failed(getUserFriendlyError(e));
     } catch (e) {
-      return SourceConnectionResult.failed(e.toString());
+      return SourceConnectionResult.failed(getUserFriendlyError(e));
     }
   }
 

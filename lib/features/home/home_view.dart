@@ -10,6 +10,7 @@ import '../../providers/download_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../widgets/quick_menu.dart';
 import '../../providers/library_providers.dart';
+import '../../providers/ra_providers.dart';
 import '../../services/config_bootstrap.dart';
 import '../../services/library_sync_service.dart';
 import '../../services/input_debouncer.dart';
@@ -412,6 +413,8 @@ class _HomeViewState extends ConsumerState<HomeView>
 
   List<QuickMenuItem?> _buildQuickMenuItems() {
     final hasDownloads = ref.read(hasQueueItemsProvider);
+    final syncFailed = ref.read(lastSyncHadFailuresProvider) ||
+        ref.read(lastRaSyncHadErrorProvider);
     return [
       QuickMenuItem(
         label: 'Search',
@@ -424,6 +427,14 @@ class _HomeViewState extends ConsumerState<HomeView>
         icon: Icons.settings_rounded,
         onSelect: _openSettings,
       ),
+      if (syncFailed) ...[
+        null,
+        QuickMenuItem(
+          label: 'Retry Sync',
+          icon: Icons.refresh_rounded,
+          onSelect: _retrySync,
+        ),
+      ],
       if (hasDownloads) ...[
         null,
         QuickMenuItem(
@@ -435,6 +446,18 @@ class _HomeViewState extends ConsumerState<HomeView>
         ),
       ],
     ];
+  }
+
+  void _retrySync() {
+    final config = ref.read(bootstrappedConfigProvider).valueOrNull;
+    if (config != null && config.systems.isNotEmpty) {
+      ref.read(librarySyncServiceProvider.notifier).syncAll(config);
+    }
+    triggerRaSync(
+      ref.read(raSyncServiceProvider.notifier),
+      ref.read(storageServiceProvider),
+      force: true,
+    );
   }
 
   void _exitApp() {

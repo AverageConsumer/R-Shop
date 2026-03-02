@@ -11,3 +11,9 @@ final librarySyncServiceProvider =
     StateNotifierProvider<LibrarySyncService, LibrarySyncState>((ref) {
   return LibrarySyncService();
 });
+
+/// Whether the last library sync had failures (and is not currently syncing).
+final lastSyncHadFailuresProvider = Provider<bool>((ref) {
+  final state = ref.watch(librarySyncServiceProvider);
+  return !state.isSyncing && state.hadFailures;
+});

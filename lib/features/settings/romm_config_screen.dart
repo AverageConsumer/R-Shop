@@ -307,11 +307,11 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
 
     if (!mounted) return;
     setState(() => _isTesting = false);
-    showConsoleNotification(
-      context,
-      message: result.success ? 'Connection successful' : result.error ?? 'Connection failed',
-      isError: !result.success,
-    );
+    if (result.success) {
+      showSuccessNotification(context, ref, message: 'Connection successful');
+    } else {
+      showErrorNotification(context, ref, message: result.error ?? 'Connection failed');
+    }
 
     if (result.success) {
       await _discoverPlatforms(url, auth);
@@ -429,12 +429,9 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
         !isPrivateNetworkUrl(url) &&
         !storage.getAllowNonLanHttp()) {
       if (mounted) {
-        showConsoleNotification(
-          context,
-          message: 'HTTP to non-local servers is blocked. '
-              'Enable in Settings → System.',
-          isError: true,
-        );
+        showErrorNotification(context, ref,
+            message: 'HTTP to non-local servers is blocked. '
+                'Enable in Settings → System.');
       }
       return;
     }
@@ -453,11 +450,8 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
             url.startsWith('http://') &&
             !url.startsWith('http://localhost') &&
             !url.startsWith('http://127.0.0.1')) {
-          showConsoleNotification(
-            context,
-            message: 'Warning: credentials sent unencrypted over HTTP',
-            isError: true,
-          );
+          showErrorNotification(context, ref,
+              message: 'Warning: credentials sent unencrypted over HTTP');
         }
       } else {
         await storage.setRommAuth(null);

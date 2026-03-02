@@ -60,7 +60,7 @@ class GameInfoCard extends StatelessWidget {
                   fontSize: rs.isSmall ? 12 : 14,
                   height: 1.4,
                 ),
-                maxLines: 5,
+                maxLines: 8,
                 overflow: TextOverflow.ellipsis,
               ),
             ),

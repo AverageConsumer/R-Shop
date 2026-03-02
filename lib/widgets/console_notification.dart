@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../providers/app_providers.dart';
 
 void showConsoleNotification(
   BuildContext context, {
@@ -37,4 +40,24 @@ void showConsoleNotification(
       duration: const Duration(seconds: 3),
     ),
   );
+}
+
+/// Shows an error notification with haptic + audio feedback.
+void showErrorNotification(
+  BuildContext context,
+  WidgetRef ref, {
+  required String message,
+}) {
+  ref.read(feedbackServiceProvider).error();
+  showConsoleNotification(context, message: message);
+}
+
+/// Shows a success notification with confirm feedback.
+void showSuccessNotification(
+  BuildContext context,
+  WidgetRef ref, {
+  required String message,
+}) {
+  ref.read(feedbackServiceProvider).confirm();
+  showConsoleNotification(context, message: message, isError: false);
 }
