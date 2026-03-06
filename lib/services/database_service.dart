@@ -13,7 +13,7 @@ import '../utils/ra_name_matcher.dart';
 class DatabaseService {
   static Future<Database>? _initFuture;
   static const String _tableName = 'games';
-  static const int _dbVersion = 8;
+  static const int _dbVersion = 10;
 
   @visibleForTesting
   static Database? testDatabase;
@@ -68,6 +68,10 @@ class DatabaseService {
 
     await db.execute('''
       CREATE INDEX idx_filename ON $_tableName (filename)
+    ''');
+
+    await db.execute('''
+      CREATE UNIQUE INDEX idx_games_system_filename ON $_tableName (systemSlug, filename)
     ''');
 
     // RetroAchievements tables
@@ -220,46 +224,83 @@ class DatabaseService {
         ''');
       });
     }
+    if (oldVersion < 9) {
+      await db.transaction((txn) async {
+        // Remove any duplicate (systemSlug, filename) rows before adding constraint
+        await txn.execute('''
+          DELETE FROM $_tableName WHERE id NOT IN (
+            SELECT MIN(id) FROM $_tableName GROUP BY systemSlug, filename
+          )
+        ''');
+        await txn.execute(
+          'CREATE UNIQUE INDEX idx_games_system_filename ON $_tableName (systemSlug, filename)',
+        );
+      });
+    }
+    if (oldVersion < 10) {
+      await db.transaction((txn) async {
+        await txn.execute(
+          'CREATE INDEX IF NOT EXISTS idx_has_thumbnail ON $_tableName (has_thumbnail)',
+        );
+      });
+    }
   }
 
   Future<void> saveGames(String systemSlug, List<GameItem> games) async {
     final db = await database;
     await db.transaction((txn) async {
-      // Preserve existing thumbnail data before delete
+      // 1. Collect existing filenames to detect orphans
       final existing = await txn.query(
         _tableName,
-        columns: ['filename', 'has_thumbnail'],
+        columns: ['filename'],
         where: 'systemSlug = ?',
         whereArgs: [systemSlug],
       );
-      final thumbData = <String, Map<String, dynamic>>{};
-      for (final row in existing) {
-        thumbData[row['filename'] as String] = row;
+      final existingFiles =
+          existing.map((r) => r['filename'] as String).toSet();
+      final incomingFiles = games.map((g) => g.filename).toSet();
+
+      // 2. Delete orphans (games no longer in remote)
+      final orphans = existingFiles.difference(incomingFiles);
+      if (orphans.isNotEmpty) {
+        final orphanList = orphans.toList();
+        for (var i = 0; i < orphanList.length; i += 100) {
+          final chunk = orphanList.skip(i).take(100).toList();
+          final placeholders = List.filled(chunk.length, '?').join(',');
+          await txn.rawDelete(
+            'DELETE FROM $_tableName WHERE systemSlug = ? AND filename IN ($placeholders)',
+            [systemSlug, ...chunk],
+          );
+        }
       }
 
-      await txn.delete(
-        _tableName,
-        where: 'systemSlug = ?',
-        whereArgs: [systemSlug],
-      );
-
+      // 3. Upsert incoming games — preserves cover_url and has_thumbnail
       final batch = txn.batch();
       for (final game in games) {
-        final prev = thumbData[game.filename];
-        batch.insert(_tableName, {
-          'systemSlug': systemSlug,
-          'filename': game.filename,
-          'displayName': game.displayName,
-          'url': game.url,
-          'region': _extractRegion(game.filename),
-          'cover_url': game.cachedCoverUrl,
-          'provider_config': game.providerConfig != null
+        batch.rawInsert('''
+          INSERT INTO $_tableName (systemSlug, filename, displayName, url, region, cover_url, provider_config, has_thumbnail, is_folder)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(systemSlug, filename) DO UPDATE SET
+            displayName = excluded.displayName,
+            url = excluded.url,
+            region = excluded.region,
+            cover_url = COALESCE(excluded.cover_url, cover_url),
+            provider_config = excluded.provider_config,
+            has_thumbnail = MAX(has_thumbnail, excluded.has_thumbnail),
+            is_folder = excluded.is_folder
+        ''', [
+          systemSlug,
+          game.filename,
+          game.displayName,
+          game.url,
+          _extractRegion(game.filename),
+          game.cachedCoverUrl,
+          game.providerConfig != null
               ? jsonEncode(game.providerConfig!.toJsonWithoutAuth())
               : null,
-          'has_thumbnail':
-              game.hasThumbnail ? 1 : (prev?['has_thumbnail'] ?? 0),
-          'is_folder': game.isFolder ? 1 : 0,
-        });
+          game.hasThumbnail ? 1 : 0,
+          game.isFolder ? 1 : 0,
+        ]);
       }
       await batch.commit(noResult: true);
     });
@@ -295,18 +336,16 @@ class DatabaseService {
   }) async {
     if (hasThumbnail == null || filenames.isEmpty) return;
     final db = await database;
-    final values = {'has_thumbnail': hasThumbnail ? 1 : 0};
+    final value = hasThumbnail ? 1 : 0;
     await db.transaction((txn) async {
-      final batch = txn.batch();
-      for (final filename in filenames) {
-        batch.update(
-          _tableName,
-          values,
-          where: 'filename = ?',
-          whereArgs: [filename],
+      for (var i = 0; i < filenames.length; i += 100) {
+        final chunk = filenames.skip(i).take(100).toList();
+        final placeholders = List.filled(chunk.length, '?').join(',');
+        await txn.rawUpdate(
+          'UPDATE $_tableName SET has_thumbnail = ? WHERE filename IN ($placeholders)',
+          [value, ...chunk],
         );
       }
-      await batch.commit(noResult: true);
     });
   }
 
@@ -315,16 +354,14 @@ class DatabaseService {
     if (filenames.isEmpty) return;
     final db = await database;
     await db.transaction((txn) async {
-      final batch = txn.batch();
-      for (final filename in filenames) {
-        batch.update(
-          _tableName,
-          {'cover_url': coverUrl},
-          where: 'filename = ?',
-          whereArgs: [filename],
+      for (var i = 0; i < filenames.length; i += 100) {
+        final chunk = filenames.skip(i).take(100).toList();
+        final placeholders = List.filled(chunk.length, '?').join(',');
+        await txn.rawUpdate(
+          'UPDATE $_tableName SET cover_url = ? WHERE filename IN ($placeholders)',
+          [coverUrl, ...chunk],
         );
       }
-      await batch.commit(noResult: true);
     });
   }
 
@@ -384,6 +421,15 @@ class DatabaseService {
         .toList();
   }
 
+  Future<void> deleteGame(String systemSlug, String filename) async {
+    final db = await database;
+    await db.delete(
+      _tableName,
+      where: 'systemSlug = ? AND filename = ?',
+      whereArgs: [systemSlug, filename],
+    );
+  }
+
   static String _escapeLike(String input) =>
       input.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
 
@@ -434,6 +480,19 @@ class DatabaseService {
     return result.isNotEmpty;
   }
 
+  /// Returns the set of system slugs (from [slugs]) that have at least one
+  /// cached game. Single query instead of N individual hasCache() calls.
+  Future<Set<String>> systemsWithCache(List<String> slugs) async {
+    if (slugs.isEmpty) return {};
+    final db = await database;
+    final placeholders = List.filled(slugs.length, '?').join(',');
+    final result = await db.rawQuery(
+      'SELECT DISTINCT systemSlug FROM $_tableName WHERE systemSlug IN ($placeholders)',
+      slugs,
+    );
+    return result.map((r) => r['systemSlug'] as String).toSet();
+  }
+
   Future<void> clearCache() async {
     final db = await database;
     await db.delete(_tableName);
@@ -450,20 +509,25 @@ class DatabaseService {
     }
   }
 
+  static final _regionPattern = RegExp(
+    r'\((USA|U|Europe|E|Japan|J|Germany|France|Spain|Italy|World)\)',
+  );
+
+  static const _regionMap = {
+    'USA': 'USA', 'U': 'USA',
+    'Europe': 'Europe', 'E': 'Europe',
+    'Japan': 'Japan', 'J': 'Japan',
+    'Germany': 'Germany',
+    'France': 'France',
+    'Spain': 'Spain',
+    'Italy': 'Italy',
+    'World': 'World',
+  };
+
   String _extractRegion(String filename) {
-    if (filename.contains('(USA)') || filename.contains('(U)')) return 'USA';
-    if (filename.contains('(Europe)') || filename.contains('(E)')) {
-      return 'Europe';
-    }
-    if (filename.contains('(Japan)') || filename.contains('(J)')) {
-      return 'Japan';
-    }
-    if (filename.contains('(Germany)')) return 'Germany';
-    if (filename.contains('(France)')) return 'France';
-    if (filename.contains('(Spain)')) return 'Spain';
-    if (filename.contains('(Italy)')) return 'Italy';
-    if (filename.contains('(World)')) return 'World';
-    return 'Unknown';
+    final match = _regionPattern.firstMatch(filename);
+    if (match == null) return 'Unknown';
+    return _regionMap[match.group(1)] ?? 'Unknown';
   }
 
   // ---------------------------------------------------------------------------

@@ -73,6 +73,7 @@ class DownloadService {
 
   HttpClient? _httpClient;
   String? _tempFilePath;
+  String? _resolvedFilename;
   Directory? _folderTempDir;
   Directory? _extractTempDir;
   bool _isCancelled = false;
@@ -126,6 +127,7 @@ class DownloadService {
     _isCancelled = false;
     _isDownloadInProgress = false;
     _tempFilePath = null;
+    _resolvedFilename = null;
     _downloadSubscription?.cancel();
     _downloadSubscription = null;
     _zipProgressSubscription?.cancel();
@@ -246,6 +248,7 @@ class DownloadService {
 
     _isDownloadInProgress = true;
     _isCancelled = false;
+    _resolvedFilename = null;
 
     if (_progressController?.isClosed == false) {
       _progressController?.add(DownloadProgress(
@@ -368,6 +371,17 @@ class DownloadService {
     }
 
     final response = await request.close();
+
+    // Parse Content-Disposition header for actual filename (e.g. RomM zips Switch games)
+    final disposition = response.headers.value('content-disposition');
+    if (disposition != null) {
+      final starMatch = RegExp(r"filename\*=UTF-8''(.+?)(?:;|$)").firstMatch(disposition);
+      final plainMatch = RegExp(r'filename="(.+?)"').firstMatch(disposition);
+      final raw = starMatch?.group(1) ?? plainMatch?.group(1);
+      if (raw != null) {
+        _resolvedFilename = Uri.decodeFull(raw);
+      }
+    }
 
     FileMode writeMode;
     int totalBytes;
@@ -975,7 +989,8 @@ class DownloadService {
       await targetDir.create(recursive: true);
     }
 
-    final extension = game.filename.toLowerCase();
+    final effectiveFilename = _resolvedFilename ?? game.filename;
+    final extension = effectiveFilename.toLowerCase();
     if (extension.endsWith('.zip')) {
       if (_progressController?.isClosed == false) {
         _progressController?.add(DownloadProgress(
@@ -1013,7 +1028,7 @@ class DownloadService {
           progress: 1.0,
         ));
       }
-      final targetPath = RomManager.safePath(targetFolder, game.filename);
+      final targetPath = RomManager.safePath(targetFolder, effectiveFilename);
       final targetFile = File(targetPath);
       try {
         if (await targetFile.exists()) {

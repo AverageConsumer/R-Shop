@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
+import '../../services/database_service.dart';
 import '../../services/download_queue_manager.dart';
 import '../../services/rom_manager.dart';
 import '../../utils/friendly_error.dart';
@@ -15,6 +16,7 @@ class GameDetailController extends ChangeNotifier {
   final bool isLocalOnly;
   final RomManager _romManager;
   final DownloadQueueManager _queueManager;
+  final DatabaseService _databaseService;
 
   bool _disposed = false;
   GameDetailState _state = const GameDetailState();
@@ -46,9 +48,11 @@ class GameDetailController extends ChangeNotifier {
     bool showFullFilename = false,
     RomManager? romManager,
     required DownloadQueueManager queueManager,
+    DatabaseService? databaseService,
     this.onAddedToQueue,
   })  : _romManager = romManager ?? RomManager(),
-        _queueManager = queueManager {
+        _queueManager = queueManager,
+        _databaseService = databaseService ?? DatabaseService() {
     _state = GameDetailState(showFullFilename: showFullFilename);
     checkInstallationStatus();
   }
@@ -104,6 +108,7 @@ class GameDetailController extends ChangeNotifier {
     notifyListeners();
     try {
       await _romManager.delete(selectedVariant, system, targetFolder);
+      await _databaseService.deleteGame(system.id, selectedVariant.filename);
       await Future.delayed(const Duration(milliseconds: 300));
       await checkInstallationStatus();
     } catch (e) {

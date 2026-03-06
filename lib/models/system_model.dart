@@ -179,7 +179,7 @@ class SystemModel {
       releaseYear: 2011,
       isZipped: false,
       libretroId: 'Nintendo_-_Nintendo_3DS',
-      romExtensions: ['.3ds', '.cia'],
+      romExtensions: ['.3ds', '.cia', '.cci', '.cxi', '.app'],
       iconName: 'nintendo_3ds.svg',
       accentColor: Color(0xFFDC2626),
     ),
