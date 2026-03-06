@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -207,8 +208,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       _installedFilesSubscription = ref.listenManual(installedFilesProvider, (prev, next) {
         if (!mounted) return;
         final data = next.value;
-        if (data != null) {
-          setState(() => _installedFiles = data.all);
+        if (data != null && !setEquals(data.all, _installedFiles)) {
+          _installedFiles = data.all;
           _applyFilters();
         }
       });

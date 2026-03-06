@@ -18,7 +18,7 @@ void main() {
     db = await databaseFactoryFfi.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 5,
+        version: 9,
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE games (
@@ -38,6 +38,7 @@ void main() {
           await db.execute('CREATE INDEX idx_systemSlug ON games (systemSlug)');
           await db.execute('CREATE INDEX idx_displayName ON games (displayName)');
           await db.execute('CREATE INDEX idx_filename ON games (filename)');
+          await db.execute('CREATE UNIQUE INDEX idx_games_system_filename ON games (systemSlug, filename)');
         },
       ),
     );
@@ -65,7 +66,7 @@ void main() {
     test('indices exist', () async {
       final indices = await db.rawQuery('PRAGMA index_list(games)');
       final names = indices.map((r) => r['name'] as String).toSet();
-      expect(names, containsAll(['idx_systemSlug', 'idx_displayName', 'idx_filename']));
+      expect(names, containsAll(['idx_systemSlug', 'idx_displayName', 'idx_filename', 'idx_games_system_filename']));
     });
   });
 
@@ -256,6 +257,174 @@ void main() {
 
       final loaded = await service.getGames('snes');
       expect(loaded.first.hasThumbnail, isTrue);
+    });
+  });
+
+  // ─── Upsert behavior ─────────────────────────────────
+
+  group('Upsert behavior', () {
+    test('upsert preserves cover_url when new game has null', () async {
+      await service.saveGames('snes', [
+        const GameItem(
+          filename: 'Zelda.zip',
+          displayName: 'Zelda',
+          url: 'http://z',
+          cachedCoverUrl: 'http://covers/zelda.png',
+        ),
+      ]);
+
+      // Re-save without cover URL
+      await service.saveGames('snes', [
+        const GameItem(
+          filename: 'Zelda.zip',
+          displayName: 'Zelda',
+          url: 'http://z',
+        ),
+      ]);
+
+      final loaded = await service.getGames('snes');
+      expect(loaded.first.cachedCoverUrl, 'http://covers/zelda.png');
+    });
+
+    test('upsert overwrites cover_url when new game has value', () async {
+      await service.saveGames('snes', [
+        const GameItem(
+          filename: 'Zelda.zip',
+          displayName: 'Zelda',
+          url: 'http://z',
+          cachedCoverUrl: 'http://covers/old.png',
+        ),
+      ]);
+
+      await service.saveGames('snes', [
+        const GameItem(
+          filename: 'Zelda.zip',
+          displayName: 'Zelda',
+          url: 'http://z',
+          cachedCoverUrl: 'http://covers/new.png',
+        ),
+      ]);
+
+      final loaded = await service.getGames('snes');
+      expect(loaded.first.cachedCoverUrl, 'http://covers/new.png');
+    });
+
+    test('upsert updates changed fields', () async {
+      await service.saveGames('snes', [
+        const GameItem(
+          filename: 'Zelda.zip',
+          displayName: 'Zelda',
+          url: 'http://old-url',
+        ),
+      ]);
+
+      await service.saveGames('snes', [
+        const GameItem(
+          filename: 'Zelda.zip',
+          displayName: 'Zelda Remastered',
+          url: 'http://new-url',
+        ),
+      ]);
+
+      final loaded = await service.getGames('snes');
+      expect(loaded.length, 1);
+      expect(loaded.first.displayName, 'Zelda Remastered');
+      expect(loaded.first.url, 'http://new-url');
+    });
+
+    test('orphaned games are deleted', () async {
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
+        const GameItem(filename: 'B.zip', displayName: 'B', url: 'http://b'),
+        const GameItem(filename: 'C.zip', displayName: 'C', url: 'http://c'),
+      ]);
+
+      // Re-save with only A — B and C should be removed
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
+      ]);
+
+      final loaded = await service.getGames('snes');
+      expect(loaded.length, 1);
+      expect(loaded.first.filename, 'A.zip');
+    });
+
+    test('new games are inserted alongside existing', () async {
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
+      ]);
+
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
+        const GameItem(filename: 'B.zip', displayName: 'B', url: 'http://b'),
+      ]);
+
+      final loaded = await service.getGames('snes');
+      expect(loaded.length, 2);
+      final filenames = loaded.map((g) => g.filename).toSet();
+      expect(filenames, containsAll(['A.zip', 'B.zip']));
+    });
+
+    test('empty list clears all games for system', () async {
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
+        const GameItem(filename: 'B.zip', displayName: 'B', url: 'http://b'),
+      ]);
+
+      await service.saveGames('snes', []);
+      final loaded = await service.getGames('snes');
+      expect(loaded, isEmpty);
+    });
+
+    test('upsert does not affect other systems', () async {
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
+      ]);
+      await service.saveGames('gba', [
+        const GameItem(filename: 'B.zip', displayName: 'B', url: 'http://b'),
+      ]);
+
+      // Update only snes
+      await service.saveGames('snes', [
+        const GameItem(filename: 'C.zip', displayName: 'C', url: 'http://c'),
+      ]);
+
+      final snes = await service.getGames('snes');
+      final gba = await service.getGames('gba');
+      expect(snes.length, 1);
+      expect(snes.first.filename, 'C.zip');
+      expect(gba.length, 1);
+      expect(gba.first.filename, 'B.zip');
+    });
+
+    test('large batch upsert works', () async {
+      final games = List.generate(
+        150,
+        (i) => GameItem(
+          filename: 'game_$i.zip',
+          displayName: 'Game $i',
+          url: 'http://example.com/$i',
+        ),
+      );
+      await service.saveGames('snes', games);
+      final loaded = await service.getGames('snes');
+      expect(loaded.length, 150);
+
+      // Remove 50, keep 100, add 25 new
+      final updated = [
+        ...games.sublist(0, 100),
+        ...List.generate(
+          25,
+          (i) => GameItem(
+            filename: 'new_$i.zip',
+            displayName: 'New $i',
+            url: 'http://example.com/new/$i',
+          ),
+        ),
+      ];
+      await service.saveGames('snes', updated);
+      final reloaded = await service.getGames('snes');
+      expect(reloaded.length, 125);
     });
   });
 

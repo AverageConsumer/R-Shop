@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.4.0] — 2026-03-06
+
+### Fixed
+- **3DS extension support** — added .cci, .cxi, and .app ROM formats (thanks @yangeric, #1)
+- **RomM Switch downloads** — games served as ZIP archives by RomM are now correctly detected and extracted via Content-Disposition header parsing (thanks @gulasch, #2)
+- **Stale game cache after deletion** — deleted games now immediately disappear from the game collection instead of lingering until the next background refresh
+
+### Improved
+- **Home carousel performance** — AnimatedBuilder now wraps individual items instead of the entire PageView, reducing unnecessary rebuilds
+- **Game list performance** — favorites provider uses selective watch to avoid rebuilding when unrelated favorites change
+- **Visible systems query** — single batch `systemsWithCache()` query replaces N individual `hasCache()` calls
+- **Sync error reporting** — failed sources are now tracked per-system with specific error messages ("2 sources unavailable" instead of generic "Offline — cached data")
+- **Library screen** — `setEquals` guard prevents unnecessary rebuilds when installed files haven't changed
+- **Thumbnail migration** — batch size increased from 3 to 15 (ThumbnailService has its own capacity guard)
+- **Memory** — `gameMetadataProvider` now uses `.autoDispose` to free metadata when detail screen is closed
+
+### Internal
+- `DatabaseService.deleteGame()` for targeted cache entry removal
+- `DatabaseService.systemsWithCache()` for batch system presence checks
+- `LibrarySyncState.failedSystems` replaces single `error` string with per-system failure map
+- 170+ new database upsert tests (cover preservation, orphan cleanup, cross-system isolation, large batches)
+- Updated onboarding and sync tests for remoteSetup step and failedSystems format
+
+---
+
 ## [1.3.0] — 2026-03-01
 
 ### Added

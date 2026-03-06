@@ -14,7 +14,7 @@ void main() {
       expect(state.totalSystems, 0);
       expect(state.completedSystems, 0);
       expect(state.currentSystem, isNull);
-      expect(state.error, isNull);
+      expect(state.failedSystems, isEmpty);
       expect(state.gamesPerSystem, isEmpty);
       expect(state.totalGamesFound, 0);
       expect(state.isUserTriggered, isFalse);
@@ -57,15 +57,21 @@ void main() {
       expect(updated.isUserTriggered, isTrue);
     });
 
-    test('copyWith error field', () {
+    test('copyWith failedSystems', () {
       const state = LibrarySyncState();
-      final withError = state.copyWith(error: 'Sync failed for NES: Timeout');
-      expect(withError.error, 'Sync failed for NES: Timeout');
+      final withFailures = state.copyWith(
+        failedSystems: {'NES': 'Connection timed out'},
+      );
+      expect(withFailures.failedSystems, {'NES': 'Connection timed out'});
+      expect(withFailures.hadFailures, isTrue);
     });
 
-    test('copyWith hadFailures', () {
+    test('hadFailures derived from failedSystems', () {
       const state = LibrarySyncState();
-      final withFailure = state.copyWith(hadFailures: true);
+      expect(state.hadFailures, isFalse);
+      final withFailure = state.copyWith(
+        failedSystems: {'SNES': 'Timeout'},
+      );
       expect(withFailure.hadFailures, isTrue);
     });
   });
@@ -235,27 +241,19 @@ void main() {
       state = state.copyWith(currentSystem: 'SNES');
 
       // System 2 failed
-      state = state.copyWith(
-        error: 'Sync failed for SNES: Connection timed out',
-        completedSystems: 2,
-      );
-      expect(state.error, contains('SNES'));
+      state = state.copyWith(completedSystems: 2);
 
       // Processing system 3
       state = state.copyWith(currentSystem: 'N64', completedSystems: 3);
 
-      // Sync complete — actual code uses copyWith which can't null-out
-      // currentSystem, so the real code passes it and the field stays.
-      // In practice syncAll creates a final state with hadFailures.
-      state = LibrarySyncState(
+      // Sync complete with per-system failure tracking
+      state = state.copyWith(
         isSyncing: false,
-        totalSystems: state.totalSystems,
-        completedSystems: state.completedSystems,
-        hadFailures: true,
+        failedSystems: {'SNES': 'Connection timed out'},
       );
       expect(state.isSyncing, isFalse);
-      expect(state.currentSystem, isNull);
       expect(state.hadFailures, isTrue);
+      expect(state.failedSystems, contains('SNES'));
     });
 
     test('discoverAll tracks per-system game counts', () {

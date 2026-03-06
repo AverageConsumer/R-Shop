@@ -16,22 +16,24 @@ class LibrarySyncState {
   final int totalSystems;
   final int completedSystems;
   final String? currentSystem;
-  final String? error;
   final Map<String, int> gamesPerSystem;
   final int totalGamesFound;
   final bool isUserTriggered;
-  final bool hadFailures;
+
+  /// Systems that failed during sync, keyed by display name with reason as value.
+  final Map<String, String> failedSystems;
+
+  bool get hadFailures => failedSystems.isNotEmpty;
 
   const LibrarySyncState({
     this.isSyncing = false,
     this.totalSystems = 0,
     this.completedSystems = 0,
     this.currentSystem,
-    this.error,
     this.gamesPerSystem = const {},
     this.totalGamesFound = 0,
     this.isUserTriggered = false,
-    this.hadFailures = false,
+    this.failedSystems = const {},
   });
 
   LibrarySyncState copyWith({
@@ -39,22 +41,20 @@ class LibrarySyncState {
     int? totalSystems,
     int? completedSystems,
     String? currentSystem,
-    String? error,
     Map<String, int>? gamesPerSystem,
     int? totalGamesFound,
     bool? isUserTriggered,
-    bool? hadFailures,
+    Map<String, String>? failedSystems,
   }) {
     return LibrarySyncState(
       isSyncing: isSyncing ?? this.isSyncing,
       totalSystems: totalSystems ?? this.totalSystems,
       completedSystems: completedSystems ?? this.completedSystems,
       currentSystem: currentSystem ?? this.currentSystem,
-      error: error ?? this.error,
       gamesPerSystem: gamesPerSystem ?? this.gamesPerSystem,
       totalGamesFound: totalGamesFound ?? this.totalGamesFound,
       isUserTriggered: isUserTriggered ?? this.isUserTriggered,
-      hadFailures: hadFailures ?? this.hadFailures,
+      failedSystems: failedSystems ?? this.failedSystems,
     );
   }
 }
@@ -92,7 +92,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     final db = DatabaseService();
     final gameService = UnifiedGameService();
     var completed = 0;
-    var anyFailed = false;
+    final failures = <String, String>{};
 
     for (final systemConfig in config.systems) {
       if (_isCancelled) break;
@@ -129,16 +129,14 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         _lastSyncTimes[systemConfig.id] = DateTime.now();
       } catch (e) {
         debugPrint('Library sync failed for ${systemConfig.id}: $e');
-        final reason = _userFriendlyError(e);
-        state = state.copyWith(error: 'Sync failed for $displayName: $reason');
-        anyFailed = true;
+        failures[displayName] = _userFriendlyError(e);
       }
 
       completed++;
       state = state.copyWith(completedSystems: completed);
     }
 
-    state = state.copyWith(isSyncing: false, currentSystem: null, hadFailures: anyFailed);
+    state = state.copyWith(isSyncing: false, currentSystem: null, failedSystems: failures);
 
     // Clean orphan thumbnails after sync
     ThumbnailService.cleanOrphans(db).catchError((e) {
@@ -164,7 +162,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     final gameService = UnifiedGameService();
     var completed = 0;
     var totalGames = 0;
-    var anyFailed = false;
+    final failures = <String, String>{};
     final perSystem = <String, int>{};
 
     for (final systemConfig in config.systems) {
@@ -210,9 +208,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       } catch (e) {
         debugPrint('Library discover failed for ${systemConfig.id}: $e');
         perSystem[systemConfig.id] = 0;
-        anyFailed = true;
-        final reason = _userFriendlyError(e);
-        state = state.copyWith(error: 'Scan failed for $displayName: $reason');
+        failures[displayName] = _userFriendlyError(e);
       }
 
       completed++;
@@ -227,7 +223,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     state = state.copyWith(
       isSyncing: false,
       currentSystem: null,
-      hadFailures: anyFailed,
+      failedSystems: failures,
     );
 
     // Clean orphan thumbnails after discover

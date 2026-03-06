@@ -45,8 +45,7 @@ class _LibrarySyncPill extends ConsumerStatefulWidget {
 }
 
 class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
-  bool _showOffline = false;
-  String? _lastError;
+  Map<String, String> _failedSystems = const {};
   Timer? _dismissTimer;
 
   @override
@@ -62,7 +61,9 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
     ref.listen<LibrarySyncState>(librarySyncServiceProvider, (prev, next) {
       if (next.isSyncing) {
         _dismissTimer?.cancel();
-        if (_showOffline) setState(() => _showOffline = false);
+        if (_failedSystems.isNotEmpty) {
+          setState(() => _failedSystems = const {});
+        }
         return;
       }
 
@@ -71,19 +72,16 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
           !next.isSyncing &&
           next.hadFailures) {
         ref.read(feedbackServiceProvider).warning();
-        setState(() {
-          _showOffline = true;
-          _lastError = next.error;
-        });
+        setState(() => _failedSystems = next.failedSystems);
         _dismissTimer?.cancel();
         _dismissTimer = Timer(const Duration(seconds: 6), () {
-          if (mounted) setState(() => _showOffline = false);
+          if (mounted) setState(() => _failedSystems = const {});
         });
       }
     });
 
     final showSyncing = state.isSyncing;
-    if (!showSyncing && !_showOffline) return const SizedBox.shrink();
+    if (!showSyncing && _failedSystems.isEmpty) return const SizedBox.shrink();
 
     final rs = context.rs;
     final iconSize = rs.isSmall ? 14.0 : 16.0;
@@ -102,21 +100,16 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
       );
     }
 
-    if (_lastError != null) {
-      return _SyncPillContent(
-        key: const ValueKey('library-error'),
-        accentColor: Colors.redAccent,
-        leadingIcon:
-            Icon(Icons.error_outline, size: iconSize, color: Colors.redAccent),
-        label: _lastError!,
-      );
-    }
+    final label = _failedSystems.length == 1
+        ? '${_failedSystems.keys.first} unavailable'
+        : '${_failedSystems.length} sources unavailable';
 
     return _SyncPillContent(
-      key: const ValueKey('library-offline'),
+      key: const ValueKey('library-warning'),
       accentColor: Colors.amber,
-      leadingIcon: Icon(Icons.cloud_off, size: iconSize, color: Colors.amber),
-      label: 'Offline — cached data',
+      leadingIcon:
+          Icon(Icons.warning_amber_rounded, size: iconSize, color: Colors.amber),
+      label: label,
     );
   }
 }

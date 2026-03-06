@@ -28,9 +28,9 @@ class ThumbnailMigrationService {
 
       debugPrint('Thumbnail migration: ${rows.length} games to process');
 
-      // Process in batches of 3 with delay between batches
-      for (var i = 0; i < rows.length; i += 3) {
-        final batch = rows.skip(i).take(3).toList();
+      // Process in batches — ThumbnailService has its own capacity guard
+      for (var i = 0; i < rows.length; i += 15) {
+        final batch = rows.skip(i).take(15).toList();
         await Future.wait(
           batch.map((row) async {
             final filename = row['filename'] as String;
@@ -49,7 +49,6 @@ class ThumbnailMigrationService {
             }
           }),
         );
-        await Future.delayed(const Duration(milliseconds: 100));
       }
 
       debugPrint('Thumbnail migration complete');

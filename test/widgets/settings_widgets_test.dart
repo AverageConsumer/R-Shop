@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:retro_eshop/features/settings/widgets/about_tab.dart';

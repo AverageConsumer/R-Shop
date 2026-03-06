@@ -56,21 +56,19 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
 
   final hideEmpty = ref.watch(hideEmptyConsolesProvider);
 
-  final visible = <SystemModel>[];
-  for (final system in configured) {
-    final sysConfig = config.systemById(system.id);
-    if (sysConfig == null) continue;
+  // Filter to systems that have a valid config entry
+  final withConfig = configured
+      .where((s) => config.systemById(s.id) != null)
+      .toList();
 
-    if (hideEmpty) {
-      final db = ref.read(libraryDbProvider);
-      final hasGames = await db.hasCache(system.id);
-      if (!hasGames) continue;
-    }
+  if (!hideEmpty) return withConfig;
 
-    visible.add(system);
-  }
-
-  return visible;
+  // Single batch query instead of N individual hasCache() calls
+  final db = ref.read(libraryDbProvider);
+  final populated = await db.systemsWithCache(
+    withConfig.map((s) => s.id).toList(),
+  );
+  return withConfig.where((s) => populated.contains(s.id)).toList();
 });
 
 // ---------------------------------------------------------------------------
@@ -78,7 +76,7 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
 // ---------------------------------------------------------------------------
 
 /// Cached game metadata lookup for the detail screen.
-final gameMetadataProvider = FutureProvider.family<GameMetadataInfo?,
+final gameMetadataProvider = FutureProvider.autoDispose.family<GameMetadataInfo?,
     ({String filename, String systemSlug})>(
   (ref, params) async {
     final db = DatabaseService();

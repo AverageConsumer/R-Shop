@@ -771,35 +771,34 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   Widget _buildCarousel(Responsive rs) {
-    double getCurrentPage() {
-      try {
-        if (_pageController.hasClients) {
-          final position = _pageController.position;
-          if (position.hasContentDimensions && position.haveDimensions) {
-            return _pageController.page ?? _initialPage.toDouble();
-          }
-        }
-      } catch (e) {
-        debugPrint('HomeView: pageController access failed: $e');
-      }
-      return _initialPage.toDouble();
-    }
-
-    return AnimatedBuilder(
-      animation: _pageController,
-      builder: (context, child) {
-        final currentPage = getCurrentPage();
-        return PageView.builder(
-          key: ValueKey('carousel_${rs.isPortrait}'),
-          controller: _pageController,
-          onPageChanged: (index) {
-            _lastStablePage = index;
-            setState(() {
-              _currentIndex = index % _totalItemCount;
-            });
-          },
-          itemCount: 10000,
-          itemBuilder: (context, index) {
+    return PageView.builder(
+      key: ValueKey('carousel_${rs.isPortrait}'),
+      controller: _pageController,
+      onPageChanged: (index) {
+        _lastStablePage = index;
+        setState(() {
+          _currentIndex = index % _totalItemCount;
+        });
+      },
+      itemCount: 10000,
+      itemBuilder: (context, index) {
+        // AnimatedBuilder per item — only rebuilds the 2-3 visible items,
+        // not the entire PageView.
+        return AnimatedBuilder(
+          animation: _pageController,
+          builder: (context, child) {
+            double currentPage = _initialPage.toDouble();
+            try {
+              if (_pageController.hasClients) {
+                final position = _pageController.position;
+                if (position.hasContentDimensions && position.haveDimensions) {
+                  currentPage =
+                      _pageController.page ?? _initialPage.toDouble();
+                }
+              }
+            } catch (e) {
+              debugPrint('HomeView: pageController access failed: $e');
+            }
             final value = (currentPage - index).abs();
             final scale = (1 - (value * 0.25)).clamp(0.75, 1.0);
             final opacity = (1 - (value * 0.6)).clamp(0.2, 1.0);
@@ -898,7 +897,9 @@ class _HomeViewState extends ConsumerState<HomeView>
 
   Widget _buildControls(Responsive rs) {
     // Check full queue (including history) to see if overlay has content
-    final hasAnyDownloads = ref.watch(downloadQueueProvider).isNotEmpty;
+    final hasAnyDownloads = ref.watch(
+      downloadQueueProvider.select((q) => q.isNotEmpty),
+    );
     final isOverlayExpanded = ref.watch(downloadOverlayExpandedProvider);
 
     // Only hide controls if the overlay is expanded AND there is content to show.

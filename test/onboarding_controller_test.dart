@@ -150,7 +150,7 @@ void main() {
       expect(c.state.canProceed, true);
     });
 
-    test('rommSetup/folder → consoleSetup (auto-configures systems)', () {
+    test('rommSetup/folder → remoteSetup (auto-configures systems)', () {
       final c = _createController();
       c.onMessageComplete();
       c.nextStep(); // → legalNotice
@@ -166,13 +166,13 @@ void main() {
       );
       c.state = c.state.copyWith(rommSetupState: rs);
 
-      c.nextStep(); // folder → consoleSetup
-      expect(c.state.currentStep, OnboardingStep.consoleSetup);
+      c.nextStep(); // folder → remoteSetup
+      expect(c.state.currentStep, OnboardingStep.remoteSetup);
       expect(c.state.configuredSystems.containsKey('nes'), true);
       expect(c.state.canProceed, true);
     });
 
-    test('localSetup → consoleSetup (auto-configures local systems)', () {
+    test('localSetup → remoteSetup (auto-configures local systems)', () {
       final c = _createController();
       // Set up at localSetup step with enabled systems
       c.state = c.state.copyWith(
@@ -190,8 +190,8 @@ void main() {
         ),
       );
 
-      c.nextStep(); // localSetup → consoleSetup
-      expect(c.state.currentStep, OnboardingStep.consoleSetup);
+      c.nextStep(); // localSetup → remoteSetup
+      expect(c.state.currentStep, OnboardingStep.remoteSetup);
       expect(c.state.configuredSystems.containsKey('snes'), true);
       expect(c.state.configuredSystems['snes']!.targetFolder, '/roms/SNES');
     });
@@ -263,10 +263,21 @@ void main() {
       expect(c.state.currentStep, OnboardingStep.legalNotice);
     });
 
-    test('consoleSetup → rommSetup when rommSetupState exists', () {
+    test('consoleSetup → remoteSetup', () {
       final c = _createController();
       c.state = c.state.copyWith(
         currentStep: OnboardingStep.consoleSetup,
+        rommSetupState: const RommSetupState(url: 'https://romm.com'),
+      );
+      c.previousStep();
+      expect(c.state.currentStep, OnboardingStep.remoteSetup);
+      expect(c.state.canProceed, true);
+    });
+
+    test('remoteSetup → rommSetup when rommSetupState exists', () {
+      final c = _createController();
+      c.state = c.state.copyWith(
+        currentStep: OnboardingStep.remoteSetup,
         rommSetupState: const RommSetupState(url: 'https://romm.com'),
       );
       c.previousStep();
@@ -275,10 +286,10 @@ void main() {
       expect(c.state.canProceed, true);
     });
 
-    test('consoleSetup → localSetup when no rommSetupState', () {
+    test('remoteSetup → localSetup when no rommSetupState', () {
       final c = _createController();
       c.state = c.state.copyWith(
-        currentStep: OnboardingStep.consoleSetup,
+        currentStep: OnboardingStep.remoteSetup,
       );
       c.previousStep();
       expect(c.state.currentStep, OnboardingStep.localSetup);
@@ -298,7 +309,7 @@ void main() {
       expect(c.state.canProceed, true);
     });
 
-    test('preserves localSetupState when going back from consoleSetup', () {
+    test('preserves localSetupState when going back from consoleSetup to remoteSetup', () {
       final c = _createController();
       final ls = const LocalSetupState(
         romBasePath: '/roms',
@@ -1601,7 +1612,7 @@ void main() {
         localSetupState: const LocalSetupState(),
       );
       c.localSetupChoice(LocalSetupAction.skip);
-      expect(c.state.currentStep, OnboardingStep.consoleSetup);
+      expect(c.state.currentStep, OnboardingStep.remoteSetup);
     });
 
     test('localSetupChoice(createFolders) sets createSystemIds + createBasePath',
@@ -1714,7 +1725,7 @@ void main() {
         ),
       );
       c.localSetupConfirm();
-      expect(c.state.currentStep, OnboardingStep.consoleSetup);
+      expect(c.state.currentStep, OnboardingStep.remoteSetup);
     });
 
     test('toggleLocalSetupSystem adds and removes', () {
@@ -1767,8 +1778,8 @@ void main() {
         ),
       );
       c.rommFolderChoice(false);
-      // Should have cleared folder state and advanced to consoleSetup
-      expect(c.state.currentStep, OnboardingStep.consoleSetup);
+      // Should have cleared folder state and advanced to remoteSetup
+      expect(c.state.currentStep, OnboardingStep.remoteSetup);
     });
 
     test('assignFolderToSystem adds assignment', () {
@@ -1827,7 +1838,7 @@ void main() {
         ),
       );
       c.rommFolderConfirm();
-      expect(c.state.currentStep, OnboardingStep.consoleSetup);
+      expect(c.state.currentStep, OnboardingStep.remoteSetup);
     });
   });
 

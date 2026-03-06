@@ -655,7 +655,13 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         onRetry: _controller.loadGames,
       );
     }
-    final favoriteFilenames = ref.watch(favoriteGamesProvider).toSet();
+    // Only rebuild when favorites relevant to THIS system's games change
+    final systemFilenames = state.filteredGroupedGames.values
+        .expand((v) => v.map((g) => g.filename))
+        .toSet();
+    final favoriteFilenames = ref.watch(favoriteGamesProvider.select(
+      (all) => all.where(systemFilenames.contains).toSet(),
+    ));
     final favorites = <String>{};
     for (final entry in state.filteredGroupedGames.entries) {
       if (entry.value.any((v) => favoriteFilenames.contains(v.filename))) {
