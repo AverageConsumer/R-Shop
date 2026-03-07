@@ -17,6 +17,7 @@ class DownloadItem {
   final GameItem game;
   final SystemModel system;
   final String targetFolder;
+  final bool autoExtract;
   final DateTime addedAt;
 
   final DownloadStatus status;
@@ -33,6 +34,7 @@ class DownloadItem {
     required this.game,
     required this.system,
     required this.targetFolder,
+    this.autoExtract = false,
     DateTime? addedAt,
     this.status = DownloadStatus.queued,
     this.progress = 0.0,
@@ -117,6 +119,7 @@ class DownloadItem {
       game: game ?? this.game,
       system: system,
       targetFolder: targetFolder,
+      autoExtract: autoExtract,
       addedAt: addedAt,
       status: status ?? this.status,
       progress: progress ?? this.progress,
@@ -138,6 +141,7 @@ class DownloadItem {
       'gameCachedCoverUrl': game.cachedCoverUrl,
       'systemId': system.id,
       'targetFolder': targetFolder,
+      'autoExtract': autoExtract,
       'addedAt': addedAt.toIso8601String(),
       'status': status.name,
       'progress': progress,
@@ -180,6 +184,7 @@ class DownloadItem {
       ),
       system: system,
       targetFolder: (json['targetFolder'] ?? json['romPath']) as String,
+      autoExtract: json['autoExtract'] as bool? ?? false,
       addedAt: DateTime.parse(json['addedAt'] as String),
       status: _parseStatus(json['status']),
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,

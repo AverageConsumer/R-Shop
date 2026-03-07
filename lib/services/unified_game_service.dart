@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../models/config/provider_config.dart';
 import '../models/config/system_config.dart';
 import '../utils/network_constants.dart';
 import '../models/game_item.dart';
@@ -37,8 +38,9 @@ class UnifiedGameService {
     for (final providerConfig in system.providers) {
       try {
         final provider = ProviderFactory.getProvider(providerConfig);
+        final timeout = _timeoutFor(providerConfig);
         return await provider.fetchGames(system).timeout(
-              NetworkTimeouts.providerDiscovery,
+              timeout,
               onTimeout: () =>
                   throw TimeoutException('Server not responding'),
             );
@@ -58,8 +60,9 @@ class UnifiedGameService {
     for (final providerConfig in system.providers) {
       try {
         final provider = ProviderFactory.getProvider(providerConfig);
+        final timeout = _timeoutFor(providerConfig);
         final games = await provider.fetchGames(system).timeout(
-              NetworkTimeouts.providerDiscovery,
+              timeout,
               onTimeout: () =>
                   throw TimeoutException('Server not responding'),
             );
@@ -96,4 +99,11 @@ class UnifiedGameService {
 
     return results.values.toList();
   }
+
+  /// RomM paginates (500/page) so needs a much longer outer timeout.
+  /// Other providers use per-connection timeouts and need a tighter safety net.
+  static Duration _timeoutFor(ProviderConfig config) =>
+      config.type == ProviderType.romm
+          ? NetworkTimeouts.paginatedDiscovery
+          : NetworkTimeouts.providerDiscovery;
 }

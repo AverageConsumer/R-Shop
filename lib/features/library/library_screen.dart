@@ -628,6 +628,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           system: systemModel,
           targetFolder: targetFolder,
           isLocalOnly: isLocalOnly,
+          autoExtract: systemConfig?.autoExtract ?? false,
         ),
       ),
     );

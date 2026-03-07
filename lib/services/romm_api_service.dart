@@ -199,24 +199,29 @@ class RommApiService {
     var offset = 0;
 
     while (true) {
-      final response = await _dio.get<dynamic>(
-        url,
-        queryParameters: {
-          'platform_ids': [platformId],
-          'limit': pageSize,
-          'offset': offset,
-        },
-        options: _buildAuthOptions(auth),
-      );
-
-      final data = response.data;
       final List<dynamic> list;
-      if (data is List) {
-        list = data;
-      } else if (data is Map) {
-        list = (data['items'] ?? data['results']) as List<dynamic>? ?? [];
-      } else {
-        break;
+      try {
+        final response = await _dio.get<dynamic>(
+          url,
+          queryParameters: {
+            'platform_ids': [platformId],
+            'limit': pageSize,
+            'offset': offset,
+          },
+          options: _buildAuthOptions(auth),
+        );
+
+        final data = response.data;
+        if (data is List) {
+          list = data;
+        } else if (data is Map) {
+          list = (data['items'] ?? data['results']) as List<dynamic>? ?? [];
+        } else {
+          break;
+        }
+      } on DioException catch (e) {
+        debugPrint('RomM: page at offset $offset failed: $e');
+        break; // Return whatever we accumulated so far
       }
 
       allRoms.addAll(

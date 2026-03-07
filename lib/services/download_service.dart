@@ -203,6 +203,7 @@ class DownloadService {
     String targetFolder,
     SystemModel system, {
     String? existingTempFilePath,
+    bool autoExtract = false,
   }) {
     // Cancel any in-flight download before starting a new one
     final oldController = _progressController;
@@ -220,7 +221,8 @@ class DownloadService {
     _isDownloadInProgress = false;
 
     _startDownload(game, targetFolder, system,
-        existingTempFilePath: existingTempFilePath)
+        existingTempFilePath: existingTempFilePath,
+        autoExtract: autoExtract)
       .catchError((e) {
         if (!controller.isClosed) {
           controller.addError(e);
@@ -236,6 +238,7 @@ class DownloadService {
     String targetFolder,
     SystemModel system, {
     String? existingTempFilePath,
+    bool autoExtract = false,
   }) async {
     if (_isDownloadInProgress) {
       _progressController?.add(DownloadProgress(
@@ -316,7 +319,7 @@ class DownloadService {
         return;
       }
 
-      await _handlePostDownload(game, tempFile, targetFolder, system);
+      await _handlePostDownload(game, tempFile, targetFolder, system, autoExtract: autoExtract);
     } catch (e) {
       if (!_isCancelled && _progressController?.isClosed == false) {
         _progressController?.add(DownloadProgress(
@@ -980,8 +983,9 @@ class DownloadService {
     GameItem game,
     File tempFile,
     String targetFolder,
-    SystemModel system,
-  ) async {
+    SystemModel system, {
+    bool autoExtract = false,
+  }) async {
     if (_isCancelled || _progressController?.isClosed == true) return;
 
     final targetDir = Directory(targetFolder);
@@ -991,7 +995,7 @@ class DownloadService {
 
     final effectiveFilename = _resolvedFilename ?? game.filename;
     final extension = effectiveFilename.toLowerCase();
-    if (extension.endsWith('.zip')) {
+    if (extension.endsWith('.zip') && autoExtract) {
       if (_progressController?.isClosed == false) {
         _progressController?.add(DownloadProgress(
           status: DownloadStatus.extracting,

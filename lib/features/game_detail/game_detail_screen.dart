@@ -43,6 +43,7 @@ class GameDetailScreen extends ConsumerStatefulWidget {
   final SystemModel system;
   final String targetFolder;
   final bool isLocalOnly;
+  final bool autoExtract;
 
   const GameDetailScreen({
     super.key,
@@ -51,6 +52,7 @@ class GameDetailScreen extends ConsumerStatefulWidget {
     required this.system,
     required this.targetFolder,
     this.isLocalOnly = false,
+    this.autoExtract = false,
   });
 
   @override
@@ -108,6 +110,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       system: widget.system,
       targetFolder: widget.targetFolder,
       isLocalOnly: widget.isLocalOnly,
+      autoExtract: widget.autoExtract,
       showFullFilename: storage.getShowFullFilename(),
       queueManager: queueManager,
       onAddedToQueue: _fireAddToQueueAnimation,
@@ -264,7 +267,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
     final queueManager = ref.read(downloadQueueManagerProvider);
     final sizeBefore = queueManager.state.queue.length;
-    queueManager.addToQueue(modifiedGame, widget.system, widget.targetFolder);
+    queueManager.addToQueue(modifiedGame, widget.system, widget.targetFolder, autoExtract: widget.autoExtract);
     if (queueManager.state.queue.length > sizeBefore) {
       _fireAddToQueueAnimation();
     }

@@ -77,12 +77,19 @@ class RomManager {
   }
 
   /// Returns the actual file path of an installed ROM, or null if not found.
-  /// Checks direct path first, then subfolder fallback (same logic as [exists]).
+  /// Checks direct path first, then original archive, then subfolder fallback.
   static Future<String?> resolveInstalledPath(
       GameItem game, SystemModel system, String targetFolder) async {
     try {
       final directPath = getTargetPath(game, system, targetFolder);
       if (await File(directPath).exists()) return directPath;
+
+      // Check if the original archive file exists (e.g. Game.zip not yet extracted)
+      final basename = p.basename(game.filename);
+      if (basename != p.basename(directPath)) {
+        final archivePath = safePath(targetFolder, basename);
+        if (await File(archivePath).exists()) return archivePath;
+      }
 
       final gameName = extractGameName(game.filename);
       if (gameName != null) {
@@ -115,6 +122,13 @@ class RomManager {
       final directPath = getTargetPath(game, system, targetFolder);
       if (await File(directPath).exists()) {
         return true;
+      }
+
+      // Check if the original archive file exists (e.g. Game.zip not yet extracted)
+      final basename = p.basename(game.filename);
+      if (basename != p.basename(directPath)) {
+        final archivePath = safePath(targetFolder, basename);
+        if (await File(archivePath).exists()) return true;
       }
 
       final gameName = extractGameName(game.filename);
@@ -165,6 +179,17 @@ class RomManager {
       if (await file.exists()) {
         await file.delete();
         return;
+      }
+
+      // Check if the original archive file exists (e.g. Game.zip not extracted)
+      final basename = p.basename(game.filename);
+      if (basename != p.basename(path)) {
+        final archivePath = safePath(targetFolder, basename);
+        final archiveFile = File(archivePath);
+        if (await archiveFile.exists()) {
+          await archiveFile.delete();
+          return;
+        }
       }
 
       final gameName = extractGameName(game.filename);

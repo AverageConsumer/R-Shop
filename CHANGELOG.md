@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.4.1] — 2026-03-07
+
+### Fixed
+- **ZIP install status inconsistency** — game detail screen now correctly shows "Installed" for archive files (.zip, .rar) that exist in the ROM folder, matching the game list badge (thanks @yangeric, #5)
+- **ZIP deletion** — deleting a game that was kept as a .zip archive now works correctly instead of silently failing
+- **autoExtract setting ignored** — the per-system auto-extract toggle is now respected; when off, downloaded .zip files are moved as-is to the ROM folder instead of being unconditionally extracted
+- **RomM pagination timeout** — large libraries (7k+ ROMs per platform) no longer time out; per-page error handling returns partial results on failure instead of nothing (thanks @yangeric, #4)
+- **Provider timeout separation** — RomM gets a dedicated 10-minute timeout for paginated fetches; FTP/SMB/Web keep a tighter 60-second safety net
+- **Flaky test** — `clearFilters resets all` no longer fails intermittently under full test suite load
+
+---
+
 ## [1.4.0] — 2026-03-06
 
 ### Fixed

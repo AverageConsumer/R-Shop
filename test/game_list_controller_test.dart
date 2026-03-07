@@ -154,10 +154,10 @@ Future<({
     storage: storage,
   );
 
-  // Wait for loadGames() to complete (it's async, kicked off in constructor)
-  await Future.delayed(Duration.zero);
-  // Extra pump to ensure all microtasks settle
-  await Future.delayed(Duration.zero);
+  // Wait for loadGames() to settle (polling handles CPU-loaded test suites)
+  for (var i = 0; i < 100 && c.state.isLoading; i++) {
+    await Future.delayed(Duration.zero);
+  }
 
   return (controller: c, db: db, storage: storage, service: service);
 }

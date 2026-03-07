@@ -14,6 +14,7 @@ class GameDetailController extends ChangeNotifier {
   final SystemModel system;
   final String targetFolder;
   final bool isLocalOnly;
+  final bool autoExtract;
   final RomManager _romManager;
   final DownloadQueueManager _queueManager;
   final DatabaseService _databaseService;
@@ -45,6 +46,7 @@ class GameDetailController extends ChangeNotifier {
     required this.system,
     required this.targetFolder,
     this.isLocalOnly = false,
+    this.autoExtract = false,
     bool showFullFilename = false,
     RomManager? romManager,
     required DownloadQueueManager queueManager,
@@ -87,7 +89,7 @@ class GameDetailController extends ChangeNotifier {
 
     try {
       final queueSizeBefore = _queueManager.state.queue.length;
-      _queueManager.addToQueue(selectedVariant, system, targetFolder);
+      _queueManager.addToQueue(selectedVariant, system, targetFolder, autoExtract: autoExtract);
       final actuallyAdded = _queueManager.state.queue.length > queueSizeBefore;
       await Future.delayed(const Duration(milliseconds: 300));
       await checkInstallationStatus();
@@ -196,7 +198,7 @@ class GameDetailController extends ChangeNotifier {
     try {
       final variant = variants[index];
       final queueSizeBefore = _queueManager.state.queue.length;
-      _queueManager.addToQueue(variant, system, targetFolder);
+      _queueManager.addToQueue(variant, system, targetFolder, autoExtract: autoExtract);
       final actuallyAdded = _queueManager.state.queue.length > queueSizeBefore;
       await Future.delayed(const Duration(milliseconds: 300));
       await checkInstallationStatus();

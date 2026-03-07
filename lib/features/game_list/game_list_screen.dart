@@ -59,6 +59,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   late int _columns;
   double _lastPinchScale = 1.0;
   late InputDebouncer _debouncer;
+  SystemConfig? _systemConfig;
 
   @override
   String get routeId => 'game_list_${widget.system.name}';
@@ -173,6 +174,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
         ref.read(bootstrappedConfigProvider).value ?? AppConfig.empty;
     final systemConfig =
         ConfigBootstrap.configForSystem(appConfig, widget.system);
+    _systemConfig = systemConfig;
 
     final installedData = ref.read(installedFilesProvider).value;
 
@@ -510,6 +512,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
           system: widget.system,
           targetFolder: widget.targetFolder,
           isLocalOnly: isLocalOnly,
+          autoExtract: _systemConfig?.autoExtract ?? false,
         ),
       ),
     );
