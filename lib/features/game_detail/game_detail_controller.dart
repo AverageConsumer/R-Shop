@@ -110,7 +110,9 @@ class GameDetailController extends ChangeNotifier {
     notifyListeners();
     try {
       await _romManager.delete(selectedVariant, system, targetFolder);
-      await _databaseService.deleteGame(system.id, selectedVariant.filename);
+      if (isLocalOnly) {
+        await _databaseService.deleteGame(system.id, selectedVariant.filename);
+      }
       await Future.delayed(const Duration(milliseconds: 300));
       await checkInstallationStatus();
     } catch (e) {
