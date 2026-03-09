@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.4.2] — 2026-03-09
+
+### Added
+- **Per-system sync** — sync individual consoles from Settings instead of all-at-once (thanks @yangeric, #7)
+- **ROM count per system** — Settings now shows game count badges for each configured console (#7)
+- **Configurable sync timeout** — choose between 1, 2, 5, or 10 minutes for slow connections (Synology NAS etc.) (#7)
+- **Game counts provider** — `gameCountsPerSystemProvider` for stable post-sync ROM counts (#6)
+
+### Fixed
+- **Cover search progress > 100%** — consecutive "Search Game Covers" runs no longer accumulate counters; generation-based cancellation ensures clean state (thanks @yangeric, #8)
+- **DB cascade deletes** — deleting games now also removes orphaned `game_metadata` and `ra_matches` rows
+- **Background refresh orphan safety** — `saveGames` orphan deletion is now explicit (`deleteOrphans` parameter) to prevent incomplete fetches from wiping cached games
+
+### Internal
+- `LibrarySyncService.syncSystem()` for single-system sync
+- `syncTimeoutProvider` with cycle-through UI in Settings
+- `CoverPreloadService._generation` counter for stale-worker protection
+- 78 new tests (1615 total) covering cover reset, DB cascade, sync timeout, per-system sync
+
+---
+
 ## [1.4.1] — 2026-03-07
 
 ### Fixed
