@@ -311,8 +311,10 @@ void main() {
         SettingsSystemTab(
           firstSystemTabNode: firstNode,
           maxDownloads: maxDownloads,
+          syncTimeout: 60,
           allowNonLanHttp: allowNonLanHttp,
           coverSubtitle: coverSubtitle,
+          systems: const [],
           onOpenRommConfig: () {},
           onOpenRaConfig: () {},
           onOpenConfigMode: () {},
@@ -320,7 +322,9 @@ void main() {
           onStartCoverPreload: () {},
           onExportErrorLog: () {},
           onAdjustMaxDownloads: (_) {},
+          onCycleSyncTimeout: () {},
           onToggleAllowNonLanHttp: () {},
+          onSyncSystem: (_) {},
         ),
         overrides: [
           feedbackServiceProvider.overrideWithValue(fakeFeedback),
@@ -391,6 +395,12 @@ void main() {
     testWidgets('hides Export Error Log when no log file', (tester) async {
       await tester.pumpWidget(buildSystemTab());
       expect(find.text('EXPORT ERROR LOG', skipOffstage: false), findsNothing);
+    });
+
+    testWidgets('displays sync timeout value', (tester) async {
+      await tester.pumpWidget(buildSystemTab(maxDownloads: 2));
+      expect(find.text('SYNC TIMEOUT'), findsOneWidget);
+      expect(find.text('1 min'), findsOneWidget);
     });
   });
 
@@ -507,6 +517,26 @@ void main() {
         version: '1.3.0',
       ));
       expect(find.text('v1.3.0'), findsOneWidget);
+    });
+  });
+
+  group('formatSyncTimeout', () {
+    test('formats known values', () {
+      expect(formatSyncTimeout(60), '1 min');
+      expect(formatSyncTimeout(120), '2 min');
+      expect(formatSyncTimeout(300), '5 min');
+      expect(formatSyncTimeout(600), '10 min');
+    });
+
+    test('formats unknown values as seconds', () {
+      expect(formatSyncTimeout(45), '45s');
+      expect(formatSyncTimeout(90), '90s');
+    });
+  });
+
+  group('syncTimeoutSteps', () {
+    test('contains expected values', () {
+      expect(syncTimeoutSteps, [60, 120, 300, 600]);
     });
   });
 }

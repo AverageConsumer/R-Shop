@@ -78,7 +78,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
 
   LibrarySyncService() : super(const LibrarySyncState());
 
-  Future<void> syncAll(AppConfig config) async {
+  Future<void> syncAll(AppConfig config, {Duration? syncTimeout}) async {
     if (state.isSyncing) return;
     if (config.systems.isEmpty) return;
 
@@ -90,9 +90,11 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     );
 
     final db = DatabaseService();
-    final gameService = UnifiedGameService();
+    final gameService = UnifiedGameService(syncTimeout: syncTimeout);
     var completed = 0;
     final failures = <String, String>{};
+    final perSystem = <String, int>{};
+    var totalGames = 0;
 
     for (final systemConfig in config.systems) {
       if (_isCancelled) break;
@@ -110,7 +112,9 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           if (systemModel != null) {
             final games = await RomManager.scanLocalGamesIsolate(
               systemModel, systemConfig.targetFolder);
-            await db.saveGames(systemConfig.id, games);
+            await db.saveGames(systemConfig.id, games, deleteOrphans: true);
+            perSystem[systemConfig.id] = games.length;
+            totalGames += games.length;
           }
         } else {
           // Remote + local merge (same quality as discoverAll)
@@ -124,7 +128,9 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           } else {
             games = remoteGames;
           }
-          await db.saveGames(systemConfig.id, games);
+          await db.saveGames(systemConfig.id, games, deleteOrphans: true);
+          perSystem[systemConfig.id] = games.length;
+          totalGames += games.length;
         }
         _lastSyncTimes[systemConfig.id] = DateTime.now();
       } catch (e) {
@@ -133,10 +139,20 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       }
 
       completed++;
-      state = state.copyWith(completedSystems: completed);
+      state = state.copyWith(
+        completedSystems: completed,
+        gamesPerSystem: Map.of(perSystem),
+        totalGamesFound: totalGames,
+      );
     }
 
-    state = state.copyWith(isSyncing: false, currentSystem: null, failedSystems: failures);
+    state = state.copyWith(
+      isSyncing: false,
+      currentSystem: null,
+      failedSystems: failures,
+      gamesPerSystem: Map.of(perSystem),
+      totalGamesFound: totalGames,
+    );
 
     // Clean orphan thumbnails after sync
     ThumbnailService.cleanOrphans(db).catchError((e) {
@@ -146,7 +162,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
 
   /// Discovers all games across ALL configured systems (including local-only).
   /// Used by the "Scan Library" feature in Settings.
-  Future<void> discoverAll(AppConfig config) async {
+  Future<void> discoverAll(AppConfig config, {Duration? syncTimeout}) async {
     if (state.isSyncing) return;
     if (config.systems.isEmpty) return;
 
@@ -159,7 +175,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     );
 
     final db = DatabaseService();
-    final gameService = UnifiedGameService();
+    final gameService = UnifiedGameService(syncTimeout: syncTimeout);
     var completed = 0;
     var totalGames = 0;
     final failures = <String, String>{};
@@ -201,13 +217,12 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           games = GameMergeHelper.merge(remoteGames, localGames, systemModel);
         }
 
-        await db.saveGames(systemConfig.id, games);
+        await db.saveGames(systemConfig.id, games, deleteOrphans: true);
         perSystem[systemConfig.id] = games.length;
         totalGames += games.length;
         _lastSyncTimes[systemConfig.id] = DateTime.now();
       } catch (e) {
         debugPrint('Library discover failed for ${systemConfig.id}: $e');
-        perSystem[systemConfig.id] = 0;
         failures[displayName] = _userFriendlyError(e);
       }
 
@@ -216,6 +231,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         completedSystems: completed,
         gamesPerSystem: Map.of(perSystem),
         totalGamesFound: totalGames,
+        failedSystems: Map.of(failures),
       );
     }
 
@@ -230,6 +246,76 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     ThumbnailService.cleanOrphans(db).catchError((e) {
       debugPrint('LibrarySyncService: orphan cleanup failed: $e');
     });
+  }
+
+  /// Syncs a single system (user-triggered). Deletes orphans since this is
+  /// an explicit action with a complete fetch.
+  Future<void> syncSystem(String systemId, AppConfig config, {Duration? syncTimeout}) async {
+    if (state.isSyncing) return;
+
+    final systemConfig = config.systems
+        .where((s) => s.id == systemId)
+        .firstOrNull;
+    if (systemConfig == null) return;
+
+    final systemModel = SystemModel.supportedSystems
+        .where((s) => s.id == systemId)
+        .firstOrNull;
+    final displayName = systemModel?.name ?? systemConfig.name;
+
+    _isCancelled = false;
+    state = LibrarySyncState(
+      isSyncing: true,
+      totalSystems: 1,
+      completedSystems: 0,
+      currentSystem: displayName,
+      isUserTriggered: true,
+    );
+
+    final db = DatabaseService();
+    final gameService = UnifiedGameService(syncTimeout: syncTimeout);
+    final failures = <String, String>{};
+    final perSystem = <String, int>{};
+    var totalGames = 0;
+
+    try {
+      final List<GameItem> games;
+      if (systemConfig.providers.isEmpty) {
+        if (systemModel != null) {
+          games = await RomManager.scanLocalGamesIsolate(
+            systemModel, systemConfig.targetFolder);
+        } else {
+          games = [];
+        }
+      } else {
+        final remoteGames = await gameService.fetchGamesForSystem(
+          systemConfig, merge: systemConfig.mergeMode);
+        if (systemModel != null) {
+          final localGames = await RomManager.scanLocalGamesIsolate(
+            systemModel, systemConfig.targetFolder);
+          games = GameMergeHelper.merge(remoteGames, localGames, systemModel);
+        } else {
+          games = remoteGames;
+        }
+      }
+
+      await db.saveGames(systemConfig.id, games, deleteOrphans: true);
+      perSystem[systemConfig.id] = games.length;
+      totalGames = games.length;
+      _lastSyncTimes[systemConfig.id] = DateTime.now();
+    } catch (e) {
+      debugPrint('Library sync failed for $systemId: $e');
+      failures[displayName] = _userFriendlyError(e);
+    }
+
+    state = state.copyWith(
+      isSyncing: false,
+      completedSystems: 1,
+      currentSystem: null,
+      gamesPerSystem: perSystem,
+      totalGamesFound: totalGames,
+      failedSystems: failures,
+    );
   }
 
   static String _userFriendlyError(Object e) =>

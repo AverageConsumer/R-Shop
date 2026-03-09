@@ -9,6 +9,10 @@ import '../models/game_item.dart';
 import 'provider_factory.dart';
 
 class UnifiedGameService {
+  final Duration? syncTimeout;
+
+  UnifiedGameService({this.syncTimeout});
+
   /// Fetches games for a system from its configured providers.
   ///
   /// In failover mode (default), providers are tried in priority order and the
@@ -102,8 +106,16 @@ class UnifiedGameService {
 
   /// RomM paginates (500/page) so needs a much longer outer timeout.
   /// Other providers use per-connection timeouts and need a tighter safety net.
-  static Duration _timeoutFor(ProviderConfig config) =>
-      config.type == ProviderType.romm
-          ? NetworkTimeouts.paginatedDiscovery
-          : NetworkTimeouts.providerDiscovery;
+  /// When a user-configured [syncTimeout] is set, it overrides the default
+  /// for non-RomM providers. RomM always gets at least 10 minutes.
+  Duration _timeoutFor(ProviderConfig config) {
+    if (config.type == ProviderType.romm) {
+      final userTimeout = syncTimeout ?? NetworkTimeouts.paginatedDiscovery;
+      // RomM always gets at least the default 10-minute pagination timeout
+      return userTimeout > NetworkTimeouts.paginatedDiscovery
+          ? userTimeout
+          : NetworkTimeouts.paginatedDiscovery;
+    }
+    return syncTimeout ?? NetworkTimeouts.providerDiscovery;
+  }
 }

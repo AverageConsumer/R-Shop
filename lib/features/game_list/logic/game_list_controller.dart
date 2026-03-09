@@ -145,7 +145,7 @@ class GameListController extends ChangeNotifier {
         _groupGames();
         _restoreFilters();
         _resolveInstalledStatus();
-        _databaseService.saveGames(system.id, _state.allGames);
+        _databaseService.saveGames(system.id, _state.allGames, deleteOrphans: true);
         return;
       }
 
@@ -181,7 +181,7 @@ class GameListController extends ChangeNotifier {
     _groupGames();
     _restoreFilters();
     _resolveInstalledStatus();
-    _databaseService.saveGames(system.id, _state.allGames);
+    _databaseService.saveGames(system.id, _state.allGames, deleteOrphans: true);
   }
 
   Future<void> _backgroundRefresh() async {
@@ -189,6 +189,7 @@ class GameListController extends ChangeNotifier {
     try {
       final remoteGames = await _unifiedService.fetchGamesForSystem(systemConfig);
       final localGames = await RomManager.scanLocalGames(system, targetFolder);
+      if (_disposed) return;
       final games = GameMergeHelper.merge(remoteGames, localGames, system);
 
       // Only update UI if game list actually changed
@@ -201,7 +202,7 @@ class GameListController extends ChangeNotifier {
         _restoreFilters();
         _resolveInstalledStatus();
       }
-      _databaseService.saveGames(system.id, games);
+      _databaseService.saveGames(system.id, games, deleteOrphans: true);
     } catch (e) {
       debugPrint('Background refresh failed for ${system.id}: $e');
     }

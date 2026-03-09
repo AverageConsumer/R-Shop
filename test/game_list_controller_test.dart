@@ -17,6 +17,7 @@ import 'package:retro_eshop/services/unified_game_service.dart';
 class FakeDatabaseService extends DatabaseService {
   List<GameItem>? savedGames;
   String? savedSystemSlug;
+  bool? lastDeleteOrphans;
   List<GameItem> cachedGames = [];
   bool hasCacheResult = false;
   final List<String> batchCoverFilenames = [];
@@ -30,9 +31,10 @@ class FakeDatabaseService extends DatabaseService {
   Future<List<GameItem>> getGames(String systemSlug) async => cachedGames;
 
   @override
-  Future<void> saveGames(String systemSlug, List<GameItem> games) async {
+  Future<void> saveGames(String systemSlug, List<GameItem> games, {bool deleteOrphans = false}) async {
     savedSystemSlug = systemSlug;
     savedGames = games;
+    lastDeleteOrphans = deleteOrphans;
   }
 
   @override
@@ -719,6 +721,19 @@ void main() {
       // Calling filterGames after dispose should not throw
       // (notifyListeners is guarded by _disposed flag)
       expect(() => r.controller.filterGames('test'), returnsNormally);
+    });
+  });
+
+  group('saveGames deleteOrphans (#6)', () {
+    test('_fetchFromSource saves with deleteOrphans: true', () async {
+      final r = await createController(games: [
+        _game('Mario (USA).zip', url: 'http://r/m.zip'),
+      ]);
+
+      // After loadGames completes (which calls _fetchFromSource),
+      // saveGames should have been called with deleteOrphans: true.
+      expect(r.db.lastDeleteOrphans, true);
+      r.controller.dispose();
     });
   });
 }

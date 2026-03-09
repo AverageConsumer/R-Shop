@@ -35,6 +35,7 @@ class StorageService {
   static const _raLastSyncKey = 'ra_last_sync';
   static const _hideEmptyConsolesKey = 'hide_empty_consoles';
   static const _startHintShownKey = 'start_hint_shown';
+  static const _syncTimeoutSecondsKey = 'sync_timeout_seconds';
   SharedPreferences? _prefs;
   final FlutterSecureStorage _secureStorage;
 
@@ -221,6 +222,18 @@ class StorageService {
   Future<void> setMaxConcurrentDownloads(int value) async {
     _ensureInitialized();
     await _prefs!.setInt(_maxConcurrentDownloadsKey, value);
+  }
+
+  // --- Sync Timeout ---
+
+  int getSyncTimeoutSeconds() {
+    _ensureInitialized();
+    return _prefs!.getInt(_syncTimeoutSecondsKey) ?? 60;
+  }
+
+  Future<void> setSyncTimeoutSeconds(int value) async {
+    _ensureInitialized();
+    await _prefs!.setInt(_syncTimeoutSecondsKey, value);
   }
 
   // --- Download Queue Persistence ---

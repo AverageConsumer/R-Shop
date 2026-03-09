@@ -451,4 +451,18 @@ void main() {
       expect(result.first.url, contains('example.com'));
     });
   });
+
+  group('syncTimeout', () {
+    test('constructor accepts syncTimeout', () {
+      final service = UnifiedGameService(
+        syncTimeout: const Duration(minutes: 5),
+      );
+      expect(service.syncTimeout, const Duration(minutes: 5));
+    });
+
+    test('default syncTimeout is null', () {
+      final service = UnifiedGameService();
+      expect(service.syncTimeout, isNull);
+    });
+  });
 }

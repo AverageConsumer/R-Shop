@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/screen_layout.dart';
 import '../../models/system_model.dart';
 import '../../models/config/app_config.dart';
+import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../providers/library_providers.dart';
 import '../../services/library_sync_service.dart';
@@ -107,7 +108,9 @@ class _LibraryScanScreenState extends ConsumerState<LibraryScanScreen>
     setState(() => _scanStarted = true);
 
     final config = ref.read(bootstrappedConfigProvider).value ?? AppConfig.empty;
-    await ref.read(librarySyncServiceProvider.notifier).discoverAll(config);
+    final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
+    await ref.read(librarySyncServiceProvider.notifier).discoverAll(
+        config, syncTimeout: timeout);
 
     if (mounted) {
       setState(() => _scanComplete = true);
@@ -224,15 +227,20 @@ class _LibraryScanScreenState extends ConsumerState<LibraryScanScreen>
     LibrarySyncState syncState,
     dynamic config,
   ) {
+    // Check for failure first (keyed by display name)
+    final systemModel = SystemModel.supportedSystems
+        .where((s) => s.id == systemId)
+        .firstOrNull;
+    final displayName = systemModel?.name ?? systemId;
+    if (syncState.failedSystems.containsKey(displayName)) {
+      return ScanTileState.failed;
+    }
+
     if (syncState.gamesPerSystem.containsKey(systemId)) {
       return ScanTileState.complete;
     }
 
     if (syncState.isSyncing) {
-      // Find if this system is the current one being scanned
-      final systemModel = SystemModel.supportedSystems
-          .where((s) => s.id == systemId)
-          .firstOrNull;
       if (systemModel != null && syncState.currentSystem == systemModel.name) {
         return ScanTileState.scanning;
       }

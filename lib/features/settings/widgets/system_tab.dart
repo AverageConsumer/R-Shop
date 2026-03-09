@@ -3,15 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/input/input.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/config/system_config.dart';
+import '../../../models/system_model.dart';
 import '../../../providers/app_providers.dart';
+import '../../../providers/library_providers.dart';
 import '../../../services/cover_preload_service.dart';
 import 'settings_item.dart';
 
 class SettingsSystemTab extends ConsumerWidget {
   final FocusNode firstSystemTabNode;
   final int maxDownloads;
+  final int syncTimeout;
   final bool allowNonLanHttp;
   final String coverSubtitle;
+  final List<SystemConfig> systems;
   final VoidCallback onOpenRommConfig;
   final VoidCallback onOpenRaConfig;
   final VoidCallback onOpenConfigMode;
@@ -19,14 +24,18 @@ class SettingsSystemTab extends ConsumerWidget {
   final VoidCallback onStartCoverPreload;
   final VoidCallback onExportErrorLog;
   final ValueChanged<int> onAdjustMaxDownloads;
+  final VoidCallback onCycleSyncTimeout;
   final VoidCallback onToggleAllowNonLanHttp;
+  final ValueChanged<String> onSyncSystem;
 
   const SettingsSystemTab({
     super.key,
     required this.firstSystemTabNode,
     required this.maxDownloads,
+    required this.syncTimeout,
     required this.allowNonLanHttp,
     required this.coverSubtitle,
+    required this.systems,
     required this.onOpenRommConfig,
     required this.onOpenRaConfig,
     required this.onOpenConfigMode,
@@ -34,7 +43,9 @@ class SettingsSystemTab extends ConsumerWidget {
     required this.onStartCoverPreload,
     required this.onExportErrorLog,
     required this.onAdjustMaxDownloads,
+    required this.onCycleSyncTimeout,
     required this.onToggleAllowNonLanHttp,
+    required this.onSyncSystem,
   });
 
   @override
@@ -148,6 +159,31 @@ class SettingsSystemTab extends ConsumerWidget {
                 onNavigate: (dir) {
                   if (dir == GridDirection.left ||
                       dir == GridDirection.right) {
+                    onCycleSyncTimeout();
+                    return true;
+                  }
+                  return false;
+                },
+                child: SettingsItem(
+                  title: 'Sync Timeout',
+                  subtitle: 'Per-provider timeout during library sync',
+                  onTap: onCycleSyncTimeout,
+                  trailingBuilder: (isFocused) => Text(
+                    formatSyncTimeout(syncTimeout),
+                    style: TextStyle(
+                      color: isFocused ? Colors.white : Colors.white70,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: rs.spacing.md),
+              _buildSettingsItemWrapper(
+                ref: ref,
+                onNavigate: (dir) {
+                  if (dir == GridDirection.left ||
+                      dir == GridDirection.right) {
                     onToggleAllowNonLanHttp();
                     return true;
                   }
@@ -176,6 +212,10 @@ class SettingsSystemTab extends ConsumerWidget {
                     const Icon(Icons.radar_rounded, color: Colors.white70),
                 onTap: onOpenLibraryScan,
               ),
+              if (systems.isNotEmpty) ...[
+                SizedBox(height: rs.spacing.lg),
+                ..._buildPerSystemItems(ref, rs),
+              ],
               SizedBox(height: rs.spacing.md),
               _buildCoverPreloadTile(ref),
               SizedBox(height: rs.spacing.md),
@@ -185,6 +225,48 @@ class SettingsSystemTab extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildPerSystemItems(WidgetRef ref, Responsive rs) {
+    final syncState = ref.watch(librarySyncServiceProvider);
+    final gameCounts = ref.watch(gameCountsPerSystemProvider);
+    final counts = gameCounts.valueOrNull ?? {};
+
+    final items = <Widget>[];
+    for (final systemConfig in systems) {
+      final systemModel = SystemModel.supportedSystems
+          .where((s) => s.id == systemConfig.id)
+          .firstOrNull;
+      final displayName = systemModel?.name ?? systemConfig.name;
+      // Prefer sync state (synchronous, always current) over DB counts
+      // to avoid brief flash of stale cached values during async DB refresh
+      final count = syncState.gamesPerSystem[systemConfig.id]
+          ?? counts[systemConfig.id]
+          ?? 0;
+      final isSyncingThis = syncState.isSyncing &&
+          syncState.currentSystem == displayName;
+
+      items.add(SettingsItem(
+        title: displayName,
+        subtitle: count > 0 ? '$count games' : 'No games synced',
+        trailingBuilder: (isFocused) => isSyncingThis
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppTheme.primaryColor,
+                ),
+              )
+            : Icon(
+                Icons.sync_rounded,
+                color: isFocused ? Colors.white : Colors.white70,
+              ),
+        onTap: syncState.isSyncing ? null : () => onSyncSystem(systemConfig.id),
+      ));
+      items.add(SizedBox(height: rs.spacing.sm));
+    }
+    return items;
   }
 
   Widget _buildCoverPreloadTile(WidgetRef ref) {

@@ -370,6 +370,38 @@ void main() {
       expect(svc.phase1Calls.length, 1);
     });
 
+    test('consecutive preloadAll resets counters (issue #8)', () async {
+      final svc = _TestableCoverPreloadService();
+
+      // First run: 3 games
+      for (int i = 0; i < 3; i++) {
+        await insertGame('run1_$i.gba', 'gba', coverUrl: 'http://run1_$i');
+      }
+      await svc.preloadAll(dbService, phase1Pool: 1, phase2Pool: 1);
+      expect(svc.state.completed, 3);
+      expect(svc.state.total, 3);
+      expect(svc.state.succeeded, 3);
+
+      // Mark games as having thumbnails so they don't appear in second run
+      for (int i = 0; i < 3; i++) {
+        await db.update('games', {'has_thumbnail': 1},
+            where: 'filename = ?', whereArgs: ['run1_$i.gba']);
+      }
+
+      // Add new games for second run
+      for (int i = 0; i < 5; i++) {
+        await insertGame('run2_$i.gba', 'gba', coverUrl: 'http://run2_$i');
+      }
+
+      // Second run: counters must reset to 0, not accumulate
+      await svc.preloadAll(dbService, phase1Pool: 1, phase2Pool: 1);
+      expect(svc.state.completed, 5);
+      expect(svc.state.total, 5);
+      expect(svc.state.succeeded, 5);
+      expect(svc.state.failed, 0);
+      expect(svc.state.progress, 1.0);
+    });
+
     test('single item with pool > 1 works correctly', () async {
       final svc = _TestableCoverPreloadService();
 

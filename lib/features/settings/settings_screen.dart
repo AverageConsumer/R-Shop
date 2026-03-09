@@ -12,6 +12,7 @@ import '../../providers/app_providers.dart';
 import '../../utils/friendly_error.dart';
 import '../../providers/download_providers.dart';
 import '../../providers/game_providers.dart';
+import '../../providers/library_providers.dart';
 import '../../widgets/download_overlay.dart';
 import '../../services/cover_preload_service.dart';
 import '../../services/database_service.dart';
@@ -45,6 +46,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   late double _bgmVolume;
   late double _sfxVolume;
   late int _maxDownloads;
+  late int _syncTimeout;
   late bool _allowNonLanHttp;
   late bool _hideEmptyConsoles;
   bool _showResetConfirm = false;
@@ -92,6 +94,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final storage = ref.read(storageServiceProvider);
     _hapticEnabled = storage.getHapticEnabled();
     _maxDownloads = storage.getMaxConcurrentDownloads();
+    _syncTimeout = storage.getSyncTimeoutSeconds();
     _allowNonLanHttp = storage.getAllowNonLanHttp();
     _hideEmptyConsoles = storage.getHideEmptyConsoles();
     final soundSettings = ref.read(soundSettingsProvider);
@@ -225,6 +228,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     ref.read(downloadQueueManagerProvider).setMaxConcurrent(newValue);
   }
 
+  void _cycleSyncTimeout() {
+    ref.read(syncTimeoutProvider.notifier).cycle();
+    setState(() => _syncTimeout = ref.read(syncTimeoutProvider));
+    ref.read(feedbackServiceProvider).tick();
+  }
+
   Future<void> _toggleAllowNonLanHttp() async {
     final value = !_allowNonLanHttp;
     await ref.read(storageServiceProvider).setAllowNonLanHttp(value);
@@ -289,6 +298,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       context,
       MaterialPageRoute(builder: (context) => const ConfigModeScreen()),
     );
+  }
+
+  void _syncSystem(String systemId) {
+    final config = ref.read(bootstrappedConfigProvider).valueOrNull;
+    if (config == null) return;
+    final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
+    ref.read(librarySyncServiceProvider.notifier).syncSystem(
+        systemId, config, syncTimeout: timeout);
   }
 
   void _openLibraryScan() {
@@ -504,8 +521,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                         1 => SettingsSystemTab(
                             firstSystemTabNode: _firstSystemTabNode,
                             maxDownloads: _maxDownloads,
+                            syncTimeout: _syncTimeout,
                             allowNonLanHttp: _allowNonLanHttp,
                             coverSubtitle: _buildCoverSubtitle(),
+                            systems: ref.watch(bootstrappedConfigProvider).valueOrNull?.systems ?? [],
                             onOpenRommConfig: _openRommConfig,
                             onOpenRaConfig: _openRaConfig,
                             onOpenConfigMode: _openConfigMode,
@@ -513,7 +532,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             onStartCoverPreload: _startCoverPreload,
                             onExportErrorLog: _exportErrorLog,
                             onAdjustMaxDownloads: _adjustMaxDownloads,
+                            onCycleSyncTimeout: _cycleSyncTimeout,
                             onToggleAllowNonLanHttp: _toggleAllowNonLanHttp,
+                            onSyncSystem: _syncSystem,
                           ),
                         _ => SettingsAboutTab(
                             appVersion: _appVersion,

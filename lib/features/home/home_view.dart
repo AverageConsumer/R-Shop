@@ -161,7 +161,9 @@ class _HomeViewState extends ConsumerState<HomeView>
     final config = await ref.read(bootstrappedConfigProvider.future);
     if (!mounted) return;
     if (config.systems.isNotEmpty) {
-      ref.read(librarySyncServiceProvider.notifier).syncAll(config);
+      final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
+      ref.read(librarySyncServiceProvider.notifier).syncAll(
+          config, syncTimeout: timeout);
     }
   }
 
@@ -386,7 +388,9 @@ class _HomeViewState extends ConsumerState<HomeView>
     final config = await ref.read(bootstrappedConfigProvider.future);
     if (!mounted) return;
     if (config.systems.isNotEmpty) {
-      ref.read(librarySyncServiceProvider.notifier).syncAll(config);
+      final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
+      ref.read(librarySyncServiceProvider.notifier).syncAll(
+          config, syncTimeout: timeout);
     }
   }
 
@@ -451,7 +455,9 @@ class _HomeViewState extends ConsumerState<HomeView>
   void _retrySync() {
     final config = ref.read(bootstrappedConfigProvider).valueOrNull;
     if (config != null && config.systems.isNotEmpty) {
-      ref.read(librarySyncServiceProvider.notifier).syncAll(config);
+      final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
+      ref.read(librarySyncServiceProvider.notifier).syncAll(
+          config, syncTimeout: timeout);
     }
     triggerRaSync(
       ref.read(raSyncServiceProvider.notifier),

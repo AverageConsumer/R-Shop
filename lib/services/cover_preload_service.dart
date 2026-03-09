@@ -52,11 +52,13 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
   CoverPreloadService() : super(const CoverPreloadState());
 
   bool _cancelled = false;
+  int _generation = 0;
   ThumbnailIndexService? _indexService;
 
   Future<void> preloadAll(DatabaseService db, {int phase1Pool = 6, int phase2Pool = 4}) async {
     if (state.isRunning) return;
-    state = state.copyWith(isRunning: true);
+    final gen = ++_generation;
+    state = state.copyWith(isRunning: true, total: 0, completed: 0, succeeded: 0, failed: 0);
     _cancelled = false;
 
     final rows = await db.getGamesNeedingCovers();
@@ -79,6 +81,9 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
 
     state = state.copyWith(
       total: rows.length,
+      completed: 0,
+      succeeded: 0,
+      failed: 0,
     );
 
     // Build system lookup map for Phase 2
@@ -91,6 +96,7 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
     await _processPool(
       items: phase1,
       poolSize: phase1Pool,
+      generation: gen,
       processItem: (row) => processWithCoverUrl(
         db: db,
         filename: row['filename'] as String,
@@ -99,7 +105,7 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
     );
 
     // Index preload — download system indexes for Phase 2 fuzzy fallback
-    if (!_cancelled && phase2.isNotEmpty) {
+    if (!_cancelled && gen == _generation && phase2.isNotEmpty) {
       _indexService ??= ThumbnailIndexService();
       final systemIds = <String>{};
       for (final row in phase2) {
@@ -116,10 +122,11 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
     }
 
     // Phase 2 — Games without cover_url (URL resolution + fuzzy fallback)
-    if (!_cancelled) {
+    if (!_cancelled && gen == _generation) {
       await _processPool(
         items: phase2,
         poolSize: phase2Pool,
+        generation: gen,
         processItem: (row) => processWithoutCoverUrl(
           db: db,
           filename: row['filename'] as String,
@@ -135,16 +142,20 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
   Future<void> _processPool({
     required List<Map<String, dynamic>> items,
     required int poolSize,
+    required int generation,
     required Future<bool> Function(Map<String, dynamic>) processItem,
   }) async {
     int nextIndex = 0;
 
     Future<void> worker() async {
-      while (!_cancelled) {
+      while (!_cancelled && _generation == generation) {
         final index = nextIndex++;
         if (index >= items.length) return;
 
         final ok = await processItem(items[index]);
+
+        // Only update state if this is still the active run
+        if (_generation != generation) return;
 
         state = state.copyWith(
           completed: state.completed + 1,
@@ -341,6 +352,7 @@ class CoverPreloadService extends StateNotifier<CoverPreloadState> {
 
   void cancel() {
     _cancelled = true;
+    _generation++;
   }
 
   @override

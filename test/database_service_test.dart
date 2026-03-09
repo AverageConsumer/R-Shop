@@ -39,6 +39,31 @@ void main() {
           await db.execute('CREATE INDEX idx_displayName ON games (displayName)');
           await db.execute('CREATE INDEX idx_filename ON games (filename)');
           await db.execute('CREATE UNIQUE INDEX idx_games_system_filename ON games (systemSlug, filename)');
+          await db.execute('''
+            CREATE TABLE game_metadata (
+              filename TEXT NOT NULL,
+              system_slug TEXT NOT NULL,
+              summary TEXT,
+              genres TEXT,
+              developer TEXT,
+              release_year INTEGER,
+              game_modes TEXT,
+              rating REAL,
+              last_updated INTEGER NOT NULL,
+              PRIMARY KEY (filename, system_slug)
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE ra_matches (
+              game_filename TEXT NOT NULL,
+              system_slug TEXT NOT NULL,
+              ra_game_id INTEGER,
+              match_type TEXT NOT NULL,
+              is_mastered INTEGER NOT NULL DEFAULT 0,
+              last_updated INTEGER NOT NULL,
+              PRIMARY KEY (game_filename, system_slug)
+            )
+          ''');
         },
       ),
     );
@@ -172,7 +197,24 @@ void main() {
       expect(loaded, isEmpty);
     });
 
-    test('save replaces previous for same systemSlug', () async {
+    test('save with deleteOrphans replaces previous for same systemSlug', () async {
+      final batch1 = [
+        const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
+        const GameItem(filename: 'B.zip', displayName: 'B', url: 'http://b'),
+      ];
+      await service.saveGames('snes', batch1);
+
+      final batch2 = [
+        const GameItem(filename: 'C.zip', displayName: 'C', url: 'http://c'),
+      ];
+      await service.saveGames('snes', batch2, deleteOrphans: true);
+
+      final loaded = await service.getGames('snes');
+      expect(loaded.length, 1);
+      expect(loaded.first.filename, 'C.zip');
+    });
+
+    test('save without deleteOrphans keeps existing games (additive)', () async {
       final batch1 = [
         const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
         const GameItem(filename: 'B.zip', displayName: 'B', url: 'http://b'),
@@ -185,8 +227,9 @@ void main() {
       await service.saveGames('snes', batch2);
 
       final loaded = await service.getGames('snes');
-      expect(loaded.length, 1);
-      expect(loaded.first.filename, 'C.zip');
+      expect(loaded.length, 3);
+      final filenames = loaded.map((g) => g.filename).toSet();
+      expect(filenames, containsAll(['A.zip', 'B.zip', 'C.zip']));
     });
 
     test('save for system A does not affect system B', () async {
@@ -200,7 +243,7 @@ void main() {
       await service.saveGames('gba', gamesB);
 
       // Replace snes games
-      await service.saveGames('snes', []);
+      await service.saveGames('snes', [], deleteOrphans: true);
       final loadedB = await service.getGames('gba');
       expect(loadedB.length, 1);
       expect(loadedB.first.filename, 'B.zip');
@@ -332,21 +375,37 @@ void main() {
       expect(loaded.first.url, 'http://new-url');
     });
 
-    test('orphaned games are deleted', () async {
+    test('orphaned games are deleted with deleteOrphans', () async {
       await service.saveGames('snes', [
         const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
         const GameItem(filename: 'B.zip', displayName: 'B', url: 'http://b'),
         const GameItem(filename: 'C.zip', displayName: 'C', url: 'http://c'),
       ]);
 
-      // Re-save with only A — B and C should be removed
+      // Re-save with only A and deleteOrphans — B and C should be removed
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
+      ], deleteOrphans: true);
+
+      final loaded = await service.getGames('snes');
+      expect(loaded.length, 1);
+      expect(loaded.first.filename, 'A.zip');
+    });
+
+    test('orphaned games are kept without deleteOrphans (additive)', () async {
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
+        const GameItem(filename: 'B.zip', displayName: 'B', url: 'http://b'),
+        const GameItem(filename: 'C.zip', displayName: 'C', url: 'http://c'),
+      ]);
+
+      // Re-save with only A without deleteOrphans — all 3 should remain
       await service.saveGames('snes', [
         const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
       ]);
 
       final loaded = await service.getGames('snes');
-      expect(loaded.length, 1);
-      expect(loaded.first.filename, 'A.zip');
+      expect(loaded.length, 3);
     });
 
     test('new games are inserted alongside existing', () async {
@@ -365,18 +424,18 @@ void main() {
       expect(filenames, containsAll(['A.zip', 'B.zip']));
     });
 
-    test('empty list clears all games for system', () async {
+    test('empty list with deleteOrphans clears all games for system', () async {
       await service.saveGames('snes', [
         const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
         const GameItem(filename: 'B.zip', displayName: 'B', url: 'http://b'),
       ]);
 
-      await service.saveGames('snes', []);
+      await service.saveGames('snes', [], deleteOrphans: true);
       final loaded = await service.getGames('snes');
       expect(loaded, isEmpty);
     });
 
-    test('upsert does not affect other systems', () async {
+    test('upsert with deleteOrphans does not affect other systems', () async {
       await service.saveGames('snes', [
         const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
       ]);
@@ -384,10 +443,10 @@ void main() {
         const GameItem(filename: 'B.zip', displayName: 'B', url: 'http://b'),
       ]);
 
-      // Update only snes
+      // Update only snes with orphan deletion
       await service.saveGames('snes', [
         const GameItem(filename: 'C.zip', displayName: 'C', url: 'http://c'),
-      ]);
+      ], deleteOrphans: true);
 
       final snes = await service.getGames('snes');
       final gba = await service.getGames('gba');
@@ -422,7 +481,7 @@ void main() {
           ),
         ),
       ];
-      await service.saveGames('snes', updated);
+      await service.saveGames('snes', updated, deleteOrphans: true);
       final reloaded = await service.getGames('snes');
       expect(reloaded.length, 125);
     });
@@ -715,6 +774,146 @@ void main() {
         'snes',
       );
       expect(icon, isNull);
+    });
+  });
+
+  // ─── getGameCountsPerSystem ──────────────────────────────
+
+  group('getGameCountsPerSystem', () {
+    test('returns counts grouped by systemSlug', () async {
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
+        const GameItem(filename: 'B.zip', displayName: 'B', url: 'http://b'),
+      ]);
+      await service.saveGames('gba', [
+        const GameItem(filename: 'C.zip', displayName: 'C', url: 'http://c'),
+      ]);
+
+      final counts = await service.getGameCountsPerSystem();
+      expect(counts['snes'], 2);
+      expect(counts['gba'], 1);
+    });
+
+    test('returns empty map when no games', () async {
+      final counts = await service.getGameCountsPerSystem();
+      expect(counts, isEmpty);
+    });
+
+    test('excludes systems with zero games after deleteOrphans', () async {
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
+      ]);
+      await service.saveGames('snes', [], deleteOrphans: true);
+
+      final counts = await service.getGameCountsPerSystem();
+      expect(counts['snes'], isNull);
+    });
+  });
+
+  group('cascade deletes', () {
+    test('deleteGame removes game_metadata and ra_matches', () async {
+      await service.saveGames('snes', [
+        const GameItem(filename: 'Mario.sfc', displayName: 'Mario', url: 'http://a'),
+      ]);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await db.insert('game_metadata', {
+        'filename': 'Mario.sfc',
+        'system_slug': 'snes',
+        'summary': 'A platformer',
+        'last_updated': now,
+      });
+      await db.insert('ra_matches', {
+        'game_filename': 'Mario.sfc',
+        'system_slug': 'snes',
+        'match_type': 'nameMatch',
+        'is_mastered': 0,
+        'last_updated': now,
+      });
+
+      await service.deleteGame('snes', 'Mario.sfc');
+
+      final games = await service.getGames('snes');
+      expect(games, isEmpty);
+      final metadata = await db.query('game_metadata',
+          where: 'filename = ? AND system_slug = ?',
+          whereArgs: ['Mario.sfc', 'snes']);
+      expect(metadata, isEmpty);
+      final matches = await db.query('ra_matches',
+          where: 'game_filename = ? AND system_slug = ?',
+          whereArgs: ['Mario.sfc', 'snes']);
+      expect(matches, isEmpty);
+    });
+
+    test('saveGames with deleteOrphans cascades to game_metadata and ra_matches', () async {
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.sfc', displayName: 'A', url: 'http://a'),
+        const GameItem(filename: 'B.sfc', displayName: 'B', url: 'http://b'),
+      ]);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await db.insert('game_metadata', {
+        'filename': 'A.sfc', 'system_slug': 'snes',
+        'summary': 'Game A', 'last_updated': now,
+      });
+      await db.insert('game_metadata', {
+        'filename': 'B.sfc', 'system_slug': 'snes',
+        'summary': 'Game B', 'last_updated': now,
+      });
+      await db.insert('ra_matches', {
+        'game_filename': 'B.sfc', 'system_slug': 'snes',
+        'match_type': 'nameMatch', 'is_mastered': 0, 'last_updated': now,
+      });
+
+      // Re-save keeping only A — B should be orphaned and cascaded
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.sfc', displayName: 'A', url: 'http://a'),
+      ], deleteOrphans: true);
+
+      final games = await service.getGames('snes');
+      expect(games.length, 1);
+      expect(games.first.filename, 'A.sfc');
+
+      // A's metadata preserved
+      final metaA = await db.query('game_metadata',
+          where: 'filename = ? AND system_slug = ?',
+          whereArgs: ['A.sfc', 'snes']);
+      expect(metaA, hasLength(1));
+
+      // B's metadata and RA match removed
+      final metaB = await db.query('game_metadata',
+          where: 'filename = ? AND system_slug = ?',
+          whereArgs: ['B.sfc', 'snes']);
+      expect(metaB, isEmpty);
+      final matchB = await db.query('ra_matches',
+          where: 'game_filename = ? AND system_slug = ?',
+          whereArgs: ['B.sfc', 'snes']);
+      expect(matchB, isEmpty);
+    });
+
+    test('cascade does not affect other systems', () async {
+      await service.saveGames('snes', [
+        const GameItem(filename: 'A.sfc', displayName: 'A', url: 'http://a'),
+      ]);
+      await service.saveGames('gba', [
+        const GameItem(filename: 'A.sfc', displayName: 'A', url: 'http://a2'),
+      ]);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await db.insert('game_metadata', {
+        'filename': 'A.sfc', 'system_slug': 'snes',
+        'summary': 'SNES version', 'last_updated': now,
+      });
+      await db.insert('game_metadata', {
+        'filename': 'A.sfc', 'system_slug': 'gba',
+        'summary': 'GBA version', 'last_updated': now,
+      });
+
+      await service.deleteGame('snes', 'A.sfc');
+
+      // GBA metadata untouched
+      final metaGba = await db.query('game_metadata',
+          where: 'filename = ? AND system_slug = ?',
+          whereArgs: ['A.sfc', 'gba']);
+      expect(metaGba, hasLength(1));
+      expect(metaGba.first['summary'], 'GBA version');
     });
   });
 }

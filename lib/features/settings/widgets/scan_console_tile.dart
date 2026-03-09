@@ -3,7 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../models/system_model.dart';
 
-enum ScanTileState { pending, scanning, complete }
+enum ScanTileState { pending, scanning, complete, failed }
 
 class ScanConsoleTile extends StatelessWidget {
   final SystemModel system;
@@ -28,12 +28,15 @@ class ScanConsoleTile extends StatelessWidget {
     final isComplete = scanState == ScanTileState.complete;
     final isScanning = scanState == ScanTileState.scanning;
     final isPending = scanState == ScanTileState.pending;
+    final isFailed = scanState == ScanTileState.failed;
 
     final double bgAlpha = isPending
         ? 0.03
         : isScanning
             ? 0.08
-            : 0.15;
+            : isFailed
+                ? 0.10
+                : 0.15;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
@@ -41,16 +44,20 @@ class ScanConsoleTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: isPending
             ? Colors.white.withValues(alpha: bgAlpha + (isFocused ? 0.05 : 0))
-            : system.accentColor.withValues(alpha: bgAlpha + (isFocused ? 0.05 : 0)),
+            : isFailed
+                ? Colors.red.withValues(alpha: bgAlpha + (isFocused ? 0.05 : 0))
+                : system.accentColor.withValues(alpha: bgAlpha + (isFocused ? 0.05 : 0)),
         borderRadius: BorderRadius.circular(rs.radius.md),
         border: Border.all(
           color: isFocused
-              ? system.accentColor.withValues(alpha: 0.9)
+              ? (isFailed ? Colors.red.withValues(alpha: 0.9) : system.accentColor.withValues(alpha: 0.9))
               : isPending
                   ? Colors.white.withValues(alpha: 0.06)
-                  : isScanning
-                      ? system.accentColor.withValues(alpha: 0.6)
-                      : system.accentColor.withValues(alpha: 0.8),
+                  : isFailed
+                      ? Colors.red.withValues(alpha: 0.6)
+                      : isScanning
+                          ? system.accentColor.withValues(alpha: 0.6)
+                          : system.accentColor.withValues(alpha: 0.8),
           width: isFocused || isScanning ? 2 : 1,
         ),
         boxShadow: [
@@ -132,6 +139,17 @@ class ScanConsoleTile extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+              ),
+            ),
+          // Error indicator
+          if (isFailed)
+            Positioned(
+              top: rs.spacing.xs,
+              right: rs.spacing.xs,
+              child: Icon(
+                Icons.error_outline,
+                color: Colors.red.withValues(alpha: 0.9),
+                size: 16,
               ),
             ),
           // Scanning indicator

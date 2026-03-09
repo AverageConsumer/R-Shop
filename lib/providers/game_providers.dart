@@ -30,7 +30,8 @@ final bootstrappedConfigProvider = FutureProvider<AppConfig>((ref) async {
 });
 
 final unifiedGameServiceProvider = Provider<UnifiedGameService>((ref) {
-  return UnifiedGameService();
+  final timeoutSeconds = ref.watch(syncTimeoutProvider);
+  return UnifiedGameService(syncTimeout: Duration(seconds: timeoutSeconds));
 });
 
 final gamesProvider =

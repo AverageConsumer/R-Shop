@@ -286,6 +286,37 @@ final favoriteGamesProvider =
   return FavoriteGamesNotifier(ref.read(storageServiceProvider));
 });
 
+// --- Sync Timeout ---
+
+const syncTimeoutSteps = [60, 120, 300, 600];
+
+class SyncTimeoutNotifier extends StateNotifier<int> {
+  final StorageService _storage;
+
+  SyncTimeoutNotifier(this._storage)
+      : super(_storage.getSyncTimeoutSeconds());
+
+  Future<void> cycle() async {
+    final currentIndex = syncTimeoutSteps.indexOf(state);
+    final next = syncTimeoutSteps[(currentIndex + 1) % syncTimeoutSteps.length];
+    state = next;
+    await _storage.setSyncTimeoutSeconds(next);
+  }
+}
+
+final syncTimeoutProvider =
+    StateNotifierProvider<SyncTimeoutNotifier, int>((ref) {
+  return SyncTimeoutNotifier(ref.read(storageServiceProvider));
+});
+
+String formatSyncTimeout(int seconds) => switch (seconds) {
+      60 => '1 min',
+      120 => '2 min',
+      300 => '5 min',
+      600 => '10 min',
+      _ => '${seconds}s',
+    };
+
 final deviceMemoryProvider = Provider<DeviceMemoryInfo>((ref) {
   throw UnimplementedError('Must be overridden in main.dart');
 });

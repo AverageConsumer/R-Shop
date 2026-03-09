@@ -246,35 +246,46 @@ class DatabaseService {
     }
   }
 
-  Future<void> saveGames(String systemSlug, List<GameItem> games) async {
+  Future<void> saveGames(String systemSlug, List<GameItem> games, {bool deleteOrphans = false}) async {
     final db = await database;
     await db.transaction((txn) async {
-      // 1. Collect existing filenames to detect orphans
-      final existing = await txn.query(
-        _tableName,
-        columns: ['filename'],
-        where: 'systemSlug = ?',
-        whereArgs: [systemSlug],
-      );
-      final existingFiles =
-          existing.map((r) => r['filename'] as String).toSet();
-      final incomingFiles = games.map((g) => g.filename).toSet();
+      // 1. Delete orphans only when explicitly requested (user-triggered full scan)
+      // Background syncs are additive to prevent data loss from incomplete fetches.
+      if (deleteOrphans) {
+        final existing = await txn.query(
+          _tableName,
+          columns: ['filename'],
+          where: 'systemSlug = ?',
+          whereArgs: [systemSlug],
+        );
+        final existingFiles =
+            existing.map((r) => r['filename'] as String).toSet();
+        final incomingFiles = games.map((g) => g.filename).toSet();
 
-      // 2. Delete orphans (games no longer in remote)
-      final orphans = existingFiles.difference(incomingFiles);
-      if (orphans.isNotEmpty) {
-        final orphanList = orphans.toList();
-        for (var i = 0; i < orphanList.length; i += 100) {
-          final chunk = orphanList.skip(i).take(100).toList();
-          final placeholders = List.filled(chunk.length, '?').join(',');
-          await txn.rawDelete(
-            'DELETE FROM $_tableName WHERE systemSlug = ? AND filename IN ($placeholders)',
-            [systemSlug, ...chunk],
-          );
+        final orphans = existingFiles.difference(incomingFiles);
+        if (orphans.isNotEmpty) {
+          final orphanList = orphans.toList();
+          for (var i = 0; i < orphanList.length; i += 100) {
+            final chunk = orphanList.skip(i).take(100).toList();
+            final placeholders = List.filled(chunk.length, '?').join(',');
+            await txn.rawDelete(
+              'DELETE FROM $_tableName WHERE systemSlug = ? AND filename IN ($placeholders)',
+              [systemSlug, ...chunk],
+            );
+            // Cascade: remove orphaned metadata and RA matches
+            await txn.rawDelete(
+              'DELETE FROM game_metadata WHERE system_slug = ? AND filename IN ($placeholders)',
+              [systemSlug, ...chunk],
+            );
+            await txn.rawDelete(
+              'DELETE FROM ra_matches WHERE system_slug = ? AND game_filename IN ($placeholders)',
+              [systemSlug, ...chunk],
+            );
+          }
         }
       }
 
-      // 3. Upsert incoming games — preserves cover_url and has_thumbnail
+      // 2. Upsert incoming games — preserves cover_url and has_thumbnail
       final batch = txn.batch();
       for (final game in games) {
         batch.rawInsert('''
@@ -304,6 +315,17 @@ class DatabaseService {
       }
       await batch.commit(noResult: true);
     });
+  }
+
+  Future<Map<String, int>> getGameCountsPerSystem() async {
+    final db = await database;
+    final rows = await db.rawQuery(
+      'SELECT systemSlug, COUNT(*) as count FROM $_tableName GROUP BY systemSlug',
+    );
+    return {
+      for (final row in rows)
+        row['systemSlug'] as String: row['count'] as int,
+    };
   }
 
   Future<void> updateGameCover(String filename, String coverUrl) async {
@@ -423,11 +445,24 @@ class DatabaseService {
 
   Future<void> deleteGame(String systemSlug, String filename) async {
     final db = await database;
-    await db.delete(
-      _tableName,
-      where: 'systemSlug = ? AND filename = ?',
-      whereArgs: [systemSlug, filename],
-    );
+    await db.transaction((txn) async {
+      await txn.delete(
+        _tableName,
+        where: 'systemSlug = ? AND filename = ?',
+        whereArgs: [systemSlug, filename],
+      );
+      // Cascade: remove orphaned metadata and RA matches
+      await txn.delete(
+        'game_metadata',
+        where: 'system_slug = ? AND filename = ?',
+        whereArgs: [systemSlug, filename],
+      );
+      await txn.delete(
+        'ra_matches',
+        where: 'system_slug = ? AND game_filename = ?',
+        whereArgs: [systemSlug, filename],
+      );
+    });
   }
 
   static String _escapeLike(String input) =>
