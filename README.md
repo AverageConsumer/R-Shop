@@ -19,6 +19,9 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
   <a href="https://github.com/averageconsumer/r-shop/releases">
     <img src="https://img.shields.io/badge/Download-Latest_APK-brightgreen?style=for-the-badge&logo=android&logoColor=white" alt="Download" />
   </a>
+  <a href="https://discord.gg/xVT26BHGqh">
+    <img src="https://img.shields.io/badge/Discord-Join_Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" />
+  </a>
 </p>
 
 <p align="center">
