@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../models/config/app_config.dart';
 import '../models/config/system_config.dart';
@@ -13,6 +14,7 @@ import '../services/config_parser.dart';
 import '../services/database_service.dart';
 import '../services/unified_game_service.dart';
 import 'app_providers.dart';
+import 'installed_files_provider.dart';
 import 'library_providers.dart';
 
 /// Whether the config was recovered from a backup (corrupt primary).
@@ -76,12 +78,59 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
 // Game metadata (RomM / IGDB)
 // ---------------------------------------------------------------------------
 
+/// Batch query returning remote and local game counts for every system slug.
+/// Remote = DB count (games with a provider_config).
+/// Local = filesystem count of ROM files in each system's targetFolder.
+final systemSourceCountsProvider =
+    FutureProvider<Map<String, ({int remote, int local})>>((ref) async {
+  // Re-fetch when sync finishes or files change on disk
+  ref.watch(librarySyncServiceProvider.select((s) => s.isSyncing));
+  final db = ref.read(libraryDbProvider);
+  final remoteCounts = await db.getRemoteGameCountsPerSystem();
+  final installed = await ref.watch(installedFilesProvider.future);
+
+  final extsBySystem = {
+    for (final s in SystemModel.supportedSystems) s.id: s.romExtensions.toSet(),
+  };
+
+  final systemIds = {...remoteCounts.keys, ...installed.bySystem.keys};
+  return {
+    for (final id in systemIds)
+      id: (
+        remote: remoteCounts[id] ?? 0,
+        local: _countRomFiles(installed.bySystem[id], extsBySystem[id]),
+      ),
+  };
+});
+
+int _countRomFiles(Set<String>? filenames, Set<String>? extensions) {
+  if (filenames == null || filenames.isEmpty) return 0;
+  if (extensions == null || extensions.isEmpty) return filenames.length;
+  return filenames.where((f) => extensions.contains(p.extension(f).toLowerCase())).length;
+}
+
 /// Cached game metadata lookup for the detail screen.
 final gameMetadataProvider = FutureProvider.autoDispose.family<GameMetadataInfo?,
     ({String filename, String systemSlug})>(
   (ref, params) async {
     final db = DatabaseService();
     return db.getGameMetadata(params.filename, params.systemSlug);
+  },
+);
+
+/// Metadata lookup across all variants of a grouped game.
+/// Returns the first metadata with content found, so grouped games show
+/// metadata even when the selected variant has none (e.g. non-RomM source).
+/// [filenames] is a '\n'-joined string to ensure stable Riverpod family equality.
+final groupMetadataProvider = FutureProvider.autoDispose.family<GameMetadataInfo?,
+    ({String filenames, String systemSlug})>(
+  (ref, params) async {
+    final db = DatabaseService();
+    for (final filename in params.filenames.split('\n')) {
+      final meta = await db.getGameMetadata(filename, params.systemSlug);
+      if (meta != null && meta.hasContent) return meta;
+    }
+    return null;
   },
 );
 

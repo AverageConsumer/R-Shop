@@ -646,28 +646,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          system.name.toUpperCase(),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: rs.isSmall ? 28 : (rs.isMedium ? 36 : 42),
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-            letterSpacing: rs.isSmall ? 4 : 8,
-            shadows: [
-              Shadow(
-                color: system.accentColor.withValues(alpha: 0.8),
-                blurRadius: rs.isSmall ? 20 : 40,
-              ),
-              Shadow(
-                color: Colors.black.withValues(alpha: 0.9),
-                blurRadius: rs.isSmall ? 10 : 20,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: rs.spacing.sm),
+        _buildGameCountBadges(system),
         Text(
           '${system.manufacturer} · ${system.releaseYear}',
           textAlign: TextAlign.center,
@@ -682,10 +661,80 @@ class _HomeViewState extends ConsumerState<HomeView>
     );
   }
 
+  Widget _buildGameCountBadges(SystemModel system) {
+    final countsAsync = ref.watch(systemSourceCountsProvider);
+    return countsAsync.when(
+      data: (counts) {
+        final c = counts[system.id];
+        if (c == null || (c.remote == 0 && c.local == 0)) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (c.remote > 0) _GameCountPill(
+                icon: Icons.cloud_outlined,
+                count: c.remote,
+                color: system.accentColor,
+              ),
+              if (c.remote > 0 && c.local > 0) const SizedBox(width: 6),
+              if (c.local > 0) _GameCountPill(
+                icon: Icons.folder_outlined,
+                count: c.local,
+                color: system.accentColor,
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildLibraryCountBadges() {
+    final countsAsync = ref.watch(systemSourceCountsProvider);
+    return countsAsync.when(
+      data: (counts) {
+        int totalRemote = 0;
+        int totalLocal = 0;
+        for (final c in counts.values) {
+          totalRemote += c.remote;
+          totalLocal += c.local;
+        }
+        if (totalRemote == 0 && totalLocal == 0) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (totalRemote > 0) _GameCountPill(
+                icon: Icons.cloud_outlined,
+                count: totalRemote,
+                color: Colors.cyanAccent,
+              ),
+              if (totalRemote > 0 && totalLocal > 0) const SizedBox(width: 6),
+              if (totalLocal > 0) _GameCountPill(
+                icon: Icons.folder_outlined,
+                count: totalLocal,
+                color: Colors.cyanAccent,
+              ),
+            ],
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
   Widget _buildLibraryNameColumn(Responsive rs) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        _buildLibraryCountBadges(),
         Text(
           'ALL GAMES',
           textAlign: TextAlign.center,
@@ -734,6 +783,7 @@ class _HomeViewState extends ConsumerState<HomeView>
           key: ValueKey(_currentIndex),
           mainAxisSize: MainAxisSize.min,
           children: [
+            _buildLibraryCountBadges(),
             Text(
               'ALL GAMES',
               textAlign: TextAlign.center,
@@ -859,32 +909,7 @@ class _HomeViewState extends ConsumerState<HomeView>
           key: ValueKey(_currentIndex),
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              system.name.toUpperCase(),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: rs.isSmall ? 28 : (rs.isMedium ? 36 : 42),
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-                letterSpacing: rs.isSmall ? 4 : 8,
-                shadows: [
-                  Shadow(
-                    color: system.accentColor.withValues(alpha: 0.8),
-                    blurRadius: rs.isSmall ? 20 : 40,
-                  ),
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.9),
-                    blurRadius: rs.isSmall ? 10 : 20,
-                    offset: const Offset(0, 4),
-                  ),
-                  Shadow(
-                    color: system.accentColor.withValues(alpha: 0.5),
-                    blurRadius: rs.isSmall ? 40 : 80,
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: rs.spacing.sm),
+            _buildGameCountBadges(system),
             Text(
               '${system.manufacturer} · ${system.releaseYear}',
               textAlign: TextAlign.center,
@@ -918,6 +943,53 @@ class _HomeViewState extends ConsumerState<HomeView>
       a: HudAction('Select', onTap: _navigateToCurrentSystem),
       b: HudAction('Exit', onTap: _showExitDialogOverlay),
       start: HudAction('Menu', onTap: toggleQuickMenu),
+    );
+  }
+}
+
+class _GameCountPill extends StatelessWidget {
+  final IconData icon;
+  final int count;
+  final Color color;
+
+  const _GameCountPill({
+    required this.icon,
+    required this.count,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: Color.lerp(Colors.black, color, 0.25)!.withValues(alpha: 0.80),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.60), width: 0.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: color,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

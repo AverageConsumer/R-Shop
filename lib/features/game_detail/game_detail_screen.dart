@@ -281,8 +281,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final isFavorite = ref.read(favoriteGamesProvider).contains(variant.filename);
     final hasDownloads = ref.read(hasQueueItemsProvider);
     final hasAlternatives = variant.alternativeSources.isNotEmpty;
-    final richMetadata = ref.read(gameMetadataProvider(
-      (filename: variant.filename, systemSlug: widget.system.id),
+    final variantFilenames = widget.variants.map((v) => v.filename).join('\n');
+    final richMetadata = ref.read(groupMetadataProvider(
+      (filenames: variantFilenames, systemSlug: widget.system.id),
     )).valueOrNull;
     final hasSummary = richMetadata?.summary != null;
     final raMatches =
@@ -615,8 +616,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     bool isFavorite,
     RaMatchResult? raMatch,
   ) {
-    final gameMetadata = ref.watch(gameMetadataProvider(
-      (filename: selectedVariant.filename, systemSlug: widget.system.id),
+    final variantFilenames = widget.variants.map((v) => v.filename).join('\n');
+    final gameMetadata = ref.watch(groupMetadataProvider(
+      (filenames: variantFilenames, systemSlug: widget.system.id),
     ));
     final richMetadata = gameMetadata.valueOrNull;
     final hasRichMetadata = richMetadata?.hasContent ?? false;
@@ -689,8 +691,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     RaMatchResult? raMatch,
   ) {
     final isMultiRom = widget.variants.length > 1;
-    final gameMetadata = ref.watch(gameMetadataProvider(
-      (filename: controller.selectedVariant.filename, systemSlug: widget.system.id),
+    final variantFilenames = widget.variants.map((v) => v.filename).join('\n');
+    final gameMetadata = ref.watch(groupMetadataProvider(
+      (filenames: variantFilenames, systemSlug: widget.system.id),
     ));
     final richMetadata = gameMetadata.valueOrNull;
     final hasRichMetadata = richMetadata?.hasContent ?? false;

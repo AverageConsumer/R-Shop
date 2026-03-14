@@ -328,6 +328,22 @@ class DatabaseService {
     };
   }
 
+  /// Returns remote game counts (games with a remote provider) per system slug.
+  /// Local counts are derived from the filesystem via [InstalledFilesProvider].
+  Future<Map<String, int>> getRemoteGameCountsPerSystem() async {
+    final db = await database;
+    final rows = await db.rawQuery('''
+      SELECT systemSlug, COUNT(*) AS remote_count
+      FROM $_tableName
+      WHERE provider_config IS NOT NULL
+      GROUP BY systemSlug
+    ''');
+    return {
+      for (final row in rows)
+        row['systemSlug'] as String: (row['remote_count'] as int?) ?? 0,
+    };
+  }
+
   Future<void> updateGameCover(String filename, String coverUrl) async {
     final db = await database;
     await db.update(
