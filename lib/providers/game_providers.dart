@@ -71,7 +71,12 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
   final populated = await db.systemsWithCache(
     withConfig.map((s) => s.id).toList(),
   );
-  return withConfig.where((s) => populated.contains(s.id)).toList();
+  final filtered = withConfig.where((s) => populated.contains(s.id)).toList();
+
+  // Never hide ALL systems — show everything rather than a dead-end empty state
+  if (filtered.isEmpty && withConfig.isNotEmpty) return withConfig;
+
+  return filtered;
 });
 
 // ---------------------------------------------------------------------------
