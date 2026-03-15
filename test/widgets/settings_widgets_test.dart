@@ -312,9 +312,9 @@ void main() {
           firstSystemTabNode: firstNode,
           maxDownloads: maxDownloads,
           syncTimeout: 60,
+          syncCooldown: 60,
           allowNonLanHttp: allowNonLanHttp,
           coverSubtitle: coverSubtitle,
-          systems: const [],
           onOpenRommConfig: () {},
           onOpenRaConfig: () {},
           onOpenConfigMode: () {},
@@ -323,8 +323,8 @@ void main() {
           onExportErrorLog: () {},
           onAdjustMaxDownloads: (_) {},
           onCycleSyncTimeout: () {},
+          onCycleSyncCooldown: () {},
           onToggleAllowNonLanHttp: () {},
-          onSyncSystem: (_) {},
         ),
         overrides: [
           feedbackServiceProvider.overrideWithValue(fakeFeedback),
@@ -386,7 +386,13 @@ void main() {
         ..writeAsStringSync('error log');
       try {
         await tester.pumpWidget(buildSystemTab(logFile: logFile));
-        expect(find.text('EXPORT ERROR LOG', skipOffstage: false), findsOneWidget);
+        // Scroll to reveal items at the bottom of the ListView
+        await tester.scrollUntilVisible(
+          find.text('EXPORT ERROR LOG'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(find.text('EXPORT ERROR LOG'), findsOneWidget);
       } finally {
         tempDir.deleteSync(recursive: true);
       }

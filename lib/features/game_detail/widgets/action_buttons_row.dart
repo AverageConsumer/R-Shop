@@ -17,6 +17,7 @@ class ActionButtonsRow extends StatelessWidget {
 
   // Icons-only fields
   final bool? isFavorite;
+  final bool? isShareEnabled;
   final int? focusedButtonIndex;
   final VoidCallback? onFavorite;
   final VoidCallback? onShare;
@@ -38,6 +39,7 @@ class ActionButtonsRow extends StatelessWidget {
     required this.hintText,
   })  : _mode = _Mode.primary,
         isFavorite = null,
+        isShareEnabled = null,
         focusedButtonIndex = null,
         onFavorite = null,
         onShare = null,
@@ -48,6 +50,7 @@ class ActionButtonsRow extends StatelessWidget {
     super.key,
     required this.accentColor,
     required this.isFavorite,
+    this.isShareEnabled = true,
     required this.focusedButtonIndex,
     required this.onFavorite,
     required this.onShare,
@@ -114,9 +117,10 @@ class ActionButtonsRow extends StatelessWidget {
           child: _IconActionButton(
             icon: Icons.share_rounded,
             label: 'Share',
-            color: Colors.white54,
+            color: isShareEnabled! ? Colors.white54 : Colors.white24,
             isFocused: focusedButtonIndex == 1,
             accentColor: accentColor,
+            enabled: isShareEnabled!,
             onTap: onShare!,
           ),
         ),
@@ -285,6 +289,7 @@ class _IconActionButton extends StatelessWidget {
   final Color color;
   final bool isFocused;
   final Color accentColor;
+  final bool enabled;
   final VoidCallback onTap;
 
   const _IconActionButton({
@@ -293,6 +298,7 @@ class _IconActionButton extends StatelessWidget {
     required this.color,
     required this.isFocused,
     required this.accentColor,
+    this.enabled = true,
     required this.onTap,
   });
 
@@ -300,40 +306,46 @@ class _IconActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final rs = context.rs;
 
+    final effectiveFocused = isFocused && enabled;
+
     return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
+      onTap: enabled ? onTap : null,
+      child: AnimatedOpacity(
         duration: const Duration(milliseconds: 150),
-        padding: EdgeInsets.symmetric(
-          horizontal: rs.isSmall ? 10 : 14,
-          vertical: rs.isSmall ? 8 : 10,
-        ),
-        decoration: BoxDecoration(
-          color: isFocused
-              ? accentColor.withValues(alpha: 0.15)
-              : Colors.white.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(rs.radius.md),
-          border: Border.all(
-            color: isFocused
-                ? accentColor.withValues(alpha: 0.5)
-                : Colors.white.withValues(alpha: 0.1),
-            width: 1,
+        opacity: enabled ? 1.0 : 0.4,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: EdgeInsets.symmetric(
+            horizontal: rs.isSmall ? 10 : 14,
+            vertical: rs.isSmall ? 8 : 10,
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: rs.isSmall ? 18 : 22),
-            SizedBox(height: rs.spacing.xs),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: isFocused ? 0.9 : 0.5),
-                fontSize: rs.isSmall ? 8 : 10,
-                fontWeight: FontWeight.w600,
-              ),
+          decoration: BoxDecoration(
+            color: effectiveFocused
+                ? accentColor.withValues(alpha: 0.15)
+                : Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(rs.radius.md),
+            border: Border.all(
+              color: effectiveFocused
+                  ? accentColor.withValues(alpha: 0.5)
+                  : Colors.white.withValues(alpha: 0.1),
+              width: 1,
             ),
-          ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: rs.isSmall ? 18 : 22),
+              SizedBox(height: rs.spacing.xs),
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: effectiveFocused ? 0.9 : 0.5),
+                  fontSize: rs.isSmall ? 8 : 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

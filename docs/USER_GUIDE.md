@@ -67,6 +67,7 @@ The main configuration screen. A grid displays all supported systems. For each c
 - Set a **target folder** where ROM files will be stored
 - Toggle **auto-extract** for archive files
 - Toggle **merge mode** to combine results from multiple providers
+- Toggle **auto-sync on app launch** to control whether this system syncs automatically (respects the cooldown setting) or only manually via the quick menu
 - **Add providers** (Web, SMB, FTP, or RomM) with connection details
 
 Press Y to add a new provider, then fill in the type-specific fields and test the connection. You can add multiple providers per console and reorder their priority.
@@ -117,8 +118,9 @@ A pulsing indicator in the top-left corner appears when downloads are active.
 Press Start to open the quick menu with options for:
 
 - **Search** — jump to game search
+- **Sync [System Name]** — sync the currently selected system (shows last sync time as subtitle; only shown when a system is selected)
+- **Sync All** — force a full sync of all configured systems regardless of cooldown (shown when multiple systems are configured)
 - **Settings** — open app settings
-- **Zoom** — adjust grid columns
 - **Downloads** — view download queue (shown when queue has items)
 
 ### Exiting
@@ -182,7 +184,8 @@ If the game has a RetroAchievements match, an info section appears below the met
 | Delete | A | Single variant, installed |
 | Pick Version | A | Multiple variants |
 | Favorite | Select | Toggle anytime |
-| Quick Menu | Start | Tags, Description, Filename, Achievements, Download sources |
+| Add/Remove Shelf | Select menu or Start menu | Add to or remove from custom shelves |
+| Quick Menu | Start | Tags, Description, Filename, Achievements, Download sources, Shelf management |
 
 ### Download
 
@@ -425,6 +428,13 @@ Open Settings from the quick menu (Start) on the home screen.
 | Sound Effects | On / Off | On | Audio feedback for UI actions |
 | Hide Empty Consoles | On / Off | Off | Hide systems with no games from the home screen |
 
+### Sync
+
+| Setting | Values | Default | Description |
+|---------|--------|---------|-------------|
+| Sync Timeout | 1 min / 2 min / 5 min / 10 min | 2 min | Maximum time to wait for a single system sync |
+| Auto-Sync Cooldown | Always / 15 min / 30 min / 1 hour / 2 hours / 6 hours | 1 hour | Minimum interval between automatic re-syncs per system; "Always" syncs on every launch |
+
 ### Audio
 
 | Setting | Range | Default | Description |
@@ -452,6 +462,7 @@ Adjust audio sliders with left/right on the D-pad (steps of 5%).
 |---------|-------------|
 | Edit Consoles | Add, remove, or reconfigure console systems and providers |
 | Scan Library | Rescan all console folders to discover games |
+| Search Game Covers | Batch-generate thumbnails for all games |
 | RetroAchievements | Configure RA credentials, test connection, sync database, and clear cache |
 | Export Error Log | Share the crash log file for bug reporting (only visible when log contains data) |
 | Reset Application | Factory reset: clears all settings, database, and cache |

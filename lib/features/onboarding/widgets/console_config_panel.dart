@@ -197,6 +197,19 @@ class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
               ? 'All sources searched, results combined'
               : 'Sources tried in order until one succeeds',
         ),
+        SizedBox(height: rs.spacing.md),
+
+        // Auto-sync toggle
+        _buildToggleRow(
+          rs: rs,
+          label: 'Auto-sync on app launch',
+          value: sub.autoSync,
+          onChanged: controller.setAutoSync,
+          fontSize: fontSize,
+          subtitle: sub.autoSync
+              ? 'Syncs automatically (respects cooldown)'
+              : 'Only syncs manually via Start menu',
+        ),
         SizedBox(height: rs.spacing.lg),
 
         // Provider list

@@ -317,6 +317,40 @@ String formatSyncTimeout(int seconds) => switch (seconds) {
       _ => '${seconds}s',
     };
 
+// --- Sync Cooldown ---
+
+const syncCooldownSteps = [0, 15, 30, 60, 120, 360];
+
+class SyncCooldownNotifier extends StateNotifier<int> {
+  final StorageService _storage;
+
+  SyncCooldownNotifier(this._storage)
+      : super(_storage.getSyncCooldownMinutes());
+
+  Future<void> cycle() async {
+    final currentIndex = syncCooldownSteps.indexOf(state);
+    final next =
+        syncCooldownSteps[(currentIndex + 1) % syncCooldownSteps.length];
+    state = next;
+    await _storage.setSyncCooldownMinutes(next);
+  }
+}
+
+final syncCooldownProvider =
+    StateNotifierProvider<SyncCooldownNotifier, int>((ref) {
+  return SyncCooldownNotifier(ref.read(storageServiceProvider));
+});
+
+String formatSyncCooldown(int minutes) => switch (minutes) {
+      0 => 'Always',
+      15 => '15 min',
+      30 => '30 min',
+      60 => '1 hour',
+      120 => '2 hours',
+      360 => '6 hours',
+      _ => '${minutes}m',
+    };
+
 final deviceMemoryProvider = Provider<DeviceMemoryInfo>((ref) {
   throw UnimplementedError('Must be overridden in main.dart');
 });

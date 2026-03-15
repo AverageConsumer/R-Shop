@@ -12,6 +12,7 @@ void showShelfPickerDialog({
   required WidgetRef ref,
   required List<CustomShelf> shelves,
   required void Function(String shelfId) onSelect,
+  String title = 'ADD TO SHELF',
 }) {
   showDialog(
     context: context,
@@ -19,6 +20,7 @@ void showShelfPickerDialog({
     builder: (ctx) => _ShelfPickerDialog(
       shelves: shelves,
       onSelect: onSelect,
+      title: title,
     ),
   );
 }
@@ -26,10 +28,12 @@ void showShelfPickerDialog({
 class _ShelfPickerDialog extends ConsumerStatefulWidget {
   final List<CustomShelf> shelves;
   final void Function(String shelfId) onSelect;
+  final String title;
 
   const _ShelfPickerDialog({
     required this.shelves,
     required this.onSelect,
+    required this.title,
   });
 
   @override
@@ -137,7 +141,7 @@ class _ShelfPickerDialogState extends ConsumerState<_ShelfPickerDialog> {
                 Padding(
                   padding: EdgeInsets.all(rs.spacing.md),
                   child: Text(
-                    'ADD TO SHELF',
+                    widget.title,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: rs.isSmall ? 12 : 14,

@@ -415,12 +415,14 @@ class ConsoleSetupState {
   final String? targetFolder;
   final bool autoExtract;
   final bool mergeMode;
+  final bool autoSync;
   final List<ProviderConfig> providers;
 
   const ConsoleSetupState({
     this.targetFolder,
     this.autoExtract = false,
     this.mergeMode = false,
+    this.autoSync = true,
     this.providers = const [],
   });
 
@@ -428,12 +430,14 @@ class ConsoleSetupState {
     String? targetFolder,
     bool? autoExtract,
     bool? mergeMode,
+    bool? autoSync,
     List<ProviderConfig>? providers,
   }) {
     return ConsoleSetupState(
       targetFolder: targetFolder ?? this.targetFolder,
       autoExtract: autoExtract ?? this.autoExtract,
       mergeMode: mergeMode ?? this.mergeMode,
+      autoSync: autoSync ?? this.autoSync,
       providers: providers ?? this.providers,
     );
   }

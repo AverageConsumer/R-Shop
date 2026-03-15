@@ -26,6 +26,7 @@ class GameDetailState {
   final int selectedIndex;
   final Map<int, bool> installedStatus;
   final bool isDeleting;
+  final bool isSharing;
   final String? error;
   final int dialogSelection;
   final bool isAddingToQueue;
@@ -45,6 +46,7 @@ class GameDetailState {
     this.selectedIndex = 0,
     this.installedStatus = const {},
     this.isDeleting = false,
+    this.isSharing = false,
     this.error,
     this.dialogSelection = 0,
     this.isAddingToQueue = false,
@@ -62,6 +64,7 @@ class GameDetailState {
     int? selectedIndex,
     Map<int, bool>? installedStatus,
     bool? isDeleting,
+    bool? isSharing,
     String? error,
     bool clearError = false,
     int? dialogSelection,
@@ -80,6 +83,7 @@ class GameDetailState {
       selectedIndex: selectedIndex ?? this.selectedIndex,
       installedStatus: installedStatus ?? this.installedStatus,
       isDeleting: isDeleting ?? this.isDeleting,
+      isSharing: isSharing ?? this.isSharing,
       error: clearError ? null : (error ?? this.error),
       dialogSelection: dialogSelection ?? this.dialogSelection,
       isAddingToQueue: isAddingToQueue ?? this.isAddingToQueue,

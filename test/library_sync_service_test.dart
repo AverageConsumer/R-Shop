@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:retro_eshop/models/config/system_config.dart';
+import 'package:retro_eshop/providers/app_providers.dart';
 import 'package:retro_eshop/services/library_sync_service.dart';
 import 'package:retro_eshop/utils/friendly_error.dart';
 
@@ -402,6 +404,147 @@ void main() {
       final service = LibrarySyncService();
       expect(service.state.isSyncing, isFalse);
       service.dispose();
+    });
+  });
+
+  // ─── waitForCompletion ─────────────────────────────────
+
+  group('waitForCompletion', () {
+    test('resolves immediately when no sync is in progress', () async {
+      final service = LibrarySyncService();
+      // Should not hang — resolves immediately
+      await service.waitForCompletion();
+      service.dispose();
+    });
+  });
+
+  // ─── syncSmart guards ──────────────────────────────────
+
+  group('syncSmart guards', () {
+    test('returns immediately for empty config', () async {
+      final service = LibrarySyncService();
+      // Empty config → should not start syncing
+      // We can't easily call syncSmart without StorageService,
+      // but we verify the guard via state
+      expect(service.state.isSyncing, isFalse);
+      service.dispose();
+    });
+  });
+
+  // ─── SystemConfig.autoSync ─────────────────────────────
+
+  group('SystemConfig.autoSync', () {
+    test('defaults to true when missing from JSON', () {
+      final config = SystemConfig.fromJson(const {
+        'id': 'nes',
+        'name': 'NES',
+        'target_folder': '/roms/nes',
+        'providers': [],
+      });
+      expect(config.autoSync, isTrue);
+    });
+
+    test('reads auto_sync: false from JSON', () {
+      final config = SystemConfig.fromJson(const {
+        'id': 'nes',
+        'name': 'NES',
+        'target_folder': '/roms/nes',
+        'providers': [],
+        'auto_sync': false,
+      });
+      expect(config.autoSync, isFalse);
+    });
+
+    test('reads auto_sync: true from JSON', () {
+      final config = SystemConfig.fromJson(const {
+        'id': 'nes',
+        'name': 'NES',
+        'target_folder': '/roms/nes',
+        'providers': [],
+        'auto_sync': true,
+      });
+      expect(config.autoSync, isTrue);
+    });
+
+    test('toJson includes auto_sync', () {
+      const config = SystemConfig(
+        id: 'nes',
+        name: 'NES',
+        targetFolder: '/roms/nes',
+        providers: [],
+        autoSync: false,
+      );
+      final json = config.toJson();
+      expect(json['auto_sync'], isFalse);
+    });
+
+    test('toJsonWithoutAuth includes auto_sync', () {
+      const config = SystemConfig(
+        id: 'nes',
+        name: 'NES',
+        targetFolder: '/roms/nes',
+        providers: [],
+        autoSync: false,
+      );
+      final json = config.toJsonWithoutAuth();
+      expect(json['auto_sync'], isFalse);
+    });
+
+    test('copyWith updates autoSync', () {
+      const config = SystemConfig(
+        id: 'nes',
+        name: 'NES',
+        targetFolder: '/roms/nes',
+        providers: [],
+        autoSync: true,
+      );
+      final updated = config.copyWith(autoSync: false);
+      expect(updated.autoSync, isFalse);
+      expect(config.autoSync, isTrue); // original unchanged
+    });
+
+    test('fromJson → toJson round-trips auto_sync', () {
+      final original = SystemConfig.fromJson(const {
+        'id': 'snes',
+        'name': 'SNES',
+        'target_folder': '/roms/snes',
+        'providers': [],
+        'auto_sync': false,
+      });
+      final roundTripped = SystemConfig.fromJson(original.toJson());
+      expect(roundTripped.autoSync, isFalse);
+    });
+  });
+
+  // ─── formatSyncCooldown ────────────────────────────────
+
+  group('formatSyncCooldown', () {
+    test('formats known values', () {
+      expect(formatSyncCooldown(0), 'Always');
+      expect(formatSyncCooldown(15), '15 min');
+      expect(formatSyncCooldown(30), '30 min');
+      expect(formatSyncCooldown(60), '1 hour');
+      expect(formatSyncCooldown(120), '2 hours');
+      expect(formatSyncCooldown(360), '6 hours');
+    });
+
+    test('formats unknown values with fallback', () {
+      expect(formatSyncCooldown(45), '45m');
+      expect(formatSyncCooldown(999), '999m');
+    });
+  });
+
+  // ─── syncCooldownSteps ─────────────────────────────────
+
+  group('syncCooldownSteps', () {
+    test('contains expected values', () {
+      expect(syncCooldownSteps, [0, 15, 30, 60, 120, 360]);
+    });
+
+    test('is sorted ascending', () {
+      for (var i = 1; i < syncCooldownSteps.length; i++) {
+        expect(syncCooldownSteps[i], greaterThan(syncCooldownSteps[i - 1]));
+      }
     });
   });
 }

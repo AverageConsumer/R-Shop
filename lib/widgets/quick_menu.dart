@@ -10,6 +10,7 @@ import 'gamepad_icons.dart';
 
 class QuickMenuItem {
   final String label;
+  final String? subtitle;
   final IconData icon;
   final String? shortcutHint;
   final VoidCallback onSelect;
@@ -17,6 +18,7 @@ class QuickMenuItem {
 
   const QuickMenuItem({
     required this.label,
+    this.subtitle,
     required this.icon,
     this.shortcutHint,
     required this.onSelect,
@@ -335,19 +337,33 @@ class _QuickMenuOverlayState extends ConsumerState<QuickMenuOverlay>
                         : Colors.white60),
               ),
               SizedBox(width: rs.spacing.sm),
-              // Label
+              // Label + optional subtitle
               Expanded(
-                child: Text(
-                  item.label,
-                  style: TextStyle(
-                    fontSize: rs.isSmall ? 13 : 14,
-                    fontWeight: isFocused ? FontWeight.w600 : FontWeight.w400,
-                    color: isFocused
-                        ? (item.highlight ? Colors.greenAccent : Colors.white)
-                        : (item.highlight
-                            ? Colors.greenAccent.withValues(alpha: 0.7)
-                            : Colors.white70),
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.label,
+                      style: TextStyle(
+                        fontSize: rs.isSmall ? 13 : 14,
+                        fontWeight: isFocused ? FontWeight.w600 : FontWeight.w400,
+                        color: isFocused
+                            ? (item.highlight ? Colors.greenAccent : Colors.white)
+                            : (item.highlight
+                                ? Colors.greenAccent.withValues(alpha: 0.7)
+                                : Colors.white70),
+                      ),
+                    ),
+                    if (item.subtitle != null)
+                      Text(
+                        item.subtitle!,
+                        style: TextStyle(
+                          fontSize: rs.isSmall ? 10 : 11,
+                          color: isFocused ? Colors.white54 : Colors.white38,
+                        ),
+                      ),
+                  ],
                 ),
               ),
               // Shortcut hint

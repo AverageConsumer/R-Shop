@@ -116,6 +116,49 @@ class RomManager {
     }
   }
 
+  /// Like [resolveInstalledPath], but returns a [SharePathResult] indicating
+  /// whether the path is a single file or a directory (multi-file ROM).
+  static Future<SharePathResult?> resolveSharePath(
+      GameItem game, SystemModel system, String targetFolder) async {
+    try {
+      final directPath = getTargetPath(game, system, targetFolder);
+      if (await File(directPath).exists()) {
+        return SharePathResult(directPath, isDirectory: false);
+      }
+
+      final basename = p.basename(game.filename);
+      if (basename != p.basename(directPath)) {
+        final archivePath = safePath(targetFolder, basename);
+        if (await File(archivePath).exists()) {
+          return SharePathResult(archivePath, isDirectory: false);
+        }
+      }
+
+      final gameName = extractGameName(game.filename);
+      if (gameName != null) {
+        final subfolderPath = safePath(targetFolder, gameName);
+        final subfolder = Directory(subfolderPath);
+        if (await subfolder.exists()) {
+          final validExts = {
+            ...system.romExtensions.map((e) => e.toLowerCase()),
+            ...?system.multiFileExtensions?.map((e) => e.toLowerCase()),
+          };
+          // Verify subfolder actually contains ROM files
+          final hasRomFiles = subfolder.listSync().any((f) =>
+              f is File && validExts.contains(p.extension(f.path).toLowerCase()));
+          if (hasRomFiles) {
+            return SharePathResult(subfolderPath, isDirectory: true);
+          }
+        }
+      }
+
+      return null;
+    } on FileSystemException catch (e) {
+      debugPrint('RomManager: resolveSharePath failed for ${game.filename}: $e');
+      return null;
+    }
+  }
+
   Future<bool> exists(
       GameItem game, SystemModel system, String targetFolder) async {
     try {
@@ -309,6 +352,13 @@ class RomManager {
         a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
     return games;
   }
+}
+
+/// Result of resolving a ROM's share path.
+class SharePathResult {
+  final String path;
+  final bool isDirectory;
+  const SharePathResult(this.path, {required this.isDirectory});
 }
 
 class _ScanParams {

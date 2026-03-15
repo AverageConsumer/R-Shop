@@ -36,6 +36,8 @@ class StorageService {
   static const _hideEmptyConsolesKey = 'hide_empty_consoles';
   static const _startHintShownKey = 'start_hint_shown';
   static const _syncTimeoutSecondsKey = 'sync_timeout_seconds';
+  static const _syncCooldownMinutesKey = 'sync_cooldown_minutes';
+  static const _lastSyncPrefix = 'last_sync_';
   SharedPreferences? _prefs;
   final FlutterSecureStorage _secureStorage;
 
@@ -234,6 +236,33 @@ class StorageService {
   Future<void> setSyncTimeoutSeconds(int value) async {
     _ensureInitialized();
     await _prefs!.setInt(_syncTimeoutSecondsKey, value);
+  }
+
+  // --- Sync Cooldown ---
+
+  int getSyncCooldownMinutes() {
+    _ensureInitialized();
+    return _prefs!.getInt(_syncCooldownMinutesKey) ?? 60;
+  }
+
+  Future<void> setSyncCooldownMinutes(int value) async {
+    _ensureInitialized();
+    await _prefs!.setInt(_syncCooldownMinutesKey, value);
+  }
+
+  // --- Per-System Last Sync Time ---
+
+  DateTime? getLastSyncTime(String systemId) {
+    _ensureInitialized();
+    final iso = _prefs!.getString('$_lastSyncPrefix$systemId');
+    if (iso == null) return null;
+    return DateTime.tryParse(iso);
+  }
+
+  Future<void> setLastSyncTime(String systemId, DateTime time) async {
+    _ensureInitialized();
+    await _prefs!.setString(
+        '$_lastSyncPrefix$systemId', time.toIso8601String());
   }
 
   // --- Download Queue Persistence ---

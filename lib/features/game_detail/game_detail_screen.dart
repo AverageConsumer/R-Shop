@@ -20,6 +20,7 @@ import '../../providers/shelf_providers.dart';
 import '../../services/download_queue_manager.dart';
 import '../../services/input_debouncer.dart';
 import '../../utils/game_metadata.dart';
+import '../../utils/rom_share_helper.dart';
 import '../../utils/image_helper.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/console_notification.dart';
@@ -321,30 +322,90 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     }
   }
 
-  void _handleShare() {
+  Future<void> _handleShare() async {
     final controller = _controller;
     if (controller == null) return;
-    final title = controller.cleanTitle;
-    final system = widget.system.name;
-    Share.share('$title ($system)', subject: title);
+    if (controller.state.isOverlayOpen || controller.state.isSharing) return;
+
+    if (!controller.state.isVariantInstalled) {
+      showConsoleNotification(context, message: 'Game is not installed');
+      ref.read(feedbackServiceProvider).cancel();
+      return;
+    }
+
+    ref.read(feedbackServiceProvider).tick();
+    controller.setSharing(true);
+
+    try {
+      final files = await RomShareHelper.prepareShareFiles(
+        game: controller.selectedVariant,
+        system: widget.system,
+        targetFolder: widget.targetFolder,
+      );
+
+      if (!mounted) return;
+
+      await Share.shareXFiles(
+        files,
+        subject: controller.cleanTitle,
+      );
+    } catch (e) {
+      debugPrint('Share failed: $e');
+      if (mounted) {
+        showConsoleNotification(context, message: 'Could not share game file');
+      }
+    } finally {
+      controller.setSharing(false);
+      // Re-enter immersive mode after the share sheet closes
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
   }
 
   void _handleCollection(GameDetailController controller) {
     final variant = controller.selectedVariant;
-    final shelves = ref.read(customShelvesProvider)
+    final allShelves = ref.read(customShelvesProvider);
+    if (allShelves.isEmpty) return;
+    final addable = allShelves
         .where((s) => !s.containsGame(
             variant.filename, variant.displayName, widget.system.id))
         .toList();
-    if (shelves.isEmpty) return;
-    showShelfPickerDialog(
-      context: context,
-      ref: ref,
-      shelves: shelves,
-      onSelect: (shelfId) {
-        ref.read(customShelvesProvider.notifier)
-            .addGameToShelf(shelfId, variant.filename);
-      },
-    );
+    if (addable.isNotEmpty) {
+      // Show shelves where the game can still be added
+      showShelfPickerDialog(
+        context: context,
+        ref: ref,
+        shelves: addable,
+        onSelect: (shelfId) {
+          ref.read(customShelvesProvider.notifier)
+              .addGameToShelf(shelfId, variant.filename);
+        },
+      );
+    } else {
+      // Game is in all shelves — offer removal
+      final containingShelves = allShelves
+          .where((s) => s.containsGame(
+              variant.filename, variant.displayName, widget.system.id))
+          .toList();
+      showShelfPickerDialog(
+        context: context,
+        ref: ref,
+        shelves: containingShelves,
+        title: 'REMOVE FROM SHELF',
+        onSelect: (shelfId) {
+          final shelf = containingShelves.firstWhere((s) => s.id == shelfId);
+          final matchesFilter = shelf.filterRules.any(
+            (r) => r.matches(variant.displayName, widget.system.id),
+          );
+          if (matchesFilter) {
+            ref.read(customShelvesProvider.notifier)
+                .excludeGameFromShelf(shelfId, variant.filename);
+          } else {
+            ref.read(customShelvesProvider.notifier)
+                .removeGameFromShelf(shelfId, variant.filename);
+          }
+        },
+      );
+    }
   }
 
   void _handleFilenameToggle() {
@@ -475,29 +536,62 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
             onSelect: () => _downloadFromSource(alt),
           ),
       ],
-      if (ref.read(customShelvesProvider)
-          .any((s) => !s.containsGame(
-              variant.filename, variant.displayName, widget.system.id))) ...[
+      if (ref.read(customShelvesProvider).isNotEmpty) ...[
         null,
-        QuickMenuItem(
-          label: 'Add to Shelf',
-          icon: Icons.shelves,
-          onSelect: () {
-            final shelves = ref.read(customShelvesProvider)
-                .where((s) => !s.containsGame(
-                    variant.filename, variant.displayName, widget.system.id))
-                .toList();
-            showShelfPickerDialog(
-              context: context,
-              ref: ref,
-              shelves: shelves,
-              onSelect: (shelfId) {
-                ref.read(customShelvesProvider.notifier)
-                    .addGameToShelf(shelfId, variant.filename);
+        () {
+          final allShelves = ref.read(customShelvesProvider);
+          final addable = allShelves
+              .where((s) => !s.containsGame(
+                  variant.filename, variant.displayName, widget.system.id))
+              .toList();
+          if (addable.isNotEmpty) {
+            return QuickMenuItem(
+              label: 'Add to Shelf',
+              icon: Icons.shelves,
+              onSelect: () {
+                showShelfPickerDialog(
+                  context: context,
+                  ref: ref,
+                  shelves: addable,
+                  onSelect: (shelfId) {
+                    ref.read(customShelvesProvider.notifier)
+                        .addGameToShelf(shelfId, variant.filename);
+                  },
+                );
               },
             );
-          },
-        ),
+          } else {
+            final containing = allShelves
+                .where((s) => s.containsGame(
+                    variant.filename, variant.displayName, widget.system.id))
+                .toList();
+            return QuickMenuItem(
+              label: 'Remove from Shelf',
+              icon: Icons.shelves,
+              onSelect: () {
+                showShelfPickerDialog(
+                  context: context,
+                  ref: ref,
+                  shelves: containing,
+                  title: 'REMOVE FROM SHELF',
+                  onSelect: (shelfId) {
+                    final shelf = containing.firstWhere((s) => s.id == shelfId);
+                    final matchesFilter = shelf.filterRules.any(
+                      (r) => r.matches(variant.displayName, widget.system.id),
+                    );
+                    if (matchesFilter) {
+                      ref.read(customShelvesProvider.notifier)
+                          .excludeGameFromShelf(shelfId, variant.filename);
+                    } else {
+                      ref.read(customShelvesProvider.notifier)
+                          .removeGameFromShelf(shelfId, variant.filename);
+                    }
+                  },
+                );
+              },
+            );
+          }
+        }(),
       ],
       if (hasDownloads) ...[
         null,
@@ -752,44 +846,46 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left column: Cover + action buttons (fixed)
+          // Left column: Cover + action buttons (scrollable on small screens)
           SizedBox(
             width: rs.isSmall ? 180 : (rs.isMedium ? 220 : 260),
-            child: Column(
-              children: [
-                AspectRatio(
-                  aspectRatio: 0.75,
-                  child: CoverSection(
-                    game: widget.game,
-                    system: widget.system,
-                    coverUrls: coverUrls,
-                    cachedUrl: selectedVariant.cachedCoverUrl,
-                    metadata: fileMetadata,
-                    isFavorite: isFavorite,
-                    isInstalled: state.isVariantInstalled,
-                    hasThumbnail: selectedVariant.hasThumbnail,
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  AspectRatio(
+                    aspectRatio: 0.75,
+                    child: CoverSection(
+                      game: widget.game,
+                      system: widget.system,
+                      coverUrls: coverUrls,
+                      cachedUrl: selectedVariant.cachedCoverUrl,
+                      metadata: fileMetadata,
+                      isFavorite: isFavorite,
+                      isInstalled: state.isVariantInstalled,
+                      hasThumbnail: selectedVariant.hasThumbnail,
+                    ),
                   ),
-                ),
-                SizedBox(height: rs.spacing.md),
-                // Primary action button (Download/Delete/Manage)
-                _buildSection(
-                  rs, state, controller, DetailSection.primaryAction,
-                  fileMetadata: fileMetadata,
-                  richMetadata: richMetadata,
-                  isMultiRom: isMultiRom,
-                  raMatch: raMatch,
-                  isFocused: controller.focusedSection == DetailSection.primaryAction,
-                ),
-                // Icon action buttons (Favorite/Share/Shelf)
-                _buildSection(
-                  rs, state, controller, DetailSection.actions,
-                  fileMetadata: fileMetadata,
-                  richMetadata: richMetadata,
-                  isMultiRom: isMultiRom,
-                  raMatch: raMatch,
-                  isFocused: controller.focusedSection == DetailSection.actions,
-                ),
-              ],
+                  SizedBox(height: rs.spacing.md),
+                  // Primary action button (Download/Delete/Manage)
+                  _buildSection(
+                    rs, state, controller, DetailSection.primaryAction,
+                    fileMetadata: fileMetadata,
+                    richMetadata: richMetadata,
+                    isMultiRom: isMultiRom,
+                    raMatch: raMatch,
+                    isFocused: controller.focusedSection == DetailSection.primaryAction,
+                  ),
+                  // Icon action buttons (Favorite/Share/Shelf)
+                  _buildSection(
+                    rs, state, controller, DetailSection.actions,
+                    fileMetadata: fileMetadata,
+                    richMetadata: richMetadata,
+                    isMultiRom: isMultiRom,
+                    raMatch: raMatch,
+                    isFocused: controller.focusedSection == DetailSection.actions,
+                  ),
+                ],
+              ),
             ),
           ),
           SizedBox(width: rs.spacing.lg),
@@ -1156,6 +1252,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     return ActionButtonsRow.iconsOnly(
       accentColor: widget.system.accentColor,
       isFavorite: isFavorite,
+      isShareEnabled: state.isVariantInstalled && !state.isSharing,
       focusedButtonIndex: state.actionButtonIndex,
       onFavorite: _handleFavorite,
       onShare: _handleShare,
@@ -1214,13 +1311,15 @@ class _CoverBackground extends StatelessWidget {
       children: [
         // Layer 1: Cover image or accent gradient fallback
         if (coverUrl != null)
-          ImageFiltered(
-            imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-            child: Image.network(
-              coverUrl!,
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-              errorBuilder: (_, __, ___) => _accentFallback(),
+          ClipRect(
+            child: ImageFiltered(
+              imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+              child: Image.network(
+                coverUrl!,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                errorBuilder: (_, __, ___) => _accentFallback(),
+              ),
             ),
           )
         else
@@ -1236,17 +1335,18 @@ class _CoverBackground extends StatelessWidget {
                 Colors.black.withValues(alpha: 0.7),
                 Colors.black.withValues(alpha: 0.92),
                 Colors.black,
+                Colors.black,
               ],
-              stops: const [0.0, 0.3, 0.6, 1.0],
+              stops: const [0.0, 0.3, 0.55, 0.75, 1.0],
             ),
           ),
         ),
-        // Layer 3: Subtle accent tint
+        // Layer 3: Subtle accent tint (top half only)
         DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              end: Alignment.center,
               colors: [
                 accentColor.withValues(alpha: 0.15),
                 Colors.transparent,

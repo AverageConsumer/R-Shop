@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,6 +10,7 @@ import '../utils/friendly_error.dart';
 import '../utils/game_merge_helper.dart';
 import 'database_service.dart';
 import 'rom_manager.dart';
+import 'storage_service.dart';
 import 'thumbnail_service.dart';
 import 'unified_game_service.dart';
 
@@ -65,6 +68,11 @@ class LibrarySyncState {
 /// single-isolate use only. Do not instantiate across multiple isolates.
 class LibrarySyncService extends StateNotifier<LibrarySyncState> {
   bool _isCancelled = false;
+  Completer<void>? _syncCompleter;
+
+  /// Returns a Future that completes when the current sync operation finishes.
+  /// Resolves immediately if no sync is in progress.
+  Future<void> waitForCompletion() => _syncCompleter?.future ?? Future.value();
 
   static final Map<String, DateTime> _lastSyncTimes = {};
   static const _freshnessDuration = Duration(minutes: 5);
@@ -83,6 +91,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     if (config.systems.isEmpty) return;
 
     _isCancelled = false;
+    _syncCompleter = Completer<void>();
     state = LibrarySyncState(
       isSyncing: true,
       totalSystems: config.systems.length,
@@ -153,8 +162,118 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       gamesPerSystem: Map.of(perSystem),
       totalGamesFound: totalGames,
     );
+    _syncCompleter?.complete();
+    _syncCompleter = null;
 
     // Clean orphan thumbnails after sync
+    ThumbnailService.cleanOrphans(db).catchError((e) {
+      debugPrint('LibrarySyncService: orphan cleanup failed: $e');
+    });
+  }
+
+  /// Smart sync: only syncs systems that need it based on cooldown and autoSync.
+  ///
+  /// Systems in [forceSystemIds] are always synced (e.g. newly added consoles).
+  /// Other systems are skipped if autoSync is false or last sync is within [cooldown].
+  Future<void> syncSmart(
+    AppConfig config, {
+    Duration? syncTimeout,
+    Duration cooldown = const Duration(minutes: 60),
+    Set<String> forceSystemIds = const {},
+    required StorageService storageService,
+  }) async {
+    if (state.isSyncing) return;
+    if (config.systems.isEmpty) return;
+
+    // Filter systems that actually need syncing
+    final now = DateTime.now();
+    final systemsToSync = config.systems.where((sc) {
+      if (forceSystemIds.contains(sc.id)) return true;
+      if (!sc.autoSync) return false;
+      if (cooldown == Duration.zero) return true;
+      final lastSync = storageService.getLastSyncTime(sc.id);
+      return lastSync == null || now.difference(lastSync) >= cooldown;
+    }).toList();
+
+    if (systemsToSync.isEmpty) {
+      debugPrint('LibrarySyncService: all systems fresh, skipping sync');
+      return;
+    }
+
+    _isCancelled = false;
+    _syncCompleter = Completer<void>();
+    state = LibrarySyncState(
+      isSyncing: true,
+      totalSystems: systemsToSync.length,
+      completedSystems: 0,
+    );
+
+    final db = DatabaseService();
+    final gameService = UnifiedGameService(syncTimeout: syncTimeout);
+    var completed = 0;
+    final failures = <String, String>{};
+    final perSystem = <String, int>{};
+    var totalGames = 0;
+
+    for (final systemConfig in systemsToSync) {
+      if (_isCancelled) break;
+
+      final systemModel = SystemModel.supportedSystems
+          .where((s) => s.id == systemConfig.id)
+          .firstOrNull;
+      final displayName = systemModel?.name ?? systemConfig.name;
+
+      state = state.copyWith(currentSystem: displayName);
+
+      try {
+        if (systemConfig.providers.isEmpty) {
+          if (systemModel != null) {
+            final games = await RomManager.scanLocalGamesIsolate(
+              systemModel, systemConfig.targetFolder);
+            await db.saveGames(systemConfig.id, games, deleteOrphans: true);
+            perSystem[systemConfig.id] = games.length;
+            totalGames += games.length;
+          }
+        } else {
+          final remoteGames = await gameService.fetchGamesForSystem(
+            systemConfig, merge: systemConfig.mergeMode);
+          final List<GameItem> games;
+          if (systemModel != null) {
+            final localGames = await RomManager.scanLocalGamesIsolate(
+              systemModel, systemConfig.targetFolder);
+            games = GameMergeHelper.merge(remoteGames, localGames, systemModel);
+          } else {
+            games = remoteGames;
+          }
+          await db.saveGames(systemConfig.id, games, deleteOrphans: true);
+          perSystem[systemConfig.id] = games.length;
+          totalGames += games.length;
+        }
+        _lastSyncTimes[systemConfig.id] = DateTime.now();
+        storageService.setLastSyncTime(systemConfig.id, DateTime.now());
+      } catch (e) {
+        debugPrint('Library sync failed for ${systemConfig.id}: $e');
+        failures[displayName] = _userFriendlyError(e);
+      }
+
+      completed++;
+      state = state.copyWith(
+        completedSystems: completed,
+        gamesPerSystem: Map.of(perSystem),
+        totalGamesFound: totalGames,
+      );
+    }
+
+    state = state.copyWith(
+      isSyncing: false,
+      currentSystem: null,
+      failedSystems: failures,
+      gamesPerSystem: Map.of(perSystem),
+      totalGamesFound: totalGames,
+    );
+    _syncCompleter?.complete();
+    _syncCompleter = null;
+
     ThumbnailService.cleanOrphans(db).catchError((e) {
       debugPrint('LibrarySyncService: orphan cleanup failed: $e');
     });
@@ -264,6 +383,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     final displayName = systemModel?.name ?? systemConfig.name;
 
     _isCancelled = false;
+    _syncCompleter = Completer<void>();
     state = LibrarySyncState(
       isSyncing: true,
       totalSystems: 1,
@@ -316,6 +436,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       totalGamesFound: totalGames,
       failedSystems: failures,
     );
+    _syncCompleter?.complete();
+    _syncCompleter = null;
   }
 
   static String _userFriendlyError(Object e) =>

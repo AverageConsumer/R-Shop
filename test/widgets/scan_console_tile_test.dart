@@ -102,8 +102,8 @@ void main() {
       final borderSide = decoration.border! as Border;
 
       // Border color should be red-ish (not accent color)
-      expect(borderSide.top.color.red, greaterThan(200));
-      expect(borderSide.top.color.green, lessThan(100));
+      expect((borderSide.top.color.r * 255.0).round(), greaterThan(200));
+      expect((borderSide.top.color.g * 255.0).round(), lessThan(100));
     });
 
     testWidgets('failed state with focus uses brighter red border', (tester) async {
@@ -119,8 +119,8 @@ void main() {
       final borderSide = decoration.border! as Border;
 
       // Focused failed should have higher alpha red
-      expect(borderSide.top.color.red, greaterThan(200));
-      expect(borderSide.top.color.alpha, greaterThan(200));
+      expect((borderSide.top.color.r * 255.0).round(), greaterThan(200));
+      expect((borderSide.top.color.a * 255.0).round(), greaterThan(200));
     });
 
     testWidgets('system name is always visible', (tester) async {

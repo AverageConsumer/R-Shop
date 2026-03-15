@@ -23,6 +23,7 @@ class GameDetailController extends ChangeNotifier {
   final DatabaseService _databaseService;
 
   bool _disposed = false;
+  bool _hasSetInitialFocus = false;
   GameDetailState _state = const GameDetailState();
   GameDetailState get state => _state;
   GameItem get selectedVariant =>
@@ -126,6 +127,16 @@ class GameDetailController extends ChangeNotifier {
     }
 
     _availableSections = sections;
+
+    // On first build, jump straight to the primary action (Download/Delete)
+    if (!_hasSetInitialFocus) {
+      _hasSetInitialFocus = true;
+      final primaryIdx = sections.indexOf(DetailSection.primaryAction);
+      if (primaryIdx >= 0) {
+        _state = _state.copyWith(focusedSectionIndex: primaryIdx);
+        return;
+      }
+    }
 
     // Ensure focused index points to an interactive section
     var focusIdx = _state.focusedSectionIndex;
@@ -442,6 +453,11 @@ class GameDetailController extends ChangeNotifier {
       _state = _state.copyWith(isDeleting: false);
       notifyListeners();
     }
+  }
+
+  void setSharing(bool value) {
+    _state = _state.copyWith(isSharing: value);
+    notifyListeners();
   }
 
   String get cleanTitle => GameMetadata.cleanTitle(selectedVariant.filename);

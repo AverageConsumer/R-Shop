@@ -474,6 +474,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         targetFolder: existing.targetFolder,
         autoExtract: existing.autoExtract,
         mergeMode: existing.mergeMode,
+        autoSync: existing.autoSync,
         providers: List.of(existing.providers),
       );
     } else {
@@ -531,6 +532,12 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     final sub = state.consoleSubState;
     if (sub == null) return;
     state = state.copyWith(consoleSubState: sub.copyWith(mergeMode: value));
+  }
+
+  void setAutoSync(bool value) {
+    final sub = state.consoleSubState;
+    if (sub == null) return;
+    state = state.copyWith(consoleSubState: sub.copyWith(autoSync: value));
   }
 
   // --- Provider form ---
@@ -2070,6 +2077,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       providers: sub.providers,
       autoExtract: sub.autoExtract,
       mergeMode: sub.mergeMode,
+      autoSync: sub.autoSync,
     );
 
     final updated = Map<String, SystemConfig>.from(state.configuredSystems);

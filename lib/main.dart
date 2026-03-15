@@ -25,6 +25,7 @@ import 'services/native_smb_service.dart';
 import 'services/provider_factory.dart';
 import 'services/thumbnail_migration_service.dart';
 import 'services/thumbnail_service.dart';
+import 'utils/rom_share_helper.dart';
 import 'widgets/add_to_queue_toast.dart';
 import 'widgets/download_overlay.dart';
 
@@ -74,6 +75,7 @@ void main() {
 
     // Clean orphaned temp files from interrupted downloads (fire-and-forget)
     DownloadService.cleanOrphanedTempFiles();
+    RomShareHelper.cleanShareTempFiles();
 
     // Initialize native SMB service and wire into ProviderFactory
     final nativeSmbService = NativeSmbService();

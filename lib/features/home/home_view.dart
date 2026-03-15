@@ -12,7 +12,6 @@ import '../../widgets/quick_menu.dart';
 import '../../providers/library_providers.dart';
 import '../../providers/ra_providers.dart';
 import '../../services/config_bootstrap.dart';
-import '../../services/library_sync_service.dart';
 import '../../services/input_debouncer.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
 import '../../widgets/console_hud.dart';
@@ -40,7 +39,9 @@ class _HomeViewState extends ConsumerState<HomeView>
   int _lastStablePage = _initialPage;
   bool _showExitDialog = false;
   bool _wasGrid = false;
+  bool _resumeAutoSyncAfterManual = false;
   ProviderSubscription? _visibleSystemsSub;
+  ProviderSubscription? _syncStateSub;
 
   final ScrollController _gridScrollController = ScrollController();
   final Map<int, GlobalKey> _gridItemKeys = {};
@@ -155,21 +156,39 @@ class _HomeViewState extends ConsumerState<HomeView>
         }
       }
     }, fireImmediately: true);
+
+    // Resume auto-sync after a manual single-system sync completes
+    _syncStateSub = ref.listenManual(
+      librarySyncServiceProvider.select((s) => s.isSyncing),
+      (prev, isSyncing) {
+        if (prev == true && !isSyncing && _resumeAutoSyncAfterManual) {
+          _resumeAutoSyncAfterManual = false;
+          _triggerLibrarySync();
+        }
+      },
+    );
   }
 
-  Future<void> _triggerLibrarySync() async {
+  Future<void> _triggerLibrarySync({Set<String> forceSystemIds = const {}}) async {
     final config = await ref.read(bootstrappedConfigProvider.future);
     if (!mounted) return;
     if (config.systems.isNotEmpty) {
       final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
-      ref.read(librarySyncServiceProvider.notifier).syncAll(
-          config, syncTimeout: timeout);
+      final cooldownMinutes = ref.read(syncCooldownProvider);
+      final storage = ref.read(storageServiceProvider);
+      ref.read(librarySyncServiceProvider.notifier).syncSmart(
+          config,
+          syncTimeout: timeout,
+          cooldown: Duration(minutes: cooldownMinutes),
+          forceSystemIds: forceSystemIds,
+          storageService: storage);
     }
   }
 
   @override
   void dispose() {
     _visibleSystemsSub?.close();
+    _syncStateSub?.close();
     _debouncer.stopHold();
     _gridScrollController.dispose();
     _pageController.removeListener(_onPageScroll);
@@ -365,6 +384,9 @@ class _HomeViewState extends ConsumerState<HomeView>
     ref.read(feedbackServiceProvider).tick();
     // Stop holding inputs before navigating
     _debouncer.stopHold();
+    // Snapshot current system IDs before entering settings
+    final preSettingsIds = ref.read(bootstrappedConfigProvider).valueOrNull
+        ?.systems.map((s) => s.id).toSet() ?? <String>{};
     final homeContext = context;
     await Navigator.push(
       homeContext,
@@ -382,15 +404,15 @@ class _HomeViewState extends ConsumerState<HomeView>
       ),
     );
     if (!mounted) return;
-    // Config may have changed — reload and re-sync
+    // Config may have changed — reload and smart-sync
     ref.invalidate(bootstrappedConfigProvider);
-    LibrarySyncService.clearFreshness();
     final config = await ref.read(bootstrappedConfigProvider.future);
     if (!mounted) return;
+    // Only force-sync newly added consoles
+    final newIds = config.systems.map((s) => s.id).toSet()
+        .difference(preSettingsIds);
     if (config.systems.isNotEmpty) {
-      final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
-      ref.read(librarySyncServiceProvider.notifier).syncAll(
-          config, syncTimeout: timeout);
+      _triggerLibrarySync(forceSystemIds: newIds);
     }
   }
 
@@ -417,8 +439,6 @@ class _HomeViewState extends ConsumerState<HomeView>
 
   List<QuickMenuItem?> _buildQuickMenuItems() {
     final hasDownloads = ref.read(hasQueueItemsProvider);
-    final syncFailed = ref.read(lastSyncHadFailuresProvider) ||
-        ref.read(lastRaSyncHadErrorProvider);
     return [
       QuickMenuItem(
         label: 'Search',
@@ -426,19 +446,24 @@ class _HomeViewState extends ConsumerState<HomeView>
         shortcutHint: 'Y',
         onSelect: _openLibrarySearch,
       ),
+      if (!_isLibraryIndex && _configuredSystems.isNotEmpty)
+        QuickMenuItem(
+          label: 'Sync ${_getSystem(_currentIndex).name}',
+          subtitle: _lastSyncLabel(_getSystem(_currentIndex).id),
+          icon: Icons.sync_rounded,
+          onSelect: _syncCurrentSystem,
+        ),
+      if (_configuredSystems.length > 1)
+        QuickMenuItem(
+          label: 'Sync All',
+          icon: Icons.sync_rounded,
+          onSelect: _syncAll,
+        ),
       QuickMenuItem(
         label: 'Settings',
         icon: Icons.settings_rounded,
         onSelect: _openSettings,
       ),
-      if (syncFailed) ...[
-        null,
-        QuickMenuItem(
-          label: 'Retry Sync',
-          icon: Icons.refresh_rounded,
-          onSelect: _retrySync,
-        ),
-      ],
       if (hasDownloads) ...[
         null,
         QuickMenuItem(
@@ -452,18 +477,50 @@ class _HomeViewState extends ConsumerState<HomeView>
     ];
   }
 
-  void _retrySync() {
+  void _syncCurrentSystem() async {
+    if (_isLibraryIndex || _configuredSystems.isEmpty) return;
+    final system = _getSystem(_currentIndex);
     final config = ref.read(bootstrappedConfigProvider).valueOrNull;
-    if (config != null && config.systems.isNotEmpty) {
-      final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
-      ref.read(librarySyncServiceProvider.notifier).syncAll(
-          config, syncTimeout: timeout);
+    if (config == null) return;
+    final syncService = ref.read(librarySyncServiceProvider.notifier);
+    // Cancel any running auto-sync so the manual request goes through
+    if (ref.read(librarySyncServiceProvider).isSyncing) {
+      syncService.cancel();
+      await syncService.waitForCompletion();
+      if (!mounted) return;
     }
+    final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
+    // Resume remaining stale systems after this manual sync completes
+    _resumeAutoSyncAfterManual = true;
+    syncService.syncSystem(system.id, config, syncTimeout: timeout);
+  }
+
+  void _syncAll() async {
+    final config = ref.read(bootstrappedConfigProvider).valueOrNull;
+    if (config == null || config.systems.isEmpty) return;
+    final syncService = ref.read(librarySyncServiceProvider.notifier);
+    if (ref.read(librarySyncServiceProvider).isSyncing) {
+      syncService.cancel();
+      await syncService.waitForCompletion();
+      if (!mounted) return;
+    }
+    final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
+    syncService.syncAll(config, syncTimeout: timeout);
     triggerRaSync(
       ref.read(raSyncServiceProvider.notifier),
       ref.read(storageServiceProvider),
       force: true,
     );
+  }
+
+  String _lastSyncLabel(String systemId) {
+    final lastSync = ref.read(storageServiceProvider).getLastSyncTime(systemId);
+    if (lastSync == null) return 'Never synced';
+    final diff = DateTime.now().difference(lastSync);
+    if (diff.inMinutes < 1) return 'Synced just now';
+    if (diff.inMinutes < 60) return 'Synced ${diff.inMinutes}min ago';
+    if (diff.inHours < 24) return 'Synced ${diff.inHours}h ago';
+    return 'Synced ${diff.inDays}d ago';
   }
 
   void _exitApp() {

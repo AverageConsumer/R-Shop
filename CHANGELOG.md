@@ -6,6 +6,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.5.0] — 2026-03-15
+
+### Added
+- **Smart sync with cooldown** — app launch now uses `syncSmart()` which skips systems whose last sync is within the configured cooldown window, drastically reducing redundant network traffic on frequent launches
+- **Per-system auto-sync toggle** — each console can individually opt out of automatic sync via a new "Auto-sync on app launch" toggle in console configuration; disabled systems only sync manually from the quick menu
+- **Sync cooldown setting** — new Settings entry (Always / 15 min / 30 min / 1 hour / 2 hours / 6 hours) controls the minimum interval between automatic re-syncs per system (default: 1 hour)
+- **Per-system sync from quick menu** — Start menu on the home screen now shows "Sync [System Name]" with a human-readable "Synced X ago" subtitle for the currently selected console; cancels any running auto-sync, syncs the single system, then resumes remaining stale systems
+- **Sync All from quick menu** — dedicated "Sync All" entry replaces the old "Retry Sync" option; forces a full sync of every configured system regardless of cooldown
+- **Shelf removal from game detail** — when a game is already in all shelves, the "Add to Shelf" action flips to "Remove from Shelf" with a picker showing containing shelves; filter-rule-matched games use exclude instead of remove
+- **Quick menu subtitles** — `QuickMenuItem` gains an optional `subtitle` field rendered below the label in a smaller font
+- **ROM file sharing** — Share button on game detail now shares the actual ROM file via system share sheet (requires game to be installed); re-enters immersive mode after share sheet closes
+
+### Improved
+- **Post-settings sync** — returning from Settings now only force-syncs newly added consoles instead of clearing all freshness and re-syncing everything
+- **Shelf picker dialog** — accepts a custom `title` parameter (used for "REMOVE FROM SHELF" vs "ADD TO SHELF")
+- **Per-system last sync persistence** — `StorageService` tracks last sync time per system ID via SharedPreferences, surviving app restarts
+- **Sync completion awaiting** — `LibrarySyncService.waitForCompletion()` returns a Future that resolves when the current sync finishes, enabling clean cancel-then-act flows
+- **Game detail initial focus** — Download/Delete button is now focused by default when entering the detail screen
+
+### Removed
+- **Per-system sync list in Settings** — the per-console sync items with game counts have been removed from the System tab in favor of the quicker quick-menu-based sync flow
+- **"Retry Sync" quick menu entry** — replaced by the more flexible "Sync [System]" and "Sync All" options
+
+### Internal
+- `SystemConfig.autoSync` field (default `true`) with JSON serialization and `copyWith` support
+- `ConsoleSetupState.autoSync` in onboarding state, wired through `OnboardingController.setAutoSync()`
+- `SyncCooldownNotifier` / `syncCooldownProvider` in app_providers.dart with cycle-through UI
+- `StorageService.getLastSyncTime()` / `setLastSyncTime()` for per-system ISO 8601 persistence
+- `LibrarySyncService.syncSmart()` with cooldown, forceSystemIds, and autoSync filtering
+- `LibrarySyncService._syncCompleter` for `waitForCompletion()` across syncAll, syncSmart, syncSystem
+- `_resumeAutoSyncAfterManual` flag in HomeView for cancel→manual→resume flow
+- 143 new test lines in library_sync_service_test.dart and settings_widgets_test.dart (1666 total)
+
+### Fixed
+- **Blurred background bleed** — `ImageFiltered` blur on the game detail cover background painted beyond widget bounds; wrapped in `ClipRect` to prevent the blurred image from bleeding through at the bottom edge
+
+---
+
 ## [1.4.2] — 2026-03-09
 
 ### Added

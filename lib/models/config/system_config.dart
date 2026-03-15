@@ -7,6 +7,7 @@ class SystemConfig {
   final List<ProviderConfig> providers;
   final bool autoExtract;
   final bool mergeMode;
+  final bool autoSync;
 
   const SystemConfig({
     required this.id,
@@ -15,6 +16,7 @@ class SystemConfig {
     required this.providers,
     this.autoExtract = false,
     this.mergeMode = false,
+    this.autoSync = true,
   });
 
   factory SystemConfig.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,7 @@ class SystemConfig {
       providers: providerList,
       autoExtract: json['auto_extract'] as bool? ?? false,
       mergeMode: json['merge_mode'] as bool? ?? false,
+      autoSync: json['auto_sync'] as bool? ?? true,
     );
   }
 
@@ -41,6 +44,7 @@ class SystemConfig {
       'providers': providers.map((p) => p.toJson()).toList(),
       'auto_extract': autoExtract,
       'merge_mode': mergeMode,
+      'auto_sync': autoSync,
     };
   }
 
@@ -53,6 +57,7 @@ class SystemConfig {
       'providers': providers.map((p) => p.toJsonWithoutAuth()).toList(),
       'auto_extract': autoExtract,
       'merge_mode': mergeMode,
+      'auto_sync': autoSync,
     };
   }
 
@@ -63,6 +68,7 @@ class SystemConfig {
     List<ProviderConfig>? providers,
     bool? autoExtract,
     bool? mergeMode,
+    bool? autoSync,
   }) {
     return SystemConfig(
       id: id ?? this.id,
@@ -71,6 +77,7 @@ class SystemConfig {
       providers: providers ?? this.providers,
       autoExtract: autoExtract ?? this.autoExtract,
       mergeMode: mergeMode ?? this.mergeMode,
+      autoSync: autoSync ?? this.autoSync,
     );
   }
 }
