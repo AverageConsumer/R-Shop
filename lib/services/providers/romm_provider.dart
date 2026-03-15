@@ -11,6 +11,8 @@ import '../download_handle.dart';
 import '../romm_api_service.dart';
 import '../source_provider.dart';
 
+export '../../models/game_metadata_info.dart' show SiblingInfo;
+
 class RommProvider implements SourceProvider {
   @override
   final ProviderConfig config;
@@ -72,27 +74,60 @@ class RommProvider implements SourceProvider {
         providerConfig: config,
       ));
 
-      final releaseYear = rom.firstReleaseDate != null
-          ? DateTime.fromMillisecondsSinceEpoch(
-                  rom.firstReleaseDate! * 1000)
-              .year
-          : null;
+      int? releaseYear;
+      String? releaseDate;
+      if (rom.firstReleaseDate != null) {
+        // RomM/IGDB gives Unix seconds, but guard against ms values
+        final raw = rom.firstReleaseDate!;
+        final ms = raw > 9999999999 ? raw : raw * 1000;
+        final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+        releaseYear = dt.year;
+        releaseDate = dt.toIso8601String().split('T').first;
+      }
 
-      if (rom.summary != null ||
-          rom.genres != null ||
-          rom.developer != null ||
-          releaseYear != null) {
-        metadata.add(GameMetadataInfo(
-          filename: rom.fileName,
-          systemSlug: system.id,
-          summary: rom.summary,
-          genres: rom.genres,
-          developer: rom.developer,
-          releaseYear: releaseYear,
-          gameModes: rom.gameModes,
-          rating: rom.averageRating,
-          lastUpdated: now,
-        ));
+      // Build full screenshot URLs (resolve relative paths)
+      String? screenshotsCsv;
+      if (rom.mergedScreenshots.isNotEmpty) {
+        final fullUrls = rom.mergedScreenshots.map((s) {
+          if (s.toLowerCase().startsWith('http')) return s;
+          return '$_baseUrl$s';
+        }).toList();
+        screenshotsCsv = fullUrls.join(',');
+      }
+
+      // Serialize siblings to JSON
+      String? siblingsJson;
+      if (rom.siblings.isNotEmpty) {
+        final siblingData = rom.siblings.map((s) => {
+              'name': s.name,
+              if (s.fsNameNoExt != null) 'filename': s.fsNameNoExt,
+            }).toList();
+        siblingsJson = jsonEncode(siblingData);
+      }
+
+      final info = GameMetadataInfo(
+        filename: rom.fileName,
+        systemSlug: system.id,
+        summary: rom.summary,
+        genres: rom.genres,
+        developer: rom.developer,
+        publisher: rom.publisher,
+        releaseYear: releaseYear,
+        releaseDate: releaseDate,
+        gameModes: rom.gameModes,
+        rating: rom.averageRating,
+        franchises: rom.franchises,
+        themes: rom.themes,
+        playerPerspectives: rom.playerPerspectives,
+        ageRating: rom.ageRatings,
+        screenshots: screenshotsCsv,
+        fileSizeBytes: rom.fileSizeBytes,
+        siblings: siblingsJson,
+        lastUpdated: now,
+      );
+
+      if (info.hasContent) {
+        metadata.add(info);
       }
     }
 

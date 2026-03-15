@@ -135,6 +135,21 @@ class DownloadItemCard extends StatelessWidget {
                             StatusLabel(item: item),
                           ],
                         ),
+                        // Error detail text
+                        if (item.isFailed && item.error != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              item.error!,
+                              style: TextStyle(
+                                color: Colors.redAccent.withValues(alpha: 0.8),
+                                fontSize: rs.isSmall ? 10 : 11,
+                                height: 1.3,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                       ],
                     ),
                   ),

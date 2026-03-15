@@ -1,10 +1,14 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../models/game_item.dart';
+import '../../models/game_metadata_info.dart';
 import '../../models/system_model.dart';
 import '../../models/ra_models.dart';
 import '../../providers/app_providers.dart';
@@ -22,19 +26,23 @@ import '../../widgets/console_notification.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/download_overlay.dart';
 import '../../widgets/quick_menu.dart';
-import '../game_list/widgets/dynamic_background.dart';
-import '../game_list/widgets/tinted_overlay.dart';
 import '../library/widgets/shelf_picker_dialog.dart';
 import 'achievements_screen.dart';
 import 'game_detail_controller.dart';
 import 'game_detail_state.dart';
 import 'widgets/cover_section.dart';
-import 'widgets/game_info_card.dart';
-import 'widgets/metadata_badges.dart';
 import 'widgets/ra_info_section.dart';
+import 'widgets/action_buttons_row.dart';
+import 'widgets/badges_row.dart';
+import 'widgets/details_section.dart';
 import 'widgets/download_action_button.dart';
-import 'widgets/description_overlay.dart';
-import 'widgets/tag_info_overlay.dart';
+import 'widgets/file_details_row.dart';
+import 'widgets/game_detail_overlay.dart';
+import 'widgets/other_versions_section.dart';
+import 'widgets/screenshot_fullscreen.dart';
+import 'widgets/screenshots_carousel.dart';
+import 'widgets/section_header.dart';
+import 'widgets/summary_section.dart';
 import 'widgets/variant_picker_overlay.dart';
 
 class GameDetailScreen extends ConsumerStatefulWidget {
@@ -64,6 +72,9 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   GameDetailController? _controller;
   late InputDebouncer _debouncer;
   ProviderSubscription? _romChangeSubscription;
+
+  // Section scroll keys for auto-scroll on D-pad navigation
+  final Map<DetailSection, GlobalKey> _sectionKeys = {};
 
   @override
   String get routeId => 'game_detail_${widget.game.filename}';
@@ -149,6 +160,32 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     super.dispose();
   }
 
+  GlobalKey _keyForSection(DetailSection section) {
+    return _sectionKeys.putIfAbsent(section, () => GlobalKey());
+  }
+
+  void _scrollToFocusedSection({bool scrollingUp = false}) {
+    final controller = _controller;
+    if (controller == null) return;
+    final section = controller.focusedSection;
+    final key = _sectionKeys[section];
+    if (key == null) return;
+    final ctx = key.currentContext;
+    if (ctx == null) return;
+    // Use alignment to position the section with breathing room above the HUD.
+    // 0.0 = top of viewport, 1.0 = bottom. 0.7 keeps it comfortably visible.
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+      alignment: scrollingUp ? 0.2 : 0.7,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Input handling
+  // ---------------------------------------------------------------------------
+
   void _handleBack() {
     final controller = _controller;
     if (controller == null) return;
@@ -183,12 +220,131 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       return;
     }
 
-    if (controller.state.showTagInfo) {
+    if (controller.state.showGameInfo) {
       return;
     }
 
+    // Context-sensitive A-button per focused section
     ref.read(feedbackServiceProvider).confirm();
-    controller.performAction();
+    final section = controller.focusedSection;
+    switch (section) {
+      case DetailSection.summary:
+        controller.toggleSummaryExpanded();
+      case DetailSection.screenshots:
+        controller.openScreenshotViewer();
+      case DetailSection.otherVersions:
+        // Only select if index points to a real variant (not an unmatched sibling)
+        final idx = controller.state.siblingIndex;
+        if (idx < controller.variants.length) {
+          controller.selectVariant(idx);
+        }
+      case DetailSection.primaryAction:
+        controller.performAction();
+      case DetailSection.actions:
+        _handleActionButtonConfirm(controller);
+      case DetailSection.achievements:
+        _tryNavigateToAchievements();
+      case DetailSection.title:
+      case DetailSection.badges:
+      case DetailSection.fileDetails:
+      case DetailSection.details:
+        break; // Non-actionable sections
+    }
+  }
+
+  void _handleNavigate(GridDirection direction) {
+    final controller = _controller;
+    if (controller == null) return;
+
+    if (controller.state.isDialogOpen) {
+      if (direction == GridDirection.left) {
+        ref.read(feedbackServiceProvider).tick();
+        controller.selectDialogOption(1);
+      } else if (direction == GridDirection.right) {
+        ref.read(feedbackServiceProvider).tick();
+        controller.selectDialogOption(0);
+      }
+      return;
+    }
+
+    final rs = context.rs;
+    final isLandscape = !rs.isPortrait;
+
+    // Up/down within left column (primaryAction ↔ actions)
+    if (isLandscape &&
+        (direction == GridDirection.up || direction == GridDirection.down) &&
+        controller.navigateLeftColumn(direction)) {
+      ref.read(feedbackServiceProvider).tick();
+      return;
+    }
+
+    // Up/down: navigate between sections (skips left-column in landscape)
+    if (direction == GridDirection.up) {
+      ref.read(feedbackServiceProvider).tick();
+      controller.focusPreviousSection();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToFocusedSection(scrollingUp: true);
+      });
+      return;
+    }
+    if (direction == GridDirection.down) {
+      ref.read(feedbackServiceProvider).tick();
+      controller.focusNextSection();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToFocusedSection();
+      });
+      return;
+    }
+
+    // Left/right: navigate within horizontal sections first
+    if (controller.navigateInSection(direction)) {
+      ref.read(feedbackServiceProvider).tick();
+      return;
+    }
+
+    // Cross-column navigation (landscape only): LEFT → left column, RIGHT → back
+    if (isLandscape && controller.navigateCrossColumn(direction)) {
+      ref.read(feedbackServiceProvider).tick();
+    }
+  }
+
+  /// Dispatches A-button press per focused icon button index.
+  /// 0 = favorite, 1 = share, 2 = collection
+  void _handleActionButtonConfirm(GameDetailController controller) {
+    switch (controller.state.actionButtonIndex) {
+      case 0:
+        _handleFavorite();
+      case 1:
+        _handleShare();
+      case 2:
+        _handleCollection(controller);
+    }
+  }
+
+  void _handleShare() {
+    final controller = _controller;
+    if (controller == null) return;
+    final title = controller.cleanTitle;
+    final system = widget.system.name;
+    Share.share('$title ($system)', subject: title);
+  }
+
+  void _handleCollection(GameDetailController controller) {
+    final variant = controller.selectedVariant;
+    final shelves = ref.read(customShelvesProvider)
+        .where((s) => !s.containsGame(
+            variant.filename, variant.displayName, widget.system.id))
+        .toList();
+    if (shelves.isEmpty) return;
+    showShelfPickerDialog(
+      context: context,
+      ref: ref,
+      shelves: shelves,
+      onSelect: (shelfId) {
+        ref.read(customShelvesProvider.notifier)
+            .addGameToShelf(shelfId, variant.filename);
+      },
+    );
   }
 
   void _handleFilenameToggle() {
@@ -203,24 +359,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     );
   }
 
-  void _handleTagInfo() {
-    final controller = _controller;
-    if (controller == null) return;
-
-    if (controller.state.showTagInfo) {
-      ref.read(feedbackServiceProvider).cancel();
-      controller.closeTagInfo();
-      return;
-    }
-
-    if (controller.state.isDialogOpen) {
-      return;
-    }
-
-    ref.read(feedbackServiceProvider).tick();
-    controller.toggleTagInfo();
-  }
-
   void _handleFavorite() {
     final controller = _controller;
     if (controller == null) return;
@@ -228,6 +366,15 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
     ref.read(feedbackServiceProvider).tick();
     ref.read(favoriteGamesProvider.notifier).toggleFavorite(controller.selectedVariant.filename);
+  }
+
+  void _tryNavigateToAchievements() {
+    final raMatches =
+        ref.read(raMatchesForSystemProvider(widget.system.id)).value ?? {};
+    final raMatch = raMatches[_controller?.selectedVariant.filename];
+    if (raMatch != null && raMatch.raGameId != null) {
+      _navigateToAchievements(raMatch);
+    }
   }
 
   void _navigateToAchievements(RaMatchResult match) {
@@ -285,7 +432,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final richMetadata = ref.read(groupMetadataProvider(
       (filenames: variantFilenames, systemSlug: widget.system.id),
     )).valueOrNull;
-    final hasSummary = richMetadata?.summary != null;
+    final hasDetails = richMetadata?.hasContent ?? false;
     final raMatches =
         ref.read(raMatchesForSystemProvider(widget.system.id)).value ?? {};
     final raMatch = raMatches[variant.filename];
@@ -297,17 +444,11 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         onSelect: _handleFavorite,
         highlight: isFavorite,
       ),
-      if (metadata.allTags.isNotEmpty)
+      if (metadata.allTags.isNotEmpty || hasDetails)
         QuickMenuItem(
-          label: 'Tags',
-          icon: Icons.label_rounded,
-          onSelect: _handleTagInfo,
-        ),
-      if (hasSummary)
-        QuickMenuItem(
-          label: 'Description',
-          icon: Icons.description_outlined,
-          onSelect: () => controller.openDescription(),
+          label: 'Game Info',
+          icon: Icons.info_outline_rounded,
+          onSelect: () => controller.openGameInfo(),
         ),
       if (raMatch != null && raMatch.hasMatch && raMatch.raGameId != null)
         QuickMenuItem(
@@ -340,7 +481,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         null,
         QuickMenuItem(
           label: 'Add to Shelf',
-          icon: Icons.playlist_add_rounded,
+          icon: Icons.shelves,
           onSelect: () {
             final shelves = ref.read(customShelvesProvider)
                 .where((s) => !s.containsGame(
@@ -370,21 +511,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     ];
   }
 
-  void _handleNavigate(GridDirection direction) {
-    final controller = _controller;
-    if (controller == null) return;
-
-    if (controller.state.isDialogOpen) {
-      if (direction == GridDirection.left) {
-        ref.read(feedbackServiceProvider).tick();
-        controller.selectDialogOption(1);
-      } else if (direction == GridDirection.right) {
-        ref.read(feedbackServiceProvider).tick();
-        controller.selectDialogOption(0);
-      }
-    }
-  }
-
   Future<void> _executeDialogAction(GameDetailController controller) async {
     final selection = controller.state.dialogSelection;
 
@@ -406,6 +532,10 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
     return KeyEventResult.ignored;
   }
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -446,13 +576,38 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final selectedVariant = controller.selectedVariant;
     final coverUrls = ImageHelper.getCoverUrlsForSingle(
         widget.system, selectedVariant.filename);
-    final GameMetadataFull metadata =
+    final GameMetadataFull fileMetadata =
         GameMetadata.parse(selectedVariant.filename);
     final isMultiRom = widget.variants.length > 1;
     final isFavorite = ref.watch(favoriteGamesProvider).contains(controller.selectedVariant.filename);
     final raMatches =
         ref.watch(raMatchesForSystemProvider(widget.system.id)).value ?? {};
     final raMatch = raMatches[selectedVariant.filename];
+
+    // Fetch rich metadata
+    final variantFilenames = widget.variants.map((v) => v.filename).join('\n');
+    final gameMetadata = ref.watch(groupMetadataProvider(
+      (filenames: variantFilenames, systemSlug: widget.system.id),
+    ));
+    final richMetadata = gameMetadata.valueOrNull;
+
+    // Update available sections based on current data
+    controller.updateAvailableSections(
+      metadata: richMetadata,
+      fileMetadata: fileMetadata,
+      raMatch: raMatch,
+    );
+
+    // In landscape, actions are in a separate left column — skip in up/down nav
+    controller.skipActionsInVerticalNav = !rs.isPortrait;
+
+    // Clamp horizontal indices
+    controller.clampHorizontalIndices(
+      screenshotCount: richMetadata?.screenshotUrlList.length ?? 0,
+      siblingCount: _getSiblingOrVariantCount(richMetadata, isMultiRom),
+      actionButtonCount: ActionButtonsRow.itemCount,
+    );
+
     return buildWithActions(
       PopScope(
         canPop: false,
@@ -466,20 +621,26 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         body: Stack(
           children: [
             Positioned.fill(
-              child: DynamicBackground(
+              child: _CoverBackground(
+                coverUrl: selectedVariant.cachedCoverUrl ?? coverUrls.firstOrNull,
                 accentColor: widget.system.accentColor,
               ),
             ),
-            TintedOverlay(accentColor: widget.system.accentColor),
             SafeArea(
               bottom: false,
-              child: rs.isPortrait
-                  ? _buildPortraitLayout(rs, state, controller, metadata,
-                      isMultiRom, coverUrls, selectedVariant, isFavorite, raMatch)
-                  : _buildLandscapeLayout(rs, state, controller, metadata,
-                      isMultiRom, coverUrls, selectedVariant, isFavorite, raMatch),
+              child: Padding(
+                // Reserve space at the bottom so content never sits behind the HUD
+                padding: const EdgeInsets.only(bottom: 56),
+                child: rs.isPortrait
+                    ? _buildPortraitLayout(rs, state, controller, fileMetadata,
+                        richMetadata, isMultiRom, coverUrls, selectedVariant,
+                        isFavorite, raMatch)
+                    : _buildLandscapeLayout(rs, state, controller, fileMetadata,
+                        richMetadata, isMultiRom, coverUrls, selectedVariant,
+                        isFavorite, raMatch),
+              ),
             ),
-            _buildControls(state, metadata),
+            _buildControls(state, controller),
             if (showQuickMenu)
               QuickMenuOverlay(
                 items: _buildQuickMenuItems(),
@@ -502,32 +663,19 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                 onSecondary: controller.cancelDialog,
               ),
             ),
-            OverlayFocusScope(
-              priority: OverlayPriority.dialog,
-              isVisible: state.showTagInfo,
-              onClose: controller.closeTagInfo,
-              child: TagInfoOverlay(
-                metadata:
-                    GameMetadata.parse(controller.selectedVariant.filename),
-                onClose: controller.closeTagInfo,
-              ),
-            ),
-            if (state.showDescription)
+            if (state.showGameInfo)
               OverlayFocusScope(
                 priority: OverlayPriority.dialog,
-                isVisible: state.showDescription,
-                onClose: controller.closeDescription,
+                isVisible: state.showGameInfo,
+                onClose: controller.closeGameInfo,
                 child: Builder(
                   builder: (context) {
-                    final richMetadata = ref.read(gameMetadataProvider(
-                      (filename: selectedVariant.filename, systemSlug: widget.system.id),
-                    )).valueOrNull;
-                    if (richMetadata == null) return const SizedBox.shrink();
-                    return DescriptionOverlay(
-                      metadata: richMetadata,
+                    return GameDetailOverlay(
+                      richMetadata: richMetadata,
+                      fileMetadata: fileMetadata,
                       gameTitle: controller.cleanTitle,
                       accentColor: widget.system.accentColor,
-                      onClose: controller.closeDescription,
+                      onClose: controller.closeGameInfo,
                     );
                   },
                 ),
@@ -552,6 +700,17 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                   requestScreenFocus();
                 },
               ),
+            if (state.showScreenshotViewer &&
+                (richMetadata?.screenshotUrlList.isNotEmpty ?? false))
+              ScreenshotFullscreen(
+                screenshots: richMetadata!.screenshotUrlList,
+                initialIndex: state.screenshotIndex,
+                accentColor: widget.system.accentColor,
+                onClose: () {
+                  controller.closeScreenshotViewer();
+                  requestScreenFocus();
+                },
+              ),
           ],
         ),
       ),
@@ -560,11 +719,23 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     );
   }
 
+  int _getSiblingOrVariantCount(GameMetadataInfo? richMetadata, bool isMultiRom) {
+    return OtherVersionsSection.entryCount(
+      variants: widget.variants,
+      siblings: richMetadata?.siblingList ?? const [],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Landscape layout: Cover + actions left (~30%), sections right (~70%)
+  // ---------------------------------------------------------------------------
+
   Widget _buildLandscapeLayout(
     Responsive rs,
     GameDetailState state,
     GameDetailController controller,
-    GameMetadataFull metadata,
+    GameMetadataFull fileMetadata,
+    GameMetadataInfo? richMetadata,
     bool isMultiRom,
     List<String> coverUrls,
     GameItem selectedVariant,
@@ -581,47 +752,77 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 40,
-            child: CoverSection(
-              game: widget.game,
-              system: widget.system,
-              coverUrls: coverUrls,
-              cachedUrl: selectedVariant.cachedCoverUrl,
-              metadata: metadata,
-              isFavorite: isFavorite,
-              isInstalled: state.isVariantInstalled,
-              hasThumbnail: selectedVariant.hasThumbnail,
+          // Left column: Cover + action buttons (fixed)
+          SizedBox(
+            width: rs.isSmall ? 180 : (rs.isMedium ? 220 : 260),
+            child: Column(
+              children: [
+                AspectRatio(
+                  aspectRatio: 0.75,
+                  child: CoverSection(
+                    game: widget.game,
+                    system: widget.system,
+                    coverUrls: coverUrls,
+                    cachedUrl: selectedVariant.cachedCoverUrl,
+                    metadata: fileMetadata,
+                    isFavorite: isFavorite,
+                    isInstalled: state.isVariantInstalled,
+                    hasThumbnail: selectedVariant.hasThumbnail,
+                  ),
+                ),
+                SizedBox(height: rs.spacing.md),
+                // Primary action button (Download/Delete/Manage)
+                _buildSection(
+                  rs, state, controller, DetailSection.primaryAction,
+                  fileMetadata: fileMetadata,
+                  richMetadata: richMetadata,
+                  isMultiRom: isMultiRom,
+                  raMatch: raMatch,
+                  isFocused: controller.focusedSection == DetailSection.primaryAction,
+                ),
+                // Icon action buttons (Favorite/Share/Shelf)
+                _buildSection(
+                  rs, state, controller, DetailSection.actions,
+                  fileMetadata: fileMetadata,
+                  richMetadata: richMetadata,
+                  isMultiRom: isMultiRom,
+                  raMatch: raMatch,
+                  isFocused: controller.focusedSection == DetailSection.actions,
+                ),
+              ],
             ),
           ),
           SizedBox(width: rs.spacing.lg),
+          // Right column: all other sections (scrollable)
           Expanded(
-            flex: 60,
-            child:
-                _buildInfoSection(rs, state, controller, metadata, raMatch),
+            child: SingleChildScrollView(
+              child: _buildSections(rs, state, controller, fileMetadata,
+                  richMetadata, isMultiRom, raMatch,
+                  excludeActions: true),
+            ),
           ),
         ],
       ),
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Portrait layout: Cover header + scrollable sections
+  // ---------------------------------------------------------------------------
+
   Widget _buildPortraitLayout(
     Responsive rs,
     GameDetailState state,
     GameDetailController controller,
-    GameMetadataFull metadata,
+    GameMetadataFull fileMetadata,
+    GameMetadataInfo? richMetadata,
     bool isMultiRom,
     List<String> coverUrls,
     GameItem selectedVariant,
     bool isFavorite,
     RaMatchResult? raMatch,
   ) {
-    final variantFilenames = widget.variants.map((v) => v.filename).join('\n');
-    final gameMetadata = ref.watch(groupMetadataProvider(
-      (filenames: variantFilenames, systemSlug: widget.system.id),
-    ));
-    final richMetadata = gameMetadata.valueOrNull;
-    final hasRichMetadata = richMetadata?.hasContent ?? false;
+    final hasCardContent = richMetadata?.hasCardContent ?? false;
 
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: rs.spacing.md),
@@ -630,107 +831,221 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         children: [
           SizedBox(height: rs.spacing.md),
           AspectRatio(
-            aspectRatio: hasRichMetadata ? 0.85 : 0.75,
+            aspectRatio: hasCardContent ? 0.85 : 0.75,
             child: CoverSection(
               game: widget.game,
               system: widget.system,
               coverUrls: coverUrls,
               cachedUrl: selectedVariant.cachedCoverUrl,
-              metadata: metadata,
+              metadata: fileMetadata,
               isFavorite: isFavorite,
               isInstalled: state.isVariantInstalled,
               hasThumbnail: selectedVariant.hasThumbnail,
             ),
           ),
           SizedBox(height: rs.spacing.md),
-          _buildTitleSection(rs, controller),
-          if (hasRichMetadata) ...[
-            _buildSectionHeader('About This Game', rs),
-            GameInfoCard(
-              metadata: richMetadata!,
-              accentColor: widget.system.accentColor,
-            ),
-          ],
-          SizedBox(height: rs.spacing.lg),
-          _buildDownloadArea(rs, state, controller, isMultiRom),
-          if (!isMultiRom) ...[
-            _buildSectionHeader('Details', rs),
-            _buildStructuredDetails(rs, metadata),
-          ],
-          if (raMatch != null && raMatch.hasMatch) ...[
-            _buildSectionHeader('Achievements', rs),
-            RaInfoSection(
-              match: raMatch,
-              filename: selectedVariant.filename,
-              systemSlug: widget.system.id,
-              onViewAchievements: () => _navigateToAchievements(raMatch),
-            ),
-          ],
-          SizedBox(height: rs.spacing.xxl),
+          _buildSections(rs, state, controller, fileMetadata, richMetadata,
+              isMultiRom, raMatch),
         ],
       ),
     );
   }
 
-  Widget _buildControls(
-      GameDetailState state, GameMetadataFull metadata) {
-    if (_controller == null) return const SizedBox.shrink();
+  // ---------------------------------------------------------------------------
+  // Shared section builder — renders all visible sections in order
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSections(
+    Responsive rs,
+    GameDetailState state,
+    GameDetailController controller,
+    GameMetadataFull fileMetadata,
+    GameMetadataInfo? richMetadata,
+    bool isMultiRom,
+    RaMatchResult? raMatch, {
+    bool excludeActions = false,
+  }) {
+    const leftColumnSections = {
+      DetailSection.primaryAction,
+      DetailSection.actions,
+    };
+    final sections = controller.availableSections;
+    final focused = controller.focusedSection;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final section in sections)
+          if (!(excludeActions && leftColumnSections.contains(section)))
+            _buildSection(
+              rs, state, controller, section,
+              fileMetadata: fileMetadata,
+              richMetadata: richMetadata,
+              isMultiRom: isMultiRom,
+              raMatch: raMatch,
+              isFocused: section == focused,
+            ),
+      ],
+    );
+  }
+
+  Widget _buildSection(
+    Responsive rs,
+    GameDetailState state,
+    GameDetailController controller,
+    DetailSection section, {
+    required GameMetadataFull fileMetadata,
+    GameMetadataInfo? richMetadata,
+    required bool isMultiRom,
+    RaMatchResult? raMatch,
+    required bool isFocused,
+  }) {
+    final Widget content;
+
+    switch (section) {
+      case DetailSection.title:
+        content = _buildTitleSection(rs, controller);
+
+      case DetailSection.badges:
+        content = BadgesRow(
+          metadata: richMetadata!,
+          accentColor: widget.system.accentColor,
+        );
+
+      case DetailSection.fileDetails:
+        content = FileDetailsRow(
+          fileMetadata: fileMetadata,
+          richMetadata: richMetadata,
+        );
+
+      case DetailSection.summary:
+        content = SummarySection(
+          metadata: richMetadata!,
+          accentColor: widget.system.accentColor,
+          isExpanded: state.summaryExpanded,
+          onToggle: controller.toggleSummaryExpanded,
+        );
+
+      case DetailSection.primaryAction:
+        content = _buildPrimaryActionSection(state, controller, isMultiRom);
+
+      case DetailSection.actions:
+        content = _buildIconButtonsSection(state, controller);
+
+      case DetailSection.screenshots:
+        content = ScreenshotsCarousel(
+          screenshots: richMetadata!.screenshotUrlList,
+          focusedIndex: state.screenshotIndex,
+          accentColor: widget.system.accentColor,
+          onOpenViewer: controller.openScreenshotViewer,
+        );
+
+      case DetailSection.otherVersions:
+        content = OtherVersionsSection(
+          siblings: richMetadata?.siblingList ?? const [],
+          variants: widget.variants,
+          isMultiRom: isMultiRom,
+          focusedIndex: state.siblingIndex,
+          installedStatus: state.installedStatus,
+          accentColor: widget.system.accentColor,
+        );
+
+      case DetailSection.details:
+        content = DetailsSection(
+          fileMetadata: fileMetadata,
+        );
+
+      case DetailSection.achievements:
+        content = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SectionHeader(label: 'Achievements'),
+            RaInfoSection(
+              match: raMatch!,
+              filename: controller.selectedVariant.filename,
+              systemSlug: widget.system.id,
+              onViewAchievements: () => _navigateToAchievements(raMatch),
+            ),
+          ],
+        );
+    }
+
+    return Container(
+      key: _keyForSection(section),
+      margin: EdgeInsets.only(bottom: rs.spacing.sm),
+      decoration: isFocused
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(rs.radius.md),
+              border: Border.all(
+                color: widget.system.accentColor.withValues(alpha: 0.4),
+                width: 1.5,
+              ),
+            )
+          : null,
+      padding: EdgeInsets.all(rs.spacing.xs),
+      child: content,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // HUD controls
+  // ---------------------------------------------------------------------------
+
+  Widget _buildControls(GameDetailState state, GameDetailController controller) {
     if (showQuickMenu) return const SizedBox.shrink();
+
+    // Context-sensitive A-button hint per focused section
+    String aHint;
+    final section = controller.focusedSection;
+    switch (section) {
+      case DetailSection.summary:
+        aHint = state.summaryExpanded ? 'Collapse' : 'Read More';
+      case DetailSection.screenshots:
+        aHint = 'View';
+      case DetailSection.otherVersions:
+        aHint = 'View';
+      case DetailSection.primaryAction:
+        aHint = 'Select';
+      case DetailSection.actions:
+        // Show hint based on focused icon button
+        switch (state.actionButtonIndex) {
+          case 0:
+            aHint = 'Favorite';
+          case 1:
+            aHint = 'Share';
+          case 2:
+            aHint = 'Add to Shelf';
+          default:
+            aHint = 'Select';
+        }
+      case DetailSection.achievements:
+        aHint = 'View';
+      case DetailSection.title:
+      case DetailSection.badges:
+      case DetailSection.fileDetails:
+      case DetailSection.details:
+        aHint = '';
+    }
+
+    // Show D-pad hint for horizontal sections
+    final bool hasHorizontalNav = section == DetailSection.screenshots ||
+        section == DetailSection.otherVersions ||
+        section == DetailSection.actions;
 
     return ConsoleHud(
       b: HudAction('Back', onTap: () => Navigator.pop(context)),
+      a: aHint.isNotEmpty ? HudAction(aHint) : null,
+      dpad: hasHorizontalNav
+          ? (label: '', action: 'Navigate')
+          : null,
+      select: HudAction('Favorite', onTap: _handleFavorite),
       start: HudAction('Menu', onTap: toggleQuickMenu),
     );
   }
 
-  Widget _buildInfoSection(
-    Responsive rs,
-    GameDetailState state,
-    GameDetailController controller,
-    GameMetadataFull metadata,
-    RaMatchResult? raMatch,
-  ) {
-    final isMultiRom = widget.variants.length > 1;
-    final variantFilenames = widget.variants.map((v) => v.filename).join('\n');
-    final gameMetadata = ref.watch(groupMetadataProvider(
-      (filenames: variantFilenames, systemSlug: widget.system.id),
-    ));
-    final richMetadata = gameMetadata.valueOrNull;
-    final hasRichMetadata = richMetadata?.hasContent ?? false;
-
-    // Landscape: compact layout without section headers or scroll —
-    // gamepad can't scroll here since nothing is focused.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildTitleSection(rs, controller),
-        if (hasRichMetadata) ...[
-          SizedBox(height: rs.spacing.sm),
-          Expanded(
-            child: GameInfoCard(
-              metadata: richMetadata!,
-              accentColor: widget.system.accentColor,
-            ),
-          ),
-        ],
-        SizedBox(height: rs.spacing.md),
-        _buildDownloadButton(state, controller, isMultiRom),
-        if (!isMultiRom) ...[
-          SizedBox(height: rs.spacing.md),
-          _buildStructuredDetails(rs, metadata),
-        ],
-        if (raMatch != null && raMatch.hasMatch) ...[
-          SizedBox(height: rs.spacing.md),
-          RaInfoSection(
-            match: raMatch,
-            filename: controller.selectedVariant.filename,
-            systemSlug: widget.system.id,
-          ),
-        ],
-        if (!hasRichMetadata) const Spacer(),
-      ],
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // Section widgets
+  // ---------------------------------------------------------------------------
 
   Widget _buildTitleSection(Responsive rs, GameDetailController controller) {
     final titleFontSize = rs.isSmall ? 20.0 : (rs.isMedium ? 24.0 : 28.0);
@@ -816,184 +1131,61 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     );
   }
 
-  Widget _buildDownloadButton(
+
+  Widget _buildPrimaryActionSection(
     GameDetailState state,
     GameDetailController controller,
     bool isMultiRom,
   ) {
-    final DownloadButtonState buttonState;
-    if (state.isAddingToQueue) {
-      buttonState = DownloadButtonState.adding;
-    } else if (widget.isLocalOnly && !state.isVariantInstalled) {
-      buttonState = DownloadButtonState.unavailable;
-    } else if (isMultiRom) {
-      final allInstalled = state.installedStatus.length == widget.variants.length &&
-          state.installedStatus.values.every((v) => v);
-      buttonState = allInstalled
+    return ActionButtonsRow.primaryOnly(
+      accentColor: widget.system.accentColor,
+      downloadButtonState: _getDownloadButtonState(state, isMultiRom),
+      variantCount: isMultiRom ? widget.variants.length : null,
+      onPrimaryAction: controller.performAction,
+      hintText: _getButtonHintText(state, isMultiRom),
+    );
+  }
+
+  Widget _buildIconButtonsSection(
+    GameDetailState state,
+    GameDetailController controller,
+  ) {
+    final isFavorite = ref.watch(favoriteGamesProvider)
+        .contains(controller.selectedVariant.filename);
+
+    return ActionButtonsRow.iconsOnly(
+      accentColor: widget.system.accentColor,
+      isFavorite: isFavorite,
+      focusedButtonIndex: state.actionButtonIndex,
+      onFavorite: _handleFavorite,
+      onShare: _handleShare,
+      onCollection: () => _handleCollection(controller),
+    );
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // Shared helpers
+  // ---------------------------------------------------------------------------
+
+  DownloadButtonState _getDownloadButtonState(
+    GameDetailState state,
+    bool isMultiRom,
+  ) {
+    if (state.isAddingToQueue) return DownloadButtonState.adding;
+    if (widget.isLocalOnly && !state.isVariantInstalled) {
+      return DownloadButtonState.unavailable;
+    }
+    if (isMultiRom) {
+      final allInstalled =
+          state.installedStatus.length == widget.variants.length &&
+              state.installedStatus.values.every((v) => v);
+      return allInstalled
           ? DownloadButtonState.installed
           : DownloadButtonState.download;
-    } else if (state.isVariantInstalled) {
-      buttonState = DownloadButtonState.delete;
-    } else {
-      buttonState = DownloadButtonState.download;
     }
-
-    return DownloadActionButton(
-      state: buttonState,
-      accentColor: widget.system.accentColor,
-      variantCount: isMultiRom ? widget.variants.length : null,
-      onTap: controller.performAction,
-    );
-  }
-
-  Widget _buildSectionHeader(String label, Responsive rs) {
-    return Padding(
-      padding: EdgeInsets.only(
-        top: rs.spacing.lg,
-        bottom: rs.spacing.sm,
-        left: rs.spacing.xs,
-      ),
-      child: Row(
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.35),
-              fontSize: rs.isSmall ? 10 : 12,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 2,
-            ),
-          ),
-          SizedBox(width: rs.spacing.md),
-          Expanded(
-            child: Container(
-              height: 1,
-              color: Colors.white.withValues(alpha: 0.06),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStructuredDetails(Responsive rs, GameMetadataFull metadata) {
-    final labelStyle = TextStyle(
-      color: Colors.white.withValues(alpha: 0.4),
-      fontSize: rs.isSmall ? 10 : 12,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.5,
-    );
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(rs.spacing.md),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(rs.radius.md),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          _detailRow(
-            rs,
-            label: 'Region',
-            labelStyle: labelStyle,
-            child: RegionBadge(region: metadata.region, fontSize: rs.isSmall ? 12 : 14),
-          ),
-          if (metadata.languages.isNotEmpty) ...[
-            Divider(color: Colors.white.withValues(alpha: 0.04), height: rs.spacing.md),
-            _detailRow(
-              rs,
-              label: 'Languages',
-              labelStyle: labelStyle,
-              child: LanguageBadges(
-                languages: metadata.languages,
-                maxVisible: rs.isSmall ? 4 : 6,
-              ),
-            ),
-          ],
-          Divider(color: Colors.white.withValues(alpha: 0.04), height: rs.spacing.md),
-          _detailRow(
-            rs,
-            label: 'Format',
-            labelStyle: labelStyle,
-            child: FileTypeBadge(fileType: metadata.fileType),
-          ),
-          if (metadata.primaryTags.isNotEmpty) ...[
-            Divider(color: Colors.white.withValues(alpha: 0.04), height: rs.spacing.md),
-            _detailRow(
-              rs,
-              label: 'Tags',
-              labelStyle: labelStyle,
-              child: TagBadges(tags: metadata.primaryTags, maxVisible: 4),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _detailRow(
-    Responsive rs, {
-    required String label,
-    required TextStyle labelStyle,
-    required Widget child,
-  }) {
-    return Row(
-      children: [
-        SizedBox(
-          width: rs.isSmall ? 70 : 85,
-          child: Text(label, style: labelStyle),
-        ),
-        SizedBox(width: rs.spacing.sm),
-        Expanded(child: child),
-      ],
-    );
-  }
-
-  Widget _buildDownloadArea(
-    Responsive rs,
-    GameDetailState state,
-    GameDetailController controller,
-    bool isMultiRom,
-  ) {
-    final accentColor = widget.system.accentColor;
-
-    return Container(
-      padding: EdgeInsets.all(rs.spacing.md),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(rs.radius.md),
-        border: Border.all(
-          color: accentColor.withValues(alpha: 0.15),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: accentColor.withValues(alpha: 0.08),
-            blurRadius: 16,
-            spreadRadius: -2,
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildDownloadButton(state, controller, isMultiRom),
-          SizedBox(height: rs.spacing.xs),
-          Text(
-            _getButtonHintText(state, isMultiRom),
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.25),
-              fontSize: rs.isSmall ? 9 : 10,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
+    if (state.isVariantInstalled) return DownloadButtonState.delete;
+    return DownloadButtonState.download;
   }
 
   String _getButtonHintText(GameDetailState state, bool isMultiRom) {
@@ -1004,3 +1196,83 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   }
 }
 
+/// Blurred cover art background with dark gradient overlay.
+/// Falls back to accent-color gradient when no cover is available.
+class _CoverBackground extends StatelessWidget {
+  final String? coverUrl;
+  final Color accentColor;
+
+  const _CoverBackground({
+    required this.coverUrl,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Layer 1: Cover image or accent gradient fallback
+        if (coverUrl != null)
+          ImageFiltered(
+            imageFilter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Image.network(
+              coverUrl!,
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+              errorBuilder: (_, __, ___) => _accentFallback(),
+            ),
+          )
+        else
+          _accentFallback(),
+        // Layer 2: Dark gradient overlay for readability
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.4),
+                Colors.black.withValues(alpha: 0.7),
+                Colors.black.withValues(alpha: 0.92),
+                Colors.black,
+              ],
+              stops: const [0.0, 0.3, 0.6, 1.0],
+            ),
+          ),
+        ),
+        // Layer 3: Subtle accent tint
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                accentColor.withValues(alpha: 0.15),
+                Colors.transparent,
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _accentFallback() {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accentColor.withValues(alpha: 0.3),
+            accentColor.withValues(alpha: 0.1),
+            const Color(0xFF0A0A0A),
+            Colors.black,
+          ],
+          stops: const [0.0, 0.2, 0.5, 1.0],
+        ),
+      ),
+    );
+  }
+}

@@ -964,13 +964,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           _filteredGames[_currentIndex].systemSlug)))
         QuickMenuItem(
           label: 'Add to Shelf',
-          icon: Icons.playlist_add_rounded,
+          icon: Icons.add_rounded,
           onSelect: _addCurrentGameToShelf,
         ),
       if (shelf != null && _filteredGames.isNotEmpty)
         QuickMenuItem(
           label: 'Remove from Shelf',
-          icon: Icons.playlist_remove_rounded,
+          icon: Icons.remove_rounded,
           onSelect: _removeCurrentGameFromShelf,
         ),
       if (shelf != null && shelf.sortMode == ShelfSortMode.manual && _filteredGames.length > 1)

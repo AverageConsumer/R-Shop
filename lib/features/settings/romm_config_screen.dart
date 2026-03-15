@@ -173,9 +173,15 @@ class _RommConfigScreenState extends ConsumerState<RommConfigScreen>
 
   static String _shortenUrl(String url) {
     var s = url;
-    if (s.startsWith('https://')) s = s.substring(8);
-    if (s.startsWith('http://')) s = s.substring(7);
-    if (s.endsWith('/')) s = s.substring(0, s.length - 1);
+    final lower = s.toLowerCase();
+    if (lower.startsWith('https://')) {
+      s = s.substring(8);
+    } else if (lower.startsWith('http://')) {
+      s = s.substring(7);
+    }
+    if (s.endsWith('/')) {
+      s = s.substring(0, s.length - 1);
+    }
     return s;
   }
 

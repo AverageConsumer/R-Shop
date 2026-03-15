@@ -411,6 +411,7 @@ class SystemModel {
 
   /// Whether [name] ends with a known game file extension.
   static bool isGameFile(String name) {
-    return allGameExtensions.any((ext) => name.endsWith(ext));
+    final lower = name.toLowerCase();
+    return allGameExtensions.any((ext) => lower.endsWith(ext));
   }
 }

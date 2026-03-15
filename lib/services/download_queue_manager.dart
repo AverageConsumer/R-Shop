@@ -389,6 +389,9 @@ class DownloadQueueManager extends ChangeNotifier {
     )
         .listen(
       (progress) {
+        if (progress.status == DownloadStatus.error) {
+          debugPrint('DownloadQueue: error via progress for ${item.game.filename}: ${progress.error}');
+        }
         _updateItem(
           item.id,
           status: progress.status,
@@ -412,6 +415,7 @@ class DownloadQueueManager extends ChangeNotifier {
         final service = _downloadServices.remove(item.id);
         service?.dispose();
         final errorMsg = error.toString();
+        debugPrint('DownloadQueue: error for ${item.game.filename}: $errorMsg');
         _updateItem(
           item.id,
           status: DownloadStatus.error,
@@ -442,8 +446,12 @@ class DownloadQueueManager extends ChangeNotifier {
   }
 
   void _onDownloadComplete(String id) {
-    debugPrint('DownloadQueue: download complete: $id');
     final item = _state.getDownloadById(id);
+    if (item != null && item.status == DownloadStatus.error) {
+      debugPrint('DownloadQueue: download FAILED: $id — ${item.error}');
+    } else {
+      debugPrint('DownloadQueue: download complete: $id');
+    }
     if (item == null) return;
 
     if (item.status == DownloadStatus.error) {

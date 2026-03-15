@@ -349,7 +349,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
                                   index: _addedGamesIndex,
                                   label: 'Added Games (${_trulyManualGameIds.length})',
                                   value: '',
-                                  icon: Icons.playlist_add_check_rounded,
+                                  icon: Icons.checklist_rounded,
                                   rs: rs,
                                   accentColor: Colors.tealAccent,
                                 ),

@@ -14,9 +14,15 @@ GameMetadataInfo _makeMetadata({
   String? summary,
   String? genres,
   String? developer,
+  String? publisher,
   int? releaseYear,
+  String? releaseDate,
   double? rating,
   String? gameModes,
+  String? franchises,
+  String? themes,
+  String? playerPerspectives,
+  String? ageRating,
 }) {
   return GameMetadataInfo(
     filename: 'test.nes',
@@ -24,9 +30,15 @@ GameMetadataInfo _makeMetadata({
     summary: summary,
     genres: genres,
     developer: developer,
+    publisher: publisher,
     releaseYear: releaseYear,
+    releaseDate: releaseDate,
     rating: rating,
     gameModes: gameModes,
+    franchises: franchises,
+    themes: themes,
+    playerPerspectives: playerPerspectives,
+    ageRating: ageRating,
     lastUpdated: 0,
   );
 }
@@ -53,8 +65,62 @@ void main() {
       expect(_makeMetadata(releaseYear: 1985).hasContent, true);
     });
 
+    test('hasContent true when franchises set', () {
+      expect(_makeMetadata(franchises: 'Zelda').hasContent, true);
+    });
+
+    test('hasContent true when themes set', () {
+      expect(_makeMetadata(themes: 'Fantasy').hasContent, true);
+    });
+
     test('hasContent false when all null', () {
       expect(_makeMetadata().hasContent, false);
+    });
+
+    test('hasCardContent true when summary set', () {
+      expect(_makeMetadata(summary: 'A game').hasCardContent, true);
+    });
+
+    test('hasCardContent true when genres set', () {
+      expect(_makeMetadata(genres: 'Action').hasCardContent, true);
+    });
+
+    test('hasCardContent false when all null', () {
+      expect(_makeMetadata().hasCardContent, false);
+    });
+
+    test('creditsLine shows developer / publisher', () {
+      expect(
+        _makeMetadata(developer: 'Rare', publisher: 'Nintendo').creditsLine,
+        'Rare / Nintendo',
+      );
+    });
+
+    test('creditsLine shows only developer when no publisher', () {
+      expect(_makeMetadata(developer: 'Rare').creditsLine, 'Rare');
+    });
+
+    test('creditsLine shows only publisher when no developer', () {
+      expect(_makeMetadata(publisher: 'Nintendo').creditsLine, 'Nintendo');
+    });
+
+    test('creditsLine null when neither set', () {
+      expect(_makeMetadata().creditsLine, isNull);
+    });
+
+    test('franchiseList splits CSV', () {
+      final meta = _makeMetadata(franchises: 'Mario, Zelda');
+      expect(meta.franchiseList, ['Mario', 'Zelda']);
+    });
+
+    test('themeList splits CSV', () {
+      final meta = _makeMetadata(themes: 'Fantasy, Sci-fi');
+      expect(meta.themeList, ['Fantasy', 'Sci-fi']);
+    });
+
+    test('playerPerspectiveList splits CSV', () {
+      final meta = _makeMetadata(playerPerspectives: 'Third person, Top-down');
+      expect(meta.playerPerspectiveList, ['Third person', 'Top-down']);
     });
 
     test('genreList splits comma-separated genres', () {
@@ -85,9 +151,15 @@ void main() {
         summary: 'desc',
         genres: 'RPG',
         developer: 'Dev',
+        publisher: 'Pub',
         releaseYear: 2000,
+        releaseDate: '2000-03-21',
         rating: 80.0,
         gameModes: 'Single',
+        franchises: 'Final Fantasy',
+        themes: 'Fantasy',
+        playerPerspectives: 'Top-down',
+        ageRating: 'ESRB: E',
       );
       final row = meta.toDbRow();
       expect(row['filename'], 'test.nes');
@@ -95,9 +167,15 @@ void main() {
       expect(row['summary'], 'desc');
       expect(row['genres'], 'RPG');
       expect(row['developer'], 'Dev');
+      expect(row['publisher'], 'Pub');
       expect(row['release_year'], 2000);
+      expect(row['release_date'], '2000-03-21');
       expect(row['rating'], 80.0);
       expect(row['game_modes'], 'Single');
+      expect(row['franchises'], 'Final Fantasy');
+      expect(row['themes'], 'Fantasy');
+      expect(row['player_perspectives'], 'Top-down');
+      expect(row['age_rating'], 'ESRB: E');
     });
 
     test('fromDbRow parses all fields', () {
@@ -107,17 +185,29 @@ void main() {
         'summary': 'A game',
         'genres': 'Action',
         'developer': 'Dev',
+        'publisher': 'Pub',
         'release_year': 1995,
+        'release_date': '1995-06-15',
         'game_modes': 'Co-op',
         'rating': 75.0,
+        'franchises': 'Zelda',
+        'themes': 'Adventure',
+        'player_perspectives': 'Third person',
+        'age_rating': 'PEGI: 7',
         'last_updated': 12345,
       });
       expect(meta.filename, 'game.sfc');
       expect(meta.systemSlug, 'snes');
       expect(meta.summary, 'A game');
       expect(meta.developer, 'Dev');
+      expect(meta.publisher, 'Pub');
       expect(meta.releaseYear, 1995);
+      expect(meta.releaseDate, '1995-06-15');
       expect(meta.rating, 75.0);
+      expect(meta.franchises, 'Zelda');
+      expect(meta.themes, 'Adventure');
+      expect(meta.playerPerspectives, 'Third person');
+      expect(meta.ageRating, 'PEGI: 7');
       expect(meta.lastUpdated, 12345);
     });
   });
@@ -136,15 +226,15 @@ void main() {
       expect(find.text('Nintendo EAD'), findsOneWidget);
     });
 
-    testWidgets('shows summary text', (tester) async {
+    testWidgets('shows credits line with developer and publisher', (tester) async {
       await tester.pumpWidget(createTestApp(
         GameInfoCard(
-          metadata: _makeMetadata(summary: 'A classic platformer game'),
+          metadata: _makeMetadata(developer: 'Squaresoft', publisher: 'Nintendo'),
           accentColor: Colors.redAccent,
         ),
       ));
 
-      expect(find.text('A classic platformer game'), findsOneWidget);
+      expect(find.text('Squaresoft / Nintendo'), findsOneWidget);
     });
 
     testWidgets('shows release year', (tester) async {
@@ -214,10 +304,21 @@ void main() {
       expect(find.byIcon(Icons.star_outline_rounded), findsNWidgets(2));
     });
 
+    testWidgets('shows truncated summary', (tester) async {
+      await tester.pumpWidget(createTestApp(
+        GameInfoCard(
+          metadata: _makeMetadata(summary: 'A great adventure game with puzzles.'),
+          accentColor: Colors.redAccent,
+        ),
+      ));
+
+      expect(find.text('A great adventure game with puzzles.'), findsOneWidget);
+    });
+
     testWidgets('no rating icons when rating is null', (tester) async {
       await tester.pumpWidget(createTestApp(
         GameInfoCard(
-          metadata: _makeMetadata(summary: 'Just a summary'),
+          metadata: _makeMetadata(developer: 'Some Dev'),
           accentColor: Colors.redAccent,
         ),
       ));
@@ -229,7 +330,7 @@ void main() {
     testWidgets('card has border and rounded corners', (tester) async {
       await tester.pumpWidget(createTestApp(
         GameInfoCard(
-          metadata: _makeMetadata(summary: 'test'),
+          metadata: _makeMetadata(developer: 'test'),
           accentColor: Colors.blue,
         ),
       ));

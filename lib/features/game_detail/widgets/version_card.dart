@@ -180,6 +180,19 @@ class SingleVersionDisplay extends StatelessWidget {
                     ],
                   ),
                 ],
+                // Show filename to distinguish variants with identical tags
+                const SizedBox(height: 6),
+                Text(
+                  variant.filename,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),

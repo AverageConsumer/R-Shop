@@ -37,6 +37,32 @@ class RommPlatform {
   }
 }
 
+class RommSibling {
+  final int id;
+  final String name;
+  final String? fsNameNoExt;
+
+  const RommSibling({
+    required this.id,
+    required this.name,
+    this.fsNameNoExt,
+  });
+
+  factory RommSibling.fromJson(Map<String, dynamic> json) {
+    return RommSibling(
+      id: json['id'] as int,
+      name: json['name'] as String? ?? '',
+      fsNameNoExt: json['fs_name_no_ext'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        if (fsNameNoExt != null) 'fs_name_no_ext': fsNameNoExt,
+      };
+}
+
 class RommRom {
   final int id;
   final String name;
@@ -49,9 +75,16 @@ class RommRom {
   final String? summary;
   final String? genres;
   final String? developer;
+  final String? publisher;
   final int? firstReleaseDate;
   final String? gameModes;
   final double? averageRating;
+  final String? franchises;
+  final String? themes;
+  final String? playerPerspectives;
+  final String? ageRatings;
+  final int? fileSizeBytes;
+  final List<RommSibling> siblings;
 
   const RommRom({
     required this.id,
@@ -65,24 +98,87 @@ class RommRom {
     this.summary,
     this.genres,
     this.developer,
+    this.publisher,
     this.firstReleaseDate,
     this.gameModes,
     this.averageRating,
+    this.franchises,
+    this.themes,
+    this.playerPerspectives,
+    this.ageRatings,
+    this.fileSizeBytes,
+    this.siblings = const [],
   });
 
   factory RommRom.fromJson(Map<String, dynamic> json) {
     final screenshots = json['merged_screenshots'];
 
+    // RomM API nests normalized metadata under "metadatum" (genres, companies,
+    // game_modes, franchises, age_ratings, first_release_date, average_rating).
+    // Raw IGDB data lives under "igdb_metadata" (themes, player_perspectives,
+    // companies with role flags). "summary" is top-level.
+    final metadatum = json['metadatum'] as Map<String, dynamic>? ?? const {};
+    final igdbMeta = json['igdb_metadata'] as Map<String, dynamic>? ?? const {};
+
     // Parse metadata defensively — malformed fields must not break game listing
     String? parsedGenres;
     String? parsedDeveloper;
+    String? parsedPublisher;
     String? parsedGameModes;
+    String? parsedFranchises;
+    String? parsedThemes;
+    String? parsedPerspectives;
+    String? parsedAgeRatings;
     try {
-      parsedGenres = _joinListField(json['genres']);
-      parsedDeveloper = _extractFirstName(json['companies']);
-      parsedGameModes = _joinListField(json['game_modes']);
+      // metadatum fields are normalized string lists
+      parsedGenres = _joinListField(metadatum['genres']);
+      parsedGameModes = _joinListField(metadatum['game_modes']);
+      parsedFranchises = _joinListField(metadatum['franchises']);
+
+      // age_ratings in metadatum are already human-readable strings (e.g. "ESRB: T")
+      parsedAgeRatings = _joinListField(metadatum['age_ratings']);
+
+      // Companies: prefer igdb_metadata (has developer/publisher role flags),
+      // fall back to metadatum (plain name strings, positional assignment)
+      final igdbCompanies = igdbMeta['companies'];
+      if (igdbCompanies is List && igdbCompanies.isNotEmpty) {
+        final companies = _extractCompanies(igdbCompanies);
+        parsedDeveloper = companies.developer;
+        parsedPublisher = companies.publisher;
+      } else {
+        final companies = _extractCompanies(metadatum['companies']);
+        parsedDeveloper = companies.developer;
+        parsedPublisher = companies.publisher;
+      }
+
+      // themes and player_perspectives are only in igdb_metadata
+      parsedThemes = _joinListField(igdbMeta['themes']);
+      parsedPerspectives = _joinListField(igdbMeta['player_perspectives']);
     } catch (e) {
       debugPrint('RommApiService: metadata parsing skipped: $e');
+    }
+
+    // first_release_date and average_rating: check metadatum first, then top-level
+    final firstRelease = metadatum['first_release_date'] as int?
+        ?? json['first_release_date'] as int?;
+    final avgRating = (metadatum['average_rating'] as num?)?.toDouble()
+        ?? (json['average_rating'] as num?)?.toDouble();
+
+    // Parse file size (top-level field)
+    final fileSize = json['fs_size_bytes'] as int?;
+
+    // Parse siblings (list of related ROMs from RomM)
+    List<RommSibling> parsedSiblings = const [];
+    try {
+      final siblingsRaw = json['siblings'];
+      if (siblingsRaw is List && siblingsRaw.isNotEmpty) {
+        parsedSiblings = siblingsRaw
+            .whereType<Map<String, dynamic>>()
+            .map((e) => RommSibling.fromJson(e))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('RommApiService: siblings parsing skipped: $e');
     }
 
     return RommRom(
@@ -99,9 +195,16 @@ class RommRom {
       summary: json['summary'] as String?,
       genres: parsedGenres,
       developer: parsedDeveloper,
-      firstReleaseDate: json['first_release_date'] as int?,
+      publisher: parsedPublisher,
+      firstReleaseDate: firstRelease,
       gameModes: parsedGameModes,
-      averageRating: (json['average_rating'] as num?)?.toDouble(),
+      averageRating: avgRating,
+      franchises: parsedFranchises,
+      themes: parsedThemes,
+      playerPerspectives: parsedPerspectives,
+      ageRatings: parsedAgeRatings,
+      fileSizeBytes: fileSize,
+      siblings: parsedSiblings,
     );
   }
 
@@ -116,13 +219,58 @@ class RommRom {
     return names.isEmpty ? null : names.join(', ');
   }
 
-  /// Extracts the first company name from a list of company objects or strings.
-  static String? _extractFirstName(dynamic field) {
-    if (field is! List || field.isEmpty) return null;
-    final first = field.first;
-    if (first is Map) return first['name']?.toString();
-    return first?.toString();
+  /// Extracts developer and publisher from the companies list.
+  /// RomM companies may have `developer`/`publisher` boolean flags.
+  /// Falls back to: first = developer, second = publisher.
+  static ({String? developer, String? publisher}) _extractCompanies(
+      dynamic field) {
+    if (field is! List || field.isEmpty) {
+      return (developer: null, publisher: null);
+    }
+
+    String? developer;
+    String? publisher;
+
+    // Check for role flags (RomM/IGDB style)
+    bool hasRoleFlags = false;
+    for (final entry in field) {
+      if (entry is Map &&
+          (entry.containsKey('developer') || entry.containsKey('publisher'))) {
+        hasRoleFlags = true;
+        break;
+      }
+    }
+
+    if (hasRoleFlags) {
+      for (final entry in field) {
+        if (entry is! Map) continue;
+        final name = entry['name']?.toString();
+        if (name == null || name.isEmpty) continue;
+        if (entry['developer'] == true && developer == null) developer = name;
+        if (entry['publisher'] == true && publisher == null) publisher = name;
+      }
+    } else {
+      // Fallback: first = developer, second = publisher
+      for (var i = 0; i < field.length; i++) {
+        final entry = field[i];
+        final name =
+            entry is Map ? entry['name']?.toString() : entry?.toString();
+        if (name == null || name.isEmpty) continue;
+        if (developer == null) {
+          developer = name;
+        } else if (publisher == null) {
+          publisher = name;
+          break;
+        }
+      }
+    }
+
+    // Don't duplicate if developer == publisher
+    if (developer != null && publisher == developer) publisher = null;
+
+    return (developer: developer, publisher: publisher);
   }
+
 }
 
 class RommApiService {
@@ -268,7 +416,7 @@ class RommApiService {
     // 1. External CDN URL (fastest)
     final cover = rom.urlCover;
     if (cover != null && cover.isNotEmpty) {
-      if (cover.startsWith('http')) return cover;
+      if (cover.toLowerCase().startsWith('http')) return cover;
       return '$base$cover';
     }
 
@@ -282,7 +430,7 @@ class RommApiService {
     // 3. First screenshot as fallback cover
     if (rom.mergedScreenshots.isNotEmpty) {
       final screenshot = rom.mergedScreenshots.first;
-      if (screenshot.startsWith('http')) return screenshot;
+      if (screenshot.toLowerCase().startsWith('http')) return screenshot;
       return '$base$screenshot';
     }
 

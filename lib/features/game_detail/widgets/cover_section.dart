@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../utils/game_metadata.dart';
-import '../../../widgets/installed_indicator.dart';
 import '../../../widgets/smart_cover_image.dart';
 
 class CoverSection extends StatelessWidget {
@@ -95,18 +94,6 @@ class CoverSection extends StatelessWidget {
                       Icons.favorite,
                       size: 18,
                       color: Colors.redAccent,
-                    ),
-                  ),
-                ),
-              if (isInstalled)
-                const Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: InstalledLedStrip(
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(12),
-                      bottomRight: Radius.circular(12),
                     ),
                   ),
                 ),

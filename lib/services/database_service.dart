@@ -13,7 +13,7 @@ import '../utils/ra_name_matcher.dart';
 class DatabaseService {
   static Future<Database>? _initFuture;
   static const String _tableName = 'games';
-  static const int _dbVersion = 10;
+  static const int _dbVersion = 12;
 
   @visibleForTesting
   static Database? testDatabase;
@@ -120,9 +120,18 @@ class DatabaseService {
         summary TEXT,
         genres TEXT,
         developer TEXT,
+        publisher TEXT,
         release_year INTEGER,
+        release_date TEXT,
         game_modes TEXT,
         rating REAL,
+        franchises TEXT,
+        themes TEXT,
+        player_perspectives TEXT,
+        age_rating TEXT,
+        screenshots TEXT,
+        file_size INTEGER,
+        siblings TEXT,
         last_updated INTEGER NOT NULL,
         PRIMARY KEY (filename, system_slug)
       )
@@ -242,6 +251,32 @@ class DatabaseService {
         await txn.execute(
           'CREATE INDEX IF NOT EXISTS idx_has_thumbnail ON $_tableName (has_thumbnail)',
         );
+      });
+    }
+    if (oldVersion < 11) {
+      await db.transaction((txn) async {
+        await txn.execute(
+            'ALTER TABLE game_metadata ADD COLUMN publisher TEXT');
+        await txn.execute(
+            'ALTER TABLE game_metadata ADD COLUMN release_date TEXT');
+        await txn.execute(
+            'ALTER TABLE game_metadata ADD COLUMN franchises TEXT');
+        await txn.execute(
+            'ALTER TABLE game_metadata ADD COLUMN themes TEXT');
+        await txn.execute(
+            'ALTER TABLE game_metadata ADD COLUMN player_perspectives TEXT');
+        await txn.execute(
+            'ALTER TABLE game_metadata ADD COLUMN age_rating TEXT');
+      });
+    }
+    if (oldVersion < 12) {
+      await db.transaction((txn) async {
+        await txn.execute(
+            'ALTER TABLE game_metadata ADD COLUMN screenshots TEXT');
+        await txn.execute(
+            'ALTER TABLE game_metadata ADD COLUMN file_size INTEGER');
+        await txn.execute(
+            'ALTER TABLE game_metadata ADD COLUMN siblings TEXT');
       });
     }
   }

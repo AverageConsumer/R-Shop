@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../core/input/app_intents.dart';
 import '../../models/game_item.dart';
+import '../../models/game_metadata_info.dart';
 import '../../models/system_model.dart';
+import '../../models/ra_models.dart';
 import '../../services/database_service.dart';
 import '../../services/download_queue_manager.dart';
 import '../../services/rom_manager.dart';
@@ -25,6 +28,13 @@ class GameDetailController extends ChangeNotifier {
   GameItem get selectedVariant =>
       variants[_state.selectedIndex.clamp(0, variants.length - 1)];
   int get selectedIndex => _state.selectedIndex;
+
+  // --- Dynamic sections ---
+  List<DetailSection> _availableSections = const [DetailSection.actions];
+  List<DetailSection> get availableSections => _availableSections;
+  DetailSection get focusedSection =>
+      _availableSections[_state.focusedSectionIndex
+          .clamp(0, _availableSections.length - 1)];
 
   @override
   void dispose() {
@@ -59,11 +69,322 @@ class GameDetailController extends ChangeNotifier {
     checkInstallationStatus();
   }
 
+  /// Recomputes which sections are visible based on available metadata.
+  /// Called by the screen whenever metadata or RA match data changes.
+  void updateAvailableSections({
+    GameMetadataInfo? metadata,
+    GameMetadataFull? fileMetadata,
+    RaMatchResult? raMatch,
+  }) {
+    final sections = <DetailSection>[DetailSection.title];
+
+    final hasRichMeta = metadata != null && metadata.hasContent;
+
+    // Badges row: genres, age rating, or star rating
+    if (hasRichMeta &&
+        (metadata.genreList.isNotEmpty ||
+            metadata.ageRating != null ||
+            metadata.rating != null)) {
+      sections.add(DetailSection.badges);
+    }
+
+    // File details row (region, language, format, size — always shown)
+    sections.add(DetailSection.fileDetails);
+
+    // Summary section
+    if (hasRichMeta && metadata.summary != null) {
+      sections.add(DetailSection.summary);
+    }
+
+    // Primary action (download/delete/manage — always present)
+    sections.add(DetailSection.primaryAction);
+
+    // Icon action buttons (favorite/share/collection — always present)
+    sections.add(DetailSection.actions);
+
+    // Screenshots
+    if (hasRichMeta && metadata.screenshotUrlList.isNotEmpty) {
+      sections.add(DetailSection.screenshots);
+    }
+
+    // Other versions (real variants + unmatched siblings shown greyed out)
+    if (variants.length > 1 ||
+        (hasRichMeta && metadata.siblingList.isNotEmpty)) {
+      sections.add(DetailSection.otherVersions);
+    }
+
+    // Structured details (file tags — single ROM only, when tags exist)
+    if (variants.length == 1 &&
+        fileMetadata != null &&
+        fileMetadata.primaryTags.isNotEmpty) {
+      sections.add(DetailSection.details);
+    }
+
+    // RA Achievements
+    if (raMatch != null && raMatch.hasMatch) {
+      sections.add(DetailSection.achievements);
+    }
+
+    _availableSections = sections;
+
+    // Ensure focused index points to an interactive section
+    var focusIdx = _state.focusedSectionIndex;
+    if (focusIdx >= sections.length) {
+      focusIdx = sections.length - 1;
+    }
+    while (focusIdx >= 0 &&
+        focusIdx < sections.length &&
+        _nonInteractiveSections.contains(sections[focusIdx])) {
+      focusIdx++;
+    }
+    if (focusIdx >= sections.length) {
+      focusIdx = sections.length - 1;
+    }
+    if (focusIdx != _state.focusedSectionIndex) {
+      _state = _state.copyWith(focusedSectionIndex: focusIdx);
+    }
+  }
+
+  // --- Section navigation ---
+
+  /// When true, up/down skips left-column sections (primaryAction + actions).
+  bool skipActionsInVerticalNav = false;
+
+  // Max item counts for horizontal sections (set by clampHorizontalIndices).
+  int _screenshotMax = 0;
+  int _siblingMax = 0;
+  int _actionButtonMax = 0;
+
+  static const _leftColumnSections = {
+    DetailSection.primaryAction,
+    DetailSection.actions,
+  };
+
+  /// Sections that are display-only and should be skipped during D-pad nav.
+  /// Title is kept focusable so the user can scroll back to the top.
+  static const _nonInteractiveSections = {
+    DetailSection.badges,
+    DetailSection.fileDetails,
+  };
+
+  bool _shouldSkip(DetailSection section) {
+    if (_nonInteractiveSections.contains(section)) {
+      return true;
+    }
+    if (skipActionsInVerticalNav &&
+        _leftColumnSections.contains(section)) {
+      return true;
+    }
+    return false;
+  }
+
+  void focusPreviousSection() {
+    var idx = _state.focusedSectionIndex;
+    if (idx <= 0) return;
+    idx--;
+    while (idx >= 0 && _shouldSkip(_availableSections[idx])) {
+      idx--;
+    }
+    if (idx >= 0) {
+      _state = _state.copyWith(focusedSectionIndex: idx);
+      notifyListeners();
+    }
+  }
+
+  void focusNextSection() {
+    var idx = _state.focusedSectionIndex;
+    if (idx >= _availableSections.length - 1) return;
+    idx++;
+    while (idx < _availableSections.length &&
+        _shouldSkip(_availableSections[idx])) {
+      idx++;
+    }
+    if (idx < _availableSections.length) {
+      _state = _state.copyWith(focusedSectionIndex: idx);
+      notifyListeners();
+    }
+  }
+
+  void focusSection(DetailSection section) {
+    final idx = _availableSections.indexOf(section);
+    if (idx >= 0) {
+      _state = _state.copyWith(focusedSectionIndex: idx);
+      notifyListeners();
+    }
+  }
+
+  /// Handles left/right navigation within a horizontal section.
+  /// Returns true if the input was consumed.
+  bool navigateInSection(GridDirection direction) {
+    final section = focusedSection;
+
+    if (direction == GridDirection.left || direction == GridDirection.right) {
+      final delta = direction == GridDirection.right ? 1 : -1;
+
+      switch (section) {
+        case DetailSection.screenshots:
+          final newIdx = _state.screenshotIndex + delta;
+          if (newIdx >= 0 && (_screenshotMax == 0 || newIdx < _screenshotMax)) {
+            _state = _state.copyWith(screenshotIndex: newIdx);
+            notifyListeners();
+            return true;
+          }
+          return false;
+
+        case DetailSection.otherVersions:
+          final newIdx = _state.siblingIndex + delta;
+          if (newIdx >= 0 && (_siblingMax == 0 || newIdx < _siblingMax)) {
+            _state = _state.copyWith(siblingIndex: newIdx);
+            notifyListeners();
+            return true;
+          }
+          return false;
+
+        case DetailSection.actions:
+          final newIdx = _state.actionButtonIndex + delta;
+          if (newIdx >= 0 && (_actionButtonMax == 0 || newIdx < _actionButtonMax)) {
+            _state = _state.copyWith(actionButtonIndex: newIdx);
+            notifyListeners();
+            return true;
+          }
+          return false;
+
+        default:
+          return false;
+      }
+    }
+
+    return false;
+  }
+
+  /// Cross-column navigation for landscape layout.
+  /// LEFT from any right-column section → jump to primaryAction (left column).
+  /// RIGHT from left-column section → jump back to last right-column section.
+  /// UP/DOWN within left column → navigate between primaryAction ↔ actions.
+  /// Returns true if navigation was consumed.
+  bool navigateCrossColumn(GridDirection direction) {
+    final section = focusedSection;
+    final isInLeftColumn = _leftColumnSections.contains(section);
+
+    // LEFT from right column → jump to primaryAction in left column
+    if (direction == GridDirection.left && !isInLeftColumn) {
+      final targetIdx =
+          _availableSections.indexOf(DetailSection.primaryAction);
+      if (targetIdx < 0) return false;
+      _state = _state.copyWith(
+        lastRightSectionIndex: _state.focusedSectionIndex,
+        focusedSectionIndex: targetIdx,
+      );
+      notifyListeners();
+      return true;
+    }
+
+    // RIGHT from left column → jump back to last right section
+    if (direction == GridDirection.right && isInLeftColumn) {
+      final targetIdx = _state.lastRightSectionIndex ??
+          _availableSections
+              .indexWhere((s) => !_leftColumnSections.contains(s));
+      if (targetIdx >= 0 && targetIdx < _availableSections.length) {
+        _state = _state.copyWith(
+          focusedSectionIndex: targetIdx,
+          clearLastRightSection: true,
+        );
+        notifyListeners();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// UP/DOWN navigation within the left column (primaryAction ↔ actions).
+  /// Returns true if consumed.
+  bool navigateLeftColumn(GridDirection direction) {
+    final section = focusedSection;
+    if (!_leftColumnSections.contains(section)) return false;
+
+    if (direction == GridDirection.up &&
+        section == DetailSection.actions) {
+      final idx = _availableSections.indexOf(DetailSection.primaryAction);
+      if (idx >= 0) {
+        _state = _state.copyWith(focusedSectionIndex: idx);
+        notifyListeners();
+        return true;
+      }
+    }
+
+    if (direction == GridDirection.down &&
+        section == DetailSection.primaryAction) {
+      final idx = _availableSections.indexOf(DetailSection.actions);
+      if (idx >= 0) {
+        _state = _state.copyWith(focusedSectionIndex: idx);
+        notifyListeners();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// Clamp horizontal indices to actual item counts (called by screen
+  /// after it knows screenshot/sibling counts).
+  void clampHorizontalIndices({
+    int screenshotCount = 0,
+    int siblingCount = 0,
+    int actionButtonCount = 0,
+  }) {
+    _screenshotMax = screenshotCount;
+    _siblingMax = siblingCount;
+    _actionButtonMax = actionButtonCount;
+
+    var changed = false;
+    var si = _state.screenshotIndex;
+    var sib = _state.siblingIndex;
+    var ab = _state.actionButtonIndex;
+
+    if (screenshotCount > 0 && si >= screenshotCount) {
+      si = screenshotCount - 1;
+      changed = true;
+    }
+    if (siblingCount > 0 && sib >= siblingCount) {
+      sib = siblingCount - 1;
+      changed = true;
+    }
+    if (actionButtonCount > 0 && ab >= actionButtonCount) {
+      ab = actionButtonCount - 1;
+      changed = true;
+    }
+
+    if (changed) {
+      _state = _state.copyWith(
+        screenshotIndex: si,
+        siblingIndex: sib,
+        actionButtonIndex: ab,
+      );
+      // Don't notify — this is typically called during build
+    }
+  }
+
+  void toggleSummaryExpanded() {
+    _state = _state.copyWith(summaryExpanded: !_state.summaryExpanded);
+    notifyListeners();
+  }
+
+  void openScreenshotViewer() {
+    _state = _state.copyWith(activeOverlay: ActiveOverlay.screenshotViewer);
+    notifyListeners();
+  }
+
+  void closeScreenshotViewer() {
+    _state = _state.copyWith(activeOverlay: ActiveOverlay.none);
+    notifyListeners();
+  }
+
   void selectVariant(int index) {
     if (index >= 0 && index < variants.length) {
       _state = _state.copyWith(
         selectedIndex: index,
-        activeOverlay: _state.activeOverlay == ActiveOverlay.tagInfo
+        activeOverlay: _state.activeOverlay == ActiveOverlay.gameInfo
             ? ActiveOverlay.none
             : null,
       );
@@ -158,24 +479,12 @@ class GameDetailController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleTagInfo() {
-    _state = _state.copyWith(
-      activeOverlay: _state.showTagInfo ? ActiveOverlay.none : ActiveOverlay.tagInfo,
-    );
+  void openGameInfo() {
+    _state = _state.copyWith(activeOverlay: ActiveOverlay.gameInfo);
     notifyListeners();
   }
 
-  void closeTagInfo() {
-    _state = _state.copyWith(activeOverlay: ActiveOverlay.none);
-    notifyListeners();
-  }
-
-  void openDescription() {
-    _state = _state.copyWith(activeOverlay: ActiveOverlay.description);
-    notifyListeners();
-  }
-
-  void closeDescription() {
+  void closeGameInfo() {
     _state = _state.copyWith(activeOverlay: ActiveOverlay.none);
     notifyListeners();
   }

@@ -10,6 +10,7 @@ class GameListHeader extends ConsumerWidget {
   final int gameCount;
   final bool hasActiveFilters;
   final bool isLocalOnly;
+  final bool isOffline;
   final String targetFolder;
 
   const GameListHeader({
@@ -18,6 +19,7 @@ class GameListHeader extends ConsumerWidget {
     required this.gameCount,
     this.hasActiveFilters = false,
     this.isLocalOnly = false,
+    this.isOffline = false,
     this.targetFolder = '',
   });
 
@@ -157,6 +159,8 @@ class GameListHeader extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    if (isOffline)
+                      _OfflineBadge(rs: rs),
                     if (targetFolder.isNotEmpty)
                       _StorageBadge(
                         targetFolder: targetFolder,
@@ -208,6 +212,51 @@ class GameListHeader extends ConsumerWidget {
       }
     }
     return path;
+  }
+}
+
+class _OfflineBadge extends StatelessWidget {
+  final Responsive rs;
+
+  const _OfflineBadge({required this.rs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: rs.isSmall ? 8 : 10,
+          vertical: rs.isSmall ? 3 : 5,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(rs.isSmall ? 10 : 14),
+          border: Border.all(
+            color: Colors.orange.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.cloud_off_rounded,
+              size: rs.isSmall ? 10 : 12,
+              color: Colors.orange,
+            ),
+            SizedBox(width: rs.isSmall ? 3 : 5),
+            Text(
+              'Offline',
+              style: TextStyle(
+                fontSize: rs.isSmall ? 9 : 11,
+                fontWeight: FontWeight.w500,
+                color: Colors.orange,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

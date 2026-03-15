@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:retro_eshop/models/config/provider_config.dart';
+import 'package:retro_eshop/models/game_metadata_info.dart';
 import 'package:retro_eshop/services/romm_api_service.dart';
 
 // ─── Test doubles ────────────────────────────────────────
@@ -276,7 +277,7 @@ void main() {
 
   // ═══════════════════════════════════════════════════════
   group('RommRom.fromJson — metadata fields', () {
-    test('parses summary field', () {
+    test('parses summary field (top-level)', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
@@ -288,147 +289,148 @@ void main() {
       expect(r.summary, 'A great platformer game.');
     });
 
-    test('parses genres as list of strings', () {
+    test('parses genres from metadatum as list of strings', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
         'file_name': 'test.rom',
         'platform_id': 1,
-        'genres': ['Platformer', 'Action'],
+        'metadatum': {
+          'genres': ['Platformer', 'Action'],
+        },
       });
 
       expect(r.genres, 'Platformer, Action');
     });
 
-    test('parses genres as list of maps with name key', () {
+    test('parses genres from metadatum as list of maps', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
         'file_name': 'test.rom',
         'platform_id': 1,
-        'genres': [
-          {'name': 'RPG'},
-          {'name': 'Strategy'},
-        ],
+        'metadatum': {
+          'genres': [
+            {'name': 'RPG'},
+            {'name': 'Strategy'},
+          ],
+        },
       });
 
       expect(r.genres, 'RPG, Strategy');
     });
 
-    test('genres null for empty list', () {
+    test('genres null for empty list in metadatum', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
         'file_name': 'test.rom',
         'platform_id': 1,
-        'genres': [],
+        'metadatum': {'genres': []},
       });
 
       expect(r.genres, isNull);
     });
 
-    test('parses companies — takes first entry', () {
+    test('parses companies from metadatum — positional assignment', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
         'file_name': 'test.rom',
         'platform_id': 1,
-        'companies': [
-          {'name': 'Nintendo'},
-          {'name': 'HAL Laboratory'},
-        ],
+        'metadatum': {
+          'companies': ['Nintendo', 'HAL Laboratory'],
+        },
       });
 
       expect(r.developer, 'Nintendo');
+      expect(r.publisher, 'HAL Laboratory');
     });
 
-    test('parses companies as list of strings', () {
+    test('prefers igdb_metadata companies with role flags', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
         'file_name': 'test.rom',
         'platform_id': 1,
-        'companies': ['Capcom'],
+        'metadatum': {
+          'companies': ['Capcom'],
+        },
+        'igdb_metadata': {
+          'companies': [
+            {'name': 'Rare', 'developer': true, 'publisher': false},
+            {'name': 'Nintendo', 'developer': false, 'publisher': true},
+          ],
+        },
       });
 
-      expect(r.developer, 'Capcom');
+      expect(r.developer, 'Rare');
+      expect(r.publisher, 'Nintendo');
     });
 
-    test('developer null for empty companies', () {
+    test('developer null for empty companies in metadatum', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
         'file_name': 'test.rom',
         'platform_id': 1,
-        'companies': [],
+        'metadatum': {'companies': []},
       });
 
       expect(r.developer, isNull);
     });
 
-    test('parses first_release_date', () {
+    test('parses first_release_date from metadatum', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
         'file_name': 'test.rom',
         'platform_id': 1,
-        'first_release_date': 599616000,
+        'metadatum': {'first_release_date': 599616000},
       });
 
       expect(r.firstReleaseDate, 599616000);
     });
 
-    test('parses game_modes as list of strings', () {
+    test('parses game_modes from metadatum', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
         'file_name': 'test.rom',
         'platform_id': 1,
-        'game_modes': ['Single Player', 'Co-op'],
+        'metadatum': {
+          'game_modes': ['Single Player', 'Co-op'],
+        },
       });
 
       expect(r.gameModes, 'Single Player, Co-op');
     });
 
-    test('parses game_modes as list of maps', () {
+    test('parses average_rating from metadatum', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
         'file_name': 'test.rom',
         'platform_id': 1,
-        'game_modes': [
-          {'name': 'Multiplayer'},
-        ],
-      });
-
-      expect(r.gameModes, 'Multiplayer');
-    });
-
-    test('parses average_rating as double', () {
-      final r = RommRom.fromJson({
-        'id': 1,
-        'name': 'Test',
-        'file_name': 'test.rom',
-        'platform_id': 1,
-        'average_rating': 85.5,
+        'metadatum': {'average_rating': 85.5},
       });
 
       expect(r.averageRating, 85.5);
     });
 
-    test('parses average_rating from int', () {
+    test('parses average_rating from int in metadatum', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
         'file_name': 'test.rom',
         'platform_id': 1,
-        'average_rating': 90,
+        'metadatum': {'average_rating': 90},
       });
 
       expect(r.averageRating, 90.0);
     });
 
-    test('all metadata fields null when absent', () {
+    test('all metadata fields null when no metadatum/igdb_metadata', () {
       final r = RommRom.fromJson({
         'id': 1,
         'name': 'Test',
@@ -439,12 +441,17 @@ void main() {
       expect(r.summary, isNull);
       expect(r.genres, isNull);
       expect(r.developer, isNull);
+      expect(r.publisher, isNull);
       expect(r.firstReleaseDate, isNull);
       expect(r.gameModes, isNull);
       expect(r.averageRating, isNull);
+      expect(r.franchises, isNull);
+      expect(r.themes, isNull);
+      expect(r.playerPerspectives, isNull);
+      expect(r.ageRatings, isNull);
     });
 
-    test('full metadata round-trip', () {
+    test('full metadata round-trip with metadatum and igdb_metadata', () {
       final r = RommRom.fromJson({
         'id': 99,
         'name': 'Zelda',
@@ -452,11 +459,19 @@ void main() {
         'platform_id': 4,
         'url_cover': 'https://images.igdb.com/cover.png',
         'summary': 'An epic adventure.',
-        'genres': [{'name': 'Action'}, {'name': 'Adventure'}],
-        'companies': [{'name': 'Nintendo EAD'}],
-        'first_release_date': 690768000,
-        'game_modes': ['Single Player'],
-        'average_rating': 95.2,
+        'metadatum': {
+          'genres': ['Action', 'Adventure'],
+          'companies': ['Nintendo EAD'],
+          'first_release_date': 690768000,
+          'game_modes': ['Single Player'],
+          'average_rating': 95.2,
+          'franchises': ['The Legend of Zelda'],
+          'age_ratings': ['ESRB: E'],
+        },
+        'igdb_metadata': {
+          'themes': [{'name': 'Fantasy'}, {'name': 'Open World'}],
+          'player_perspectives': [{'name': 'Third person'}],
+        },
       });
 
       expect(r.summary, 'An epic adventure.');
@@ -465,6 +480,130 @@ void main() {
       expect(r.firstReleaseDate, 690768000);
       expect(r.gameModes, 'Single Player');
       expect(r.averageRating, 95.2);
+      expect(r.franchises, 'The Legend of Zelda');
+      expect(r.themes, 'Fantasy, Open World');
+      expect(r.playerPerspectives, 'Third person');
+      expect(r.ageRatings, 'ESRB: E');
+    });
+
+    // ── Nested metadata field tests ──
+
+    test('parses franchises from metadatum', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'metadatum': {
+          'franchises': ['Mario', 'Nintendo'],
+        },
+      });
+      expect(r.franchises, 'Mario, Nintendo');
+    });
+
+    test('parses themes from igdb_metadata', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'igdb_metadata': {
+          'themes': [{'name': 'Fantasy'}, {'name': 'Action'}],
+        },
+      });
+      expect(r.themes, 'Fantasy, Action');
+    });
+
+    test('parses player_perspectives from igdb_metadata', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'igdb_metadata': {
+          'player_perspectives': [{'name': 'Third person'}, {'name': 'Top-down'}],
+        },
+      });
+      expect(r.playerPerspectives, 'Third person, Top-down');
+    });
+
+    test('igdb_metadata companies preferred over metadatum for role flags', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'metadatum': {
+          'companies': ['Squaresoft', 'Nintendo'],
+        },
+        'igdb_metadata': {
+          'companies': [
+            {'name': 'Rare', 'developer': true, 'publisher': false},
+            {'name': 'Nintendo', 'developer': false, 'publisher': true},
+          ],
+        },
+      });
+      expect(r.developer, 'Rare');
+      expect(r.publisher, 'Nintendo');
+    });
+
+    test('falls back to metadatum companies when igdb_metadata missing', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'metadatum': {
+          'companies': ['Squaresoft', 'Nintendo'],
+        },
+      });
+      expect(r.developer, 'Squaresoft');
+      expect(r.publisher, 'Nintendo');
+    });
+
+    test('publisher null when same as developer', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'igdb_metadata': {
+          'companies': [
+            {'name': 'Nintendo', 'developer': true, 'publisher': true},
+          ],
+        },
+      });
+      expect(r.developer, 'Nintendo');
+      expect(r.publisher, isNull);
+    });
+
+    test('single company in metadatum gives developer only', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'metadatum': {
+          'companies': ['Capcom'],
+        },
+      });
+      expect(r.developer, 'Capcom');
+      expect(r.publisher, isNull);
+    });
+
+    test('parses pre-formatted age_ratings from metadatum', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'metadatum': {
+          'age_ratings': ['ESRB: T'],
+        },
+      });
+      expect(r.ageRatings, 'ESRB: T');
+    });
+
+    test('age_ratings null for empty list in metadatum', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'metadatum': {'age_ratings': []},
+      });
+      expect(r.ageRatings, isNull);
+    });
+
+    test('malformed metadatum/igdb_metadata fields do not crash', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'metadatum': {
+          'franchises': 'not a list',
+          'age_ratings': 'invalid',
+        },
+        'igdb_metadata': {
+          'themes': 42,
+          'player_perspectives': null,
+        },
+      });
+      expect(r.franchises, isNull);
+      expect(r.themes, isNull);
+      expect(r.playerPerspectives, isNull);
+      expect(r.ageRatings, isNull);
     });
   });
 
@@ -915,6 +1054,186 @@ void main() {
 
       final url = service.buildRomDownloadUrl('https://romm.local///', rom);
       expect(url, startsWith('https://romm.local/api/'));
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════
+  group('RommRom.fromJson — file size and siblings', () {
+    test('parses fs_size_bytes', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'fs_size_bytes': 268435456,
+      });
+      expect(r.fileSizeBytes, 268435456);
+    });
+
+    test('fileSizeBytes is null when missing', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+      });
+      expect(r.fileSizeBytes, isNull);
+    });
+
+    test('parses siblings list', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'siblings': [
+          {'id': 20735, 'name': 'Game A', 'fs_name_no_ext': 'Game A (France)'},
+          {'id': 20748, 'name': 'Game B', 'fs_name_no_ext': 'Game B (USA)'},
+        ],
+      });
+      expect(r.siblings, hasLength(2));
+      expect(r.siblings[0].id, 20735);
+      expect(r.siblings[0].name, 'Game A');
+      expect(r.siblings[0].fsNameNoExt, 'Game A (France)');
+      expect(r.siblings[1].id, 20748);
+      expect(r.siblings[1].fsNameNoExt, 'Game B (USA)');
+    });
+
+    test('siblings empty when missing', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+      });
+      expect(r.siblings, isEmpty);
+    });
+
+    test('siblings empty for empty list', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'siblings': [],
+      });
+      expect(r.siblings, isEmpty);
+    });
+
+    test('siblings handles malformed entries gracefully', () {
+      final r = RommRom.fromJson({
+        'id': 1, 'name': 'T', 'file_name': 't.rom', 'platform_id': 1,
+        'siblings': ['not a map', 42, {'id': 5, 'name': 'Valid'}],
+      });
+      expect(r.siblings, hasLength(1));
+      expect(r.siblings[0].name, 'Valid');
+    });
+
+    test('RommSibling.toJson round-trips', () {
+      const sibling = RommSibling(
+        id: 42,
+        name: 'Test Game',
+        fsNameNoExt: 'Test Game (USA)',
+      );
+      final json = sibling.toJson();
+      final restored = RommSibling.fromJson(json);
+      expect(restored.id, 42);
+      expect(restored.name, 'Test Game');
+      expect(restored.fsNameNoExt, 'Test Game (USA)');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════
+  group('GameMetadataInfo — new fields', () {
+    test('screenshotUrlList splits comma-separated URLs', () {
+      const meta = GameMetadataInfo(
+        filename: 'test.rom',
+        systemSlug: 'nds',
+        screenshots: 'https://a.com/1.jpg,https://a.com/2.jpg,https://a.com/3.jpg',
+        lastUpdated: 0,
+      );
+      expect(meta.screenshotUrlList, hasLength(3));
+      expect(meta.screenshotUrlList[0], 'https://a.com/1.jpg');
+      expect(meta.screenshotUrlList[2], 'https://a.com/3.jpg');
+    });
+
+    test('screenshotUrlList returns empty for null', () {
+      const meta = GameMetadataInfo(
+        filename: 'test.rom',
+        systemSlug: 'nds',
+        lastUpdated: 0,
+      );
+      expect(meta.screenshotUrlList, isEmpty);
+    });
+
+    test('siblingList parses JSON array', () {
+      const meta = GameMetadataInfo(
+        filename: 'test.rom',
+        systemSlug: 'nds',
+        siblings: '[{"name":"Game A","filename":"Game A (France)"},{"name":"Game B"}]',
+        lastUpdated: 0,
+      );
+      final siblings = meta.siblingList;
+      expect(siblings, hasLength(2));
+      expect(siblings[0].name, 'Game A');
+      expect(siblings[0].filename, 'Game A (France)');
+      expect(siblings[1].name, 'Game B');
+      expect(siblings[1].filename, isNull);
+    });
+
+    test('siblingList returns empty for null', () {
+      const meta = GameMetadataInfo(
+        filename: 'test.rom',
+        systemSlug: 'nds',
+        lastUpdated: 0,
+      );
+      expect(meta.siblingList, isEmpty);
+    });
+
+    test('siblingList returns empty for malformed JSON', () {
+      const meta = GameMetadataInfo(
+        filename: 'test.rom',
+        systemSlug: 'nds',
+        siblings: 'not json',
+        lastUpdated: 0,
+      );
+      expect(meta.siblingList, isEmpty);
+    });
+
+    test('formattedFileSize formats bytes correctly', () {
+      const kb = GameMetadataInfo(
+        filename: 'a', systemSlug: 'b', fileSizeBytes: 512, lastUpdated: 0,
+      );
+      expect(kb.formattedFileSize, '512 B');
+
+      const mb = GameMetadataInfo(
+        filename: 'a', systemSlug: 'b', fileSizeBytes: 268435456, lastUpdated: 0,
+      );
+      expect(mb.formattedFileSize, '256.0 MB');
+
+      const gb = GameMetadataInfo(
+        filename: 'a', systemSlug: 'b', fileSizeBytes: 4294967296, lastUpdated: 0,
+      );
+      expect(gb.formattedFileSize, '4.00 GB');
+    });
+
+    test('formattedFileSize returns null when no size', () {
+      const meta = GameMetadataInfo(
+        filename: 'a', systemSlug: 'b', lastUpdated: 0,
+      );
+      expect(meta.formattedFileSize, isNull);
+    });
+
+    test('toDbRow/fromDbRow round-trips new fields', () {
+      const original = GameMetadataInfo(
+        filename: 'test.rom',
+        systemSlug: 'nds',
+        screenshots: 'https://a.com/1.jpg,https://a.com/2.jpg',
+        fileSizeBytes: 268435456,
+        siblings: '[{"name":"Sibling"}]',
+        lastUpdated: 1234567890,
+      );
+      final row = original.toDbRow();
+      final restored = GameMetadataInfo.fromDbRow(row);
+      expect(restored.screenshots, original.screenshots);
+      expect(restored.fileSizeBytes, original.fileSizeBytes);
+      expect(restored.siblings, original.siblings);
+      expect(restored.screenshotUrlList, hasLength(2));
+      expect(restored.siblingList, hasLength(1));
+    });
+
+    test('hasContent is true when screenshots present', () {
+      const meta = GameMetadataInfo(
+        filename: 'a', systemSlug: 'b',
+        screenshots: 'https://a.com/1.jpg',
+        lastUpdated: 0,
+      );
+      expect(meta.hasContent, isTrue);
     });
   });
 }

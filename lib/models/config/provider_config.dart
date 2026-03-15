@@ -190,15 +190,42 @@ class ProviderConfig {
       switch (type) {
         case ProviderType.web:
         case ProviderType.romm:
-          if (p.url == url) return p;
+          if (_normalizeUrl(p.url) == _normalizeUrl(url)) return p;
         case ProviderType.smb:
-          if (p.host == host && p.share == share) return p;
+          if (p.host?.toLowerCase() == host?.toLowerCase() &&
+              p.share == share) {
+            return p;
+          }
         case ProviderType.ftp:
-          if (p.host == host) return p;
+          if (p.host?.toLowerCase() == host?.toLowerCase()) {
+            return p;
+          }
       }
     }
     return null;
   }
+
+  /// Normalizes a URL for comparison: lowercase scheme/host, strip trailing
+  /// slashes. Prevents auth rehydration failures from cosmetic URL differences.
+  static String? _normalizeUrl(String? rawUrl) {
+    if (rawUrl == null) return null;
+    final uri = Uri.tryParse(rawUrl.trim());
+    if (uri == null) return rawUrl.trim().toLowerCase();
+    // Rebuild with lowercase scheme + host, preserving path/port
+    final scheme = uri.scheme.toLowerCase();
+    final host = uri.host.toLowerCase();
+    final port = uri.hasPort && uri.port != _defaultPort(scheme)
+        ? ':${uri.port}'
+        : '';
+    var path = uri.path;
+    while (path.endsWith('/')) {
+      path = path.substring(0, path.length - 1);
+    }
+    return '$scheme://$host$port$path';
+  }
+
+  static int _defaultPort(String scheme) =>
+      scheme == 'https' ? 443 : 80;
 
   ProviderConfig copyWith({
     ProviderType? type,

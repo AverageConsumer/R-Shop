@@ -321,6 +321,7 @@ class DownloadService {
 
       await _handlePostDownload(game, tempFile, targetFolder, system, autoExtract: autoExtract);
     } catch (e) {
+      debugPrint('DownloadService: download failed: $e');
       if (!_isCancelled && _progressController?.isClosed == false) {
         _progressController?.add(DownloadProgress(
           status: DownloadStatus.error,

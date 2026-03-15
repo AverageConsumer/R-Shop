@@ -466,7 +466,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       if (_canAddToShelf())
         QuickMenuItem(
           label: 'Add to Shelf',
-          icon: Icons.playlist_add_rounded,
+          icon: Icons.shelves,
           onSelect: _handleAddToShelf,
         ),
       QuickMenuItem(
@@ -638,6 +638,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
           gameCount: state.filteredGroups.length,
           hasActiveFilters: state.activeFilters.isNotEmpty,
           isLocalOnly: state.isLocalOnly,
+          isOffline: state.isOffline,
           targetFolder: widget.targetFolder,
         ),
       ],

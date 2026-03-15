@@ -31,6 +31,7 @@ class GameListState {
   final List<FilterOption> availableLanguages;
   final Map<String, List<GameItem>> filteredGroupedGames;
   final bool isLocalOnly;
+  final bool isOffline;
 
   const GameListState({
     this.allGames = const [],
@@ -48,6 +49,7 @@ class GameListState {
     this.availableLanguages = const [],
     this.filteredGroupedGames = const {},
     this.isLocalOnly = false,
+    this.isOffline = false,
   });
 
   GameListState copyWith({
@@ -66,6 +68,7 @@ class GameListState {
     List<FilterOption>? availableLanguages,
     Map<String, List<GameItem>>? filteredGroupedGames,
     bool? isLocalOnly,
+    bool? isOffline,
   }) {
     return GameListState(
       allGames: allGames ?? this.allGames,
@@ -83,6 +86,7 @@ class GameListState {
       availableLanguages: availableLanguages ?? this.availableLanguages,
       filteredGroupedGames: filteredGroupedGames ?? this.filteredGroupedGames,
       isLocalOnly: isLocalOnly ?? this.isLocalOnly,
+      isOffline: isOffline ?? this.isOffline,
     );
   }
 }
@@ -168,7 +172,7 @@ class GameListController extends ChangeNotifier {
       // No cache or forced refresh — fetch from source
       await _fetchFromSource();
     } catch (e) {
-      _state = _state.copyWith(error: getUserFriendlyError(e), isLoading: false);
+      _state = _state.copyWith(error: getUserFriendlyError(e), isLoading: false, isOffline: true);
       notifyListeners();
     }
   }
@@ -177,7 +181,7 @@ class GameListController extends ChangeNotifier {
     final remoteGames = await _unifiedService.fetchGamesForSystem(systemConfig);
     final localGames = await RomManager.scanLocalGames(system, targetFolder);
     final games = GameMergeHelper.merge(remoteGames, localGames, system);
-    _state = _state.copyWith(allGames: games, isLocalOnly: false);
+    _state = _state.copyWith(allGames: games, isLocalOnly: false, isOffline: false);
     _groupGames();
     _restoreFilters();
     _resolveInstalledStatus();
@@ -203,8 +207,14 @@ class GameListController extends ChangeNotifier {
         _resolveInstalledStatus();
       }
       _databaseService.saveGames(system.id, games, deleteOrphans: true);
+      if (_state.isOffline) {
+        _state = _state.copyWith(isOffline: false);
+        notifyListeners();
+      }
     } catch (e) {
       debugPrint('Background refresh failed for ${system.id}: $e');
+      _state = _state.copyWith(isOffline: true);
+      notifyListeners();
     }
   }
 
