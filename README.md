@@ -64,8 +64,11 @@ It bridges the gap between your self-hosted storage (**RomM, SMB, FTP, Web**) an
   <img src="screenshots/rom_list.png" width="400" alt="ROM List" />
 </p>
 <p align="center">
-  <img src="screenshots/smb_setup.png" width="400" alt="SMB Network Setup" />
+  <img src="screenshots/detail_screen.png" width="400" alt="Game Detail Screen" />
   <img src="screenshots/download_queue.png" width="400" alt="Download Queue" />
+</p>
+<p align="center">
+  <img src="screenshots/smb_setup.png" width="400" alt="SMB Network Setup" />
 </p>
 
 ---
