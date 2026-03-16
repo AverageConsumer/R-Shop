@@ -153,7 +153,7 @@ class GameListController extends ChangeNotifier {
         _groupGames();
         _restoreFilters();
         _resolveInstalledStatus();
-        _databaseService.saveGames(system.id, _state.allGames, forceDeleteOrphans: true);
+        await _databaseService.saveGames(system.id, _state.allGames, forceDeleteOrphans: true);
         onGamesSaved?.call();
         return;
       }
