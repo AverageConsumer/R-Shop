@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.5.1] — 2026-03-16
+
+### Improved
+- **Detail screen focus visibility** — focus indicators now use white borders and glow instead of accent-color-only styling, ensuring clear visibility regardless of system theme color
+- **Correct focus tracking** — sub-widgets (primary button, icon buttons, screenshots, version cards) only show focus highlight when their section is actually focused; eliminates phantom focus on multiple elements simultaneously
+- **Action buttons anchored** — Download/Delete and Favorite/Share/Shelf buttons are now anchored to the bottom of the left column in landscape, consistent across all detail views
+- **Variant picker redesign** — compact tag pills with region flags, marquee-scrolling filenames for long ROM names, wider overlay (55% screen width), D-pad left/right blocked to prevent focus leak
+- **Other Versions section** — now shows only RomM/IGDB siblings instead of duplicating local variants already visible in the variant picker
+- **Universal 4:3 and 16:9 layout** — replaced hardcoded pixel constraints with screen-relative `clamp()` values across 9 overlay/dialog widgets to prevent overflow on narrow screens and wasted space on wide ones
+- **MarqueeText widget** — new shared ticker-scroll widget for long text in version cards and sibling entries; scrolls when focused, static ellipsis otherwise
+
+### Fixed
+- **Variant picker focus restore** — returning from the download queue while the variant picker is open now correctly restores D-pad focus to the picker
+- **Icon button resize on focus** — removed text labels from Favorite/Share/Shelf buttons that caused multi-line wrapping on 4:3 screens
+- **LanguageBadges overflow** — removed language flags from version cards that caused RenderFlex overflow in tight layouts
+
+### Internal
+- Extracted `MarqueeText` to `lib/widgets/marquee_text.dart` for reuse across variant picker and sibling section
+- `isSectionFocused` parameter threaded through `ActionButtonsRow`, `ScreenshotsCarousel`, `OtherVersionsSection`
+- Detail screen `_buildPrimaryActionSection` and `_buildIconButtonsSection` now receive `isFocused` from parent
+
+---
+
 ## [1.5.0] — 2026-03-15
 
 ### Added
