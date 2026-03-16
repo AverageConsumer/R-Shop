@@ -222,7 +222,7 @@ class _QuickMenuOverlayState extends ConsumerState<QuickMenuOverlay>
       child: GestureDetector(
         onTap: () {}, // Block tap-through to backdrop
         child: Container(
-          width: rs.isSmall ? 220 : 260,
+          width: (rs.isSmall ? 220.0 : 260.0).clamp(0, rs.screenWidth * 0.45),
           decoration: BoxDecoration(
             color: const Color(0xFF1A1A1A),
             borderRadius: BorderRadius.circular(rs.radius.lg),

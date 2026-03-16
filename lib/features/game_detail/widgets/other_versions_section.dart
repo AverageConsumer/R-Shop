@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../models/game_item.dart';
 import '../../../models/game_metadata_info.dart';
+import '../../../widgets/marquee_text.dart';
 import 'section_header.dart';
 
 enum _VersionStatus { installed, available, notFound }
@@ -10,12 +11,10 @@ enum _VersionStatus { installed, available, notFound }
 class _VersionEntry {
   final String name;
   final _VersionStatus status;
-  final int? variantIndex; // non-null for real variants
 
   const _VersionEntry({
     required this.name,
     required this.status,
-    this.variantIndex,
   });
 }
 
@@ -24,6 +23,7 @@ class OtherVersionsSection extends StatefulWidget {
   final List<GameItem> variants;
   final bool isMultiRom;
   final int focusedIndex;
+  final bool isSectionFocused;
   final Map<int, bool> installedStatus;
   final Color accentColor;
 
@@ -33,22 +33,17 @@ class OtherVersionsSection extends StatefulWidget {
     required this.variants,
     required this.isMultiRom,
     required this.focusedIndex,
+    this.isSectionFocused = false,
     required this.installedStatus,
     required this.accentColor,
   });
 
-  /// Total number of entries (variants + unmatched siblings).
+  /// Total number of sibling entries from RomM/IGDB.
   static int entryCount({
     required List<GameItem> variants,
     required List<SiblingInfo> siblings,
   }) {
-    final variantNames = variants
-        .map((v) => v.displayName.toLowerCase())
-        .toSet();
-    final unmatchedCount = siblings
-        .where((s) => !variantNames.contains(s.name.toLowerCase()))
-        .length;
-    return variants.length + unmatchedCount;
+    return siblings.length;
   }
 
   @override
@@ -84,28 +79,13 @@ class _OtherVersionsSectionState extends State<OtherVersionsSection> {
 
   List<_VersionEntry> _buildEntries() {
     final entries = <_VersionEntry>[];
-    final variantNames = <String>{};
 
-    // Real variants first
-    for (var i = 0; i < widget.variants.length; i++) {
-      final v = widget.variants[i];
-      variantNames.add(v.displayName.toLowerCase());
-      final isInstalled = widget.installedStatus[i] ?? false;
-      entries.add(_VersionEntry(
-        name: v.displayName,
-        status: isInstalled ? _VersionStatus.installed : _VersionStatus.available,
-        variantIndex: i,
-      ));
-    }
-
-    // Unmatched siblings after
+    // Only show RomM/IGDB siblings — real variants are handled by the variant picker
     for (final s in widget.siblings) {
-      if (!variantNames.contains(s.name.toLowerCase())) {
-        entries.add(_VersionEntry(
-          name: s.name,
-          status: _VersionStatus.notFound,
-        ));
-      }
+      entries.add(_VersionEntry(
+        name: s.name,
+        status: _VersionStatus.notFound,
+      ));
     }
 
     return entries;
@@ -131,7 +111,7 @@ class _OtherVersionsSectionState extends State<OtherVersionsSection> {
             separatorBuilder: (_, __) => SizedBox(width: rs.spacing.sm),
             itemBuilder: (context, index) {
               final entry = entries[index];
-              final isFocused = index == clampedIdx;
+              final isFocused = widget.isSectionFocused && index == clampedIdx;
               return _buildItem(rs, entry, isFocused, index);
             },
           ),
@@ -174,9 +154,12 @@ class _OtherVersionsSectionState extends State<OtherVersionsSection> {
         subtitle = 'Not found';
     }
 
+    final cardWidth = rs.isSmall ? 140.0 : 170.0;
+
     return AnimatedContainer(
       key: _keyFor(index),
       duration: const Duration(milliseconds: 150),
+      width: cardWidth,
       padding: EdgeInsets.symmetric(
         horizontal: rs.isSmall ? 10 : 14,
         vertical: rs.isSmall ? 6 : 8,
@@ -193,15 +176,14 @@ class _OtherVersionsSectionState extends State<OtherVersionsSection> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            entry.name,
+          MarqueeText(
+            text: entry.name,
+            animate: isFocused,
             style: TextStyle(
               color: textColor,
               fontSize: rs.isSmall ? 11 : 13,
               fontWeight: FontWeight.w600,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
           if (subtitle != null) ...[
             const SizedBox(height: 2),

@@ -11,6 +11,7 @@ class GameListHeader extends ConsumerWidget {
   final bool hasActiveFilters;
   final bool isLocalOnly;
   final bool isOffline;
+  final bool isSyncing;
   final String targetFolder;
 
   const GameListHeader({
@@ -20,6 +21,7 @@ class GameListHeader extends ConsumerWidget {
     this.hasActiveFilters = false,
     this.isLocalOnly = false,
     this.isOffline = false,
+    this.isSyncing = false,
     this.targetFolder = '',
   });
 
@@ -159,6 +161,8 @@ class GameListHeader extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    if (isSyncing)
+                      _SyncingBadge(rs: rs),
                     if (isOffline)
                       _OfflineBadge(rs: rs),
                     if (targetFolder.isNotEmpty)
@@ -251,6 +255,78 @@ class _OfflineBadge extends StatelessWidget {
                 fontSize: rs.isSmall ? 9 : 11,
                 fontWeight: FontWeight.w500,
                 color: Colors.orange,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SyncingBadge extends StatefulWidget {
+  final Responsive rs;
+
+  const _SyncingBadge({required this.rs});
+
+  @override
+  State<_SyncingBadge> createState() => _SyncingBadgeState();
+}
+
+class _SyncingBadgeState extends State<_SyncingBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rs = widget.rs;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: rs.isSmall ? 8 : 10,
+          vertical: rs.isSmall ? 3 : 5,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(rs.isSmall ? 10 : 14),
+          border: Border.all(
+            color: Colors.cyanAccent.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RotationTransition(
+              turns: _controller,
+              child: Icon(
+                Icons.sync,
+                size: rs.isSmall ? 10 : 12,
+                color: Colors.cyanAccent,
+              ),
+            ),
+            SizedBox(width: rs.isSmall ? 3 : 5),
+            Text(
+              'Syncing',
+              style: TextStyle(
+                fontSize: rs.isSmall ? 9 : 11,
+                fontWeight: FontWeight.w500,
+                color: Colors.cyanAccent,
               ),
             ),
           ],

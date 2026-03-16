@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/config/app_config.dart';
+import '../models/config/system_config.dart';
 import '../models/game_item.dart';
 import '../models/system_model.dart';
 import '../utils/friendly_error.dart';
@@ -70,6 +71,16 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
   bool _isCancelled = false;
   Completer<void>? _syncCompleter;
 
+  /// Queue of system IDs waiting to be synced (user-triggered only).
+  final List<String> _pendingQueue = [];
+
+  /// True when a queue-based sync (from [syncSystem]) is active.
+  /// Used to distinguish from bulk syncs (syncAll/syncSmart/discoverAll).
+  bool _isQueueActive = false;
+
+  /// Whether the current sync was started by [syncSystem] and accepts queuing.
+  bool get isQueueSync => _isQueueActive;
+
   /// Returns a Future that completes when the current sync operation finishes.
   /// Resolves immediately if no sync is in progress.
   Future<void> waitForCompletion() => _syncCompleter?.future ?? Future.value();
@@ -83,6 +94,12 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
   }
 
   static void clearFreshness() => _lastSyncTimes.clear();
+
+  /// The system ID currently being synced, or null if idle / between systems.
+  /// Used by GameListController to avoid competing fetches.
+  static String? _currentlySyncingSystemId;
+  static bool isSyncingSystem(String systemId) =>
+      _currentlySyncingSystemId == systemId;
 
   LibrarySyncService() : super(const LibrarySyncState());
 
@@ -114,6 +131,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       final displayName = systemModel?.name ?? systemConfig.name;
 
       state = state.copyWith(currentSystem: displayName);
+      _currentlySyncingSystemId = systemConfig.id;
 
       try {
         if (systemConfig.providers.isEmpty) {
@@ -121,7 +139,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           if (systemModel != null) {
             final games = await RomManager.scanLocalGamesIsolate(
               systemModel, systemConfig.targetFolder);
-            await db.saveGames(systemConfig.id, games, deleteOrphans: true);
+            await db.saveGames(systemConfig.id, games, forceDeleteOrphans: true);
             perSystem[systemConfig.id] = games.length;
             totalGames += games.length;
           }
@@ -145,6 +163,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       } catch (e) {
         debugPrint('Library sync failed for ${systemConfig.id}: $e');
         failures[displayName] = _userFriendlyError(e);
+      } finally {
+        _currentlySyncingSystemId = null;
       }
 
       completed++;
@@ -224,13 +244,14 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       final displayName = systemModel?.name ?? systemConfig.name;
 
       state = state.copyWith(currentSystem: displayName);
+      _currentlySyncingSystemId = systemConfig.id;
 
       try {
         if (systemConfig.providers.isEmpty) {
           if (systemModel != null) {
             final games = await RomManager.scanLocalGamesIsolate(
               systemModel, systemConfig.targetFolder);
-            await db.saveGames(systemConfig.id, games, deleteOrphans: true);
+            await db.saveGames(systemConfig.id, games, forceDeleteOrphans: true);
             perSystem[systemConfig.id] = games.length;
             totalGames += games.length;
           }
@@ -254,6 +275,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       } catch (e) {
         debugPrint('Library sync failed for ${systemConfig.id}: $e');
         failures[displayName] = _userFriendlyError(e);
+      } finally {
+        _currentlySyncingSystemId = null;
       }
 
       completed++;
@@ -314,6 +337,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
 
       final displayName = systemModel.name;
       state = state.copyWith(currentSystem: displayName);
+      _currentlySyncingSystemId = systemConfig.id;
 
       try {
         final List<GameItem> games;
@@ -323,6 +347,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
             systemModel,
             systemConfig.targetFolder,
           );
+          await db.saveGames(systemConfig.id, games, forceDeleteOrphans: true);
         } else {
           // Remote + local merge
           final remoteGames = await gameService.fetchGamesForSystem(
@@ -334,15 +359,17 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
             systemConfig.targetFolder,
           );
           games = GameMergeHelper.merge(remoteGames, localGames, systemModel);
+          await db.saveGames(systemConfig.id, games, deleteOrphans: true);
         }
 
-        await db.saveGames(systemConfig.id, games, deleteOrphans: true);
         perSystem[systemConfig.id] = games.length;
         totalGames += games.length;
         _lastSyncTimes[systemConfig.id] = DateTime.now();
       } catch (e) {
         debugPrint('Library discover failed for ${systemConfig.id}: $e');
         failures[displayName] = _userFriendlyError(e);
+      } finally {
+        _currentlySyncingSystemId = null;
       }
 
       completed++;
@@ -367,37 +394,99 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     });
   }
 
-  /// Syncs a single system (user-triggered). Deletes orphans since this is
-  /// an explicit action with a complete fetch.
+  /// Syncs a single system (user-triggered). Supports queuing: if a queue sync
+  /// is already running, the system is appended to the queue instead of being
+  /// rejected. Deletes orphans since this is an explicit action.
   Future<void> syncSystem(String systemId, AppConfig config, {Duration? syncTimeout}) async {
-    if (state.isSyncing) return;
-
     final systemConfig = config.systems
         .where((s) => s.id == systemId)
         .firstOrNull;
     if (systemConfig == null) return;
 
-    final systemModel = SystemModel.supportedSystems
-        .where((s) => s.id == systemId)
-        .firstOrNull;
-    final displayName = systemModel?.name ?? systemConfig.name;
+    // Dedup: don't queue if already syncing or already queued
+    if (_currentlySyncingSystemId == systemId) return;
+    if (_pendingQueue.contains(systemId)) return;
 
+    // If a queue sync is already running, just enqueue
+    if (state.isSyncing && _isQueueActive) {
+      _pendingQueue.add(systemId);
+      state = state.copyWith(totalSystems: state.totalSystems + 1);
+      return;
+    }
+
+    // If a bulk sync (syncAll/syncSmart/discoverAll) is running, reject
+    if (state.isSyncing) return;
+
+    // Start a new queue sync
     _isCancelled = false;
+    _isQueueActive = true;
     _syncCompleter = Completer<void>();
     state = LibrarySyncState(
       isSyncing: true,
       totalSystems: 1,
       completedSystems: 0,
-      currentSystem: displayName,
+      currentSystem: _displayName(systemId, systemConfig),
       isUserTriggered: true,
     );
 
     final db = DatabaseService();
     final gameService = UnifiedGameService(syncTimeout: syncTimeout);
-    final failures = <String, String>{};
-    final perSystem = <String, int>{};
-    var totalGames = 0;
 
+    await _syncOneSystem(systemConfig, systemId, db, gameService);
+
+    // Process any systems that were queued while the first was syncing
+    await _processQueue(config, db, gameService, syncTimeout: syncTimeout);
+
+    _isQueueActive = false;
+    state = state.copyWith(
+      isSyncing: false,
+      currentSystem: null,
+    );
+    _syncCompleter?.complete();
+    _syncCompleter = null;
+
+    ThumbnailService.cleanOrphans(db).catchError((e) {
+      debugPrint('LibrarySyncService: orphan cleanup failed: $e');
+    });
+  }
+
+  /// Processes queued systems in FIFO order.
+  Future<void> _processQueue(
+    AppConfig config,
+    DatabaseService db,
+    UnifiedGameService gameService, {
+    Duration? syncTimeout,
+  }) async {
+    while (_pendingQueue.isNotEmpty && !_isCancelled) {
+      final nextId = _pendingQueue.removeAt(0);
+      final systemConfig = config.systems
+          .where((s) => s.id == nextId)
+          .firstOrNull;
+      if (systemConfig == null) {
+        // System removed from config while queued — skip it
+        state = state.copyWith(completedSystems: state.completedSystems + 1);
+        continue;
+      }
+      state = state.copyWith(
+        currentSystem: _displayName(nextId, systemConfig),
+      );
+      await _syncOneSystem(systemConfig, nextId, db, gameService);
+    }
+  }
+
+  /// Syncs one system and updates state accumulators.
+  Future<void> _syncOneSystem(
+    SystemConfig systemConfig,
+    String systemId,
+    DatabaseService db,
+    UnifiedGameService gameService,
+  ) async {
+    final systemModel = SystemModel.supportedSystems
+        .where((s) => s.id == systemId)
+        .firstOrNull;
+    final displayName = _displayName(systemId, systemConfig);
+
+    _currentlySyncingSystemId = systemConfig.id;
     try {
       final List<GameItem> games;
       if (systemConfig.providers.isEmpty) {
@@ -407,6 +496,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         } else {
           games = [];
         }
+        await db.saveGames(systemConfig.id, games, forceDeleteOrphans: true);
       } else {
         final remoteGames = await gameService.fetchGamesForSystem(
           systemConfig, merge: systemConfig.mergeMode);
@@ -417,38 +507,45 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         } else {
           games = remoteGames;
         }
+        await db.saveGames(systemConfig.id, games, deleteOrphans: true);
       }
 
-      await db.saveGames(systemConfig.id, games, deleteOrphans: true);
+      final perSystem = Map<String, int>.of(state.gamesPerSystem);
       perSystem[systemConfig.id] = games.length;
-      totalGames = games.length;
+      state = state.copyWith(
+        gamesPerSystem: perSystem,
+        totalGamesFound: state.totalGamesFound + games.length,
+      );
       _lastSyncTimes[systemConfig.id] = DateTime.now();
     } catch (e) {
       debugPrint('Library sync failed for $systemId: $e');
+      final failures = Map<String, String>.of(state.failedSystems);
       failures[displayName] = _userFriendlyError(e);
+      state = state.copyWith(failedSystems: failures);
+    } finally {
+      _currentlySyncingSystemId = null;
     }
 
-    state = state.copyWith(
-      isSyncing: false,
-      completedSystems: 1,
-      currentSystem: null,
-      gamesPerSystem: perSystem,
-      totalGamesFound: totalGames,
-      failedSystems: failures,
-    );
-    _syncCompleter?.complete();
-    _syncCompleter = null;
+    state = state.copyWith(completedSystems: state.completedSystems + 1);
+  }
+
+  String _displayName(String systemId, SystemConfig systemConfig) {
+    return SystemModel.supportedSystems
+        .where((s) => s.id == systemId)
+        .firstOrNull?.name ?? systemConfig.name;
   }
 
   static String _userFriendlyError(Object e) =>
       getUserFriendlyError(e, returnRawOnNoMatch: true);
 
   void cancel() {
+    _pendingQueue.clear();
     _isCancelled = true;
   }
 
   @override
   void dispose() {
+    _pendingQueue.clear();
     _isCancelled = true;
     super.dispose();
   }

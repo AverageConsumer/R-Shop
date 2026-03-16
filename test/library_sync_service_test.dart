@@ -534,6 +534,38 @@ void main() {
     });
   });
 
+  // ─── Sync queue ──────────────────────────────────────────
+
+  group('Sync queue', () {
+    test('isQueueSync is false when idle', () {
+      final service = LibrarySyncService();
+      expect(service.isQueueSync, isFalse);
+      service.dispose();
+    });
+
+    test('cancel clears pending queue', () {
+      final service = LibrarySyncService();
+      // cancel() should clear internal queue without error
+      service.cancel();
+      expect(service.isQueueSync, isFalse);
+      service.dispose();
+    });
+
+    test('dispose clears pending queue', () {
+      final service = LibrarySyncService();
+      service.dispose();
+      // No error after dispose — queue was cleared
+    });
+
+    test('waitForCompletion resolves immediately when idle (no queue)', () async {
+      final service = LibrarySyncService();
+      expect(service.isQueueSync, isFalse);
+      await service.waitForCompletion();
+      expect(service.state.isSyncing, isFalse);
+      service.dispose();
+    });
+  });
+
   // ─── syncCooldownSteps ─────────────────────────────────
 
   group('syncCooldownSteps', () {

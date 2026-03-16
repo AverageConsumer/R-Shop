@@ -66,6 +66,9 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
 
   if (!hideEmpty) return withConfig;
 
+  // Re-query when games are saved outside of sync (e.g. by GameListController)
+  ref.watch(gameDbChangedProvider);
+
   // Single batch query instead of N individual hasCache() calls
   final db = ref.read(libraryDbProvider);
   final populated = await db.systemsWithCache(
@@ -88,14 +91,23 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
 /// Local = filesystem count of ROM files in each system's targetFolder.
 final systemSourceCountsProvider =
     FutureProvider<Map<String, ({int remote, int local})>>((ref) async {
-  // Re-fetch when sync finishes or files change on disk
+  // Re-fetch when sync finishes, files change on disk, or games saved outside sync
   ref.watch(librarySyncServiceProvider.select((s) => s.isSyncing));
+  ref.watch(gameDbChangedProvider);
   final db = ref.read(libraryDbProvider);
   final remoteCounts = await db.getRemoteGameCountsPerSystem();
   final installed = await ref.watch(installedFilesProvider.future);
 
+  final archiveExts = SystemModel.archiveExtensions
+      .map((e) => e.toLowerCase())
+      .toSet();
   final extsBySystem = {
-    for (final s in SystemModel.supportedSystems) s.id: s.romExtensions.toSet(),
+    for (final s in SystemModel.supportedSystems) s.id: {
+      ...s.romExtensions.map((e) => e.toLowerCase()),
+      if (s.multiFileExtensions != null)
+        ...s.multiFileExtensions!.map((e) => e.toLowerCase()),
+      ...archiveExts,
+    },
   };
 
   final systemIds = {...remoteCounts.keys, ...installed.bySystem.keys};
@@ -111,7 +123,12 @@ final systemSourceCountsProvider =
 int _countRomFiles(Set<String>? filenames, Set<String>? extensions) {
   if (filenames == null || filenames.isEmpty) return 0;
   if (extensions == null || extensions.isEmpty) return filenames.length;
-  return filenames.where((f) => extensions.contains(p.extension(f).toLowerCase())).length;
+  return filenames.where((f) {
+    final ext = p.extension(f).toLowerCase();
+    // Directories (no extension) are already validated by installedFilesProvider
+    if (ext.isEmpty) return true;
+    return extensions.contains(ext);
+  }).length;
 }
 
 /// Cached game metadata lookup for the detail screen.

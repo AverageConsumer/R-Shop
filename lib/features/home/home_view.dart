@@ -483,14 +483,15 @@ class _HomeViewState extends ConsumerState<HomeView>
     final config = ref.read(bootstrappedConfigProvider).valueOrNull;
     if (config == null) return;
     final syncService = ref.read(librarySyncServiceProvider.notifier);
-    // Cancel any running auto-sync so the manual request goes through
-    if (ref.read(librarySyncServiceProvider).isSyncing) {
+    final syncState = ref.read(librarySyncServiceProvider);
+    // If a bulk sync (syncAll/syncSmart) is running, cancel it first
+    if (syncState.isSyncing && !syncService.isQueueSync) {
       syncService.cancel();
       await syncService.waitForCompletion();
       if (!mounted) return;
     }
+    // If a queue sync is running, syncSystem will enqueue; if idle, it starts
     final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
-    // Resume remaining stale systems after this manual sync completes
     _resumeAutoSyncAfterManual = true;
     syncService.syncSystem(system.id, config, syncTimeout: timeout);
   }

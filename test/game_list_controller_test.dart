@@ -31,10 +31,10 @@ class FakeDatabaseService extends DatabaseService {
   Future<List<GameItem>> getGames(String systemSlug) async => cachedGames;
 
   @override
-  Future<void> saveGames(String systemSlug, List<GameItem> games, {bool deleteOrphans = false}) async {
+  Future<void> saveGames(String systemSlug, List<GameItem> games, {bool deleteOrphans = false, bool forceDeleteOrphans = false}) async {
     savedSystemSlug = systemSlug;
     savedGames = games;
-    lastDeleteOrphans = deleteOrphans;
+    lastDeleteOrphans = deleteOrphans || forceDeleteOrphans;
   }
 
   @override

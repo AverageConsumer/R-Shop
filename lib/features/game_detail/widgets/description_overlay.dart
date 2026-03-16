@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/responsive/responsive.dart';
 import '../../../models/game_metadata_info.dart';
 
 class DescriptionOverlay extends StatelessWidget {
@@ -18,13 +19,17 @@ class DescriptionOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final rs = context.rs;
     return Container(
       color: Colors.black.withValues(alpha: 0.85),
       child: SafeArea(
         child: Center(
           child: Container(
             margin: const EdgeInsets.all(24),
-            constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+            constraints: BoxConstraints(
+              maxWidth: (rs.screenWidth - 48).clamp(280, 500),
+              maxHeight: (rs.screenHeight - 48).clamp(300, 600),
+            ),
             decoration: BoxDecoration(
               color: const Color(0xFF1E1E1E),
               borderRadius: BorderRadius.circular(16),

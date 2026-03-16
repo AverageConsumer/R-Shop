@@ -145,7 +145,7 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
               child: FadeTransition(
                 opacity: _fadeAnimation,
                 child: Container(
-                  width: rs.isSmall ? 320 : 450,
+                  width: (rs.isSmall ? 320.0 : 450.0).clamp(0, rs.screenWidth * 0.85),
                   padding: EdgeInsets.all(rs.spacing.xl),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1A1A1A),

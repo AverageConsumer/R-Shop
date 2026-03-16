@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../models/game_metadata_info.dart';
+import '../../../core/responsive/responsive.dart';
 import '../../../utils/game_metadata.dart';
 
 /// Unified game info overlay showing RomM metadata and filename tags.
@@ -24,6 +25,7 @@ class GameDetailOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final rs = context.rs;
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.gameButtonB,
@@ -41,8 +43,10 @@ class GameDetailOverlay extends StatelessWidget {
             child: Center(
               child: Container(
                 margin: const EdgeInsets.all(24),
-                constraints:
-                    const BoxConstraints(maxWidth: 520, maxHeight: 600),
+                constraints: BoxConstraints(
+                  maxWidth: (rs.screenWidth - 48).clamp(280, 520),
+                  maxHeight: (rs.screenHeight - 48).clamp(300, 600),
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1E1E1E),
                   borderRadius: BorderRadius.circular(16),

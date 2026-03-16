@@ -461,3 +461,79 @@ class GameGridError extends StatelessWidget {
     );
   }
 }
+
+class GameGridSyncing extends StatefulWidget {
+  final Color accentColor;
+
+  const GameGridSyncing({
+    super.key,
+    required this.accentColor,
+  });
+
+  @override
+  State<GameGridSyncing> createState() => _GameGridSyncingState();
+}
+
+class _GameGridSyncingState extends State<GameGridSyncing>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rs = context.rs;
+    final titleFontSize = rs.isSmall ? 14.0 : 18.0;
+    final subtitleFontSize = rs.isSmall ? 10.0 : 12.0;
+    final iconSize = rs.isSmall ? 36.0 : 48.0;
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          RotationTransition(
+            turns: _controller,
+            child: Icon(
+              Icons.sync,
+              size: iconSize,
+              color: Colors.cyanAccent,
+            ),
+          ),
+          SizedBox(height: rs.spacing.md),
+          Text(
+            'Syncing library\u2026',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: titleFontSize,
+            ),
+          ),
+          SizedBox(height: rs.spacing.sm),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: rs.spacing.xl),
+            child: Text(
+              'Games will appear shortly',
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: subtitleFontSize,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

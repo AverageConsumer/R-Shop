@@ -101,6 +101,10 @@ class GameListController extends ChangeNotifier {
   bool _disposed = false;
   Timer? _thumbnailDebounce;
 
+  /// Called after games are saved to the database, so the UI layer
+  /// can signal count providers to re-query.
+  VoidCallback? onGamesSaved;
+
   GameListState _state = const GameListState();
   GameListState get state => _state;
 
@@ -149,7 +153,8 @@ class GameListController extends ChangeNotifier {
         _groupGames();
         _restoreFilters();
         _resolveInstalledStatus();
-        _databaseService.saveGames(system.id, _state.allGames, deleteOrphans: true);
+        _databaseService.saveGames(system.id, _state.allGames, forceDeleteOrphans: true);
+        onGamesSaved?.call();
         return;
       }
 
@@ -186,10 +191,18 @@ class GameListController extends ChangeNotifier {
     _restoreFilters();
     _resolveInstalledStatus();
     _databaseService.saveGames(system.id, _state.allGames, deleteOrphans: true);
+    onGamesSaved?.call();
   }
 
   Future<void> _backgroundRefresh() async {
     if (LibrarySyncService.isFresh(system.id)) return;
+    if (LibrarySyncService.isSyncingSystem(system.id)) return;
+    // Also check persistent sync time (survives app restart)
+    final lastPersistent = _storage?.getLastSyncTime(system.id);
+    if (lastPersistent != null &&
+        DateTime.now().difference(lastPersistent).inMinutes < 5) {
+      return;
+    }
     try {
       final remoteGames = await _unifiedService.fetchGamesForSystem(systemConfig);
       final localGames = await RomManager.scanLocalGames(system, targetFolder);
@@ -207,6 +220,8 @@ class GameListController extends ChangeNotifier {
         _resolveInstalledStatus();
       }
       _databaseService.saveGames(system.id, games, deleteOrphans: true);
+      _storage?.setLastSyncTime(system.id, DateTime.now());
+      onGamesSaved?.call();
       if (_state.isOffline) {
         _state = _state.copyWith(isOffline: false);
         notifyListeners();

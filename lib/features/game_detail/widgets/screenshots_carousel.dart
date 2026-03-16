@@ -6,6 +6,7 @@ import 'section_header.dart';
 class ScreenshotsCarousel extends StatefulWidget {
   final List<String> screenshots;
   final int focusedIndex;
+  final bool isSectionFocused;
   final Color accentColor;
   final VoidCallback onOpenViewer;
 
@@ -13,6 +14,7 @@ class ScreenshotsCarousel extends StatefulWidget {
     super.key,
     required this.screenshots,
     required this.focusedIndex,
+    this.isSectionFocused = false,
     required this.accentColor,
     required this.onOpenViewer,
   });
@@ -66,7 +68,7 @@ class _ScreenshotsCarouselState extends State<ScreenshotsCarousel> {
             itemCount: widget.screenshots.length,
             separatorBuilder: (_, __) => SizedBox(width: rs.spacing.sm),
             itemBuilder: (context, index) {
-              final isFocused = index == clampedIdx;
+              final isFocused = widget.isSectionFocused && index == clampedIdx;
               return GestureDetector(
                 key: _keyFor(index),
                 onTap: widget.onOpenViewer,

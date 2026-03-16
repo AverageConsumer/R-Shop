@@ -8,7 +8,6 @@ import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../providers/app_providers.dart';
 import '../../../utils/game_metadata.dart';
-import '../../../widgets/console_hud.dart';
 import 'version_card.dart';
 
 class VariantPickerOverlay extends ConsumerStatefulWidget {
@@ -150,12 +149,24 @@ class _VariantPickerOverlayState extends ConsumerState<VariantPickerOverlay>
       return KeyEventResult.handled;
     }
 
+    // Consume left/right to prevent focus leaking to background
+    if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight) {
+      return KeyEventResult.handled;
+    }
+
     return KeyEventResult.ignored;
   }
 
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+
+    // Reclaim focus immediately when returning from a higher-priority overlay
+    final priority = ref.watch(overlayPriorityProvider);
+    if (priority == OverlayPriority.dialog && !_focusNode.hasFocus) {
+      _focusNode.requestFocus();
+    }
 
     return OverlayFocusScope(
       priority: OverlayPriority.dialog,
@@ -186,9 +197,9 @@ class _VariantPickerOverlayState extends ConsumerState<VariantPickerOverlay>
                     child: Container(
                       width: rs.isPortrait
                           ? rs.screenWidth * 0.88
-                          : rs.screenWidth * 0.45,
+                          : rs.screenWidth * 0.55,
                       constraints: BoxConstraints(
-                        maxHeight: rs.screenHeight * 0.7,
+                        maxHeight: rs.screenHeight * 0.8,
                       ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF161616),
@@ -209,7 +220,6 @@ class _VariantPickerOverlayState extends ConsumerState<VariantPickerOverlay>
                         children: [
                           _buildHeader(rs),
                           Flexible(child: _buildList(rs)),
-                          _buildHud(rs),
                         ],
                       ),
                     ),
@@ -232,9 +242,9 @@ class _VariantPickerOverlayState extends ConsumerState<VariantPickerOverlay>
     return Padding(
       padding: EdgeInsets.fromLTRB(
         rs.spacing.md,
-        rs.spacing.md,
-        rs.spacing.md,
         rs.spacing.sm,
+        rs.spacing.md,
+        rs.spacing.xs,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,7 +299,9 @@ class _VariantPickerOverlayState extends ConsumerState<VariantPickerOverlay>
 
     return ListView.builder(
       shrinkWrap: true,
-      padding: EdgeInsets.symmetric(horizontal: rs.spacing.sm),
+      padding: EdgeInsets.fromLTRB(
+        rs.spacing.sm, 0, rs.spacing.sm, rs.spacing.sm,
+      ),
       itemCount: widget.variants.length,
       itemBuilder: (context, index) {
         final isInstalled = widget.installedStatus[index] ?? false;
@@ -299,7 +311,7 @@ class _VariantPickerOverlayState extends ConsumerState<VariantPickerOverlay>
           key: _cardKeys[index],
           padding: EdgeInsets.only(
             bottom:
-                index < widget.variants.length - 1 ? rs.spacing.sm : 0,
+                index < widget.variants.length - 1 ? rs.spacing.xs : 0,
           ),
           child: GestureDetector(
             onTap: () {
@@ -327,17 +339,4 @@ class _VariantPickerOverlayState extends ConsumerState<VariantPickerOverlay>
     );
   }
 
-  Widget _buildHud(Responsive rs) {
-    final isInstalled = widget.installedStatus[_focusedIndex] ?? false;
-
-    return Padding(
-      padding: EdgeInsets.all(rs.spacing.sm),
-      child: ConsoleHud(
-        embedded: true,
-        dpad: (label: '', action: 'Navigate'),
-        a: HudAction(isInstalled ? 'Delete' : 'Download'),
-        b: HudAction('Close'),
-      ),
-    );
-  }
 }

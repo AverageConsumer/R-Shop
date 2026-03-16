@@ -139,8 +139,8 @@ class _SystemPickerDialogState extends ConsumerState<_SystemPickerDialog> {
           child: Material(
             type: MaterialType.transparency,
             child: Container(
-              width: rs.isPortrait ? rs.screenWidth * 0.8 : 320,
-              constraints: const BoxConstraints(maxHeight: 400),
+              width: rs.isPortrait ? rs.screenWidth * 0.8 : (rs.screenWidth * 0.4).clamp(280, 400),
+              constraints: BoxConstraints(maxHeight: (rs.screenHeight * 0.6).clamp(250, 400)),
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1A1A),
                 borderRadius: BorderRadius.circular(rs.radius.lg),

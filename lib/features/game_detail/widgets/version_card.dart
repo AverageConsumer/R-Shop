@@ -4,6 +4,7 @@ import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../utils/game_metadata.dart';
 import '../../../widgets/installed_indicator.dart';
+import '../../../widgets/marquee_text.dart';
 import 'metadata_badges.dart' hide InstalledBadge;
 
 class SingleVersionDisplay extends StatelessWidget {
@@ -89,7 +90,7 @@ class SingleVersionDisplay extends StatelessWidget {
         children: [
           AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: bgColor,
               borderRadius: BorderRadius.circular(12),
@@ -98,100 +99,47 @@ class SingleVersionDisplay extends StatelessWidget {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
+                // Row 1: Region + tags + installed
                 Row(
                   children: [
+                    RegionBadge(region: metadata.region),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      child: Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
                         children: [
-                          RegionBadge(region: metadata.region),
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: LanguageBadges(
-                                languages: metadata.languages),
+                          for (final tag in metadata.primaryTags)
+                            _TagPill(label: tag.raw, alpha: isFocused ? 0.9 : 0.6),
+                          _TagPill(
+                            label: metadata.fileType.toUpperCase(),
+                            alpha: isFocused ? 0.5 : 0.3,
                           ),
+                          if (variant.providerConfig != null)
+                            _TagPill(
+                              label: variant.providerConfig!.shortLabel,
+                              alpha: isFocused ? 0.5 : 0.3,
+                            ),
                         ],
                       ),
                     ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.08),
-                            ),
-                          ),
-                          child: Text(
-                            metadata.fileType.toUpperCase(),
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                        if (variant.providerConfig != null) ...[
-                          const SizedBox(width: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.1),
-                              ),
-                            ),
-                            child: Text(
-                              variant.providerConfig!.shortLabel,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.5),
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                    if (isInstalled) ...[
+                      const SizedBox(width: 6),
+                      const InstalledBadge(compact: true),
+                    ],
                   ],
                 ),
-                if (metadata.primaryTags.isNotEmpty || isInstalled) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      if (metadata.primaryTags.isNotEmpty)
-                        Expanded(
-                          child: TagBadges(tags: metadata.primaryTags, maxVisible: 5),
-                        ),
-                      if (isInstalled) ...[
-                        if (metadata.primaryTags.isNotEmpty)
-                          const SizedBox(width: 8),
-                        const InstalledBadge(compact: true),
-                      ],
-                    ],
-                  ),
-                ],
-                // Show filename to distinguish variants with identical tags
-                const SizedBox(height: 6),
-                Text(
-                  variant.filename,
+                // Row 2: Filename — marquee when focused, ellipsis otherwise
+                const SizedBox(height: 4),
+                MarqueeText(
+                  text: variant.filename,
+                  animate: isFocused,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.25),
+                    color: Colors.white.withValues(alpha: isFocused ? 0.35 : 0.2),
                     fontSize: 9,
-                    fontWeight: FontWeight.w400,
-                    letterSpacing: 0.2,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -209,6 +157,36 @@ class SingleVersionDisplay extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _TagPill extends StatelessWidget {
+  final String label;
+  final double alpha;
+
+  const _TagPill({required this.label, required this.alpha});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: alpha * 0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: alpha * 0.15),
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: alpha),
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.3,
+        ),
       ),
     );
   }

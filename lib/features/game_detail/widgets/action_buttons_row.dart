@@ -29,6 +29,9 @@ class ActionButtonsRow extends StatelessWidget {
   /// Total navigable items in the icon buttons section.
   static const int itemCount = 3;
 
+  // Primary-only: whether the section is focused
+  final bool isSectionFocused;
+
   /// Renders only the primary action button (Download/Delete/Manage).
   const ActionButtonsRow.primaryOnly({
     super.key,
@@ -37,6 +40,7 @@ class ActionButtonsRow extends StatelessWidget {
     this.variantCount,
     required this.onPrimaryAction,
     required this.hintText,
+    this.isSectionFocused = false,
   })  : _mode = _Mode.primary,
         isFavorite = null,
         isShareEnabled = null,
@@ -52,6 +56,7 @@ class ActionButtonsRow extends StatelessWidget {
     required this.isFavorite,
     this.isShareEnabled = true,
     required this.focusedButtonIndex,
+    this.isSectionFocused = false,
     required this.onFavorite,
     required this.onShare,
     required this.onCollection,
@@ -79,7 +84,7 @@ class ActionButtonsRow extends StatelessWidget {
           state: downloadButtonState!,
           accentColor: accentColor,
           variantCount: variantCount,
-          isFocused: true,
+          isFocused: isSectionFocused,
           onTap: onPrimaryAction,
         ),
         if (hintText != null && hintText!.isNotEmpty) ...[
@@ -105,9 +110,8 @@ class ActionButtonsRow extends StatelessWidget {
             icon: isFavorite!
                 ? Icons.favorite_rounded
                 : Icons.favorite_border_rounded,
-            label: 'Favorite',
             color: isFavorite! ? Colors.redAccent : Colors.white54,
-            isFocused: focusedButtonIndex == 0,
+            isFocused: isSectionFocused && focusedButtonIndex == 0,
             accentColor: accentColor,
             onTap: onFavorite!,
           ),
@@ -116,9 +120,8 @@ class ActionButtonsRow extends StatelessWidget {
         Expanded(
           child: _IconActionButton(
             icon: Icons.share_rounded,
-            label: 'Share',
             color: isShareEnabled! ? Colors.white54 : Colors.white24,
-            isFocused: focusedButtonIndex == 1,
+            isFocused: isSectionFocused && focusedButtonIndex == 1,
             accentColor: accentColor,
             enabled: isShareEnabled!,
             onTap: onShare!,
@@ -128,9 +131,8 @@ class ActionButtonsRow extends StatelessWidget {
         Expanded(
           child: _IconActionButton(
             icon: Icons.shelves,
-            label: 'Shelf',
             color: Colors.white54,
-            isFocused: focusedButtonIndex == 2,
+            isFocused: isSectionFocused && focusedButtonIndex == 2,
             accentColor: accentColor,
             onTap: onCollection!,
           ),
@@ -215,15 +217,24 @@ class _PrimaryActionButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(rs.radius.md),
-          border: Border.all(color: borderColor, width: isFocused ? 2 : 1.5),
+          border: Border.all(
+            color: isFocused ? Colors.white.withValues(alpha: 0.9) : borderColor,
+            width: isFocused ? 2 : 1.5,
+          ),
           boxShadow: isFocused
               ? [
+                  BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    spreadRadius: 1,
+                  ),
                   BoxShadow(
                     color: (state == DownloadButtonState.delete
                             ? Colors.red
                             : accentColor)
-                        .withValues(alpha: 0.25),
-                    blurRadius: 8,
+                        .withValues(alpha: 0.3),
+                    blurRadius: 20,
+                    spreadRadius: 2,
                   ),
                 ]
               : null,
@@ -285,7 +296,6 @@ class _PrimaryActionButton extends StatelessWidget {
 
 class _IconActionButton extends StatelessWidget {
   final IconData icon;
-  final String label;
   final Color color;
   final bool isFocused;
   final Color accentColor;
@@ -294,7 +304,6 @@ class _IconActionButton extends StatelessWidget {
 
   const _IconActionButton({
     required this.icon,
-    required this.label,
     required this.color,
     required this.isFocused,
     required this.accentColor,
@@ -326,26 +335,20 @@ class _IconActionButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(rs.radius.md),
             border: Border.all(
               color: effectiveFocused
-                  ? accentColor.withValues(alpha: 0.5)
+                  ? Colors.white.withValues(alpha: 0.7)
                   : Colors.white.withValues(alpha: 0.1),
               width: 1,
             ),
+            boxShadow: effectiveFocused
+                ? [
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      blurRadius: 8,
+                    ),
+                  ]
+                : null,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color, size: rs.isSmall ? 18 : 22),
-              SizedBox(height: rs.spacing.xs),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: effectiveFocused ? 0.9 : 0.5),
-                  fontSize: rs.isSmall ? 8 : 10,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
+          child: Icon(icon, color: color, size: rs.isSmall ? 18 : 22),
         ),
       ),
     );

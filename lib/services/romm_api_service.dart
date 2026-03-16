@@ -369,7 +369,7 @@ class RommApiService {
         }
       } on DioException catch (e) {
         debugPrint('RomM: page at offset $offset failed: $e');
-        break; // Return whatever we accumulated so far
+        rethrow; // Partial data is dangerous — callers must know the fetch failed
       }
 
       allRoms.addAll(

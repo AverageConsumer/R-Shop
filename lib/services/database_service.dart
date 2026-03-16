@@ -281,12 +281,18 @@ class DatabaseService {
     }
   }
 
-  Future<void> saveGames(String systemSlug, List<GameItem> games, {bool deleteOrphans = false}) async {
+  Future<void> saveGames(
+    String systemSlug,
+    List<GameItem> games, {
+    bool deleteOrphans = false,
+    bool forceDeleteOrphans = false,
+  }) async {
     final db = await database;
     await db.transaction((txn) async {
-      // 1. Delete orphans only when explicitly requested (user-triggered full scan)
-      // Background syncs are additive to prevent data loss from incomplete fetches.
-      if (deleteOrphans) {
+      // 1. Delete orphans when requested.
+      // forceDeleteOrphans: unconditional (safe for local filesystem scans).
+      // deleteOrphans: guarded — blocks mass deletion from incomplete fetches.
+      if (deleteOrphans || forceDeleteOrphans) {
         final existing = await txn.query(
           _tableName,
           columns: ['filename'],
@@ -299,23 +305,36 @@ class DatabaseService {
 
         final orphans = existingFiles.difference(incomingFiles);
         if (orphans.isNotEmpty) {
-          final orphanList = orphans.toList();
-          for (var i = 0; i < orphanList.length; i += 100) {
-            final chunk = orphanList.skip(i).take(100).toList();
-            final placeholders = List.filled(chunk.length, '?').join(',');
-            await txn.rawDelete(
-              'DELETE FROM $_tableName WHERE systemSlug = ? AND filename IN ($placeholders)',
-              [systemSlug, ...chunk],
+          // Safety: if incoming data looks incomplete, skip deletion to prevent
+          // data loss from partial fetches (e.g. RomM timeout mid-pagination).
+          // forceDeleteOrphans bypasses this for authoritative sources (local scan).
+          if (!forceDeleteOrphans &&
+              existingFiles.length >= 10 &&
+              incomingFiles.length < existingFiles.length ~/ 2) {
+            debugPrint(
+              'saveGames($systemSlug): BLOCKED orphan deletion — '
+              'incoming ${incomingFiles.length} vs existing ${existingFiles.length}. '
+              'Looks like incomplete fetch data.',
             );
-            // Cascade: remove orphaned metadata and RA matches
-            await txn.rawDelete(
-              'DELETE FROM game_metadata WHERE system_slug = ? AND filename IN ($placeholders)',
-              [systemSlug, ...chunk],
-            );
-            await txn.rawDelete(
-              'DELETE FROM ra_matches WHERE system_slug = ? AND game_filename IN ($placeholders)',
-              [systemSlug, ...chunk],
-            );
+          } else {
+            final orphanList = orphans.toList();
+            for (var i = 0; i < orphanList.length; i += 100) {
+              final chunk = orphanList.skip(i).take(100).toList();
+              final placeholders = List.filled(chunk.length, '?').join(',');
+              await txn.rawDelete(
+                'DELETE FROM $_tableName WHERE systemSlug = ? AND filename IN ($placeholders)',
+                [systemSlug, ...chunk],
+              );
+              // Cascade: remove orphaned metadata and RA matches
+              await txn.rawDelete(
+                'DELETE FROM game_metadata WHERE system_slug = ? AND filename IN ($placeholders)',
+                [systemSlug, ...chunk],
+              );
+              await txn.rawDelete(
+                'DELETE FROM ra_matches WHERE system_slug = ? AND game_filename IN ($placeholders)',
+                [systemSlug, ...chunk],
+              );
+            }
           }
         }
       }

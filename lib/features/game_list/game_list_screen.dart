@@ -12,8 +12,10 @@ import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
+import '../../providers/library_providers.dart';
 import '../../providers/ra_providers.dart';
 import '../../services/config_bootstrap.dart';
+import '../../services/library_sync_service.dart';
 import '../../services/input_debouncer.dart';
 import '../../services/thumbnail_service.dart';
 import '../game_detail/game_detail_screen.dart';
@@ -55,6 +57,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   bool _isFiltering = false;
   bool _showStartHint = false;
   ProviderSubscription? _installedFilesSubscription;
+  ProviderSubscription? _syncSub;
 
   late int _columns;
   double _lastPinchScale = 1.0;
@@ -186,6 +189,10 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       storage: ref.read(storageServiceProvider),
     )..addListener(_onControllerChanged);
 
+    _controller.onGamesSaved = () {
+      ref.read(gameDbChangedProvider.notifier).state++;
+    };
+
     _focusManager = FocusSyncManager(
       scrollController: _scrollController,
       getCrossAxisCount: () => _columns,
@@ -208,6 +215,18 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
           );
         }
       });
+
+      // Auto-retry when sync finishes and we're showing an error or have no games
+      _syncSub = ref.listenManual(
+        librarySyncServiceProvider.select((s) => s.isSyncing),
+        (prev, isSyncing) {
+          if (prev == true && !isSyncing) {
+            if (_controller.state.error != null || _controller.state.allGames.isEmpty) {
+              _controller.loadGames();
+            }
+          }
+        },
+      );
 
       final storage = ref.read(storageServiceProvider);
       if (!storage.getStartHintShown()) {
@@ -244,6 +263,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     });
 
     _installedFilesSubscription?.close();
+    _syncSub?.close();
     _debouncer.stopHold();
     _controller.removeListener(_onControllerChanged);
     _controller.dispose();
@@ -627,11 +647,18 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   }
 
   Widget _buildNormalContent(GameListState state, double topPadding) {
+    // Watch sync state so we rebuild when it changes
+    final syncState = ref.watch(librarySyncServiceProvider);
+    final syncActive = syncState.isSyncing && (
+      LibrarySyncService.isSyncingSystem(widget.system.id) ||
+      !syncState.gamesPerSystem.containsKey(widget.system.id)
+    );
+
     return Stack(
       children: [
         Padding(
           padding: EdgeInsets.only(top: topPadding),
-          child: _buildGridOrStatus(state),
+          child: _buildGridOrStatus(state, syncActive),
         ),
         GameListHeader(
           system: widget.system,
@@ -639,25 +666,38 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
           hasActiveFilters: state.activeFilters.isNotEmpty,
           isLocalOnly: state.isLocalOnly,
           isOffline: state.isOffline,
+          isSyncing: syncActive,
           targetFolder: widget.targetFolder,
         ),
       ],
     );
   }
 
-  Widget _buildGridOrStatus(GameListState state) {
+  Widget _buildGridOrStatus(GameListState state, bool syncActive) {
     if (state.isLoading) {
+      if (syncActive) {
+        return GameGridSyncing(accentColor: widget.system.accentColor);
+      }
       return GameGridLoading(
         accentColor: widget.system.accentColor,
         crossAxisCount: _columns,
       );
     }
     if (state.error != null) {
+      // Sync is active — show syncing state instead of confusing error
+      if (syncActive) {
+        return GameGridSyncing(accentColor: widget.system.accentColor);
+      }
       return GameGridError(
         error: state.error!,
         accentColor: widget.system.accentColor,
         onRetry: _controller.loadGames,
       );
+    }
+    // Empty game list while sync hasn't reached this system yet
+    if (state.filteredGroups.isEmpty && syncActive &&
+        state.searchQuery.isEmpty && state.activeFilters.isEmpty) {
+      return GameGridSyncing(accentColor: widget.system.accentColor);
     }
     // Only rebuild when favorites relevant to THIS system's games change
     final systemFilenames = state.filteredGroupedGames.values

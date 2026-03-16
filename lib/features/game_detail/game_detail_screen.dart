@@ -848,44 +848,50 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         children: [
           // Left column: Cover + action buttons (scrollable on small screens)
           SizedBox(
-            width: rs.isSmall ? 180 : (rs.isMedium ? 220 : 260),
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  AspectRatio(
-                    aspectRatio: 0.75,
-                    child: CoverSection(
-                      game: widget.game,
-                      system: widget.system,
-                      coverUrls: coverUrls,
-                      cachedUrl: selectedVariant.cachedCoverUrl,
-                      metadata: fileMetadata,
-                      isFavorite: isFavorite,
-                      isInstalled: state.isVariantInstalled,
-                      hasThumbnail: selectedVariant.hasThumbnail,
+            width: (rs.screenWidth * (rs.isSmall ? 0.28 : 0.22)).clamp(150, 280),
+            child: Column(
+              children: [
+                // Cover takes available space, buttons anchor to bottom
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        AspectRatio(
+                          aspectRatio: 0.75,
+                          child: CoverSection(
+                            game: widget.game,
+                            system: widget.system,
+                            coverUrls: coverUrls,
+                            cachedUrl: selectedVariant.cachedCoverUrl,
+                            metadata: fileMetadata,
+                            isFavorite: isFavorite,
+                            isInstalled: state.isVariantInstalled,
+                            hasThumbnail: selectedVariant.hasThumbnail,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(height: rs.spacing.md),
-                  // Primary action button (Download/Delete/Manage)
-                  _buildSection(
-                    rs, state, controller, DetailSection.primaryAction,
-                    fileMetadata: fileMetadata,
-                    richMetadata: richMetadata,
-                    isMultiRom: isMultiRom,
-                    raMatch: raMatch,
-                    isFocused: controller.focusedSection == DetailSection.primaryAction,
-                  ),
-                  // Icon action buttons (Favorite/Share/Shelf)
-                  _buildSection(
-                    rs, state, controller, DetailSection.actions,
-                    fileMetadata: fileMetadata,
-                    richMetadata: richMetadata,
-                    isMultiRom: isMultiRom,
-                    raMatch: raMatch,
-                    isFocused: controller.focusedSection == DetailSection.actions,
-                  ),
-                ],
-              ),
+                ),
+                SizedBox(height: rs.spacing.sm),
+                // Action buttons always anchored at bottom of left column
+                _buildSection(
+                  rs, state, controller, DetailSection.primaryAction,
+                  fileMetadata: fileMetadata,
+                  richMetadata: richMetadata,
+                  isMultiRom: isMultiRom,
+                  raMatch: raMatch,
+                  isFocused: controller.focusedSection == DetailSection.primaryAction,
+                ),
+                _buildSection(
+                  rs, state, controller, DetailSection.actions,
+                  fileMetadata: fileMetadata,
+                  richMetadata: richMetadata,
+                  isMultiRom: isMultiRom,
+                  raMatch: raMatch,
+                  isFocused: controller.focusedSection == DetailSection.actions,
+                ),
+              ],
             ),
           ),
           SizedBox(width: rs.spacing.lg),
@@ -1023,15 +1029,16 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         );
 
       case DetailSection.primaryAction:
-        content = _buildPrimaryActionSection(state, controller, isMultiRom);
+        content = _buildPrimaryActionSection(state, controller, isMultiRom, isFocused: isFocused);
 
       case DetailSection.actions:
-        content = _buildIconButtonsSection(state, controller);
+        content = _buildIconButtonsSection(state, controller, isFocused: isFocused);
 
       case DetailSection.screenshots:
         content = ScreenshotsCarousel(
           screenshots: richMetadata!.screenshotUrlList,
           focusedIndex: state.screenshotIndex,
+          isSectionFocused: isFocused,
           accentColor: widget.system.accentColor,
           onOpenViewer: controller.openScreenshotViewer,
         );
@@ -1042,6 +1049,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           variants: widget.variants,
           isMultiRom: isMultiRom,
           focusedIndex: state.siblingIndex,
+          isSectionFocused: isFocused,
           installedStatus: state.installedStatus,
           accentColor: widget.system.accentColor,
         );
@@ -1073,9 +1081,16 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           ? BoxDecoration(
               borderRadius: BorderRadius.circular(rs.radius.md),
               border: Border.all(
-                color: widget.system.accentColor.withValues(alpha: 0.4),
+                color: Colors.white.withValues(alpha: 0.5),
                 width: 1.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.system.accentColor.withValues(alpha: 0.15),
+                  blurRadius: 12,
+                  spreadRadius: 1,
+                ),
+              ],
             )
           : null,
       padding: EdgeInsets.all(rs.spacing.xs),
@@ -1231,21 +1246,24 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   Widget _buildPrimaryActionSection(
     GameDetailState state,
     GameDetailController controller,
-    bool isMultiRom,
-  ) {
+    bool isMultiRom, {
+    required bool isFocused,
+  }) {
     return ActionButtonsRow.primaryOnly(
       accentColor: widget.system.accentColor,
       downloadButtonState: _getDownloadButtonState(state, isMultiRom),
       variantCount: isMultiRom ? widget.variants.length : null,
       onPrimaryAction: controller.performAction,
       hintText: _getButtonHintText(state, isMultiRom),
+      isSectionFocused: isFocused,
     );
   }
 
   Widget _buildIconButtonsSection(
     GameDetailState state,
-    GameDetailController controller,
-  ) {
+    GameDetailController controller, {
+    required bool isFocused,
+  }) {
     final isFavorite = ref.watch(favoriteGamesProvider)
         .contains(controller.selectedVariant.filename);
 
@@ -1254,6 +1272,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       isFavorite: isFavorite,
       isShareEnabled: state.isVariantInstalled && !state.isSharing,
       focusedButtonIndex: state.actionButtonIndex,
+      isSectionFocused: isFocused,
       onFavorite: _handleFavorite,
       onShare: _handleShare,
       onCollection: () => _handleCollection(controller),
