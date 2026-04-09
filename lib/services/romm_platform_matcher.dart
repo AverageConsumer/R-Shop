@@ -71,4 +71,22 @@ class RommPlatformMatcher {
 
     return null;
   }
+
+  /// Builds the `knownPlatforms` map for a freshly-paired RomM source.
+  ///
+  /// For every R-Shop system slug in [systemIds], looks for a matching
+  /// [RommPlatform] in [platforms] and records its numeric id. Systems
+  /// the server doesn't ship are silently dropped — they will not be
+  /// fetched on sync.
+  static Map<String, int> buildKnownPlatforms(
+    Iterable<String> systemIds,
+    List<RommPlatform> platforms,
+  ) {
+    final result = <String, int>{};
+    for (final id in systemIds) {
+      final match = findMatch(id, platforms);
+      if (match != null) result[id] = match.id;
+    }
+    return result;
+  }
 }

@@ -90,6 +90,18 @@ class ProviderConfig {
   final int? platformId;
   final String? platformName;
 
+  /// True when this provider was synthesised by [SourcesNotifier] from a
+  /// top-level [Source]. Marked entries are owned by the dual-write code
+  /// and get replaced wholesale on every sources mutation; unmarked
+  /// entries (legacy onboarding output, manually edited config) survive
+  /// untouched.
+  final bool managedBySource;
+
+  /// Optional id of the [Source] that contributed this provider. Set when
+  /// [managedBySource] is true so the dual-write can map managed entries
+  /// back to their owner source for diffing.
+  final String? sourceId;
+
   const ProviderConfig({
     required this.type,
     required this.priority,
@@ -101,6 +113,8 @@ class ProviderConfig {
     this.auth,
     this.platformId,
     this.platformName,
+    this.managedBySource = false,
+    this.sourceId,
   });
 
   factory ProviderConfig.fromJson(Map<String, dynamic> json) {
@@ -117,6 +131,8 @@ class ProviderConfig {
           : null,
       platformId: json['platform_id'] as int?,
       platformName: json['platform_name'] as String?,
+      managedBySource: json['managed_by_source'] as bool? ?? false,
+      sourceId: json['source_id'] as String?,
     );
   }
 
@@ -132,6 +148,8 @@ class ProviderConfig {
       if (auth != null) 'auth': auth!.toJson(),
       if (platformId != null) 'platform_id': platformId,
       if (platformName != null) 'platform_name': platformName,
+      if (managedBySource) 'managed_by_source': true,
+      if (sourceId != null) 'source_id': sourceId,
     };
   }
 
@@ -291,6 +309,8 @@ class ProviderConfig {
     AuthConfig? auth,
     int? platformId,
     String? platformName,
+    bool? managedBySource,
+    String? sourceId,
   }) {
     return ProviderConfig(
       type: type ?? this.type,
@@ -303,6 +323,8 @@ class ProviderConfig {
       auth: auth ?? this.auth,
       platformId: platformId ?? this.platformId,
       platformName: platformName ?? this.platformName,
+      managedBySource: managedBySource ?? this.managedBySource,
+      sourceId: sourceId ?? this.sourceId,
     );
   }
 }

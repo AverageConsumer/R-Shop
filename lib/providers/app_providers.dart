@@ -11,6 +11,7 @@ import '../services/config_storage_service.dart';
 import '../services/disk_space_service.dart';
 import '../services/native_smb_service.dart';
 import '../services/romm_pairing_service.dart';
+import '../services/sources_notifier.dart';
 import '../models/game_item.dart';
 import '../models/sound_settings.dart';
 
@@ -34,6 +35,11 @@ final nativeSmbServiceProvider = Provider<NativeSmbService>((ref) {
 
 final rommPairingServiceProvider = Provider<RommPairingService>((ref) {
   return RommPairingService();
+});
+
+final sourcesProvider =
+    StateNotifierProvider<SourcesNotifier, SourcesState>((ref) {
+  return SourcesNotifier(ref.read(configStorageServiceProvider));
 });
 
 final configStorageServiceProvider = Provider<ConfigStorageService>((ref) {

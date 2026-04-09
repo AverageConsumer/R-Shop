@@ -23,7 +23,10 @@ import '../../widgets/exit_confirmation_overlay.dart';
 import '../../widgets/quick_menu.dart';
 import '../onboarding/onboarding_controller.dart';
 import '../pairing/qr_pairing_screen.dart';
+import '../../models/system_model.dart';
+import '../../services/romm_api_service.dart';
 import '../../services/romm_pairing_service.dart';
+import '../../services/romm_platform_matcher.dart';
 import 'config_mode_screen.dart';
 import 'library_scan_screen.dart';
 import 'ra_config_screen.dart';
@@ -270,13 +273,47 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       MaterialPageRoute(builder: (_) => const QrPairingScreen()),
     );
     if (!mounted || result == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Paired: ${result.name} (${result.scopes.length} scopes)',
-        ),
-      ),
-    );
+
+    // 1. Build a Source from the pair result.
+    final source = buildSourceFromPairResult(result);
+
+    // 2. Discover what platforms the server ships and resolve them
+    //    against R-Shop's known system slugs. The token we just got
+    //    is enough to authenticate the request.
+    Map<String, int> knownPlatforms = const {};
+    String? discoveryError;
+    try {
+      final api = RommApiService();
+      final platforms = await api.fetchPlatforms(
+        result.serverUrl,
+        auth: source.auth,
+      );
+      final allSystemIds = SystemModel.supportedSystems.map((s) => s.id);
+      knownPlatforms =
+          RommPlatformMatcher.buildKnownPlatforms(allSystemIds, platforms);
+    } catch (e) {
+      debugPrint('Pairing: platform discovery failed: $e');
+      discoveryError = e.toString();
+    }
+
+    // 3. Persist the source with the discovered platform map. The
+    //    SourcesNotifier handles the atomic write to config.json.
+    final notifier = ref.read(sourcesProvider.notifier);
+    await notifier.addSource(source.copyWith(knownPlatforms: knownPlatforms));
+
+    // 4. Invalidate the bootstrappedConfigProvider so the rest of the app
+    //    re-reads the just-written config (the legacy SystemConfig.providers
+    //    lists were rebuilt by the notifier on disk).
+    ref.invalidate(bootstrappedConfigProvider);
+
+    if (!mounted) return;
+
+    final platformCount = knownPlatforms.length;
+    final summary = discoveryError != null
+        ? 'Added ${source.name}, but platform discovery failed'
+        : 'Added ${source.name} (${platformCount == 0 ? "no" : platformCount} '
+            '${platformCount == 1 ? "platform" : "platforms"})';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(summary)));
   }
 
   void _showResetDialog() {

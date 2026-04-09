@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:retro_eshop/models/config/source.dart';
 import 'package:retro_eshop/services/romm_pairing_service.dart';
 
 /// Lightweight Dio adapter that returns pre-canned responses keyed by
@@ -397,6 +398,67 @@ void main() {
 
       final version = await svc.probeServer('http://10.0.0.99:8090');
       expect(version, isNull);
+    });
+  });
+
+  group('buildSourceFromPairResult', () {
+    RommPairResult result({
+      String name = 'My RomM',
+      List<String> scopes = const ['roms.read', 'roms.write'],
+      DateTime? expiresAt,
+    }) {
+      return RommPairResult(
+        serverUrl: 'http://192.168.1.50:8090',
+        token: 'eyJ.test.token',
+        tokenId: 7,
+        name: name,
+        scopes: scopes,
+        userId: 1,
+        expiresAt: expiresAt,
+      );
+    }
+
+    test('produces an enabled RomM source with auth and empty platforms', () {
+      final src = buildSourceFromPairResult(result());
+      expect(src.type, SourceType.romm);
+      expect(src.url, 'http://192.168.1.50:8090');
+      expect(src.autoMap, isTrue);
+      expect(src.enabled, isTrue);
+      expect(src.knownPlatforms, isEmpty);
+      expect(src.auth?.clientToken, 'eyJ.test.token');
+      expect(src.auth?.clientTokenId, 7);
+    });
+
+    test('marks read-only tokens as borrowed', () {
+      final src =
+          buildSourceFromPairResult(result(scopes: const ['roms.read']));
+      expect(src.borrowed, isTrue);
+    });
+
+    test('does not mark read+write tokens as borrowed', () {
+      final src = buildSourceFromPairResult(
+          result(scopes: const ['roms.read', 'roms.write']));
+      expect(src.borrowed, isFalse);
+    });
+
+    test('explicit borrowed flag overrides the heuristic', () {
+      final src = buildSourceFromPairResult(
+        result(scopes: const ['roms.read', 'roms.write']),
+        borrowed: true,
+      );
+      expect(src.borrowed, isTrue);
+    });
+
+    test('mirrors expiresAt onto the source', () {
+      final exp = DateTime.utc(2026, 5, 9, 12);
+      final src = buildSourceFromPairResult(result(expiresAt: exp));
+      expect(src.tokenExpiresAt, exp);
+      expect(src.auth?.clientTokenExpiresAt, exp);
+    });
+
+    test('falls back to host label when token name is empty', () {
+      final src = buildSourceFromPairResult(result(name: ''));
+      expect(src.name, '192.168.1.50');
     });
   });
 }

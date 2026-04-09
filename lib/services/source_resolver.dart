@@ -129,6 +129,8 @@ class SourceResolver {
           auth: source.auth,
           platformId: source.rommPlatformIdFor(system.id),
           platformName: system.id,
+          managedBySource: true,
+          sourceId: source.id,
         );
       case SourceType.smb:
         return ProviderConfig(
@@ -139,6 +141,8 @@ class SourceResolver {
           share: source.share,
           path: mapping?.remotePath,
           auth: source.auth,
+          managedBySource: true,
+          sourceId: source.id,
         );
       case SourceType.ftp:
         return ProviderConfig(
@@ -148,10 +152,10 @@ class SourceResolver {
           port: source.port,
           path: mapping?.remotePath,
           auth: source.auth,
+          managedBySource: true,
+          sourceId: source.id,
         );
       case SourceType.web:
-        // Web sources need a fully-qualified URL per system. Concatenate
-        // the source base URL with the per-system mapping path.
         final base = source.url ?? '';
         final segment = mapping?.remotePath ?? '';
         final joined = _joinUrl(base, segment);
@@ -160,12 +164,15 @@ class SourceResolver {
           priority: entry.effectivePriority,
           url: joined,
           auth: source.auth,
+          managedBySource: true,
+          sourceId: source.id,
         );
       case SourceType.local:
-        // Local sources have no ProviderConfig representation today.
         return ProviderConfig(
           type: ProviderType.web, // placeholder; never resolved in practice
           priority: entry.effectivePriority,
+          managedBySource: true,
+          sourceId: source.id,
         );
     }
   }

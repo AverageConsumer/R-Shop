@@ -1,6 +1,53 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
+import '../models/config/provider_config.dart';
+import '../models/config/source.dart';
+
+/// Builds a brand-new [Source] from a [RommPairResult] without yet
+/// knowing which platforms the server ships. The caller is expected to
+/// follow up with `RommApiService.fetchPlatforms` and then
+/// `SourcesNotifier.updateKnownPlatforms` to fill the cache.
+///
+/// `borrowed` is set when the granted token name suggests the source
+/// belongs to someone else (e.g. contains "guest", "share", or the role
+/// is read-only). For now this is a coarse heuristic — Step 9 will let
+/// the user override the badge manually.
+Source buildSourceFromPairResult(
+  RommPairResult result, {
+  String? id,
+  bool? borrowed,
+  int priority = 1,
+}) {
+  final hasReadOnlyScopes = result.scopes.isNotEmpty &&
+      !result.scopes.any((s) => s.endsWith('.write'));
+  final guessedBorrowed = borrowed ??
+      (hasReadOnlyScopes ||
+          result.name.toLowerCase().contains('guest') ||
+          result.name.toLowerCase().contains('share'));
+
+  final uri = Uri.tryParse(result.serverUrl);
+  final hostLabel = uri?.host ?? result.serverUrl;
+
+  return Source(
+    id: id ?? 'src-romm-${DateTime.now().millisecondsSinceEpoch}',
+    name: result.name.isNotEmpty ? result.name : hostLabel,
+    type: SourceType.romm,
+    url: result.serverUrl,
+    auth: AuthConfig(
+      clientToken: result.token,
+      clientTokenId: result.tokenId,
+      clientTokenExpiresAt: result.expiresAt,
+    ),
+    autoMap: true,
+    priority: priority,
+    enabled: true,
+    borrowed: guessedBorrowed,
+    tokenExpiresAt: result.expiresAt,
+    knownPlatforms: const {},
+  );
+}
+
 /// Result of a successful pairing-code exchange against a RomM 4.8+ server.
 ///
 /// The token string is the bearer credential that subsequent API calls must
