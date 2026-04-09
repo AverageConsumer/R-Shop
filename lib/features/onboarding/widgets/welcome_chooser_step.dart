@@ -355,15 +355,13 @@ class _ChoiceTile extends StatelessWidget {
       focusNode: focusNode,
       onSelect: onSelect,
       borderRadius: 12,
+      focusScale: 1.0,
+      focusBorderColor: AppTheme.primaryColor,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppTheme.primaryColor.withValues(alpha: 0.10),
+          color: const Color(0xFF1C1C1C),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppTheme.primaryColor.withValues(alpha: 0.45),
-            width: 2,
-          ),
         ),
         child: Row(
           children: [

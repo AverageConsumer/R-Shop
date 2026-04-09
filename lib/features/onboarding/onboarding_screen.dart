@@ -638,21 +638,27 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _buildLandscapeContent(OnboardingState state, Responsive rs) {
+    // The welcome chooser is its own self-contained screen — hide the
+    // step indicator + Pixel mascot side rail so it doesn't look like
+    // a stepper page that the user needs to walk through.
+    final isChooser = state.currentStep == OnboardingStep.welcome;
     return Expanded(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            children: [
-              PixelMascot(size: rs.isSmall ? 36 : 48),
-              SizedBox(height: rs.spacing.sm),
-              _StepIndicator(
-                currentStep: state.currentStep,
-                isSmall: rs.isSmall,
-                vertical: true,
-              ),
-            ],
-          ),
+          if (!isChooser) ...[
+            Column(
+              children: [
+                PixelMascot(size: rs.isSmall ? 36 : 48),
+                SizedBox(height: rs.spacing.sm),
+                _StepIndicator(
+                  currentStep: state.currentStep,
+                  isSmall: rs.isSmall,
+                  vertical: true,
+                ),
+              ],
+            ),
+          ],
           Expanded(
             child: _buildContent(state),
           ),
@@ -662,21 +668,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Widget _buildPortraitContent(OnboardingState state, Responsive rs) {
+    final isChooser = state.currentStep == OnboardingStep.welcome;
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              PixelMascot(size: rs.isSmall ? 28 : 40),
-              SizedBox(width: rs.spacing.md),
-              _StepIndicator(
-                currentStep: state.currentStep,
-                isSmall: rs.isSmall,
-              ),
-            ],
-          ),
-          SizedBox(height: rs.spacing.sm),
+          if (!isChooser) ...[
+            Row(
+              children: [
+                PixelMascot(size: rs.isSmall ? 28 : 40),
+                SizedBox(width: rs.spacing.md),
+                _StepIndicator(
+                  currentStep: state.currentStep,
+                  isSmall: rs.isSmall,
+                ),
+              ],
+            ),
+            SizedBox(height: rs.spacing.sm),
+          ],
           Expanded(child: _buildContent(state)),
         ],
       ),
