@@ -15,6 +15,7 @@ class SettingsSystemTab extends ConsumerWidget {
   final bool allowNonLanHttp;
   final String coverSubtitle;
   final VoidCallback onOpenRommConfig;
+  final VoidCallback onOpenPairing;
   final VoidCallback onOpenRaConfig;
   final VoidCallback onOpenConfigMode;
   final VoidCallback onOpenLibraryScan;
@@ -34,6 +35,7 @@ class SettingsSystemTab extends ConsumerWidget {
     required this.allowNonLanHttp,
     required this.coverSubtitle,
     required this.onOpenRommConfig,
+    required this.onOpenPairing,
     required this.onOpenRaConfig,
     required this.onOpenConfigMode,
     required this.onOpenLibraryScan,
@@ -238,6 +240,14 @@ class SettingsSystemTab extends ConsumerWidget {
               _buildCoverPreloadTile(ref),
               SizedBox(height: rs.spacing.md),
               _buildExportLogTile(ref),
+              SizedBox(height: rs.spacing.md),
+              SettingsItem(
+                title: 'Pairing (DEV)',
+                subtitle: 'QR scan or manual server + code',
+                trailing: const Icon(Icons.qr_code_scanner,
+                    color: Colors.white70),
+                onTap: onOpenPairing,
+              ),
             ],
           ),
         ),

@@ -22,6 +22,8 @@ import '../../widgets/console_notification.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
 import '../../widgets/quick_menu.dart';
 import '../onboarding/onboarding_controller.dart';
+import '../pairing/qr_pairing_screen.dart';
+import '../../services/romm_pairing_service.dart';
 import 'config_mode_screen.dart';
 import 'library_scan_screen.dart';
 import 'ra_config_screen.dart';
@@ -259,6 +261,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const RommConfigScreen()),
+    );
+  }
+
+  Future<void> _openPairing() async {
+    final result = await Navigator.push<RommPairResult?>(
+      context,
+      MaterialPageRoute(builder: (_) => const QrPairingScreen()),
+    );
+    if (!mounted || result == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Paired: ${result.name} (${result.scopes.length} scopes)',
+        ),
+      ),
     );
   }
 
@@ -525,6 +542,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             allowNonLanHttp: _allowNonLanHttp,
                             coverSubtitle: _buildCoverSubtitle(),
                             onOpenRommConfig: _openRommConfig,
+                            onOpenPairing: _openPairing,
                             onOpenRaConfig: _openRaConfig,
                             onOpenConfigMode: _openConfigMode,
                             onOpenLibraryScan: _openLibraryScan,

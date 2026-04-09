@@ -112,13 +112,30 @@ class RommPairingService {
     final match = _pairUrlPattern.firstMatch(trimmed);
     if (match == null) {
       throw const RommPairInvalidQrException(
-        'QR-Code ist kein RomM-Pairing-Link',
+        'QR code is not a valid RomM pairing link',
       );
     }
     return RommPairCodeData(
       serverUrl: match.group(1)!,
-      code: match.group(2)!,
+      code: normalizeCode(match.group(2)!),
     );
+  }
+
+  /// Canonicalises a pairing code to the server-expected `XXXX-XXXX` form.
+  ///
+  /// Strips spaces, hyphens, and lowercase letters; if the result is exactly
+  /// 8 characters it is split into two 4-character groups separated by a
+  /// hyphen. Shorter or longer codes are returned uppercase but unchanged so
+  /// the server can reject them with a meaningful error.
+  static String normalizeCode(String input) {
+    final stripped = input
+        .replaceAll(RegExp(r'\s+'), '')
+        .replaceAll('-', '')
+        .toUpperCase();
+    if (stripped.length == 8) {
+      return '${stripped.substring(0, 4)}-${stripped.substring(4)}';
+    }
+    return stripped;
   }
 
   /// Exchanges a pairing [code] against [serverUrl] for a bearer token.
@@ -132,12 +149,13 @@ class RommPairingService {
     required String code,
   }) async {
     final normalized = _normalizeServerUrl(serverUrl);
+    final canonicalCode = normalizeCode(code);
     final endpoint = '$normalized/api/client-tokens/exchange';
 
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         endpoint,
-        data: {'code': code},
+        data: {'code': canonicalCode},
         options: Options(
           contentType: Headers.jsonContentType,
           responseType: ResponseType.json,
@@ -161,7 +179,7 @@ class RommPairingService {
           status == 400 ||
           status == 404) {
         throw RommPairCodeExpiredException(
-          body['detail']?.toString() ?? 'Pairing-Code ungültig oder abgelaufen',
+          body['detail']?.toString() ?? 'Pairing code invalid or expired',
         );
       }
       throw RommPairUnknownException('HTTP $status: ${body['detail'] ?? body}');
@@ -171,7 +189,7 @@ class RommPairingService {
           e.type == DioExceptionType.receiveTimeout ||
           e.type == DioExceptionType.sendTimeout) {
         throw RommPairServerUnreachableException(
-          'Server $normalized nicht erreichbar',
+          'Server $normalized is not reachable',
         );
       }
       rethrow;
@@ -211,10 +229,12 @@ class RommPairingService {
     required String serverUrl,
     required Map<String, dynamic> json,
   }) {
-    final token = json['token']?.toString();
+    // RomM 4.8 returns the bearer in `raw_token`. Older preview builds used
+    // `token`; accept both so the parser is forward/backward tolerant.
+    final token = (json['raw_token'] ?? json['token'])?.toString();
     if (token == null || token.isEmpty) {
       throw const RommPairUnknownException(
-        'Server-Response enthält kein Token',
+        'Server response did not contain a token',
       );
     }
 
@@ -232,16 +252,19 @@ class RommPairingService {
     return RommPairResult(
       serverUrl: serverUrl,
       token: token,
-      tokenId: (json['id'] ?? json['token_id'] ?? 0) is int
-          ? (json['id'] ?? json['token_id'] ?? 0) as int
-          : int.tryParse('${json['id'] ?? json['token_id']}') ?? 0,
+      tokenId: _asInt(json['id'] ?? json['token_id']),
       name: json['name']?.toString() ?? 'R-Shop',
       scopes: scopes,
-      userId: (json['user_id'] ?? 0) is int
-          ? (json['user_id'] ?? 0) as int
-          : int.tryParse('${json['user_id']}') ?? 0,
+      userId: _asInt(json['user_id']),
       expiresAt: expiresAt,
     );
+  }
+
+  static int _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 
   String _normalizeServerUrl(String url) {

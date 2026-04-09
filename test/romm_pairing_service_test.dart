@@ -68,6 +68,33 @@ RommPairingService _makeService(_FakeAdapter adapter) {
 }
 
 void main() {
+  group('normalizeCode', () {
+    test('canonical 8-char code stays as XXXX-XXXX', () {
+      expect(RommPairingService.normalizeCode('B7K9-3MX2'), 'B7K9-3MX2');
+    });
+
+    test('lowercase is uppercased', () {
+      expect(RommPairingService.normalizeCode('b7k9-3mx2'), 'B7K9-3MX2');
+    });
+
+    test('missing dash is reinserted', () {
+      expect(RommPairingService.normalizeCode('B7K93MX2'), 'B7K9-3MX2');
+    });
+
+    test('whitespace is stripped', () {
+      expect(RommPairingService.normalizeCode('  B7K9 - 3MX2 '), 'B7K9-3MX2');
+    });
+
+    test('multiple dashes collapse', () {
+      expect(RommPairingService.normalizeCode('B7-K9-3-MX2'), 'B7K9-3MX2');
+    });
+
+    test('non-8-char input returns uppercase stripped form', () {
+      expect(RommPairingService.normalizeCode('abc'), 'ABC');
+      expect(RommPairingService.normalizeCode('toolong-1234'), 'TOOLONG1234');
+    });
+  });
+
   group('parseQrPayload', () {
     final svc = RommPairingService();
 
@@ -84,9 +111,10 @@ void main() {
     });
 
     test('trims whitespace', () {
-      final result = svc.parseQrPayload('  https://r.io/pair?code=XX-YY  ');
+      final result =
+          svc.parseQrPayload('  https://r.io/pair?code=AAAA-BBBB  ');
       expect(result.serverUrl, 'https://r.io');
-      expect(result.code, 'XX-YY');
+      expect(result.code, 'AAAA-BBBB');
     });
 
     test('rejects non-pair URL', () {
@@ -126,7 +154,7 @@ void main() {
           url: 'http://localhost:8090/api/client-tokens/exchange',
           status: 200,
           body: {
-            'token': 'eyJraWQiOiJhYmM',
+            'raw_token': 'eyJraWQiOiJhYmM',
             'id': 7,
             'name': 'rshop-test',
             'scopes': ['roms.read', 'platforms.read'],
@@ -152,6 +180,51 @@ void main() {
       expect(result.serverUrl, 'http://localhost:8090');
     });
 
+    test('accepts legacy `token` field as fallback', () async {
+      final adapter = _FakeAdapter()
+        ..on(
+          method: 'POST',
+          url: 'http://localhost:8090/api/client-tokens/exchange',
+          status: 200,
+          body: {
+            'token': 'legacy-token',
+            'id': 1,
+            'name': 'legacy',
+            'scopes': <String>[],
+            'user_id': 1,
+          },
+        );
+      final svc = _makeService(adapter);
+      final result = await svc.exchangeCode(
+        serverUrl: 'http://localhost:8090',
+        code: 'AAAA-BBBB',
+      );
+      expect(result.token, 'legacy-token');
+    });
+
+    test('normalises code before sending to server', () async {
+      final adapter = _FakeAdapter()
+        ..on(
+          method: 'POST',
+          url: 'http://localhost:8090/api/client-tokens/exchange',
+          status: 200,
+          body: {
+            'raw_token': 't',
+            'id': 1,
+            'name': 'n',
+            'scopes': <String>[],
+            'user_id': 1,
+          },
+        );
+      final svc = _makeService(adapter);
+      await svc.exchangeCode(
+        serverUrl: 'http://localhost:8090',
+        code: '  b7k93mx2 ',
+      );
+      final sent = adapter.requests.first.data as Map;
+      expect(sent['code'], 'B7K9-3MX2');
+    });
+
     test('handles null expiry (never expires)', () async {
       final adapter = _FakeAdapter()
         ..on(
@@ -159,7 +232,7 @@ void main() {
           url: 'http://localhost:8090/api/client-tokens/exchange',
           status: 200,
           body: {
-            'token': 'tok',
+            'raw_token': 'tok',
             'id': 1,
             'name': 'forever',
             'scopes': ['roms.read'],
@@ -183,7 +256,7 @@ void main() {
           url: 'http://localhost:8090/api/client-tokens/exchange',
           status: 200,
           body: {
-            'token': 't',
+            'raw_token': 't',
             'id': 1,
             'name': 'n',
             'scopes': <String>[],
@@ -266,7 +339,7 @@ void main() {
           url: 'http://localhost:8090/api/client-tokens/exchange',
           status: 200,
           body: {
-            'token': 'qr-tok',
+            'raw_token': 'qr-tok',
             'id': 42,
             'name': 'from-qr',
             'scopes': ['roms.read'],

@@ -316,6 +316,7 @@ void main() {
           allowNonLanHttp: allowNonLanHttp,
           coverSubtitle: coverSubtitle,
           onOpenRommConfig: () {},
+          onOpenPairing: () {},
           onOpenRaConfig: () {},
           onOpenConfigMode: () {},
           onOpenLibraryScan: () {},
