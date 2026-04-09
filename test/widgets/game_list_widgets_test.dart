@@ -5,6 +5,7 @@ import 'package:retro_eshop/features/game_list/widgets/game_grid.dart';
 import 'package:retro_eshop/features/game_list/widgets/game_list_header.dart';
 import 'package:retro_eshop/models/system_model.dart';
 import 'package:retro_eshop/services/disk_space_service.dart';
+import 'package:retro_eshop/widgets/base_game_card.dart';
 import '../helpers/pump_helpers.dart';
 
 // ─── Test Fixtures ───────────────────────────────────────
@@ -136,6 +137,58 @@ void main() {
       ));
 
       expect(find.byIcon(Icons.games), findsOneWidget);
+    });
+  });
+
+  group('BaseGameCard source dot', () {
+    Widget wrap(Widget child) => createTestApp(
+          SizedBox(width: 200, height: 280, child: child),
+        );
+
+    testWidgets('renders no dot when sourceDotColor is null', (tester) async {
+      await tester.pumpWidget(wrap(BaseGameCard(
+        displayName: 'Test',
+        coverUrls: const [],
+        cachedUrl: null,
+        isInstalled: false,
+        isSelected: false,
+        accentColor: Colors.green,
+        onTap: () {},
+      )));
+      expect(find.byIcon(Icons.share), findsNothing);
+    });
+
+    testWidgets('renders solid dot when sourceDotColor set and not borrowed',
+        (tester) async {
+      await tester.pumpWidget(wrap(BaseGameCard(
+        displayName: 'Test',
+        coverUrls: const [],
+        cachedUrl: null,
+        isInstalled: false,
+        isSelected: false,
+        accentColor: Colors.green,
+        sourceDotColor: Colors.greenAccent,
+        sourceDotBorrowed: false,
+        onTap: () {},
+      )));
+      // No share icon because not borrowed.
+      expect(find.byIcon(Icons.share), findsNothing);
+    });
+
+    testWidgets('renders share glyph when sourceDotBorrowed is true',
+        (tester) async {
+      await tester.pumpWidget(wrap(BaseGameCard(
+        displayName: 'Test',
+        coverUrls: const [],
+        cachedUrl: null,
+        isInstalled: false,
+        isSelected: false,
+        accentColor: Colors.green,
+        sourceDotColor: Colors.lightBlueAccent,
+        sourceDotBorrowed: true,
+        onTap: () {},
+      )));
+      expect(find.byIcon(Icons.share), findsOneWidget);
     });
   });
 

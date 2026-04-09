@@ -166,6 +166,11 @@ class ProviderConfig {
       if (path != null) 'path': path,
       if (platformId != null) 'platform_id': platformId,
       if (platformName != null) 'platform_name': platformName,
+      // Source provenance must survive the auth-stripped round-trip so
+      // that the per-card source dot keeps working when GameItems are
+      // loaded back from the SQLite cache.
+      if (managedBySource) 'managed_by_source': true,
+      if (sourceId != null) 'source_id': sourceId,
     };
   }
 

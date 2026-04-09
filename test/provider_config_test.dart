@@ -177,6 +177,25 @@ void main() {
       final withAuthCopy = Map<String, dynamic>.from(withAuth)..remove('auth');
       expect(without, withAuthCopy);
     });
+
+    test('preserves managedBySource and sourceId across the round-trip', () {
+      const managed = ProviderConfig(
+        type: ProviderType.romm,
+        priority: 1,
+        url: 'http://romm.local',
+        platformId: 8,
+        platformName: 'nds',
+        managedBySource: true,
+        sourceId: 'src-romm-42',
+      );
+      final json = managed.toJsonWithoutAuth();
+      expect(json['managed_by_source'], true);
+      expect(json['source_id'], 'src-romm-42');
+      // Round-trip via fromJson keeps both fields populated.
+      final back = ProviderConfig.fromJson(json);
+      expect(back.managedBySource, isTrue);
+      expect(back.sourceId, 'src-romm-42');
+    });
   });
 
   // ─── shortLabel ───────────────────────────────────────────────────

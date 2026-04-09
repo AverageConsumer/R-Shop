@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../models/config/source.dart';
 import '../../../models/game_item.dart';
 import '../../../models/ra_models.dart';
 import '../../../models/system_model.dart';
+import '../../../providers/app_providers.dart';
 import '../../../utils/image_helper.dart';
 import '../../../widgets/base_game_card.dart';
 import '../../../widgets/selection_aware_item.dart';
 
-class GameGrid extends StatefulWidget {
+class GameGrid extends ConsumerStatefulWidget {
   final SystemModel system;
   final List<String> filteredGroups;
   final Map<String, List<GameItem>> groupedGames;
@@ -61,10 +64,10 @@ class GameGrid extends StatefulWidget {
   });
 
   @override
-  State<GameGrid> createState() => _GameGridState();
+  ConsumerState<GameGrid> createState() => _GameGridState();
 }
 
-class _GameGridState extends State<GameGrid> {
+class _GameGridState extends ConsumerState<GameGrid> {
   int _optimalCacheWidth = 500;
   Map<String, List<String>> _coverUrlCache = {};
 
@@ -215,6 +218,24 @@ class _GameGridState extends State<GameGrid> {
     final providerLabel = first.providerConfig?.shortLabel;
     final raMatch = widget.raMatches[first.filename];
 
+    // Source dot — look up the contributing Source by its id (set by
+    // SourceResolver when it synthesised this provider). Falls back to
+    // null for legacy/unmanaged providers, in which case BaseGameCard
+    // simply renders no dot.
+    final sourcesState = ref.watch(sourcesProvider);
+    final sourceId = first.providerConfig?.sourceId;
+    Source? source;
+    if (sourceId != null) {
+      for (final s in sourcesState.sources) {
+        if (s.id == sourceId) {
+          source = s;
+          break;
+        }
+      }
+    }
+    final dotColor = source == null ? null : _colorForSource(source);
+    final dotBorrowed = source?.borrowed ?? false;
+
     return RepaintBoundary(
       key: widget.itemKeys[index],
       child: SelectionAwareItem(
@@ -237,6 +258,8 @@ class _GameGridState extends State<GameGrid> {
           memCacheWidth: _optimalCacheWidth,
           scrollSuppression: widget.scrollSuppression,
           focusNode: widget.focusNodes[index],
+          sourceDotColor: dotColor,
+          sourceDotBorrowed: dotBorrowed,
           onTap: () => widget.onOpenGame(displayName, variants),
           onTapSelect: () => widget.onSelectionChanged(index),
           onCoverFound: (url) => widget.onCoverFound(url, variants),
@@ -244,6 +267,22 @@ class _GameGridState extends State<GameGrid> {
         ),
       ),
     );
+  }
+
+  static Color _colorForSource(Source source) {
+    if (source.borrowed) return Colors.lightBlueAccent;
+    switch (source.type) {
+      case SourceType.romm:
+        return Colors.greenAccent;
+      case SourceType.smb:
+        return Colors.amberAccent;
+      case SourceType.ftp:
+        return Colors.purpleAccent;
+      case SourceType.web:
+        return Colors.tealAccent;
+      case SourceType.local:
+        return Colors.white70;
+    }
   }
 }
 

@@ -23,6 +23,17 @@ class BaseGameCard extends StatelessWidget {
   final RaMatchType raMatchType;
   final bool isMastered;
 
+  /// Optional color for the small "source dot" rendered in the bottom-
+  /// right corner of the cover. When `null`, no dot is drawn — used for
+  /// games that come from legacy/unmanaged providers or for cards
+  /// outside the v3 source pipeline.
+  final Color? sourceDotColor;
+
+  /// When `true`, the source dot is rendered with a hollow ring + share
+  /// glyph instead of a solid circle, marking games that came from a
+  /// borrowed (read-only / shared) source.
+  final bool sourceDotBorrowed;
+
   // Thumbnail pipeline
   final bool hasThumbnail;
   final void Function(String url)? onThumbnailNeeded;
@@ -61,6 +72,8 @@ class BaseGameCard extends StatelessWidget {
     this.onTapSelect,
     this.onLongPress,
     this.onCoverFound,
+    this.sourceDotColor,
+    this.sourceDotBorrowed = false,
   });
 
   @override
@@ -269,6 +282,18 @@ class BaseGameCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                // Source dot — bottom right, above the title gradient.
+                // Solid circle = owned, hollow ring = borrowed.
+                if (sourceDotColor != null)
+                  Positioned(
+                    right: padding,
+                    bottom: padding,
+                    child: _SourceDot(
+                      color: sourceDotColor!,
+                      borrowed: sourceDotBorrowed,
+                      isSmall: rs.isSmall,
+                    ),
+                  ),
                 // Selection line
                 if (isSelected)
                   Positioned(
@@ -433,6 +458,59 @@ class _RaBadge extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Tiny visual indicator drawn in the bottom-right corner of a game
+/// cover, showing which top-level [Source] this game came from.
+///
+/// Owned source = solid circle in the source colour.
+/// Borrowed source = hollow ring in the source colour with a small share
+/// glyph in the centre. The glyph distinguishes "this game lives on a
+/// friend's server" from "I downloaded this myself" without needing a
+/// legend.
+class _SourceDot extends StatelessWidget {
+  const _SourceDot({
+    required this.color,
+    required this.borrowed,
+    required this.isSmall,
+  });
+
+  final Color color;
+  final bool borrowed;
+  final bool isSmall;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = isSmall ? 10.0 : 12.0;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: borrowed ? Colors.transparent : color,
+        border: Border.all(
+          color: borrowed ? color : Colors.black.withValues(alpha: 0.5),
+          width: borrowed ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.6),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: borrowed
+          ? Center(
+              child: Icon(
+                Icons.share,
+                size: size - 4,
+                color: color,
+              ),
+            )
+          : null,
     );
   }
 }
