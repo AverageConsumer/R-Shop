@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.5.2] — 2026-04-09
+
+### Fixed
+- **RomM platform filter (#11)** — `platform_ids` query parameter was serialized in a way the RomM API ignored, causing every system to receive the entire library mixed across platforms. Combined with the larger RetroAchievements metadata payloads in recent RomM versions, this also caused sync to stall at 0/N for users with bigger libraries. Filter now uses repeated query params (`platform_ids=1&platform_ids=2`) so the server actually applies it.
+- **Sync receive timeout** — bumped from 30s to 90s. A single 500-ROM page with embedded RA achievements and screenshots can be several MB, especially with high server latency.
+
+### Added
+- **Local fallback on remote failure** — when a remote source (RomM/SMB/FTP/Web) fails for a system, the sync now falls back to a local-only filesystem scan so users don't lose visibility on locally-present ROMs. Applied to all four sync paths (full sync, smart sync, library scan, single-system sync).
+- **Persistent error pill** — when a sync fails, the status pill in the top-left now turns red, pulses gently, and stays visible until the next sync starts (was amber and auto-dismissed after 6s — easy to miss).
+
+---
+
 ## [1.5.1] — 2026-03-16
 
 ### Improved
