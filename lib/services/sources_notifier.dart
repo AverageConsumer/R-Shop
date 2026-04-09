@@ -127,6 +127,30 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     await _writeAndPublish(next);
   }
 
+  /// Adds a new manual source together with the per-system path mappings
+  /// the user picked in the add screen. Both halves land in the same
+  /// atomic write so the resolver immediately produces working providers
+  /// for every mapped system on the next rebuild.
+  ///
+  /// [mappingsBySystemId] is keyed by R-Shop system slug; the value is
+  /// the remote path (relative to the source's base) for that system.
+  /// Empty paths are dropped.
+  Future<void> addSourceWithMappings(
+    Source source,
+    Map<String, String> mappingsBySystemId,
+  ) async {
+    if (state.sources.any((s) => s.id == source.id)) return;
+    final next = [...state.sources, source];
+    final cleaned = <String, String>{
+      for (final e in mappingsBySystemId.entries)
+        if (e.value.trim().isNotEmpty) e.key: e.value.trim(),
+    };
+    await _writeAndPublish(
+      next,
+      addMappings: {source.id: cleaned},
+    );
+  }
+
   /// Replaces the source with the same id. Throws [StateError] if the id
   /// is unknown.
   Future<void> updateSource(Source source) async {
@@ -226,7 +250,16 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     await _writeAndPublish(next);
   }
 
-  Future<void> _writeAndPublish(List<Source> next) async {
+  /// Persists [next] as the new sources list.
+  ///
+  /// [addMappings] (sourceId → systemSlug → remotePath) lets callers
+  /// inject SystemSourceMapping entries into the systems list as part of
+  /// the same atomic write. Used by [addSourceWithMappings] so a manual
+  /// source's per-system paths land alongside the source itself.
+  Future<void> _writeAndPublish(
+    List<Source> next, {
+    Map<String, Map<String, String>> addMappings = const {},
+  }) async {
     // Re-read the config from disk so any writes that happened outside
     // this notifier (e.g. the onboarding flow adding new systems) are
     // picked up before we touch the file. This prevents the notifier's
@@ -238,6 +271,35 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     } catch (e) {
       debugPrint('SourcesNotifier: re-read failed, using cache: $e');
       latest = _cachedConfig;
+    }
+
+    // Inject any caller-supplied SystemSourceMappings before the rebuild
+    // so the resolver picks them up in the same atomic write.
+    if (addMappings.isNotEmpty) {
+      latest = latest.copyWith(
+        systems: latest.systems.map((s) {
+          final extras = <SystemSourceMapping>[];
+          for (final entry in addMappings.entries) {
+            final sourceId = entry.key;
+            final path = entry.value[s.id];
+            if (path != null && path.isNotEmpty) {
+              // Skip if a mapping for this source already exists.
+              final exists =
+                  s.manualMappings.any((m) => m.sourceId == sourceId);
+              if (!exists) {
+                extras.add(SystemSourceMapping(
+                  sourceId: sourceId,
+                  remotePath: path,
+                ));
+              }
+            }
+          }
+          if (extras.isEmpty) return s;
+          return s.copyWith(
+            manualMappings: [...s.manualMappings, ...extras],
+          );
+        }).toList(growable: false),
+      );
     }
 
     // Tracked rebuild: drop every provider previously written by the

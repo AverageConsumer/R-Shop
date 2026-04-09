@@ -19,6 +19,7 @@ import '../../services/sources_notifier.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../pairing/qr_pairing_screen.dart';
+import '../sources/manual_source_add_screen.dart';
 
 /// Verwaltungs-Screen für alle gepairten / konfigurierten [Source]s.
 ///
@@ -50,6 +51,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   final ScrollController _scrollController = ScrollController();
 
   Source? _activeActionsSource;
+  bool _showTypePicker = false;
 
   /// True once we've successfully moved focus off of the screen-level
   /// Focus stub created by [ConsoleScreenMixin.buildWithActions]. Until
@@ -183,12 +185,48 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     return true;
   }
 
-  Future<void> _addSource() async {
+  void _addSource() {
     // NB: do NOT call canPerformAction() here — SearchAction.invoke
     // already consumed the debounce slot, calling it again immediately
     // would always fail and silently swallow the Y press.
     ref.read(feedbackServiceProvider).tick();
+    setState(() => _showTypePicker = true);
+  }
 
+  void _closeTypePicker() {
+    if (!_showTypePicker) return;
+    setState(() => _showTypePicker = false);
+  }
+
+  Future<void> _onTypePicked(SourceType type) async {
+    setState(() => _showTypePicker = false);
+    if (type == SourceType.romm) {
+      await _addRommSource();
+    } else {
+      await _addManualSource(type);
+    }
+  }
+
+  Future<void> _addManualSource(SourceType type) async {
+    final result = await Navigator.of(context).push<Source?>(
+      MaterialPageRoute(builder: (_) => ManualSourceAddScreen(type: type)),
+    );
+    if (!mounted || result == null) return;
+    ref.invalidate(bootstrappedConfigProvider);
+    ref.invalidate(gamesProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusFor(result.id).requestFocus();
+      _initialFocusClaimed = true;
+    });
+    showSuccessNotification(
+      context,
+      ref,
+      message: 'Added ${result.name} — map systems from its actions menu',
+    );
+  }
+
+  Future<void> _addRommSource() async {
     final result = await Navigator.of(context).push<RommPairResult?>(
       MaterialPageRoute(builder: (_) => const QrPairingScreen()),
     );
@@ -378,6 +416,11 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                     _toggleSourceEnabled(_activeActionsSource!),
                 onRemove: () => _removeSource(_activeActionsSource!),
                 onRepair: () => _repairSource(_activeActionsSource!),
+              ),
+            if (_showTypePicker)
+              _SourceTypePickerOverlay(
+                onClose: _closeTypePicker,
+                onPick: _onTypePicked,
               ),
           ],
         ),
@@ -1046,6 +1089,242 @@ class _OverlayButton extends StatelessWidget {
               color: color,
               fontWeight: FontWeight.w600,
               fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Modal that asks the user which kind of source they want to add. RomM
+/// hands off to the QR/code pairing flow; the other types open the
+/// generic [ManualSourceAddScreen]. Local folders are intentionally not
+/// offered here — they live on each system as `targetFolder` already, so
+/// a "local source" entry would just duplicate state.
+class _SourceTypePickerOverlay extends ConsumerStatefulWidget {
+  const _SourceTypePickerOverlay({
+    required this.onClose,
+    required this.onPick,
+  });
+
+  final VoidCallback onClose;
+  final void Function(SourceType type) onPick;
+
+  @override
+  ConsumerState<_SourceTypePickerOverlay> createState() =>
+      _SourceTypePickerOverlayState();
+}
+
+class _SourceTypePickerOverlayState
+    extends ConsumerState<_SourceTypePickerOverlay> {
+  final FocusNode _scopeFocus =
+      FocusNode(debugLabel: 'source_type_picker');
+  int _selectedIndex = 0;
+
+  static const List<_TypeOption> _options = [
+    _TypeOption(
+      type: SourceType.romm,
+      icon: Icons.qr_code_2,
+      label: 'RomM Server',
+      hint: 'Pair via QR or 8-digit code',
+    ),
+    _TypeOption(
+      type: SourceType.smb,
+      icon: Icons.folder_shared,
+      label: 'SMB Share',
+      hint: 'Windows / NAS network share',
+    ),
+    _TypeOption(
+      type: SourceType.ftp,
+      icon: Icons.cloud_queue,
+      label: 'FTP Server',
+      hint: 'Classic FTP/FTPS host',
+    ),
+    _TypeOption(
+      type: SourceType.web,
+      icon: Icons.public,
+      label: 'Web Mirror',
+      hint: 'HTTPS directory listing',
+    ),
+  ];
+
+  @override
+  void dispose() {
+    _scopeFocus.dispose();
+    super.dispose();
+  }
+
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowUp) {
+      setState(() => _selectedIndex =
+          (_selectedIndex - 1 + _options.length) % _options.length);
+      ref.read(feedbackServiceProvider).tick();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowDown) {
+      setState(() =>
+          _selectedIndex = (_selectedIndex + 1) % _options.length);
+      ref.read(feedbackServiceProvider).tick();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.gameButtonA ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.select) {
+      ref.read(feedbackServiceProvider).confirm();
+      widget.onPick(_options[_selectedIndex].type);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.gameButtonB ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.goBack) {
+      ref.read(feedbackServiceProvider).cancel();
+      widget.onClose();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OverlayFocusScope(
+      priority: OverlayPriority.dialog,
+      isVisible: true,
+      onClose: widget.onClose,
+      child: Focus(
+        focusNode: _scopeFocus,
+        autofocus: true,
+        onKeyEvent: _onKeyEvent,
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.78),
+          child: Center(
+            child: Material(
+              type: MaterialType.transparency,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1C1C1C),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Add a source',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Where do your games come from?',
+                        style: TextStyle(
+                          color: Colors.grey.shade500,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      for (int i = 0; i < _options.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 8),
+                        _TypeOptionTile(
+                          option: _options[i],
+                          selected: _selectedIndex == i,
+                        ),
+                      ],
+                      const SizedBox(height: 14),
+                      const Center(
+                        child: Text(
+                          '↑↓ navigate · [A] select · [B] back',
+                          style: TextStyle(
+                            color: Colors.white30,
+                            fontSize: 10,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TypeOption {
+  const _TypeOption({
+    required this.type,
+    required this.icon,
+    required this.label,
+    required this.hint,
+  });
+  final SourceType type;
+  final IconData icon;
+  final String label;
+  final String hint;
+}
+
+class _TypeOptionTile extends StatelessWidget {
+  const _TypeOptionTile({required this.option, required this.selected});
+  final _TypeOption option;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppTheme.primaryColor;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: selected ? 0.22 : 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: selected ? color : color.withValues(alpha: 0.3),
+          width: selected ? 2 : 1,
+        ),
+        boxShadow: selected
+            ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12)]
+            : null,
+      ),
+      child: Row(
+        children: [
+          Icon(option.icon, color: color, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  option.label,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  option.hint,
+                  style: TextStyle(
+                    color: Colors.grey.shade500,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
