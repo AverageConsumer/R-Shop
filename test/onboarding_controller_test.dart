@@ -33,7 +33,6 @@ SystemConfig _systemConfig(
   String? targetFolder,
   List<ProviderConfig> providers = const [],
   bool autoExtract = false,
-  bool mergeMode = false,
 }) {
   final system = SystemModel.supportedSystems.firstWhere((s) => s.id == id);
   return SystemConfig(
@@ -42,7 +41,6 @@ SystemConfig _systemConfig(
     targetFolder: targetFolder ?? '/roms/$id',
     providers: providers,
     autoExtract: autoExtract,
-    mergeMode: mergeMode,
   );
 }
 
@@ -638,7 +636,6 @@ void main() {
         'nes',
         targetFolder: '/custom/path',
         autoExtract: true,
-        mergeMode: true,
         providers: [
           const ProviderConfig(
             type: ProviderType.web,
@@ -654,7 +651,6 @@ void main() {
       c.selectConsole('nes');
       expect(c.state.consoleSubState!.targetFolder, '/custom/path');
       expect(c.state.consoleSubState!.autoExtract, true);
-      expect(c.state.consoleSubState!.mergeMode, true);
       expect(c.state.consoleSubState!.providers.length, 1);
     });
 
@@ -731,14 +727,6 @@ void main() {
       expect(c.state.consoleSubState!.autoExtract, true);
     });
 
-    test('setMergeMode updates consoleSubState', () {
-      final c = _createController();
-      c.state = c.state.copyWith(
-        consoleSubState: const ConsoleSetupState(),
-      );
-      c.setMergeMode(true);
-      expect(c.state.consoleSubState!.mergeMode, true);
-    });
   });
 
   // =========================================================================

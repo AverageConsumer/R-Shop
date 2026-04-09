@@ -327,8 +327,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         targetFolder: '$basePath/$folderName',
         providers: [rommProvider],
         autoExtract: system.isZipped,
-        mergeMode: false,
-      );
+              );
     }
 
     // Local-only systems — folder path but no providers
@@ -347,8 +346,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         targetFolder: '$basePath/$folderName',
         providers: const [],
         autoExtract: system.isZipped,
-        mergeMode: false,
-      );
+              );
     }
 
     // Manual folder assignments to non-RomM/non-local systems
@@ -369,8 +367,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         targetFolder: '$basePath/${entry.value}',
         providers: const [],
         autoExtract: system.isZipped,
-        mergeMode: false,
-      );
+              );
     }
 
     // Pre-save scanned+matched but not explicitly enabled consoles (path only)
@@ -392,8 +389,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           targetFolder: '$basePath/${folder.name}',
           providers: const [],
           autoExtract: system.isZipped,
-          mergeMode: false,
-        );
+                  );
       }
     }
 
@@ -601,8 +597,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       subState = ConsoleSetupState(
         targetFolder: existing.targetFolder,
         autoExtract: existing.autoExtract,
-        mergeMode: existing.mergeMode,
-        autoSync: existing.autoSync,
+                autoSync: existing.autoSync,
         providers: List.of(existing.providers),
       );
     } else {
@@ -654,12 +649,6 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     final sub = state.consoleSubState;
     if (sub == null) return;
     state = state.copyWith(consoleSubState: sub.copyWith(autoExtract: value));
-  }
-
-  void setMergeMode(bool value) {
-    final sub = state.consoleSubState;
-    if (sub == null) return;
-    state = state.copyWith(consoleSubState: sub.copyWith(mergeMode: value));
   }
 
   void setAutoSync(bool value) {
@@ -1464,8 +1453,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         targetFolder: dirPath,
         providers: const [],
         autoExtract: system.isZipped,
-        mergeMode: false,
-      );
+              );
     }
 
     if (!mounted) return null;
@@ -1670,8 +1658,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         targetFolder: '$basePath/$folderName',
         providers: const [],
         autoExtract: system.isZipped,
-        mergeMode: false,
-      );
+              );
     }
 
     // Manual folder assignments to non-enabled systems
@@ -1690,8 +1677,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         targetFolder: '$basePath/${entry.value}',
         providers: const [],
         autoExtract: system.isZipped,
-        mergeMode: false,
-      );
+              );
     }
 
     // Pre-save scanned+matched but not explicitly enabled consoles (path only)
@@ -1713,8 +1699,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           targetFolder: '$basePath/${folder.name}',
           providers: const [],
           autoExtract: system.isZipped,
-          mergeMode: false,
-        );
+                  );
       }
     }
 
@@ -2071,8 +2056,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           targetFolder: existing.targetFolder,
           providers: providers,
           autoExtract: existing.autoExtract,
-          mergeMode: providers.length > 1,
-        );
+                  );
       } else {
         // Create new system config
         updated[systemId] = SystemConfig(
@@ -2081,8 +2065,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           targetFolder: '$basePath/${folder.name}',
           providers: [providerConfig.copyWith(priority: 0)],
           autoExtract: system.isZipped,
-          mergeMode: false,
-        );
+                  );
       }
     }
 
@@ -2204,8 +2187,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       targetFolder: sub.targetFolder!,
       providers: sub.providers,
       autoExtract: sub.autoExtract,
-      mergeMode: sub.mergeMode,
-      autoSync: sub.autoSync,
+            autoSync: sub.autoSync,
     );
 
     final updated = Map<String, SystemConfig>.from(state.configuredSystems);

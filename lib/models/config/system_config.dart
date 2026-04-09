@@ -14,7 +14,6 @@ class SystemConfig {
   final List<ProviderConfig> providers;
 
   final bool autoExtract;
-  final bool mergeMode;
   final bool autoSync;
 
   /// Optional explicit allow-list of source ids that contribute to this
@@ -34,11 +33,6 @@ class SystemConfig {
     required this.targetFolder,
     required this.providers,
     this.autoExtract = false,
-    // Default ON: when a system has multiple sources (RomM + SMB etc.)
-    // we always want them to stack additively. Single-source systems
-    // are unaffected — _fetchMerged with one provider behaves the same
-    // as failover.
-    this.mergeMode = true,
     this.autoSync = true,
     this.enabledSourceIds,
     this.manualMappings = const [],
@@ -66,7 +60,6 @@ class SystemConfig {
       targetFolder: json['target_folder'] as String,
       providers: providerList,
       autoExtract: json['auto_extract'] as bool? ?? false,
-      mergeMode: json['merge_mode'] as bool? ?? true,
       autoSync: json['auto_sync'] as bool? ?? true,
       enabledSourceIds: allowList,
       manualMappings: mappings,
@@ -80,7 +73,6 @@ class SystemConfig {
       'target_folder': targetFolder,
       'providers': providers.map((p) => p.toJson()).toList(),
       'auto_extract': autoExtract,
-      'merge_mode': mergeMode,
       'auto_sync': autoSync,
       if (enabledSourceIds != null) 'enabled_source_ids': enabledSourceIds,
       if (manualMappings.isNotEmpty)
@@ -96,7 +88,6 @@ class SystemConfig {
       'target_folder': targetFolder,
       'providers': providers.map((p) => p.toJsonWithoutAuth()).toList(),
       'auto_extract': autoExtract,
-      'merge_mode': mergeMode,
       'auto_sync': autoSync,
       if (enabledSourceIds != null) 'enabled_source_ids': enabledSourceIds,
       if (manualMappings.isNotEmpty)
@@ -110,7 +101,6 @@ class SystemConfig {
     String? targetFolder,
     List<ProviderConfig>? providers,
     bool? autoExtract,
-    bool? mergeMode,
     bool? autoSync,
     List<String>? enabledSourceIds,
     bool clearEnabledSourceIds = false,
@@ -122,7 +112,6 @@ class SystemConfig {
       targetFolder: targetFolder ?? this.targetFolder,
       providers: providers ?? this.providers,
       autoExtract: autoExtract ?? this.autoExtract,
-      mergeMode: mergeMode ?? this.mergeMode,
       autoSync: autoSync ?? this.autoSync,
       enabledSourceIds: clearEnabledSourceIds
           ? null

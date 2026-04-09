@@ -351,13 +351,7 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       // source. Always rewrite providers to the (possibly empty) combo.
       final combined = [...unmanaged, ...managed]
         ..sort((a, b) => a.priority.compareTo(b.priority));
-      // Auto-merge when 2+ providers contribute to the same system. The
-      // legacy failover model only consults the first provider that
-      // answers, which silently hides every additional source — exactly
-      // the wrong default in the source-centric world where SMB/FTP/Web
-      // are meant to stack on top of RomM.
-      final shouldMerge = combined.length >= 2 ? true : s.mergeMode;
-      return s.copyWith(providers: combined, mergeMode: shouldMerge);
+      return s.copyWith(providers: combined);
     }).toList(growable: false);
 
     final updated = latest.copyWith(

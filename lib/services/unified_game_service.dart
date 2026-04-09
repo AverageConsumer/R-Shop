@@ -22,39 +22,12 @@ class UnifiedGameService {
   /// deduplicating by filename (higher-priority provider wins).
   Future<List<GameItem>> fetchGamesForSystem(
     SystemConfig system, {
-    bool? merge,
+    @Deprecated('merge mode is always on; flag is ignored') bool? merge,
   }) async {
     if (system.providers.isEmpty) {
       throw StateError('No providers configured for system "${system.name}"');
     }
-
-    final useMerge = merge ?? system.mergeMode;
-    if (useMerge) {
-      return _fetchMerged(system);
-    } else {
-      return _fetchFailover(system);
-    }
-  }
-
-  Future<List<GameItem>> _fetchFailover(SystemConfig system) async {
-    Object? lastError;
-
-    for (final providerConfig in system.providers) {
-      try {
-        final provider = ProviderFactory.getProvider(providerConfig);
-        final timeout = _timeoutFor(providerConfig);
-        return await provider.fetchGames(system).timeout(
-              timeout,
-              onTimeout: () =>
-                  throw TimeoutException('Server not responding'),
-            );
-      } catch (e) {
-        lastError = e;
-        continue;
-      }
-    }
-
-    throw lastError ?? StateError('All providers failed for system "${system.name}"');
+    return _fetchMerged(system);
   }
 
   Future<List<GameItem>> _fetchMerged(SystemConfig system) async {

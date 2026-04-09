@@ -39,7 +39,7 @@ final unifiedGameServiceProvider = Provider<UnifiedGameService>((ref) {
 final gamesProvider =
     FutureProvider.family<List<GameItem>, SystemConfig>((ref, system) {
   final service = ref.read(unifiedGameServiceProvider);
-  return service.fetchGamesForSystem(system, merge: system.mergeMode);
+  return service.fetchGamesForSystem(system);
 });
 
 /// Systems visible on the home screen.

@@ -39,33 +39,7 @@ class _TestableUnifiedGameService extends UnifiedGameService {
     if (system.providers.isEmpty) {
       throw StateError('No providers configured for system "${system.name}"');
     }
-
-    final useMerge = merge ?? system.mergeMode;
-    if (useMerge) {
-      return _fetchMerged(system);
-    } else {
-      return _fetchFailover(system);
-    }
-  }
-
-  Future<List<GameItem>> _fetchFailover(SystemConfig system) async {
-    Object? lastError;
-
-    for (final providerConfig in system.providers) {
-      try {
-        final provider = _fakeProviders[providerConfig.type];
-        if (provider == null) throw StateError('No fake for ${providerConfig.type}');
-        return await provider.fetchGames(system).timeout(
-              const Duration(seconds: 30),
-              onTimeout: () => throw TimeoutException('Server not responding'),
-            );
-      } catch (e) {
-        lastError = e;
-        continue;
-      }
-    }
-
-    throw lastError ?? StateError('All providers failed');
+    return _fetchMerged(system);
   }
 
   Future<List<GameItem>> _fetchMerged(SystemConfig system) async {
@@ -142,22 +116,11 @@ void main() {
     providers: [webConfig],
   );
 
-  const systemWithMultiple = SystemConfig(
-    id: 'nes',
-    name: 'NES',
-    targetFolder: '/roms/nes',
-    providers: [webConfig, smbConfig],
-    // Failover-mode tests below need mergeMode off explicitly now
-    // that the default is true.
-    mergeMode: false,
-  );
-
   const systemMerge = SystemConfig(
     id: 'nes',
     name: 'NES',
     targetFolder: '/roms/nes',
     providers: [webConfig, smbConfig],
-    mergeMode: true,
   );
 
   const systemNoProviders = SystemConfig(
@@ -195,65 +158,11 @@ void main() {
     providerConfig: smbConfig,
   );
 
-  // ─── Failover mode ────────────────────────────────────
+  // ─── No-providers + empty-result edge cases ────────────
 
-  group('Failover mode', () {
-    test('returns games from first successful provider', () async {
-      final service = _TestableUnifiedGameService({
-        ProviderType.web: _FakeProvider(
-          config: webConfig,
-          games: [game1, game2],
-        ),
-        ProviderType.smb: _FakeProvider(
-          config: smbConfig,
-          games: [game1Smb, game3Smb],
-        ),
-      });
-
-      final result = await service.fetchGamesForSystem(systemWithMultiple);
-      expect(result, hasLength(2));
-      expect(result.first.filename, 'mario.nes');
-      expect(result.first.url, contains('example.com'));
-    });
-
-    test('falls back to second provider when first fails', () async {
-      final service = _TestableUnifiedGameService({
-        ProviderType.web: _FakeProvider(
-          config: webConfig,
-          error: Exception('Connection refused'),
-        ),
-        ProviderType.smb: _FakeProvider(
-          config: smbConfig,
-          games: [game1Smb, game3Smb],
-        ),
-      });
-
-      final result = await service.fetchGamesForSystem(systemWithMultiple);
-      expect(result, hasLength(2));
-      expect(result.first.url, contains('nas.local'));
-    });
-
-    test('throws last error when all providers fail', () async {
-      final service = _TestableUnifiedGameService({
-        ProviderType.web: _FakeProvider(
-          config: webConfig,
-          error: Exception('Web failed'),
-        ),
-        ProviderType.smb: _FakeProvider(
-          config: smbConfig,
-          error: Exception('SMB failed'),
-        ),
-      });
-
-      expect(
-        () => service.fetchGamesForSystem(systemWithMultiple),
-        throwsA(isA<Exception>()),
-      );
-    });
-
+  group('Edge cases', () {
     test('throws StateError when no providers configured', () async {
       final service = _TestableUnifiedGameService({});
-
       expect(
         () => service.fetchGamesForSystem(systemNoProviders),
         throwsA(isA<StateError>()),
@@ -267,7 +176,6 @@ void main() {
           games: [],
         ),
       });
-
       final result = await service.fetchGamesForSystem(systemWithWeb);
       expect(result, isEmpty);
     });
@@ -379,7 +287,6 @@ void main() {
         name: 'NES',
         targetFolder: '/roms/nes',
         providers: [webConfig, smbConfig, ftpConfig],
-        mergeMode: true,
       );
 
       final service = _TestableUnifiedGameService({
@@ -406,52 +313,6 @@ void main() {
         mario.alternativeSources.map((a) => a.providerConfig.type),
         containsAll([ProviderType.smb, ProviderType.ftp]),
       );
-    });
-  });
-
-  // ─── Merge flag override ───────────────────────────────
-
-  group('Merge flag', () {
-    test('explicit merge=true overrides system config', () async {
-      final service = _TestableUnifiedGameService({
-        ProviderType.web: _FakeProvider(
-          config: webConfig,
-          games: [game1],
-        ),
-        ProviderType.smb: _FakeProvider(
-          config: smbConfig,
-          games: [game3Smb],
-        ),
-      });
-
-      // systemWithMultiple has mergeMode=false, but we override
-      final result = await service.fetchGamesForSystem(
-        systemWithMultiple,
-        merge: true,
-      );
-      expect(result, hasLength(2));
-    });
-
-    test('explicit merge=false overrides system config', () async {
-      final service = _TestableUnifiedGameService({
-        ProviderType.web: _FakeProvider(
-          config: webConfig,
-          games: [game1, game2],
-        ),
-        ProviderType.smb: _FakeProvider(
-          config: smbConfig,
-          games: [game1Smb, game3Smb],
-        ),
-      });
-
-      // systemMerge has mergeMode=true, but we override
-      final result = await service.fetchGamesForSystem(
-        systemMerge,
-        merge: false,
-      );
-      // Failover: only returns from first successful provider
-      expect(result, hasLength(2));
-      expect(result.first.url, contains('example.com'));
     });
   });
 

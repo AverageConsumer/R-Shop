@@ -150,7 +150,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         } else {
           // Remote + local merge (same quality as discoverAll)
           final remoteGames = await gameService.fetchGamesForSystem(
-            systemConfig, merge: systemConfig.mergeMode);
+            systemConfig);
           final List<GameItem> games;
           if (systemModel != null) {
             final localGames = await RomManager.scanLocalGamesIsolate(
@@ -277,7 +277,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           }
         } else {
           final remoteGames = await gameService.fetchGamesForSystem(
-            systemConfig, merge: systemConfig.mergeMode);
+            systemConfig);
           final List<GameItem> games;
           if (systemModel != null) {
             final localGames = await RomManager.scanLocalGamesIsolate(
@@ -386,7 +386,6 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           // Remote + local merge
           final remoteGames = await gameService.fetchGamesForSystem(
             systemConfig,
-            merge: systemConfig.mergeMode,
           );
           final localGames = await RomManager.scanLocalGamesIsolate(
             systemModel,
@@ -556,7 +555,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         await db.saveGames(systemConfig.id, games, forceDeleteOrphans: true);
       } else {
         final remoteGames = await gameService.fetchGamesForSystem(
-          systemConfig, merge: systemConfig.mergeMode);
+          systemConfig);
         if (systemModel != null) {
           final localGames = await RomManager.scanLocalGamesIsolate(
             systemModel, systemConfig.targetFolder);

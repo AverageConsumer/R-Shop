@@ -183,19 +183,6 @@ class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
         ),
         SizedBox(height: rs.spacing.md),
 
-        // Merge mode toggle
-        _buildToggleRow(
-          rs: rs,
-          label: 'Search all sources (merge)',
-          value: sub.mergeMode,
-          onChanged: controller.setMergeMode,
-          fontSize: fontSize,
-          subtitle: sub.mergeMode
-              ? 'All sources searched, results combined'
-              : 'Sources tried in order until one succeeds',
-        ),
-        SizedBox(height: rs.spacing.md),
-
         // Auto-sync toggle
         _buildToggleRow(
           rs: rs,

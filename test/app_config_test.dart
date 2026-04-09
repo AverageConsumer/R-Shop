@@ -45,7 +45,6 @@ void main() {
     test('fromJson round-trips via toJson', () {
       final json = _systemJson(
         autoExtract: true,
-        mergeMode: true,
         providers: [
           _providerJson(url: 'https://a.com'),
           _providerJson(type: 'smb', priority: 2, host: 'nas', share: 'r'),
@@ -56,7 +55,6 @@ void main() {
       expect(config.name, 'Game Boy Advance');
       expect(config.targetFolder, '/roms/gba');
       expect(config.autoExtract, isTrue);
-      expect(config.mergeMode, isTrue);
       expect(config.providers, hasLength(2));
 
       final roundTrip = SystemConfig.fromJson(config.toJson());
@@ -78,12 +76,10 @@ void main() {
       expect(config.providers[2].priority, 3);
     });
 
-    test('fromJson defaults autoExtract=false and mergeMode=true when absent',
-        () {
-      final json = _systemJson(); // no auto_extract or merge_mode keys
+    test('fromJson defaults autoExtract=false when absent', () {
+      final json = _systemJson();
       final config = SystemConfig.fromJson(json);
       expect(config.autoExtract, isFalse);
-      expect(config.mergeMode, isTrue);
     });
 
     test('toJsonWithoutAuth strips credentials from all providers', () {
@@ -119,7 +115,6 @@ void main() {
       // Preserved
       expect(copy.id, 'gba');
       expect(copy.targetFolder, '/roms/gba');
-      expect(copy.mergeMode, isTrue);
     });
   });
 
