@@ -24,7 +24,6 @@ import '../../widgets/quick_menu.dart';
 import '../onboarding/onboarding_controller.dart';
 import 'config_mode_screen.dart';
 import 'sources_screen.dart';
-import 'library_scan_screen.dart';
 import 'ra_config_screen.dart';
 import 'widgets/about_tab.dart';
 import 'widgets/preferences_tab.dart';
@@ -309,13 +308,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     );
   }
 
-  void _openLibraryScan() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const LibraryScanScreen()),
-    );
-  }
-
   Future<void> _loadCoverStats() async {
     final usage = await ThumbnailService.getDiskUsage();
     final pending = await DatabaseService().getGamesNeedingCovers();
@@ -529,7 +521,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             onOpenPairing: _openPairing,
                             onOpenRaConfig: _openRaConfig,
                             onOpenConfigMode: _openConfigMode,
-                            onOpenLibraryScan: _openLibraryScan,
                             onStartCoverPreload: _startCoverPreload,
                             onExportErrorLog: _exportErrorLog,
                             onAdjustMaxDownloads: _adjustMaxDownloads,

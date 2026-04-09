@@ -17,7 +17,6 @@ class SettingsSystemTab extends ConsumerWidget {
   final VoidCallback onOpenPairing;
   final VoidCallback onOpenRaConfig;
   final VoidCallback onOpenConfigMode;
-  final VoidCallback onOpenLibraryScan;
   final VoidCallback onStartCoverPreload;
   final VoidCallback onExportErrorLog;
   final ValueChanged<int> onAdjustMaxDownloads;
@@ -36,7 +35,6 @@ class SettingsSystemTab extends ConsumerWidget {
     required this.onOpenPairing,
     required this.onOpenRaConfig,
     required this.onOpenConfigMode,
-    required this.onOpenLibraryScan,
     required this.onStartCoverPreload,
     required this.onExportErrorLog,
     required this.onAdjustMaxDownloads,
@@ -221,18 +219,10 @@ class SettingsSystemTab extends ConsumerWidget {
               ),
               SizedBox(height: rs.spacing.md),
               SettingsItem(
-                title: 'Edit Consoles',
-                subtitle: 'Add, remove or reconfigure consoles',
+                title: 'Edit Systems',
+                subtitle: 'Folder, autoExtract and per-system options',
                 trailing: const Icon(Icons.tune, color: Colors.white70),
                 onTap: onOpenConfigMode,
-              ),
-              SizedBox(height: rs.spacing.md),
-              SettingsItem(
-                title: 'Scan Library',
-                subtitle: 'Discover all games across all consoles',
-                trailing:
-                    const Icon(Icons.radar_rounded, color: Colors.white70),
-                onTap: onOpenLibraryScan,
               ),
               SizedBox(height: rs.spacing.md),
               _buildCoverPreloadTile(ref),

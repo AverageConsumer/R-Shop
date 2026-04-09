@@ -318,7 +318,6 @@ void main() {
           onOpenPairing: () {},
           onOpenRaConfig: () {},
           onOpenConfigMode: () {},
-          onOpenLibraryScan: () {},
           onStartCoverPreload: () {},
           onExportErrorLog: () {},
           onAdjustMaxDownloads: (_) {},
@@ -362,15 +361,9 @@ void main() {
       expect(find.text('ALLOW HTTP FOR EXTERNAL SERVERS'), findsOneWidget);
     });
 
-    testWidgets('renders Edit Consoles item', (tester) async {
+    testWidgets('renders Edit Systems item', (tester) async {
       await tester.pumpWidget(buildSystemTab());
-      expect(find.text('EDIT CONSOLES'), findsOneWidget);
-    });
-
-    testWidgets('renders Scan Library item', (tester) async {
-      await tester.pumpWidget(buildSystemTab());
-      // Scan Library may be offscreen in the ListView
-      expect(find.text('SCAN LIBRARY', skipOffstage: false), findsOneWidget);
+      expect(find.text('EDIT SYSTEMS'), findsOneWidget);
     });
 
     testWidgets('renders Fetch All Covers when idle', (tester) async {
