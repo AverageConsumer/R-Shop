@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/source_color.dart';
 import '../../../models/config/source.dart';
 import '../../../models/game_item.dart';
 import '../../../models/ra_models.dart';
@@ -233,7 +234,7 @@ class _GameGridState extends ConsumerState<GameGrid> {
         }
       }
     }
-    final dotColor = source == null ? null : _colorForSource(source);
+    final dotColor = source == null ? null : sourceDotColorFor(source);
     final dotBorrowed = source?.borrowed ?? false;
 
     return RepaintBoundary(
@@ -269,21 +270,6 @@ class _GameGridState extends ConsumerState<GameGrid> {
     );
   }
 
-  static Color _colorForSource(Source source) {
-    if (source.borrowed) return Colors.lightBlueAccent;
-    switch (source.type) {
-      case SourceType.romm:
-        return Colors.greenAccent;
-      case SourceType.smb:
-        return Colors.amberAccent;
-      case SourceType.ftp:
-        return Colors.purpleAccent;
-      case SourceType.web:
-        return Colors.tealAccent;
-      case SourceType.local:
-        return Colors.white70;
-    }
-  }
 }
 
 class GameGridLoading extends StatefulWidget {

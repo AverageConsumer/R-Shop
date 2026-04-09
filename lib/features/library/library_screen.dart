@@ -10,8 +10,10 @@ import 'package:path/path.dart' as p;
 
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
+import '../../core/util/source_color.dart';
 import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
+import '../../models/config/source.dart';
 import '../../models/custom_shelf.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
@@ -1315,6 +1317,24 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
             systemModel?.accentColor ?? Colors.grey;
 
         final raMatch = _raMatches[entry.filename];
+
+        // Source dot lookup — entry.providerConfig is rehydrated from
+        // the games DB; if it was synthesised by SourceResolver it
+        // carries a sourceId we can map back to a live Source.
+        final sourcesState = ref.watch(sourcesProvider);
+        final entrySourceId = entry.providerConfig?.sourceId;
+        Source? entrySource;
+        if (entrySourceId != null) {
+          for (final s in sourcesState.sources) {
+            if (s.id == entrySourceId) {
+              entrySource = s;
+              break;
+            }
+          }
+        }
+        final entryDotColor =
+            entrySource == null ? null : sourceDotColorFor(entrySource);
+        final entryDotBorrowed = entrySource?.borrowed ?? false;
         final isGrabbed = _reorderState == ReorderState.grabbed && _grabbedIndex == index;
         final isReordering = _reorderState != ReorderState.none;
 
@@ -1338,6 +1358,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
               raAchievementCount: raMatch?.achievementCount,
               raMatchType: raMatch?.type ?? RaMatchType.none,
               isMastered: raMatch?.isMastered ?? false,
+              sourceDotColor: entryDotColor,
+              sourceDotBorrowed: entryDotBorrowed,
               onCoverFound: (url) => _onCoverFound(url, entry),
               onThumbnailNeeded: (url) => _onThumbnailNeeded(url, entry),
               onTap: () {
