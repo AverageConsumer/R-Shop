@@ -1335,6 +1335,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         final entryDotColor =
             entrySource == null ? null : sourceDotColorFor(entrySource);
         final entryDotBorrowed = entrySource?.borrowed ?? false;
+
+        // Library entries don't carry alternativeSources today (they
+        // come from a flat DB row), so the extras list is always empty.
+        // Wired through anyway so adding multi-source DB support later
+        // only needs to populate this list.
+        const List<SourceDotData> entryExtraDots = [];
         final isGrabbed = _reorderState == ReorderState.grabbed && _grabbedIndex == index;
         final isReordering = _reorderState != ReorderState.none;
 
@@ -1360,6 +1366,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
               isMastered: raMatch?.isMastered ?? false,
               sourceDotColor: entryDotColor,
               sourceDotBorrowed: entryDotBorrowed,
+              extraSourceDots: entryExtraDots,
               onCoverFound: (url) => _onCoverFound(url, entry),
               onThumbnailNeeded: (url) => _onThumbnailNeeded(url, entry),
               onTap: () {

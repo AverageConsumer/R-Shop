@@ -27,6 +27,10 @@ class BaseGameCard extends StatelessWidget {
   /// right corner of the cover. When `null`, no dot is drawn — used for
   /// games that come from legacy/unmanaged providers or for cards
   /// outside the v3 source pipeline.
+  /// Optional list of additional source dots beyond the primary one. Each
+  /// entry renders as a small dot stacked to the left of the primary, in
+  /// reverse order so the primary stays right-most. Empty list = single dot.
+  final List<SourceDotData>? extraSourceDots;
   final Color? sourceDotColor;
 
   /// When `true`, the source dot is rendered with a hollow ring + share
@@ -74,6 +78,7 @@ class BaseGameCard extends StatelessWidget {
     this.onCoverFound,
     this.sourceDotColor,
     this.sourceDotBorrowed = false,
+    this.extraSourceDots,
   });
 
   @override
@@ -288,9 +293,12 @@ class BaseGameCard extends StatelessWidget {
                   Positioned(
                     right: padding,
                     bottom: padding,
-                    child: _SourceDot(
-                      color: sourceDotColor!,
-                      borrowed: sourceDotBorrowed,
+                    child: _SourceDotRow(
+                      primary: SourceDotData(
+                        color: sourceDotColor!,
+                        borrowed: sourceDotBorrowed,
+                      ),
+                      extras: extraSourceDots ?? const [],
                       isSmall: rs.isSmall,
                     ),
                   ),
@@ -470,6 +478,54 @@ class _RaBadge extends StatelessWidget {
 /// glyph in the centre. The glyph distinguishes "this game lives on a
 /// friend's server" from "I downloaded this myself" without needing a
 /// legend.
+/// One source dot's worth of styling — colour + borrowed flag.
+class SourceDotData {
+  const SourceDotData({required this.color, this.borrowed = false});
+  final Color color;
+  final bool borrowed;
+}
+
+/// Renders the primary source dot plus up to 2 extras to its left, in
+/// reverse order so the right-most dot is always the primary. Caps at 3
+/// total to keep the corner readable; further sources just don't show.
+class _SourceDotRow extends StatelessWidget {
+  const _SourceDotRow({
+    required this.primary,
+    required this.extras,
+    required this.isSmall,
+  });
+
+  final SourceDotData primary;
+  final List<SourceDotData> extras;
+  final bool isSmall;
+
+  static const int _maxExtras = 2;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleExtras = extras.take(_maxExtras).toList(growable: false);
+    final spacing = isSmall ? 3.0 : 4.0;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final dot in visibleExtras.reversed) ...[
+          _SourceDot(
+            color: dot.color,
+            borrowed: dot.borrowed,
+            isSmall: isSmall,
+          ),
+          SizedBox(width: spacing),
+        ],
+        _SourceDot(
+          color: primary.color,
+          borrowed: primary.borrowed,
+          isSmall: isSmall,
+        ),
+      ],
+    );
+  }
+}
+
 class _SourceDot extends StatelessWidget {
   const _SourceDot({
     required this.color,

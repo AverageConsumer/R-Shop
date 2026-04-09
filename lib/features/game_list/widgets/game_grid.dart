@@ -237,6 +237,27 @@ class _GameGridState extends ConsumerState<GameGrid> {
     final dotColor = source == null ? null : sourceDotColorFor(source);
     final dotBorrowed = source?.borrowed ?? false;
 
+    // Extras: every alternativeSource that resolves to a known Source.
+    // Variants are different filenames so they don't count as "this same
+    // game has multiple sources" — only `first.alternativeSources` does.
+    final List<SourceDotData> extraDots = [];
+    for (final alt in first.alternativeSources) {
+      final altId = alt.providerConfig.sourceId;
+      if (altId == null) continue;
+      Source? altSource;
+      for (final s in sourcesState.sources) {
+        if (s.id == altId) {
+          altSource = s;
+          break;
+        }
+      }
+      if (altSource == null) continue;
+      extraDots.add(SourceDotData(
+        color: sourceDotColorFor(altSource),
+        borrowed: altSource.borrowed,
+      ));
+    }
+
     return RepaintBoundary(
       key: widget.itemKeys[index],
       child: SelectionAwareItem(
@@ -261,6 +282,7 @@ class _GameGridState extends ConsumerState<GameGrid> {
           focusNode: widget.focusNodes[index],
           sourceDotColor: dotColor,
           sourceDotBorrowed: dotBorrowed,
+          extraSourceDots: extraDots,
           onTap: () => widget.onOpenGame(displayName, variants),
           onTapSelect: () => widget.onSelectionChanged(index),
           onCoverFound: (url) => widget.onCoverFound(url, variants),
