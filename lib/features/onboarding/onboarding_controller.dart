@@ -35,6 +35,47 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   static const String _welcomeChooserDefaultBase =
       '/storage/emulated/0/ROMs';
 
+  /// Welcome chooser shared step: scan [basePath] for ROM subfolders and
+  /// create a SystemConfig for every match that actually contains files.
+  /// Used as the first step of every chooser path so the user always
+  /// gets their local games surfaced — RomM/Server pairing then layers
+  /// remote sources on top of these baseline systems.
+  ///
+  /// Stores [basePath] on state so completeFromRommPairing /
+  /// completeFromManualSource can reuse it as the target folder root
+  /// for systems the source advertises but that aren't on disk yet.
+  Future<void> seedLocalSystemsFromBase(String basePath) async {
+    try {
+      final service = RomFolderService();
+      final subfolders = await service.scanAllSubfolders(basePath);
+      final updated = Map<String, SystemConfig>.from(state.configuredSystems);
+      for (final folder in subfolders) {
+        if (folder.fileCount == 0) continue;
+        final matchedId = LocalFolderMatcher.matchFolder(
+          folder.name,
+          SystemModel.supportedSystems,
+          const [],
+        );
+        if (matchedId == null) continue;
+        if (updated.containsKey(matchedId)) continue;
+        final model = SystemModel.supportedSystems
+            .where((s) => s.id == matchedId)
+            .firstOrNull;
+        if (model == null) continue;
+        updated[matchedId] = SystemConfig(
+          id: matchedId,
+          name: model.name,
+          targetFolder: '$basePath/${folder.name}',
+          providers: const [],
+          autoExtract: model.isZipped,
+        );
+      }
+      state = state.copyWith(configuredSystems: updated);
+    } catch (e) {
+      debugPrint('seedLocalSystemsFromBase: $e');
+    }
+  }
+
   /// Welcome chooser → "Pair RomM" path. Persists [source] (already
   /// exchanged + platform-discovered) and creates a SystemConfig for
   /// every advertised platform so the home screen has consoles to show.

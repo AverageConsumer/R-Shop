@@ -106,13 +106,26 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
 
   Future<void> _handleQrPair() async {
     if (_busy) return;
+    final basePath = await _pickRomBaseFolder();
+    if (!mounted || basePath == null) return;
+
+    setState(() {
+      _busy = true;
+      _busyMessage = 'Scanning local ROM folders…';
+    });
+    final controller =
+        ref.read(onboardingControllerProvider.notifier);
+    await controller.seedLocalSystemsFromBase(basePath);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _busyMessage = null;
+    });
+
     final result = await Navigator.of(context).push<RommPairResult?>(
       MaterialPageRoute(builder: (_) => const QrPairingScreen()),
     );
     if (!mounted || result == null) return;
-
-    final basePath = await _pickRomBaseFolder();
-    if (!mounted || basePath == null) return;
 
     setState(() {
       _busy = true;
@@ -132,8 +145,6 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
     }
     final hydrated = source.copyWith(knownPlatforms: knownPlatforms);
 
-    final controller =
-        ref.read(onboardingControllerProvider.notifier);
     final notifier = ref.read(sourcesProvider.notifier);
     await controller.completeFromRommPairing(
       sourcesNotifier: notifier,
@@ -149,6 +160,22 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
 
   Future<void> _handleManualServer() async {
     if (_busy) return;
+    final basePath = await _pickRomBaseFolder();
+    if (!mounted || basePath == null) return;
+
+    setState(() {
+      _busy = true;
+      _busyMessage = 'Scanning local ROM folders…';
+    });
+    final controller =
+        ref.read(onboardingControllerProvider.notifier);
+    await controller.seedLocalSystemsFromBase(basePath);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _busyMessage = null;
+    });
+
     final type = await _showTypePicker();
     if (type == null || !mounted) return;
 
@@ -161,9 +188,6 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
       MaterialPageRoute(builder: (_) => SourceMappingsScreen(source: source)),
     );
     if (!mounted || saved != true) return;
-
-    final basePath = await _pickRomBaseFolder();
-    if (!mounted || basePath == null) return;
 
     // Read back the system ids the user mapped against this source.
     final cfg = ref.read(bootstrappedConfigProvider).valueOrNull;
@@ -179,8 +203,6 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
       }
     }
 
-    final controller =
-        ref.read(onboardingControllerProvider.notifier);
     await controller.completeFromManualSource(
       sourceId: source.id,
       mappedSystemIds: mappedSystemIds,
