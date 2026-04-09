@@ -249,7 +249,10 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       final unmanaged =
           s.providers.where((p) => !p.managedBySource).toList(growable: false);
       final managed = SourceResolver.providersFor(s, next);
-      if (unmanaged.isEmpty && managed.isEmpty) return s;
+      // NB: do NOT early-return when both lists are empty — that would
+      // leave the system's old providers in place after a disable, which
+      // is exactly the bug where syncAll keeps hitting a turned-off
+      // source. Always rewrite providers to the (possibly empty) combo.
       final combined = [...unmanaged, ...managed]
         ..sort((a, b) => a.priority.compareTo(b.priority));
       return s.copyWith(providers: combined);
