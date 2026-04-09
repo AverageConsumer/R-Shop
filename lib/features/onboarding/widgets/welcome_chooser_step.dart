@@ -37,7 +37,6 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
   final FocusNode _qrFocus = FocusNode(debugLabel: 'welcome_qr');
   final FocusNode _serverFocus = FocusNode(debugLabel: 'welcome_server');
   final FocusNode _localFocus = FocusNode(debugLabel: 'welcome_local');
-  final FocusNode _skipFocus = FocusNode(debugLabel: 'welcome_skip');
   final FocusNode _screenFocus =
       FocusNode(debugLabel: 'welcome_chooser_screen');
 
@@ -57,13 +56,11 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
     _qrFocus.dispose();
     _serverFocus.dispose();
     _localFocus.dispose();
-    _skipFocus.dispose();
     _screenFocus.dispose();
     super.dispose();
   }
 
-  List<FocusNode> get _navOrder =>
-      [_qrFocus, _serverFocus, _localFocus, _skipFocus];
+  List<FocusNode> get _navOrder => [_qrFocus, _serverFocus, _localFocus];
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
@@ -243,11 +240,6 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
     ref.read(onboardingControllerProvider.notifier).startLocalOnlyFromWelcome();
   }
 
-  void _handleSkip() {
-    if (_busy) return;
-    ref.read(onboardingControllerProvider.notifier).skipFromWelcome();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Focus(
@@ -298,14 +290,6 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
             title: 'Local games only',
             subtitle: 'ROMs already on this device',
             onSelect: _handleLocalOnly,
-          ),
-          const SizedBox(height: 12),
-          _ChoiceTile(
-            focusNode: _skipFocus,
-            icon: Icons.skip_next_outlined,
-            title: 'Skip for now',
-            subtitle: 'Set everything up later from Settings',
-            onSelect: _handleSkip,
           ),
           if (_busy) ...[
             const SizedBox(height: 16),

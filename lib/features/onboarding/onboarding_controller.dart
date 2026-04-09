@@ -114,16 +114,6 @@ class OnboardingController extends StateNotifier<OnboardingState> {
     _autoDetectRomFolder();
   }
 
-  /// Welcome chooser → "Skip for now" path. Marks the user as set up
-  /// without any sources or systems; they can add them later from
-  /// Settings → Sources or via the per-system add flow.
-  void skipFromWelcome() {
-    state = state.copyWith(
-      currentStep: OnboardingStep.complete,
-      canProceed: true,
-    );
-  }
-
   /// Pre-initializes the controller from an existing config (for config mode).
   void loadFromConfig(AppConfig config) {
     final systems = <String, SystemConfig>{};
