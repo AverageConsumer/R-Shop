@@ -356,7 +356,8 @@ class RommApiService {
             'limit': pageSize,
             'offset': offset,
           },
-          options: _buildAuthOptions(auth),
+          options: (_buildAuthOptions(auth) ?? Options())
+              .copyWith(listFormat: ListFormat.multi),
         );
 
         final data = response.data;

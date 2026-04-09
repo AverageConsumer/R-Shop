@@ -163,6 +163,21 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       } catch (e) {
         debugPrint('Library sync failed for ${systemConfig.id}: $e');
         failures[displayName] = _userFriendlyError(e);
+        // Remote failed — try to at least save local games so the system isn't empty
+        if (systemModel != null && systemConfig.providers.isNotEmpty) {
+          try {
+            final localGames = await RomManager.scanLocalGamesIsolate(
+              systemModel, systemConfig.targetFolder);
+            if (localGames.isNotEmpty) {
+              await db.saveGames(systemConfig.id, localGames);
+              perSystem[systemConfig.id] = localGames.length;
+              totalGames += localGames.length;
+              debugPrint('LibrarySync: saved ${localGames.length} local fallback games for ${systemConfig.id}');
+            }
+          } catch (localErr) {
+            debugPrint('LibrarySync: local fallback failed for ${systemConfig.id}: $localErr');
+          }
+        }
       } finally {
         _currentlySyncingSystemId = null;
       }
@@ -275,6 +290,20 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       } catch (e) {
         debugPrint('Library sync failed for ${systemConfig.id}: $e');
         failures[displayName] = _userFriendlyError(e);
+        if (systemModel != null && systemConfig.providers.isNotEmpty) {
+          try {
+            final localGames = await RomManager.scanLocalGamesIsolate(
+              systemModel, systemConfig.targetFolder);
+            if (localGames.isNotEmpty) {
+              await db.saveGames(systemConfig.id, localGames);
+              perSystem[systemConfig.id] = localGames.length;
+              totalGames += localGames.length;
+              debugPrint('LibrarySync: saved ${localGames.length} local fallback games for ${systemConfig.id}');
+            }
+          } catch (localErr) {
+            debugPrint('LibrarySync: local fallback failed for ${systemConfig.id}: $localErr');
+          }
+        }
       } finally {
         _currentlySyncingSystemId = null;
       }
@@ -368,6 +397,20 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       } catch (e) {
         debugPrint('Library discover failed for ${systemConfig.id}: $e');
         failures[displayName] = _userFriendlyError(e);
+        if (systemConfig.providers.isNotEmpty) {
+          try {
+            final localGames = await RomManager.scanLocalGamesIsolate(
+              systemModel, systemConfig.targetFolder);
+            if (localGames.isNotEmpty) {
+              await db.saveGames(systemConfig.id, localGames);
+              perSystem[systemConfig.id] = localGames.length;
+              totalGames += localGames.length;
+              debugPrint('LibrarySync: saved ${localGames.length} local fallback games for ${systemConfig.id}');
+            }
+          } catch (localErr) {
+            debugPrint('LibrarySync: local fallback failed for ${systemConfig.id}: $localErr');
+          }
+        }
       } finally {
         _currentlySyncingSystemId = null;
       }
@@ -522,6 +565,24 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       final failures = Map<String, String>.of(state.failedSystems);
       failures[displayName] = _userFriendlyError(e);
       state = state.copyWith(failedSystems: failures);
+      if (systemModel != null && systemConfig.providers.isNotEmpty) {
+        try {
+          final localGames = await RomManager.scanLocalGamesIsolate(
+            systemModel, systemConfig.targetFolder);
+          if (localGames.isNotEmpty) {
+            await db.saveGames(systemConfig.id, localGames);
+            final perSystem = Map<String, int>.of(state.gamesPerSystem);
+            perSystem[systemConfig.id] = localGames.length;
+            state = state.copyWith(
+              gamesPerSystem: perSystem,
+              totalGamesFound: state.totalGamesFound + localGames.length,
+            );
+            debugPrint('LibrarySync: saved ${localGames.length} local fallback games for $systemId');
+          }
+        } catch (localErr) {
+          debugPrint('LibrarySync: local fallback failed for $systemId: $localErr');
+        }
+      }
     } finally {
       _currentlySyncingSystemId = null;
     }

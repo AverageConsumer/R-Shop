@@ -6,7 +6,7 @@ abstract final class NetworkTimeouts {
   static const httpConnect = Duration(seconds: 30);
   static const httpIdle = Duration(minutes: 5);
   static const apiConnect = Duration(seconds: 15);
-  static const apiReceive = Duration(seconds: 30);
+  static const apiReceive = Duration(seconds: 90);
   static const providerDiscovery = Duration(seconds: 60);
   static const paginatedDiscovery = Duration(minutes: 10);
 }

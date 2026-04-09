@@ -46,13 +46,6 @@ class _LibrarySyncPill extends ConsumerStatefulWidget {
 
 class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
   Map<String, String> _failedSystems = const {};
-  Timer? _dismissTimer;
-
-  @override
-  void dispose() {
-    _dismissTimer?.cancel();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +53,7 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
 
     ref.listen<LibrarySyncState>(librarySyncServiceProvider, (prev, next) {
       if (next.isSyncing) {
-        _dismissTimer?.cancel();
+        // New sync starting — clear stale failure state
         if (_failedSystems.isNotEmpty) {
           setState(() => _failedSystems = const {});
         }
@@ -73,10 +66,6 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
           next.hadFailures) {
         ref.read(feedbackServiceProvider).warning();
         setState(() => _failedSystems = next.failedSystems);
-        _dismissTimer?.cancel();
-        _dismissTimer = Timer(const Duration(seconds: 6), () {
-          if (mounted) setState(() => _failedSystems = const {});
-        });
       }
     });
 
@@ -101,15 +90,56 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
     }
 
     final label = _failedSystems.length == 1
-        ? '${_failedSystems.keys.first} unavailable'
-        : '${_failedSystems.length} sources unavailable';
+        ? '${_failedSystems.keys.first} sync failed'
+        : '${_failedSystems.length} systems failed to sync';
 
-    return _SyncPillContent(
-      key: const ValueKey('library-warning'),
-      accentColor: Colors.amber,
-      leadingIcon:
-          Icon(Icons.warning_amber_rounded, size: iconSize, color: Colors.amber),
-      label: label,
+    return _PulsingPill(
+      key: const ValueKey('library-error'),
+      child: _SyncPillContent(
+        accentColor: Colors.redAccent,
+        leadingIcon:
+            Icon(Icons.error_outline, size: iconSize, color: Colors.redAccent),
+        label: label,
+      ),
+    );
+  }
+}
+
+/// Slow pulse animation to draw attention to error pills.
+class _PulsingPill extends StatefulWidget {
+  final Widget child;
+  const _PulsingPill({super.key, required this.child});
+
+  @override
+  State<_PulsingPill> createState() => _PulsingPillState();
+}
+
+class _PulsingPillState extends State<_PulsingPill>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.55, end: 1.0).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+      ),
+      child: widget.child,
     );
   }
 }
