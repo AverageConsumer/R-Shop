@@ -257,6 +257,9 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final notifier = ref.read(sourcesProvider.notifier);
     await notifier.setEnabled(source.id, !source.enabled);
     ref.invalidate(bootstrappedConfigProvider);
+    // gamesProvider doesn't watch bootstrappedConfig, so the DB-cached
+    // game lists in HomeView/Library wouldn't refresh on their own.
+    ref.invalidate(gamesProvider);
     if (mounted) _closeSourceActions();
   }
 
@@ -323,6 +326,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final notifier = ref.read(sourcesProvider.notifier);
     await notifier.removeSource(source.id);
     ref.invalidate(bootstrappedConfigProvider);
+    ref.invalidate(gamesProvider);
     if (mounted) {
       // Skip the focus-restore-on-deleted-card path.
       setState(() => _activeActionsSource = null);

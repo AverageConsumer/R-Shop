@@ -526,7 +526,7 @@ class DatabaseService {
       return 0;
     }
     final db = await database;
-    final pattern = '%"sourceId":"$sourceId"%';
+    final pattern = '%"source_id":"$sourceId"%';
     final deleted = await db.rawDelete(
       'DELETE FROM $_tableName WHERE provider_config LIKE ?',
       [pattern],
