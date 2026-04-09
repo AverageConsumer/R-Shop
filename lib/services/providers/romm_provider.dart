@@ -36,6 +36,10 @@ class RommProvider implements SourceProvider {
     final auth = _auth;
     if (auth == null) return {};
 
+    // RomM 4.8+ Client API Token (preferred — granular scopes, revocable).
+    if (auth.clientToken != null && auth.clientToken!.isNotEmpty) {
+      return {'Authorization': 'Bearer ${auth.clientToken}'};
+    }
     if (auth.apiKey != null && auth.apiKey!.isNotEmpty) {
       return {'Authorization': 'Bearer ${auth.apiKey}'};
     }

@@ -1,0 +1,329 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:retro_eshop/services/romm_pairing_service.dart';
+
+/// Lightweight Dio adapter that returns pre-canned responses keyed by
+/// `<METHOD> <uri>`.
+class _FakeAdapter implements HttpClientAdapter {
+  final Map<String, _Response> _routes = {};
+  final List<RequestOptions> requests = [];
+  Object? throwOn;
+
+  void on({
+    required String method,
+    required String url,
+    required int status,
+    Map<String, dynamic>? body,
+  }) {
+    _routes['$method $url'] = _Response(status, body ?? const {});
+  }
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests.add(options);
+    if (throwOn != null) {
+      final t = throwOn;
+      throwOn = null;
+      if (t is DioException) throw t;
+    }
+    final key = '${options.method} ${options.uri}';
+    final route = _routes[key];
+    if (route == null) {
+      return ResponseBody.fromString(
+        '{"detail":"unmocked $key"}',
+        404,
+        headers: {
+          'content-type': ['application/json'],
+        },
+      );
+    }
+    return ResponseBody.fromString(
+      jsonEncode(route.body),
+      route.status,
+      headers: {
+        'content-type': ['application/json'],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+class _Response {
+  _Response(this.status, this.body);
+  final int status;
+  final Map<String, dynamic> body;
+}
+
+RommPairingService _makeService(_FakeAdapter adapter) {
+  final dio = Dio()..httpClientAdapter = adapter;
+  return RommPairingService(dio: dio);
+}
+
+void main() {
+  group('parseQrPayload', () {
+    final svc = RommPairingService();
+
+    test('parses http URL with code', () {
+      final result = svc.parseQrPayload('http://localhost:8090/pair?code=B7K9-3MX2');
+      expect(result.serverUrl, 'http://localhost:8090');
+      expect(result.code, 'B7K9-3MX2');
+    });
+
+    test('parses https URL with code', () {
+      final result = svc.parseQrPayload('https://romm.example.com/pair?code=ABCD-1234');
+      expect(result.serverUrl, 'https://romm.example.com');
+      expect(result.code, 'ABCD-1234');
+    });
+
+    test('trims whitespace', () {
+      final result = svc.parseQrPayload('  https://r.io/pair?code=XX-YY  ');
+      expect(result.serverUrl, 'https://r.io');
+      expect(result.code, 'XX-YY');
+    });
+
+    test('rejects non-pair URL', () {
+      expect(
+        () => svc.parseQrPayload('https://romm.example.com/'),
+        throwsA(isA<RommPairInvalidQrException>()),
+      );
+    });
+
+    test('rejects ftp scheme', () {
+      expect(
+        () => svc.parseQrPayload('ftp://server/pair?code=XX-YY'),
+        throwsA(isA<RommPairInvalidQrException>()),
+      );
+    });
+
+    test('rejects plain code without URL', () {
+      expect(
+        () => svc.parseQrPayload('B7K9-3MX2'),
+        throwsA(isA<RommPairInvalidQrException>()),
+      );
+    });
+
+    test('rejects empty payload', () {
+      expect(
+        () => svc.parseQrPayload(''),
+        throwsA(isA<RommPairInvalidQrException>()),
+      );
+    });
+  });
+
+  group('exchangeCode', () {
+    test('returns parsed RommPairResult on 200', () async {
+      final adapter = _FakeAdapter()
+        ..on(
+          method: 'POST',
+          url: 'http://localhost:8090/api/client-tokens/exchange',
+          status: 200,
+          body: {
+            'token': 'eyJraWQiOiJhYmM',
+            'id': 7,
+            'name': 'rshop-test',
+            'scopes': ['roms.read', 'platforms.read'],
+            'user_id': 1,
+            'expires_at': '2026-05-09T12:34:56',
+            'created_at': '2026-04-09T12:00:00',
+            'last_used_at': null,
+          },
+        );
+      final svc = _makeService(adapter);
+
+      final result = await svc.exchangeCode(
+        serverUrl: 'http://localhost:8090',
+        code: 'B7K9-3MX2',
+      );
+
+      expect(result.token, 'eyJraWQiOiJhYmM');
+      expect(result.tokenId, 7);
+      expect(result.name, 'rshop-test');
+      expect(result.scopes, ['roms.read', 'platforms.read']);
+      expect(result.userId, 1);
+      expect(result.expiresAt, DateTime.parse('2026-05-09T12:34:56'));
+      expect(result.serverUrl, 'http://localhost:8090');
+    });
+
+    test('handles null expiry (never expires)', () async {
+      final adapter = _FakeAdapter()
+        ..on(
+          method: 'POST',
+          url: 'http://localhost:8090/api/client-tokens/exchange',
+          status: 200,
+          body: {
+            'token': 'tok',
+            'id': 1,
+            'name': 'forever',
+            'scopes': ['roms.read'],
+            'user_id': 1,
+            'expires_at': null,
+          },
+        );
+      final svc = _makeService(adapter);
+
+      final result = await svc.exchangeCode(
+        serverUrl: 'http://localhost:8090',
+        code: 'XX-YY',
+      );
+      expect(result.expiresAt, isNull);
+    });
+
+    test('strips trailing slashes from serverUrl', () async {
+      final adapter = _FakeAdapter()
+        ..on(
+          method: 'POST',
+          url: 'http://localhost:8090/api/client-tokens/exchange',
+          status: 200,
+          body: {
+            'token': 't',
+            'id': 1,
+            'name': 'n',
+            'scopes': <String>[],
+            'user_id': 1,
+          },
+        );
+      final svc = _makeService(adapter);
+
+      await svc.exchangeCode(
+        serverUrl: 'http://localhost:8090///',
+        code: 'X-Y',
+      );
+
+      expect(adapter.requests.first.uri.toString(),
+          'http://localhost:8090/api/client-tokens/exchange');
+    });
+
+    test('throws RommPairCodeExpiredException on 400 with expired detail',
+        () async {
+      final adapter = _FakeAdapter()
+        ..on(
+          method: 'POST',
+          url: 'http://localhost:8090/api/client-tokens/exchange',
+          status: 400,
+          body: {'detail': 'Invalid or expired pairing code'},
+        );
+      final svc = _makeService(adapter);
+
+      expect(
+        () => svc.exchangeCode(
+          serverUrl: 'http://localhost:8090',
+          code: 'EXPI-RED1',
+        ),
+        throwsA(isA<RommPairCodeExpiredException>()),
+      );
+    });
+
+    test('throws RommPairCodeExpiredException on 404', () async {
+      final adapter = _FakeAdapter()
+        ..on(
+          method: 'POST',
+          url: 'http://localhost:8090/api/client-tokens/exchange',
+          status: 404,
+          body: {'detail': 'Not Found'},
+        );
+      final svc = _makeService(adapter);
+
+      expect(
+        () => svc.exchangeCode(
+          serverUrl: 'http://localhost:8090',
+          code: 'NOPE-1234',
+        ),
+        throwsA(isA<RommPairCodeExpiredException>()),
+      );
+    });
+
+    test('throws RommPairServerUnreachableException on connection error',
+        () async {
+      final adapter = _FakeAdapter()
+        ..throwOn = DioException(
+          requestOptions: RequestOptions(path: '/'),
+          type: DioExceptionType.connectionError,
+          message: 'host down',
+        );
+      final svc = _makeService(adapter);
+
+      expect(
+        () => svc.exchangeCode(
+          serverUrl: 'http://10.0.0.99:8090',
+          code: 'X-Y',
+        ),
+        throwsA(isA<RommPairServerUnreachableException>()),
+      );
+    });
+
+    test('exchanges via pairFromQr in one call', () async {
+      final adapter = _FakeAdapter()
+        ..on(
+          method: 'POST',
+          url: 'http://localhost:8090/api/client-tokens/exchange',
+          status: 200,
+          body: {
+            'token': 'qr-tok',
+            'id': 42,
+            'name': 'from-qr',
+            'scopes': ['roms.read'],
+            'user_id': 1,
+          },
+        );
+      final svc = _makeService(adapter);
+
+      final result =
+          await svc.pairFromQr('http://localhost:8090/pair?code=B7K9-3MX2');
+
+      expect(result.token, 'qr-tok');
+      expect(result.tokenId, 42);
+    });
+  });
+
+  group('probeServer', () {
+    test('returns version on 200 heartbeat', () async {
+      final adapter = _FakeAdapter()
+        ..on(
+          method: 'GET',
+          url: 'http://localhost:8090/api/heartbeat',
+          status: 200,
+          body: {
+            'SYSTEM': {'VERSION': '4.8.1'},
+          },
+        );
+      final svc = _makeService(adapter);
+
+      final version = await svc.probeServer('http://localhost:8090');
+      expect(version, '4.8.1');
+    });
+
+    test('returns null on 404', () async {
+      final adapter = _FakeAdapter()
+        ..on(
+          method: 'GET',
+          url: 'http://localhost:8090/api/heartbeat',
+          status: 404,
+          body: {},
+        );
+      final svc = _makeService(adapter);
+
+      final version = await svc.probeServer('http://localhost:8090');
+      expect(version, isNull);
+    });
+
+    test('returns null on connection error', () async {
+      final adapter = _FakeAdapter()
+        ..throwOn = DioException(
+          requestOptions: RequestOptions(path: '/'),
+          type: DioExceptionType.connectionError,
+        );
+      final svc = _makeService(adapter);
+
+      final version = await svc.probeServer('http://10.0.0.99:8090');
+      expect(version, isNull);
+    });
+  });
+}

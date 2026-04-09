@@ -289,7 +289,9 @@ class RommApiService {
 
     final headers = <String, String>{};
 
-    if (auth.apiKey != null && auth.apiKey!.isNotEmpty) {
+    if (auth.clientToken != null && auth.clientToken!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer ${auth.clientToken}';
+    } else if (auth.apiKey != null && auth.apiKey!.isNotEmpty) {
       headers['Authorization'] = 'Bearer ${auth.apiKey}';
     } else if (auth.user != null && auth.user!.isNotEmpty) {
       final credentials = base64Encode(

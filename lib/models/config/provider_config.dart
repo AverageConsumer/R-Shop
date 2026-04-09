@@ -6,14 +6,41 @@ class AuthConfig {
   final String? apiKey;
   final String? domain;
 
-  const AuthConfig({this.user, this.pass, this.apiKey, this.domain});
+  /// RomM 4.8+ Client API Token (Bearer). When present, takes precedence
+  /// over [apiKey] and [user]/[pass] in [RommProvider].
+  final String? clientToken;
+
+  /// Server-side id of the client token, used for revoke and status polling.
+  final int? clientTokenId;
+
+  /// Optional expiry of the client token (null = never expires). Surfaced
+  /// in the Sources screen as a "läuft in N Tagen ab" badge.
+  final DateTime? clientTokenExpiresAt;
+
+  const AuthConfig({
+    this.user,
+    this.pass,
+    this.apiKey,
+    this.domain,
+    this.clientToken,
+    this.clientTokenId,
+    this.clientTokenExpiresAt,
+  });
 
   factory AuthConfig.fromJson(Map<String, dynamic> json) {
+    DateTime? expires;
+    final raw = json['client_token_expires_at'];
+    if (raw is String && raw.isNotEmpty) {
+      expires = DateTime.tryParse(raw);
+    }
     return AuthConfig(
       user: json['user'] as String?,
       pass: json['pass'] as String?,
       apiKey: json['api_key'] as String?,
       domain: json['domain'] as String?,
+      clientToken: json['client_token'] as String?,
+      clientTokenId: json['client_token_id'] as int?,
+      clientTokenExpiresAt: expires,
     );
   }
 
@@ -23,7 +50,31 @@ class AuthConfig {
       if (pass != null) 'pass': pass,
       if (apiKey != null) 'api_key': apiKey,
       if (domain != null) 'domain': domain,
+      if (clientToken != null) 'client_token': clientToken,
+      if (clientTokenId != null) 'client_token_id': clientTokenId,
+      if (clientTokenExpiresAt != null)
+        'client_token_expires_at': clientTokenExpiresAt!.toIso8601String(),
     };
+  }
+
+  AuthConfig copyWith({
+    String? user,
+    String? pass,
+    String? apiKey,
+    String? domain,
+    String? clientToken,
+    int? clientTokenId,
+    DateTime? clientTokenExpiresAt,
+  }) {
+    return AuthConfig(
+      user: user ?? this.user,
+      pass: pass ?? this.pass,
+      apiKey: apiKey ?? this.apiKey,
+      domain: domain ?? this.domain,
+      clientToken: clientToken ?? this.clientToken,
+      clientTokenId: clientTokenId ?? this.clientTokenId,
+      clientTokenExpiresAt: clientTokenExpiresAt ?? this.clientTokenExpiresAt,
+    );
   }
 }
 
@@ -171,7 +222,8 @@ class ProviderConfig {
     if (privateIp.hasMatch(host)) return null;
     final hasAuth = auth != null &&
         ((auth!.user != null && auth!.user!.isNotEmpty) ||
-            (auth!.apiKey != null && auth!.apiKey!.isNotEmpty));
+            (auth!.apiKey != null && auth!.apiKey!.isNotEmpty) ||
+            (auth!.clientToken != null && auth!.clientToken!.isNotEmpty));
     if (!hasAuth) return null;
     return 'Credentials will be sent unencrypted over HTTP';
   }
@@ -180,7 +232,8 @@ class ProviderConfig {
   bool get needsAuth => auth == null ||
       ((auth!.user?.isEmpty ?? true) &&
        (auth!.pass?.isEmpty ?? true) &&
-       (auth!.apiKey?.isEmpty ?? true));
+       (auth!.apiKey?.isEmpty ?? true) &&
+       (auth!.clientToken?.isEmpty ?? true));
 
   /// Finds a [ProviderConfig] in [providers] that matches this config's type
   /// and connection details (host/url/share), ignoring auth credentials.
