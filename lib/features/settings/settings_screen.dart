@@ -26,7 +26,6 @@ import 'config_mode_screen.dart';
 import 'sources_screen.dart';
 import 'library_scan_screen.dart';
 import 'ra_config_screen.dart';
-import 'romm_config_screen.dart';
 import 'widgets/about_tab.dart';
 import 'widgets/preferences_tab.dart';
 import 'widgets/settings_tabs.dart';
@@ -253,13 +252,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const RaConfigScreen()),
-    );
-  }
-
-  void _openRommConfig() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const RommConfigScreen()),
     );
   }
 
@@ -534,7 +526,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             syncCooldown: _syncCooldown,
                             allowNonLanHttp: _allowNonLanHttp,
                             coverSubtitle: _buildCoverSubtitle(),
-                            onOpenRommConfig: _openRommConfig,
                             onOpenPairing: _openPairing,
                             onOpenRaConfig: _openRaConfig,
                             onOpenConfigMode: _openConfigMode,

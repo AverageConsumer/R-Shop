@@ -14,7 +14,6 @@ class SettingsSystemTab extends ConsumerWidget {
   final int syncCooldown;
   final bool allowNonLanHttp;
   final String coverSubtitle;
-  final VoidCallback onOpenRommConfig;
   final VoidCallback onOpenPairing;
   final VoidCallback onOpenRaConfig;
   final VoidCallback onOpenConfigMode;
@@ -34,7 +33,6 @@ class SettingsSystemTab extends ConsumerWidget {
     required this.syncCooldown,
     required this.allowNonLanHttp,
     required this.coverSubtitle,
-    required this.onOpenRommConfig,
     required this.onOpenPairing,
     required this.onOpenRaConfig,
     required this.onOpenConfigMode,
@@ -64,11 +62,11 @@ class SettingsSystemTab extends ConsumerWidget {
             children: [
               SettingsItem(
                 focusNode: firstSystemTabNode,
-                title: 'RomM Server',
-                subtitle: 'Global RomM connection settings',
-                trailing:
-                    const Icon(Icons.dns_outlined, color: Colors.white70),
-                onTap: onOpenRommConfig,
+                title: 'Sources',
+                subtitle: 'Manage RomM, SMB, FTP and Web sources',
+                trailing: const Icon(Icons.cloud_outlined,
+                    color: Colors.white70),
+                onTap: onOpenPairing,
               ),
               SizedBox(height: rs.spacing.md),
               SettingsItem(
@@ -240,14 +238,6 @@ class SettingsSystemTab extends ConsumerWidget {
               _buildCoverPreloadTile(ref),
               SizedBox(height: rs.spacing.md),
               _buildExportLogTile(ref),
-              SizedBox(height: rs.spacing.md),
-              SettingsItem(
-                title: 'Sources',
-                subtitle: 'Manage paired RomMs and other game sources',
-                trailing: const Icon(Icons.cloud_outlined,
-                    color: Colors.white70),
-                onTap: onOpenPairing,
-              ),
             ],
           ),
         ),

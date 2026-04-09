@@ -315,7 +315,6 @@ void main() {
           syncCooldown: 60,
           allowNonLanHttp: allowNonLanHttp,
           coverSubtitle: coverSubtitle,
-          onOpenRommConfig: () {},
           onOpenPairing: () {},
           onOpenRaConfig: () {},
           onOpenConfigMode: () {},
@@ -338,11 +337,12 @@ void main() {
       );
     }
 
-    testWidgets('renders RomM Server item', (tester) async {
+    testWidgets('renders Sources item', (tester) async {
       await tester.pumpWidget(buildSystemTab());
       // SettingsItem uppercases titles
-      expect(find.text('ROMM SERVER'), findsOneWidget);
-      expect(find.text('Global RomM connection settings'), findsOneWidget);
+      expect(find.text('SOURCES'), findsOneWidget);
+      expect(find.text('Manage RomM, SMB, FTP and Web sources'),
+          findsOneWidget);
     });
 
     testWidgets('renders RetroAchievements item', (tester) async {
