@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
+import '../../models/config/source.dart';
 import '../../models/config/system_config.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
@@ -18,6 +19,7 @@ import '../../services/rom_folder_service.dart';
 import '../../services/ra_api_service.dart';
 import '../../services/romm_api_service.dart';
 import '../../services/romm_platform_matcher.dart';
+import '../../services/sources_notifier.dart';
 
 import 'onboarding_state.dart';
 export 'onboarding_state.dart';
@@ -26,6 +28,97 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   final ConfigStorageService _configStorage;
 
   OnboardingController(this._configStorage) : super(const OnboardingState());
+
+  /// Default ROM base path used by the welcome chooser shortcuts. Each
+  /// auto-created system gets `<base>/<systemId>` so the user has working
+  /// download targets without going through the full local-folder picker.
+  static const String _welcomeChooserDefaultBase =
+      '/storage/emulated/0/ROMs';
+
+  /// Welcome chooser → "Pair RomM" path. Persists [source] (already
+  /// exchanged + platform-discovered) and creates a SystemConfig for
+  /// every advertised platform so the home screen has consoles to show.
+  /// Then jumps straight to the complete step.
+  Future<void> completeFromRommPairing({
+    required SourcesNotifier sourcesNotifier,
+    required Source source,
+  }) async {
+    await sourcesNotifier.addSource(source);
+    final updated = Map<String, SystemConfig>.from(state.configuredSystems);
+    for (final systemId in source.knownPlatforms.keys) {
+      if (updated.containsKey(systemId)) continue;
+      final model = SystemModel.supportedSystems
+          .where((s) => s.id == systemId)
+          .firstOrNull;
+      if (model == null) continue;
+      updated[systemId] = SystemConfig(
+        id: systemId,
+        name: model.name,
+        targetFolder: '$_welcomeChooserDefaultBase/$systemId',
+        providers: const [],
+        autoExtract: model.isZipped,
+      );
+    }
+    state = state.copyWith(
+      configuredSystems: updated,
+      currentStep: OnboardingStep.complete,
+      canProceed: true,
+    );
+  }
+
+  /// Welcome chooser → "Add server" path. The source + mappings have
+  /// already been persisted by [ManualSourceAddScreen]/[SourceMappingsScreen]
+  /// via SourcesNotifier. We only need to create matching SystemConfigs
+  /// for the systems the user mapped, so the home screen knows about
+  /// them. The actual provider list will be filled in by the next
+  /// SourcesNotifier rebuild — we don't need to set it here.
+  Future<void> completeFromManualSource({
+    required String sourceId,
+    required Iterable<String> mappedSystemIds,
+  }) async {
+    final updated = Map<String, SystemConfig>.from(state.configuredSystems);
+    for (final systemId in mappedSystemIds) {
+      if (updated.containsKey(systemId)) continue;
+      final model = SystemModel.supportedSystems
+          .where((s) => s.id == systemId)
+          .firstOrNull;
+      if (model == null) continue;
+      updated[systemId] = SystemConfig(
+        id: systemId,
+        name: model.name,
+        targetFolder: '$_welcomeChooserDefaultBase/$systemId',
+        providers: const [],
+        autoExtract: model.isZipped,
+      );
+    }
+    state = state.copyWith(
+      configuredSystems: updated,
+      currentStep: OnboardingStep.complete,
+      canProceed: true,
+    );
+  }
+
+  /// Welcome chooser → "Local games only" path. Jumps into the existing
+  /// localSetup step which handles folder detection + per-system pick.
+  void startLocalOnlyFromWelcome() {
+    state = state.copyWith(
+      currentStep: OnboardingStep.localSetup,
+      localSetupState:
+          state.localSetupState ?? const LocalSetupState(isAutoDetecting: true),
+      canProceed: false,
+    );
+    _autoDetectRomFolder();
+  }
+
+  /// Welcome chooser → "Skip for now" path. Marks the user as set up
+  /// without any sources or systems; they can add them later from
+  /// Settings → Sources or via the per-system add flow.
+  void skipFromWelcome() {
+    state = state.copyWith(
+      currentStep: OnboardingStep.complete,
+      canProceed: true,
+    );
+  }
 
   /// Pre-initializes the controller from an existing config (for config mode).
   void loadFromConfig(AppConfig config) {

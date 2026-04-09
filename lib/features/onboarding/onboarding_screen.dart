@@ -21,6 +21,7 @@ import 'widgets/local_setup_step.dart';
 import 'widgets/ra_setup_step.dart';
 import 'widgets/remote_setup_step.dart';
 import 'widgets/romm_setup_step.dart';
+import 'widgets/welcome_chooser_step.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -73,6 +74,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // Only for non-interactive steps — interactive steps (romm/local/ra/console)
     // need A to reach their ConsoleFocusable buttons.
     final isInteractiveStep =
+        state.currentStep == OnboardingStep.welcome ||
         state.currentStep == OnboardingStep.rommSetup ||
         state.currentStep == OnboardingStep.localSetup ||
         state.currentStep == OnboardingStep.remoteSetup ||
@@ -88,17 +90,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return KeyEventResult.handled;
     }
 
-    // Welcome step: left/right cycles controller layout
-    if (state.currentStep == OnboardingStep.welcome &&
-        state.canProceed) {
-      if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-        _cycleControllerLayout(-1);
-        return KeyEventResult.handled;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-        _cycleControllerLayout(1);
-        return KeyEventResult.handled;
-      }
+    // Welcome chooser is fully owned by WelcomeChooserStep — let its own
+    // ConsoleFocusable buttons handle every key.
+    if (state.currentStep == OnboardingStep.welcome) {
+      return KeyEventResult.ignored;
     }
 
     // RomM setup step — delegate based on sub-step
@@ -498,14 +493,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
-  void _cycleControllerLayout(int delta) {
-    const layouts = ControllerLayout.values;
-    final current = ref.read(controllerLayoutProvider);
-    final index = (layouts.indexOf(current) + delta) % layouts.length;
-    ref.read(controllerLayoutProvider.notifier).setLayout(layouts[index]);
-    ref.read(feedbackServiceProvider).tick();
-  }
-
   void _persistRaCredentials(RaSetupState raState) {
     final storage = ref.read(storageServiceProvider);
     if (raState.hasCredentials && raState.connectionSuccess) {
@@ -700,7 +687,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final controller = ref.read(onboardingControllerProvider.notifier);
     switch (state.currentStep) {
       case OnboardingStep.welcome:
-        return _WelcomeStep(onComplete: controller.onMessageComplete);
+        return const WelcomeChooserStep();
       case OnboardingStep.legalNotice:
         return _LegalNoticeStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.rommSetup:
@@ -886,6 +873,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       );
     }
 
+    // Welcome chooser owns its own buttons (RomM/Server/Local/Skip) and
+    // doesn't need a global Continue, just an Import shortcut so power
+    // users can still drop in a JSON config without going through any
+    // setup wizard.
+    if (state.currentStep == OnboardingStep.welcome) {
+      return ConsoleHud(
+        select: HudAction('Import config', onTap: _importConfig),
+      );
+    }
+
     // Standard steps
     return ConsoleHud(
       a: HudAction(
@@ -944,154 +941,6 @@ class _RadialGlow extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _WelcomeStep extends ConsumerWidget {
-  final VoidCallback onComplete;
-  const _WelcomeStep({required this.onComplete});
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final rs = context.rs;
-    final labelFontSize = rs.isSmall ? 10.0 : 12.0;
-    final hintFontSize = rs.isSmall ? 11.0 : 13.0;
-    final hintIconSize = rs.isSmall ? 14.0 : 16.0;
-    final layout = ref.watch(controllerLayoutProvider);
-    return Column(
-      key: const ValueKey('welcome'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ChatBubble(
-          message:
-              "Hey there! I'm Pixel, your R-Shop guide! R-Shop lets you browse and download ROMs from your own servers \u2014 straight to your device. Let's set it up!",
-          onComplete: onComplete,
-        ),
-        SizedBox(height: rs.spacing.md),
-        Padding(
-          padding: EdgeInsets.only(left: rs.isSmall ? 40 : 60),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _WorkflowHint(
-                icon: Icons.settings,
-                text: 'Configure consoles & sources',
-                fontSize: hintFontSize,
-                iconSize: hintIconSize,
-              ),
-              SizedBox(height: rs.spacing.xs),
-              _WorkflowHint(
-                icon: Icons.search,
-                text: 'Browse your game library',
-                fontSize: hintFontSize,
-                iconSize: hintIconSize,
-              ),
-              SizedBox(height: rs.spacing.xs),
-              _WorkflowHint(
-                icon: Icons.download,
-                text: 'Download ROMs to your device',
-                fontSize: hintFontSize,
-                iconSize: hintIconSize,
-              ),
-              SizedBox(height: rs.spacing.lg),
-              Text(
-                'CONTROLLER',
-                style: TextStyle(
-                  color: Colors.grey.shade500,
-                  fontSize: labelFontSize,
-                  letterSpacing: 2,
-                ),
-              ),
-              SizedBox(height: rs.spacing.sm),
-              _ControllerLayoutPicker(layout: layout, ref: ref),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _WorkflowHint extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final double fontSize;
-  final double iconSize;
-
-  const _WorkflowHint({
-    required this.icon,
-    required this.text,
-    required this.fontSize,
-    required this.iconSize,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final rs = context.rs;
-    return Row(
-      children: [
-        Icon(icon, color: Colors.grey.shade500, size: iconSize),
-        SizedBox(width: rs.spacing.sm),
-        Text(
-          text,
-          style: TextStyle(
-            color: Colors.grey.shade400,
-            fontSize: fontSize,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ControllerLayoutPicker extends StatelessWidget {
-  final ControllerLayout layout;
-  final WidgetRef ref;
-
-  const _ControllerLayoutPicker({required this.layout, required this.ref});
-
-  @override
-  Widget build(BuildContext context) {
-    final rs = context.rs;
-    final chipFontSize = rs.isSmall ? 11.0 : 13.0;
-    return Wrap(
-      spacing: rs.spacing.sm,
-      children: ControllerLayout.values.map((l) {
-        final selected = layout == l;
-        final label = switch (l) {
-          ControllerLayout.nintendo => 'Nintendo',
-          ControllerLayout.xbox => 'Xbox',
-          ControllerLayout.playstation => 'PlayStation',
-        };
-        return GestureDetector(
-          onTap: () => ref.read(controllerLayoutProvider.notifier).setLayout(l),
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: rs.spacing.md,
-              vertical: rs.spacing.sm,
-            ),
-            decoration: BoxDecoration(
-              color: selected
-                  ? Colors.redAccent.withValues(alpha: 0.3)
-                  : Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(rs.radius.round),
-              border: Border.all(
-                color: selected
-                    ? Colors.redAccent.withValues(alpha: 0.7)
-                    : Colors.white.withValues(alpha: 0.1),
-              ),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : Colors.white54,
-                fontSize: chipFontSize,
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
     );
   }
 }
