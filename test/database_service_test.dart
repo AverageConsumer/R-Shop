@@ -32,7 +32,8 @@ void main() {
               provider_config TEXT,
               thumb_hash TEXT,
               has_thumbnail INTEGER NOT NULL DEFAULT 0,
-              is_folder INTEGER NOT NULL DEFAULT 0
+              is_folder INTEGER NOT NULL DEFAULT 0,
+              alternative_sources TEXT
             )
           ''');
           await db.execute('CREATE INDEX idx_systemSlug ON games (systemSlug)');

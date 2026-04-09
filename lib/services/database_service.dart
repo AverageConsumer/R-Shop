@@ -14,7 +14,7 @@ import '../utils/ra_name_matcher.dart';
 class DatabaseService {
   static Future<Database>? _initFuture;
   static const String _tableName = 'games';
-  static const int _dbVersion = 12;
+  static const int _dbVersion = 13;
 
   @visibleForTesting
   static Database? testDatabase;
@@ -55,7 +55,8 @@ class DatabaseService {
         provider_config TEXT,
         thumb_hash TEXT,
         has_thumbnail INTEGER NOT NULL DEFAULT 0,
-        is_folder INTEGER NOT NULL DEFAULT 0
+        is_folder INTEGER NOT NULL DEFAULT 0,
+        alternative_sources TEXT
       )
     ''');
 
@@ -280,6 +281,16 @@ class DatabaseService {
             'ALTER TABLE game_metadata ADD COLUMN siblings TEXT');
       });
     }
+    if (oldVersion < 13) {
+      // alternative_sources: JSON list serialised by AlternativeSource.toJson.
+      // Carries the merged secondary sources for a game so the grid can
+      // render multi-source dots and the detail screen's "from <source>"
+      // download picker survives a DB roundtrip.
+      await db.transaction((txn) async {
+        await txn.execute(
+            'ALTER TABLE $_tableName ADD COLUMN alternative_sources TEXT');
+      });
+    }
   }
 
   Future<void> saveGames(
@@ -344,8 +355,8 @@ class DatabaseService {
       final batch = txn.batch();
       for (final game in games) {
         batch.rawInsert('''
-          INSERT INTO $_tableName (systemSlug, filename, displayName, url, region, cover_url, provider_config, has_thumbnail, is_folder)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO $_tableName (systemSlug, filename, displayName, url, region, cover_url, provider_config, has_thumbnail, is_folder, alternative_sources)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(systemSlug, filename) DO UPDATE SET
             displayName = excluded.displayName,
             url = excluded.url,
@@ -353,7 +364,8 @@ class DatabaseService {
             cover_url = COALESCE(excluded.cover_url, cover_url),
             provider_config = excluded.provider_config,
             has_thumbnail = MAX(has_thumbnail, excluded.has_thumbnail),
-            is_folder = excluded.is_folder
+            is_folder = excluded.is_folder,
+            alternative_sources = excluded.alternative_sources
         ''', [
           systemSlug,
           game.filename,
@@ -366,6 +378,10 @@ class DatabaseService {
               : null,
           game.hasThumbnail ? 1 : 0,
           game.isFolder ? 1 : 0,
+          game.alternativeSources.isEmpty
+              ? null
+              : jsonEncode(
+                  game.alternativeSources.map((a) => a.toJson()).toList()),
         ]);
       }
       await batch.commit(noResult: true);
@@ -510,8 +526,24 @@ class DatabaseService {
                   map['provider_config'] as String?),
               hasThumbnail: (map['has_thumbnail'] as int?) == 1,
               isFolder: (map['is_folder'] as int?) == 1,
+              alternativeSources: _decodeAlternativeSources(
+                  map['alternative_sources'] as String?),
             ))
         .toList();
+  }
+
+  static List<AlternativeSource> _decodeAlternativeSources(String? raw) {
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list
+          .map((e) =>
+              AlternativeSource.fromJson((e as Map).cast<String, dynamic>()))
+          .toList(growable: false);
+    } catch (e) {
+      debugPrint('_decodeAlternativeSources: $e');
+      return const [];
+    }
   }
 
   /// Cleans up cached games when a [Source] is disabled or removed.

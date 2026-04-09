@@ -6,6 +6,19 @@ class AlternativeSource {
   final ProviderConfig providerConfig;
 
   const AlternativeSource({required this.url, required this.providerConfig});
+
+  Map<String, dynamic> toJson() => {
+        'url': url,
+        'provider_config': providerConfig.toJsonWithoutAuth(),
+      };
+
+  factory AlternativeSource.fromJson(Map<String, dynamic> json) {
+    return AlternativeSource(
+      url: json['url'] as String,
+      providerConfig: ProviderConfig.fromJson(
+          (json['provider_config'] as Map).cast<String, dynamic>()),
+    );
+  }
 }
 
 class GameItem {
