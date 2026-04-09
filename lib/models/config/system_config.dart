@@ -34,7 +34,11 @@ class SystemConfig {
     required this.targetFolder,
     required this.providers,
     this.autoExtract = false,
-    this.mergeMode = false,
+    // Default ON: when a system has multiple sources (RomM + SMB etc.)
+    // we always want them to stack additively. Single-source systems
+    // are unaffected — _fetchMerged with one provider behaves the same
+    // as failover.
+    this.mergeMode = true,
     this.autoSync = true,
     this.enabledSourceIds,
     this.manualMappings = const [],
@@ -62,7 +66,7 @@ class SystemConfig {
       targetFolder: json['target_folder'] as String,
       providers: providerList,
       autoExtract: json['auto_extract'] as bool? ?? false,
-      mergeMode: json['merge_mode'] as bool? ?? false,
+      mergeMode: json['merge_mode'] as bool? ?? true,
       autoSync: json['auto_sync'] as bool? ?? true,
       enabledSourceIds: allowList,
       manualMappings: mappings,

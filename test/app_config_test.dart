@@ -78,12 +78,12 @@ void main() {
       expect(config.providers[2].priority, 3);
     });
 
-    test('fromJson defaults autoExtract and mergeMode to false when absent',
+    test('fromJson defaults autoExtract=false and mergeMode=true when absent',
         () {
       final json = _systemJson(); // no auto_extract or merge_mode keys
       final config = SystemConfig.fromJson(json);
       expect(config.autoExtract, isFalse);
-      expect(config.mergeMode, isFalse);
+      expect(config.mergeMode, isTrue);
     });
 
     test('toJsonWithoutAuth strips credentials from all providers', () {
@@ -119,7 +119,7 @@ void main() {
       // Preserved
       expect(copy.id, 'gba');
       expect(copy.targetFolder, '/roms/gba');
-      expect(copy.mergeMode, isFalse);
+      expect(copy.mergeMode, isTrue);
     });
   });
 

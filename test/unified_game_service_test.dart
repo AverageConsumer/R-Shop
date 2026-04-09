@@ -147,6 +147,9 @@ void main() {
     name: 'NES',
     targetFolder: '/roms/nes',
     providers: [webConfig, smbConfig],
+    // Failover-mode tests below need mergeMode off explicitly now
+    // that the default is true.
+    mergeMode: false,
   );
 
   const systemMerge = SystemConfig(
