@@ -85,15 +85,12 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
       return KeyEventResult.ignored;
     }
 
-    // Console panel is open
+    // Console panel is open — only system-level options here, source
+    // management has moved to Settings → Sources.
     if (state.hasConsoleSelected) {
       if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
           event.logicalKey == LogicalKeyboardKey.escape) {
         controller.deselectConsole();
-        return KeyEventResult.handled;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-        controller.startAddProvider();
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;

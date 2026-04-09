@@ -35,12 +35,10 @@ ConsoleHud? buildConsoleSetupHud({
   }
 
   if (state.hasConsoleSelected) {
-    final hasSources = state.consoleSubState?.providers.isNotEmpty ?? false;
+    // Source add/remove/reorder lives in Settings → Sources now;
+    // this panel only handles system-level options.
     return ConsoleHud(
       b: HudAction('Close', onTap: controller.deselectConsole),
-      y: HudAction('Add Source', onTap: controller.startAddProvider),
-      dpad: hasSources ? (label: '◄►', action: 'Reorder') : null,
-      x: hasSources ? const HudAction('Delete') : null,
     );
   }
 

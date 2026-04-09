@@ -1,15 +1,12 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/widgets/console_focusable.dart';
 import '../../../models/system_model.dart';
-import '../../../providers/app_providers.dart';
 import '../onboarding_controller.dart';
 import 'provider_form.dart';
-import 'provider_list_item.dart';
 
 class ConsoleConfigPanel extends ConsumerStatefulWidget {
   const ConsoleConfigPanel({super.key});
@@ -212,96 +209,72 @@ class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
         ),
         SizedBox(height: rs.spacing.lg),
 
-        // Provider list
+        // Read-only summary of which sources currently contribute to
+        // this system. Adding/removing/reordering sources moved to
+        // Settings → Sources after the source-centric refactor; this
+        // panel only handles system-level config now (folder, toggles).
         _buildSectionLabel(
           'SOURCES (${sub.providers.length})',
           labelFontSize,
         ),
         SizedBox(height: rs.spacing.sm),
-        ...List.generate(sub.providers.length, (i) {
-          final p = sub.providers[i];
-          return Focus(
-            key: ValueKey(
-              'prov_${p.type.name}_${p.url ?? ''}_${p.host ?? ''}'
-              '_${p.port ?? ''}_${p.share ?? ''}_${p.path ?? ''}',
-            ),
-            canRequestFocus: false,
-            skipTraversal: true,
-            onKeyEvent: (node, event) {
-              if (event is KeyUpEvent) return KeyEventResult.ignored;
-              if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                if (i > 0) {
-                  controller.moveProvider(i, i - 1);
-                  ref.read(feedbackServiceProvider).tick();
-                }
-                return KeyEventResult.handled;
-              }
-              if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-                if (i < sub.providers.length - 1) {
-                  controller.moveProvider(i, i + 1);
-                  ref.read(feedbackServiceProvider).tick();
-                }
-                return KeyEventResult.handled;
-              }
-              if (event.logicalKey == LogicalKeyboardKey.gameButtonX) {
-                controller.removeProvider(i);
-                ref.read(feedbackServiceProvider).tick();
-                return KeyEventResult.handled;
-              }
-              return KeyEventResult.ignored;
-            },
-            child: ProviderListItem(
-              provider: p,
-              index: i,
-              onEdit: () => controller.startEditProvider(i),
-              onDelete: () => controller.removeProvider(i),
-              onMoveUp: i > 0
-                  ? () => controller.moveProvider(i, i - 1)
-                  : null,
-              onMoveDown: i < sub.providers.length - 1
-                  ? () => controller.moveProvider(i, i + 1)
-                  : null,
-            ),
-          );
-        }),
-        SizedBox(height: rs.spacing.sm),
-
-        // Add source button
-        ConsoleFocusable(
-          onSelect: controller.startAddProvider,
-          borderRadius: rs.radius.sm,
-          child: GestureDetector(
-            onTap: controller.startAddProvider,
-            child: Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(minHeight: 48),
-              padding: EdgeInsets.symmetric(vertical: rs.spacing.md),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: Colors.redAccent.withValues(alpha: 0.3),
-                  width: 1,
-                ),
-                borderRadius: BorderRadius.circular(rs.radius.sm),
-                color: Colors.redAccent.withValues(alpha: 0.05),
+        if (sub.providers.isEmpty)
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: rs.spacing.sm),
+            child: Text(
+              'No sources mapped — manage in Settings → Sources.',
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: fontSize,
+                fontStyle: FontStyle.italic,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add, color: Colors.redAccent, size: rs.isSmall ? 16.0 : 20.0),
-                  SizedBox(width: rs.spacing.xs),
-                  Text(
-                    'Add Source',
-                    style: TextStyle(
-                      color: Colors.redAccent,
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.bold,
+            ),
+          )
+        else ...[
+          ...sub.providers.map((p) => Padding(
+                padding: EdgeInsets.only(bottom: rs.spacing.xs),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: rs.spacing.md, vertical: rs.spacing.sm),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(rs.radius.sm),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
                     ),
                   ),
-                ],
-              ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.cloud_outlined,
+                          size: rs.isSmall ? 14 : 16,
+                          color: Colors.white54),
+                      SizedBox(width: rs.spacing.sm),
+                      Expanded(
+                        child: Text(
+                          p.detailLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: fontSize,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )),
+          SizedBox(height: rs.spacing.xs),
+          Text(
+            'Add or remove sources in Settings → Sources.',
+            style: TextStyle(
+              color: Colors.white38,
+              fontSize: labelFontSize,
+              fontStyle: FontStyle.italic,
             ),
           ),
-        ),
+        ],
         SizedBox(height: rs.spacing.lg),
 
         // Done button
