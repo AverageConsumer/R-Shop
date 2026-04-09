@@ -522,7 +522,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final storage = ref.read(storageServiceProvider);
 
     try {
-      final config = controller.buildFinalConfig();
+      final config = await controller.buildFinalConfig();
       final jsonString = const JsonEncoder.withIndent('  ').convert(config.toJson());
       await ref.read(configStorageServiceProvider).saveConfig(jsonString);
       await storage.setOnboardingCompleted(true);

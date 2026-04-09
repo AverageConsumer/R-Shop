@@ -1846,8 +1846,8 @@ void main() {
   // 15. Build Final Config / Export
   // =========================================================================
   group('Build final config / export', () {
-    test('buildFinalConfig returns AppConfig with version 2 and all systems',
-        () {
+    test('buildFinalConfig returns AppConfig and includes all systems',
+        () async {
       final c = _createController();
       c.state = c.state.copyWith(
         configuredSystems: {
@@ -1855,8 +1855,8 @@ void main() {
           'snes': _systemConfig('snes'),
         },
       );
-      final config = c.buildFinalConfig();
-      expect(config.version, 2);
+      final config = await c.buildFinalConfig();
+      expect(config.version, AppConfig.currentVersion);
       expect(config.systems.length, 2);
       expect(config.systems.any((s) => s.id == 'nes'), true);
       expect(config.systems.any((s) => s.id == 'snes'), true);
@@ -1874,10 +1874,10 @@ void main() {
       expect(storage.lastExportedConfig!.systems[0].id, 'nes');
     });
 
-    test('buildFinalConfig with empty systems returns empty list', () {
+    test('buildFinalConfig with empty systems returns empty list', () async {
       final c = _createController();
-      final config = c.buildFinalConfig();
-      expect(config.version, 2);
+      final config = await c.buildFinalConfig();
+      expect(config.version, AppConfig.currentVersion);
       expect(config.systems, isEmpty);
     });
   });

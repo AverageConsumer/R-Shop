@@ -121,7 +121,7 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     final audioManager = ref.read(audioManagerProvider);
     audioManager.stopTyping();
     final controller = ref.read(onboardingControllerProvider.notifier);
-    final config = controller.buildFinalConfig();
+    final config = await controller.buildFinalConfig();
     final jsonString =
         const JsonEncoder.withIndent('  ').convert(config.toJson());
     await ref.read(configStorageServiceProvider).saveConfig(jsonString);

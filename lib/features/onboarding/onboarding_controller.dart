@@ -2192,15 +2192,27 @@ class OnboardingController extends StateNotifier<OnboardingState> {
 
   // --- Build final config ---
 
-  AppConfig buildFinalConfig() {
+  /// Builds the final AppConfig that gets persisted at the end of
+  /// onboarding. Reads any sources that were written to disk during the
+  /// flow (e.g. by the welcome chooser → SourcesNotifier path) so the
+  /// final save doesn't clobber them with an empty list.
+  Future<AppConfig> buildFinalConfig() async {
+    List<Source> existingSources = const [];
+    try {
+      final loaded = await _configStorage.loadConfig();
+      if (loaded != null) existingSources = loaded.sources;
+    } catch (e) {
+      debugPrint('buildFinalConfig: failed to read existing sources: $e');
+    }
     return AppConfig(
-      version: 2,
+      version: AppConfig.currentVersion,
       systems: state.configuredSystems.values.toList(),
+      sources: existingSources,
     );
   }
 
   Future<void> exportConfig() async {
-    final config = buildFinalConfig();
+    final config = await buildFinalConfig();
     await _configStorage.exportConfig(config);
   }
 }
