@@ -126,12 +126,13 @@ void main() {
   // ─── AppConfig ────────────────────────────────────────────────────
 
   group('AppConfig', () {
-    test('AppConfig.empty has version 2 and no systems', () {
-      expect(AppConfig.empty.version, 2);
+    test('AppConfig.empty has currentVersion and no systems', () {
+      expect(AppConfig.empty.version, AppConfig.currentVersion);
       expect(AppConfig.empty.systems, isEmpty);
+      expect(AppConfig.empty.sources, isEmpty);
     });
 
-    test('fromJson round-trips via toJson', () {
+    test('v2 JSON is migrated to currentVersion on load', () {
       final json = {
         'version': 2,
         'systems': [
@@ -140,21 +141,26 @@ void main() {
         ],
       };
       final config = AppConfig.fromJson(json);
-      expect(config.version, 2);
+      // Migration bumps the schema and derives top-level sources from
+      // each system's legacy provider list.
+      expect(config.version, AppConfig.currentVersion);
       expect(config.systems, hasLength(2));
+      expect(config.sources, isNotEmpty);
 
+      // After migration, re-encoding and decoding is a true round-trip.
       final roundTrip = AppConfig.fromJson(config.toJson());
       expect(roundTrip.version, config.version);
       expect(roundTrip.systems.length, config.systems.length);
+      expect(roundTrip.sources.length, config.sources.length);
       expect(roundTrip.systems[0].id, 'gba');
       expect(roundTrip.systems[1].id, 'snes');
     });
 
-    test('fromJson defaults version to 1 when missing', () {
+    test('fromJson migrates version-less input to currentVersion', () {
       final config = AppConfig.fromJson({
         'systems': [_systemJson()],
       });
-      expect(config.version, 1);
+      expect(config.version, AppConfig.currentVersion);
     });
 
     test('systemById returns matching system or null', () {
@@ -191,8 +197,8 @@ void main() {
         (providers[0] as Map<String, dynamic>).containsKey('auth'),
         isFalse,
       );
-      // Version preserved
-      expect(stripped['version'], 2);
+      // Version was migrated to current.
+      expect(stripped['version'], AppConfig.currentVersion);
     });
   });
 }
