@@ -103,7 +103,11 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
 
   LibrarySyncService() : super(const LibrarySyncState());
 
-  Future<void> syncAll(AppConfig config, {Duration? syncTimeout}) async {
+  Future<void> syncAll(
+    AppConfig config, {
+    Duration? syncTimeout,
+    StorageService? storageService,
+  }) async {
     if (state.isSyncing) return;
     if (config.systems.isEmpty) return;
 
@@ -160,6 +164,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           totalGames += games.length;
         }
         _lastSyncTimes[systemConfig.id] = DateTime.now();
+        storageService?.setLastSyncTime(systemConfig.id, DateTime.now());
       } catch (e) {
         debugPrint('Library sync failed for ${systemConfig.id}: $e');
         failures[displayName] = _userFriendlyError(e);
@@ -440,7 +445,12 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
   /// Syncs a single system (user-triggered). Supports queuing: if a queue sync
   /// is already running, the system is appended to the queue instead of being
   /// rejected. Deletes orphans since this is an explicit action.
-  Future<void> syncSystem(String systemId, AppConfig config, {Duration? syncTimeout}) async {
+  Future<void> syncSystem(
+    String systemId,
+    AppConfig config, {
+    Duration? syncTimeout,
+    StorageService? storageService,
+  }) async {
     final systemConfig = config.systems
         .where((s) => s.id == systemId)
         .firstOrNull;
@@ -478,7 +488,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     await _syncOneSystem(systemConfig, systemId, db, gameService);
 
     // Process any systems that were queued while the first was syncing
-    await _processQueue(config, db, gameService, syncTimeout: syncTimeout);
+    await _processQueue(config, db, gameService,
+        syncTimeout: syncTimeout, storageService: storageService);
 
     _isQueueActive = false;
     state = state.copyWith(
@@ -499,6 +510,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     DatabaseService db,
     UnifiedGameService gameService, {
     Duration? syncTimeout,
+    StorageService? storageService,
   }) async {
     while (_pendingQueue.isNotEmpty && !_isCancelled) {
       final nextId = _pendingQueue.removeAt(0);
@@ -513,7 +525,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       state = state.copyWith(
         currentSystem: _displayName(nextId, systemConfig),
       );
-      await _syncOneSystem(systemConfig, nextId, db, gameService);
+      await _syncOneSystem(systemConfig, nextId, db, gameService,
+          storageService: storageService);
     }
   }
 
@@ -522,8 +535,9 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     SystemConfig systemConfig,
     String systemId,
     DatabaseService db,
-    UnifiedGameService gameService,
-  ) async {
+    UnifiedGameService gameService, {
+    StorageService? storageService,
+  }) async {
     final systemModel = SystemModel.supportedSystems
         .where((s) => s.id == systemId)
         .firstOrNull;
@@ -560,6 +574,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         totalGamesFound: state.totalGamesFound + games.length,
       );
       _lastSyncTimes[systemConfig.id] = DateTime.now();
+      storageService?.setLastSyncTime(systemConfig.id, DateTime.now());
     } catch (e) {
       debugPrint('Library sync failed for $systemId: $e');
       final failures = Map<String, String>.of(state.failedSystems);

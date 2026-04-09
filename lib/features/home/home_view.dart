@@ -493,7 +493,12 @@ class _HomeViewState extends ConsumerState<HomeView>
     // If a queue sync is running, syncSystem will enqueue; if idle, it starts
     final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
     _resumeAutoSyncAfterManual = true;
-    syncService.syncSystem(system.id, config, syncTimeout: timeout);
+    syncService.syncSystem(
+      system.id,
+      config,
+      syncTimeout: timeout,
+      storageService: ref.read(storageServiceProvider),
+    );
   }
 
   void _syncAll() async {
@@ -506,7 +511,11 @@ class _HomeViewState extends ConsumerState<HomeView>
       if (!mounted) return;
     }
     final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
-    syncService.syncAll(config, syncTimeout: timeout);
+    syncService.syncAll(
+      config,
+      syncTimeout: timeout,
+      storageService: ref.read(storageServiceProvider),
+    );
     triggerRaSync(
       ref.read(raSyncServiceProvider.notifier),
       ref.read(storageServiceProvider),
