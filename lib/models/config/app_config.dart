@@ -125,6 +125,7 @@ AppConfig _migrateLegacyToV3(List<SystemConfig> legacySystems) {
 
   for (final system in legacySystems) {
     final newMappings = <SystemSourceMapping>[];
+    final taggedProviders = <ProviderConfig>[];
 
     for (final provider in system.providers) {
       final probe = Source(
@@ -184,9 +185,25 @@ AppConfig _migrateLegacyToV3(List<SystemConfig> legacySystems) {
           );
         }
       }
+
+      // Tag the legacy provider so the SourcesNotifier rebuild recognises
+      // it as belonging to a source. Without this the provider would be
+      // treated as unmanaged forever and survive a source disable/remove,
+      // which is exactly the "sync still hits the disabled RomM" bug.
+      taggedProviders.add(
+        provider.copyWith(
+          managedBySource: true,
+          sourceId: sourcesByKey[key]!.id,
+        ),
+      );
     }
 
-    migratedSystems.add(system.copyWith(manualMappings: newMappings));
+    migratedSystems.add(
+      system.copyWith(
+        manualMappings: newMappings,
+        providers: taggedProviders,
+      ),
+    );
   }
 
   return AppConfig(

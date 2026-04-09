@@ -74,6 +74,21 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       final loaded = await _storage.loadConfig();
       _cachedConfig = loaded ?? AppConfig.empty;
 
+      // One-shot upgrade for users on a v3 config whose system.providers
+      // were never tagged with their source id. Without this fix-up the
+      // notifier treats them as unmanaged forever, and disabling/removing
+      // a source has no effect on what syncAll iterates over. Persist
+      // immediately so bootstrappedConfigProvider sees the same view.
+      final retagged = _retagUnmanagedProviders(_cachedConfig);
+      if (!identical(retagged, _cachedConfig)) {
+        _cachedConfig = retagged;
+        try {
+          await _storage.saveConfig(jsonEncode(_cachedConfig.toJson()));
+        } catch (e) {
+          debugPrint('SourcesNotifier: retag persist failed: $e');
+        }
+      }
+
       // Sync the in-memory snapshot's legacy providers lists with the
       // current sources list using the same managed/unmanaged split as
       // _writeAndPublish. Read-only — never writes back to disk.
@@ -256,6 +271,51 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       debugPrint('SourcesNotifier: persist failed: $e');
       state = state.copyWith(error: e.toString());
       rethrow;
+    }
+  }
+
+  /// Walks every system's provider list and tags any unmanaged provider
+  /// whose connection details match an existing [Source] as belonging to
+  /// that source. Used as a one-shot upgrade for v3 configs that were
+  /// written before the managedBySource tagging existed; without it, an
+  /// untagged provider would survive disable/remove forever.
+  AppConfig _retagUnmanagedProviders(AppConfig config) {
+    if (config.sources.isEmpty || config.systems.isEmpty) return config;
+    var anyChange = false;
+    final newSystems = config.systems.map((s) {
+      var systemChanged = false;
+      final newProviders = s.providers.map((p) {
+        if (p.managedBySource) return p;
+        for (final source in config.sources) {
+          if (_providerMatchesSource(p, source)) {
+            systemChanged = true;
+            anyChange = true;
+            return p.copyWith(
+              managedBySource: true,
+              sourceId: source.id,
+            );
+          }
+        }
+        return p;
+      }).toList(growable: false);
+      return systemChanged ? s.copyWith(providers: newProviders) : s;
+    }).toList(growable: false);
+    if (!anyChange) return config;
+    return config.copyWith(systems: newSystems);
+  }
+
+  static bool _providerMatchesSource(ProviderConfig p, Source s) {
+    // Reuse SourceResolver's matching rules.
+    switch (s.type) {
+      case SourceType.romm:
+      case SourceType.web:
+        return s.url != null && s.url == p.url;
+      case SourceType.smb:
+        return s.host == p.host && s.share == p.share && s.port == p.port;
+      case SourceType.ftp:
+        return s.host == p.host && s.port == p.port;
+      case SourceType.local:
+        return false;
     }
   }
 
