@@ -578,7 +578,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _SourceList extends StatelessWidget {
+class _SourceList extends ConsumerWidget {
   const _SourceList({
     required this.sources,
     required this.focusForId,
@@ -594,7 +594,18 @@ class _SourceList extends StatelessWidget {
   final Responsive rs;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Tally per-source manual mapping counts so the card can show
+    // "N mappings" for SMB/FTP/Web (where knownPlatforms is always 0).
+    final cfg = ref.watch(bootstrappedConfigProvider).valueOrNull;
+    final mappingCounts = <String, int>{};
+    if (cfg != null) {
+      for (final s in cfg.systems) {
+        for (final m in s.manualMappings) {
+          mappingCounts[m.sourceId] = (mappingCounts[m.sourceId] ?? 0) + 1;
+        }
+      }
+    }
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 720),
@@ -617,6 +628,7 @@ class _SourceList extends StatelessWidget {
                 autofocus: index == 0,
                 onTap: () => onTap(source),
                 rs: rs,
+                mappingCount: mappingCounts[source.id] ?? 0,
               );
             },
           ),
@@ -634,6 +646,7 @@ class _SourceCard extends StatelessWidget {
     required this.autofocus,
     required this.onTap,
     required this.rs,
+    this.mappingCount = 0,
   });
 
   final Source source;
@@ -641,6 +654,7 @@ class _SourceCard extends StatelessWidget {
   final bool autofocus;
   final VoidCallback onTap;
   final Responsive rs;
+  final int mappingCount;
 
   Color get _accent {
     if (source.borrowed) return Colors.lightBlueAccent;
@@ -685,7 +699,13 @@ class _SourceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final platformCount = source.knownPlatforms.length;
+    // RomM auto-discovers platforms; everything else lives off manual
+    // mappings, so the same "N entries" badge means different things
+    // depending on the source type.
+    final isAutoMapped = source.autoMap;
+    final entryCount =
+        isAutoMapped ? source.knownPlatforms.length : mappingCount;
+    final entryNoun = isAutoMapped ? 'platform' : 'mapping';
     final expiry = _expiryLabel();
     final expiryUrgent = expiry != null &&
         source.tokenExpiresAt != null &&
@@ -804,10 +824,12 @@ class _SourceCard extends StatelessWidget {
                           size: 11, color: Colors.grey.shade500),
                       const SizedBox(width: 3),
                       Text(
-                        platformCount == 0
-                            ? 'No platforms'
-                            : '$platformCount '
-                                '${platformCount == 1 ? "platform" : "platforms"}',
+                        entryCount == 0
+                            ? (isAutoMapped
+                                ? 'No platforms'
+                                : 'No mappings — [A] to add')
+                            : '$entryCount '
+                                '${entryCount == 1 ? entryNoun : "${entryNoun}s"}',
                         style: TextStyle(
                           color: Colors.grey.shade500,
                           fontSize: 11,
