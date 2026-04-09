@@ -29,6 +29,7 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
   String? _error;
   final FocusNode _backFocus = FocusNode();
   final FocusNode _manualFocus = FocusNode();
+  final FocusNode _screenFocus = FocusNode(debugLabel: 'qr_pair_screen');
 
   @override
   void initState() {
@@ -44,7 +45,35 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
     _controller.dispose();
     _backFocus.dispose();
     _manualFocus.dispose();
+    _screenFocus.dispose();
     super.dispose();
+  }
+
+  /// Top-level key handler so [B]/Escape always closes the scanner and
+  /// [A]/Enter always opens manual entry, regardless of which inner
+  /// widget happens to have focus. The QR screen has no real "primary
+  /// action" target since the camera does the work, so it makes more
+  /// sense to bind A globally to the only manual-action escape hatch
+  /// than to require the user to tab onto a button first.
+  KeyEventResult _handleScreenKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.gameButtonB ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.goBack) {
+      Navigator.of(context).maybePop();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.gameButtonA ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.select) {
+      _openManual();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   Future<void> _onDetect(BarcodeCapture capture) async {
@@ -114,13 +143,10 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
-        child: CallbackShortcuts(
-          bindings: {
-            const SingleActivator(LogicalKeyboardKey.gameButtonB): () =>
-                Navigator.of(context).maybePop(),
-            const SingleActivator(LogicalKeyboardKey.escape): () =>
-                Navigator.of(context).maybePop(),
-          },
+        child: Focus(
+          focusNode: _screenFocus,
+          autofocus: true,
+          onKeyEvent: _handleScreenKey,
           child: Stack(
             children: [
               // Camera preview (or solid black on devices without one).

@@ -27,12 +27,21 @@ class ManualPairingScreen extends ConsumerStatefulWidget {
 class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
   final TextEditingController _urlController = TextEditingController();
   final TextEditingController _codeController = TextEditingController();
-  final FocusNode _urlConsoleFocus = FocusNode();
-  final FocusNode _urlTextFocus = FocusNode();
-  final FocusNode _codeConsoleFocus = FocusNode();
-  final FocusNode _codeTextFocus = FocusNode();
-  final FocusNode _submitFocus = FocusNode();
-  final FocusNode _backFocus = FocusNode();
+  // Wrapper focus nodes (controller navigates between these).
+  final FocusNode _urlConsoleFocus = FocusNode(debugLabel: 'mp_url_wrap');
+  final FocusNode _codeConsoleFocus = FocusNode(debugLabel: 'mp_code_wrap');
+  final FocusNode _submitFocus = FocusNode(debugLabel: 'mp_submit');
+  final FocusNode _backFocus = FocusNode(debugLabel: 'mp_back');
+  // Text-edit focus nodes — skipTraversal so the controller can never
+  // land here via arrow keys; the user has to press A on the wrapper
+  // first to start editing, and B to leave editing again.
+  final FocusNode _urlTextFocus =
+      FocusNode(skipTraversal: true, debugLabel: 'mp_url_text');
+  final FocusNode _codeTextFocus =
+      FocusNode(skipTraversal: true, debugLabel: 'mp_code_text');
+  // Top-level focus that catches every key on this screen so [B] always
+  // exits and the screen owns its own ↑/↓ traversal between wrappers.
+  final FocusNode _screenFocus = FocusNode(debugLabel: 'mp_screen');
 
   Timer? _probeDebounce;
   String? _probeVersion;
@@ -46,6 +55,11 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
   void initState() {
     super.initState();
     _urlController.addListener(_onUrlChanged);
+    // Land on the URL wrapper after first frame so the user can hit
+    // [A] to start typing or ↓ to skip straight to the code field.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _urlConsoleFocus.requestFocus();
+    });
   }
 
   @override
@@ -60,7 +74,86 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
     _codeTextFocus.dispose();
     _submitFocus.dispose();
     _backFocus.dispose();
+    _screenFocus.dispose();
     super.dispose();
+  }
+
+  /// Ordered list of wrapper focus nodes. ↑/↓ walk through this list.
+  List<FocusNode> get _navOrder =>
+      [_urlConsoleFocus, _codeConsoleFocus, _submitFocus];
+
+  /// True when one of the text fields is currently in edit mode (soft
+  /// keyboard up). [B] in this state should exit editing instead of
+  /// popping the screen.
+  bool get _isEditing => _urlTextFocus.hasFocus || _codeTextFocus.hasFocus;
+
+  KeyEventResult _handleScreenKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+
+    // [B] / Escape: leave editing first, only then close the screen.
+    if (key == LogicalKeyboardKey.gameButtonB ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.goBack) {
+      if (_isEditing) {
+        if (_urlTextFocus.hasFocus) {
+          _urlConsoleFocus.requestFocus();
+        } else {
+          _codeConsoleFocus.requestFocus();
+        }
+        return KeyEventResult.handled;
+      }
+      Navigator.of(context).maybePop();
+      return KeyEventResult.handled;
+    }
+
+    // While editing, let arrow keys / A / Enter behave normally inside
+    // the TextField (cursor movement, line break, etc.).
+    if (_isEditing) return KeyEventResult.ignored;
+
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _moveFocus(1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _moveFocus(-1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.gameButtonA ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter ||
+        key == LogicalKeyboardKey.select) {
+      _activateFocused();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  void _moveFocus(int delta) {
+    final order = _navOrder;
+    final currentIndex = order.indexWhere((n) => n.hasFocus);
+    final start = currentIndex < 0 ? (delta > 0 ? -1 : order.length) : currentIndex;
+    final next = (start + delta).clamp(0, order.length - 1);
+    if (next == currentIndex) return; // edge — no move
+    final target = order[next];
+    if (target.canRequestFocus) {
+      target.requestFocus();
+      ref.read(feedbackServiceProvider).tick();
+    }
+  }
+
+  void _activateFocused() {
+    if (_urlConsoleFocus.hasFocus) {
+      _urlTextFocus.requestFocus();
+    } else if (_codeConsoleFocus.hasFocus) {
+      _codeTextFocus.requestFocus();
+    } else if (_submitFocus.hasFocus) {
+      if (!_busy) _submit();
+    } else if (_backFocus.hasFocus) {
+      Navigator.of(context).maybePop();
+    }
   }
 
   void _onUrlChanged() {
@@ -133,13 +226,10 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
       body: SafeArea(
-        child: CallbackShortcuts(
-          bindings: {
-            const SingleActivator(LogicalKeyboardKey.gameButtonB): () =>
-                Navigator.of(context).maybePop(),
-            const SingleActivator(LogicalKeyboardKey.escape): () =>
-                Navigator.of(context).maybePop(),
-          },
+        child: Focus(
+          focusNode: _screenFocus,
+          autofocus: true,
+          onKeyEvent: _handleScreenKey,
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
@@ -182,7 +272,6 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
                       consoleFocus: _urlConsoleFocus,
                       textFocus: _urlTextFocus,
                       hint: 'https://romm.example.com',
-                      autofocus: true,
                       monospace: true,
                     ),
                     const SizedBox(height: 6),
@@ -268,14 +357,15 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
     required FocusNode consoleFocus,
     required FocusNode textFocus,
     required String hint,
-    bool autofocus = false,
     bool monospace = false,
     bool uppercase = false,
   }) {
     return ConsoleFocusable(
       focusNode: consoleFocus,
-      autofocus: autofocus,
       focusScale: 1.0,
+      // A on the wrapper enters edit mode. The screen-level handler
+      // also routes A here, but keep onSelect set so touch taps work
+      // identically to controller A presses.
       onSelect: () => textFocus.requestFocus(),
       child: ListenableBuilder(
         listenable: textFocus,
@@ -292,35 +382,27 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
                 width: 2,
               ),
             ),
-            child: CallbackShortcuts(
-              bindings: {
-                const SingleActivator(LogicalKeyboardKey.escape): () =>
-                    consoleFocus.requestFocus(),
-                const SingleActivator(LogicalKeyboardKey.gameButtonB): () =>
-                    consoleFocus.requestFocus(),
-              },
-              child: TextField(
-                controller: controller,
-                focusNode: textFocus,
-                textCapitalization: uppercase
-                    ? TextCapitalization.characters
-                    : TextCapitalization.none,
-                style: TextStyle(
-                  color: Colors.white,
+            child: TextField(
+              controller: controller,
+              focusNode: textFocus,
+              textCapitalization: uppercase
+                  ? TextCapitalization.characters
+                  : TextCapitalization.none,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontFamily: monospace ? 'monospace' : null,
+              ),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(
+                  color: Colors.grey.shade700,
                   fontSize: 14,
                   fontFamily: monospace ? 'monospace' : null,
                 ),
-                decoration: InputDecoration(
-                  hintText: hint,
-                  hintStyle: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 14,
-                    fontFamily: monospace ? 'monospace' : null,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 14),
-                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 14),
               ),
             ),
           );

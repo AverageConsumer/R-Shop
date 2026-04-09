@@ -242,9 +242,9 @@ class SettingsSystemTab extends ConsumerWidget {
               _buildExportLogTile(ref),
               SizedBox(height: rs.spacing.md),
               SettingsItem(
-                title: 'Pairing (DEV)',
-                subtitle: 'QR scan or manual server + code',
-                trailing: const Icon(Icons.qr_code_scanner,
+                title: 'Sources',
+                subtitle: 'Manage paired RomMs and other game sources',
+                trailing: const Icon(Icons.cloud_outlined,
                     color: Colors.white70),
                 onTap: onOpenPairing,
               ),
