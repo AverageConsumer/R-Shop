@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/config/app_config.dart';
 import '../models/config/source.dart';
+import '../models/config/provider_config.dart';
 import 'config_storage_service.dart';
+import 'romm_pairing_service.dart';
 import 'source_resolver.dart';
 
 /// Snapshot exposed by [SourcesNotifier]. Loading and error states are
@@ -147,6 +149,33 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     );
     if (mapEquals(src.knownPlatforms, platforms)) return;
     await updateSource(src.copyWith(knownPlatforms: platforms));
+  }
+
+  /// Refreshes an existing source's bearer token + expiry from a fresh
+  /// [RommPairResult]. Preserves id, name, manualMappings, priority,
+  /// autoMap, enabled, borrowed flag, and (unless [knownPlatforms] is
+  /// passed) the previously discovered platform map. Used by the
+  /// "Re-pair" action when a borrowed token is about to expire.
+  Future<void> refreshTokenFromPair(
+    String id,
+    RommPairResult result, {
+    Map<String, int>? knownPlatforms,
+  }) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == id,
+      orElse: () => throw StateError('Unknown source: $id'),
+    );
+    final updated = src.copyWith(
+      url: result.serverUrl,
+      auth: AuthConfig(
+        clientToken: result.token,
+        clientTokenId: result.tokenId,
+        clientTokenExpiresAt: result.expiresAt,
+      ),
+      tokenExpiresAt: result.expiresAt,
+      knownPlatforms: knownPlatforms ?? src.knownPlatforms,
+    );
+    await updateSource(updated);
   }
 
   /// Bulk replace — used by config import flows. Skips the diff and

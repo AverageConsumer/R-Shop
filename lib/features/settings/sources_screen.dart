@@ -7,6 +7,7 @@ import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/console_focusable.dart';
 import '../../core/widgets/screen_layout.dart';
+import '../../models/config/provider_config.dart';
 import '../../models/config/source.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
@@ -259,6 +260,65 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     if (mounted) _closeSourceActions();
   }
 
+  /// Re-pair flow: closes the action overlay, opens the QR scanner, and on
+  /// success calls [SourcesNotifier.refreshTokenFromPair] which preserves
+  /// the existing source's id, name, and per-system mappings while
+  /// swapping in the fresh bearer token + expiry. Used by the user when a
+  /// borrowed token is about to expire (or already has).
+  Future<void> _repairSource(Source source) async {
+    setState(() => _activeActionsSource = null);
+
+    final result = await Navigator.of(context).push<RommPairResult?>(
+      MaterialPageRoute(builder: (_) => const QrPairingScreen()),
+    );
+    if (!mounted || result == null) return;
+
+    // Re-discover the platform map against the (possibly new) URL so the
+    // existing knownPlatforms cache stays in sync after re-pair.
+    Map<String, int>? platforms;
+    try {
+      final api = RommApiService();
+      final fetched = await api.fetchPlatforms(
+        result.serverUrl,
+        auth: AuthConfig(clientToken: result.token),
+      );
+      final allSystemIds = SystemModel.supportedSystems.map((s) => s.id);
+      platforms =
+          RommPlatformMatcher.buildKnownPlatforms(allSystemIds, fetched);
+    } catch (e) {
+      debugPrint('SourcesScreen: re-pair platform discovery failed: $e');
+    }
+
+    final notifier = ref.read(sourcesProvider.notifier);
+    try {
+      await notifier.refreshTokenFromPair(
+        source.id,
+        result,
+        knownPlatforms: platforms,
+      );
+      ref.invalidate(bootstrappedConfigProvider);
+    } catch (e) {
+      debugPrint('SourcesScreen: refreshTokenFromPair failed: $e');
+      if (mounted) {
+        showErrorNotification(context, ref,
+            message: 'Re-pair failed: $e');
+      }
+      return;
+    }
+
+    if (!mounted) return;
+    // Restore focus to the (still-existing) card.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusFor(source.id).requestFocus();
+    });
+    showSuccessNotification(
+      context,
+      ref,
+      message: 'Re-paired ${source.name}',
+    );
+  }
+
   Future<void> _removeSource(Source source) async {
     final notifier = ref.read(sourcesProvider.notifier);
     await notifier.removeSource(source.id);
@@ -313,6 +373,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                 onToggleEnabled: () =>
                     _toggleSourceEnabled(_activeActionsSource!),
                 onRemove: () => _removeSource(_activeActionsSource!),
+                onRepair: () => _repairSource(_activeActionsSource!),
               ),
           ],
         ),
@@ -730,12 +791,14 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
     required this.onClose,
     required this.onToggleEnabled,
     required this.onRemove,
+    required this.onRepair,
   });
 
   final Source source;
   final VoidCallback onClose;
   final VoidCallback onToggleEnabled;
   final VoidCallback onRemove;
+  final VoidCallback onRepair;
 
   @override
   ConsumerState<_SourceActionsOverlay> createState() =>
@@ -747,8 +810,36 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
       FocusNode(debugLabel: 'source_actions_overlay');
   int _selectedIndex = 0;
 
-  // 0 = toggle, 1 = remove, 2 = cancel
-  static const int _itemCount = 3;
+  /// Build the ordered list of actions for the current source. Re-pair is
+  /// only offered for RomM sources because the QR/code flow is RomM-only.
+  List<_OverlayAction> get _actions {
+    final src = widget.source;
+    return [
+      if (src.type == SourceType.romm)
+        _OverlayAction(
+          icon: Icons.qr_code_2,
+          label: 'Re-pair',
+          onActivate: widget.onRepair,
+        ),
+      _OverlayAction(
+        icon: src.enabled ? Icons.toggle_off : Icons.toggle_on,
+        label: src.enabled ? 'Disable' : 'Enable',
+        onActivate: widget.onToggleEnabled,
+      ),
+      _OverlayAction(
+        icon: Icons.delete_outline,
+        label: 'Remove',
+        destructive: true,
+        onActivate: widget.onRemove,
+      ),
+      _OverlayAction(
+        icon: Icons.close,
+        label: 'Cancel',
+        cancelStyle: true,
+        onActivate: widget.onClose,
+      ),
+    ];
+  }
 
   @override
   void dispose() {
@@ -762,16 +853,17 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
     }
     final key = event.logicalKey;
 
+    final count = _actions.length;
     if (key == LogicalKeyboardKey.arrowUp) {
       setState(() {
-        _selectedIndex = (_selectedIndex - 1 + _itemCount) % _itemCount;
+        _selectedIndex = (_selectedIndex - 1 + count) % count;
       });
       ref.read(feedbackServiceProvider).tick();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
       setState(() {
-        _selectedIndex = (_selectedIndex + 1) % _itemCount;
+        _selectedIndex = (_selectedIndex + 1) % count;
       });
       ref.read(feedbackServiceProvider).tick();
       return KeyEventResult.handled;
@@ -793,18 +885,13 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
   }
 
   void _activate() {
-    ref.read(feedbackServiceProvider).confirm();
-    switch (_selectedIndex) {
-      case 0:
-        widget.onToggleEnabled();
-        break;
-      case 1:
-        widget.onRemove();
-        break;
-      case 2:
-        widget.onClose();
-        break;
+    final action = _actions[_selectedIndex];
+    if (action.cancelStyle) {
+      ref.read(feedbackServiceProvider).cancel();
+    } else {
+      ref.read(feedbackServiceProvider).confirm();
     }
+    action.onActivate();
   }
 
   @override
@@ -854,47 +941,17 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      _OverlayButton(
-                        icon: src.enabled ? Icons.toggle_off : Icons.toggle_on,
-                        label: src.enabled ? 'Disable' : 'Enable',
-                        selected: _selectedIndex == 0,
-                      ),
-                      const SizedBox(height: 8),
-                      _OverlayButton(
-                        icon: Icons.delete_outline,
-                        label: 'Remove',
-                        selected: _selectedIndex == 1,
-                        destructive: true,
-                      ),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 120),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: _selectedIndex == 2
-                                  ? Colors.white70
-                                  : Colors.transparent,
-                              width: 2,
-                            ),
-                          ),
-                          child: Text(
-                            'Cancel',
-                            style: TextStyle(
-                              color: _selectedIndex == 2
-                                  ? Colors.white
-                                  : Colors.grey.shade500,
-                              fontWeight: _selectedIndex == 2
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                            ),
-                          ),
+                      for (int i = 0; i < _actions.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 8),
+                        _OverlayButton(
+                          icon: _actions[i].icon,
+                          label: _actions[i].label,
+                          selected: _selectedIndex == i,
+                          destructive: _actions[i].destructive,
+                          subdued: _actions[i].cancelStyle,
                         ),
-                      ),
-                      const SizedBox(height: 8),
+                      ],
+                      const SizedBox(height: 12),
                       const Center(
                         child: Text(
                           '↑↓ navigate · [A] select · [B] back',
@@ -917,22 +974,44 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
   }
 }
 
+class _OverlayAction {
+  const _OverlayAction({
+    required this.icon,
+    required this.label,
+    required this.onActivate,
+    this.destructive = false,
+    this.cancelStyle = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onActivate;
+  final bool destructive;
+  final bool cancelStyle;
+}
+
 class _OverlayButton extends StatelessWidget {
   const _OverlayButton({
     required this.icon,
     required this.label,
     required this.selected,
     this.destructive = false,
+    this.subdued = false,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
   final bool destructive;
+  final bool subdued;
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? Colors.redAccent : AppTheme.primaryColor;
+    final color = destructive
+        ? Colors.redAccent
+        : subdued
+            ? Colors.white70
+            : AppTheme.primaryColor;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),
       width: double.infinity,

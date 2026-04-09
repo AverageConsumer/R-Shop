@@ -7,6 +7,7 @@ import 'package:retro_eshop/models/config/provider_config.dart';
 import 'package:retro_eshop/models/config/source.dart';
 import 'package:retro_eshop/models/config/system_config.dart';
 import 'package:retro_eshop/services/config_storage_service.dart';
+import 'package:retro_eshop/services/romm_pairing_service.dart';
 import 'package:retro_eshop/services/sources_notifier.dart';
 
 ConfigStorageService _storageInTempDir() {
@@ -461,6 +462,95 @@ void main() {
       expect(reloaded.state.sources, hasLength(1));
       // GBA's provider list reflects the new source.
       expect(reloaded.debugCachedConfig.systems.single.providers, hasLength(1));
+    });
+  });
+
+  group('SourcesNotifier — refreshTokenFromPair', () {
+    test('updates token + expiry while preserving id, name, borrowed',
+        () async {
+      final storage = _storageInTempDir();
+      final notifier = SourcesNotifier(storage);
+      await notifier.ready;
+      await notifier.addSource(Source(
+        id: 'tims-romm',
+        name: 'Tims RomM',
+        type: SourceType.romm,
+        url: 'http://old.example.com',
+        autoMap: true,
+        enabled: true,
+        borrowed: true,
+        knownPlatforms: const {'snes': 4, 'gba': 5},
+        tokenExpiresAt: DateTime.utc(2026, 1, 1),
+      ));
+
+      final newExpiry = DateTime.utc(2026, 6, 1);
+      await notifier.refreshTokenFromPair(
+        'tims-romm',
+        RommPairResult(
+          serverUrl: 'http://new.example.com',
+          token: 'fresh-bearer-token',
+          tokenId: 99,
+          name: 'ignored — name comes from existing source',
+          scopes: const ['roms.read'],
+          userId: 7,
+          expiresAt: newExpiry,
+        ),
+      );
+
+      final updated = notifier.state.sources.single;
+      expect(updated.id, 'tims-romm');
+      expect(updated.name, 'Tims RomM'); // unchanged
+      expect(updated.borrowed, isTrue); // unchanged
+      expect(updated.url, 'http://new.example.com'); // refreshed
+      expect(updated.auth?.clientToken, 'fresh-bearer-token');
+      expect(updated.auth?.clientTokenId, 99);
+      expect(updated.tokenExpiresAt, newExpiry);
+      // knownPlatforms preserved when not passed.
+      expect(updated.knownPlatforms, {'snes': 4, 'gba': 5});
+    });
+
+    test('replaces knownPlatforms when caller passes a fresh map', () async {
+      final storage = _storageInTempDir();
+      final notifier = SourcesNotifier(storage);
+      await notifier.ready;
+      await notifier.addSource(_romm(id: 's1', platforms: const {'snes': 4}));
+
+      await notifier.refreshTokenFromPair(
+        's1',
+        RommPairResult(
+          serverUrl: 'http://romm.local:8090',
+          token: 't',
+          tokenId: 1,
+          name: 'r-shop',
+          scopes: const [],
+          userId: 1,
+          expiresAt: null,
+        ),
+        knownPlatforms: const {'nds': 8, 'gba': 5},
+      );
+
+      expect(notifier.state.sources.single.knownPlatforms,
+          {'nds': 8, 'gba': 5});
+    });
+
+    test('throws StateError when source id is unknown', () async {
+      final storage = _storageInTempDir();
+      final notifier = SourcesNotifier(storage);
+      await notifier.ready;
+      expect(
+        () => notifier.refreshTokenFromPair(
+          'nope',
+          RommPairResult(
+            serverUrl: 'http://x',
+            token: 't',
+            tokenId: 1,
+            name: 'n',
+            scopes: const [],
+            userId: 1,
+          ),
+        ),
+        throwsStateError,
+      );
     });
   });
 
