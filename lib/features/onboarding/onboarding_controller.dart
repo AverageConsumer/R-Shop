@@ -42,8 +42,10 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   Future<void> completeFromRommPairing({
     required SourcesNotifier sourcesNotifier,
     required Source source,
+    String? basePath,
   }) async {
     await sourcesNotifier.addSource(source);
+    final base = basePath ?? _welcomeChooserDefaultBase;
     final updated = Map<String, SystemConfig>.from(state.configuredSystems);
     for (final systemId in source.knownPlatforms.keys) {
       if (updated.containsKey(systemId)) continue;
@@ -54,7 +56,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       updated[systemId] = SystemConfig(
         id: systemId,
         name: model.name,
-        targetFolder: '$_welcomeChooserDefaultBase/$systemId',
+        targetFolder: '$base/$systemId',
         providers: const [],
         autoExtract: model.isZipped,
       );
@@ -75,7 +77,9 @@ class OnboardingController extends StateNotifier<OnboardingState> {
   Future<void> completeFromManualSource({
     required String sourceId,
     required Iterable<String> mappedSystemIds,
+    String? basePath,
   }) async {
+    final base = basePath ?? _welcomeChooserDefaultBase;
     final updated = Map<String, SystemConfig>.from(state.configuredSystems);
     for (final systemId in mappedSystemIds) {
       if (updated.containsKey(systemId)) continue;
@@ -86,7 +90,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       updated[systemId] = SystemConfig(
         id: systemId,
         name: model.name,
-        targetFolder: '$_welcomeChooserDefaultBase/$systemId',
+        targetFolder: '$base/$systemId',
         providers: const [],
         autoExtract: model.isZipped,
       );

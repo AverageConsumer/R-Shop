@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -95,12 +96,26 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
 
   // ---- path handlers ----
 
+  Future<String?> _pickRomBaseFolder() async {
+    try {
+      return await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'Pick the folder where ROMs should be saved',
+      );
+    } catch (e) {
+      debugPrint('WelcomeChooser: folder picker failed: $e');
+      return null;
+    }
+  }
+
   Future<void> _handleQrPair() async {
     if (_busy) return;
     final result = await Navigator.of(context).push<RommPairResult?>(
       MaterialPageRoute(builder: (_) => const QrPairingScreen()),
     );
     if (!mounted || result == null) return;
+
+    final basePath = await _pickRomBaseFolder();
+    if (!mounted || basePath == null) return;
 
     setState(() {
       _busy = true;
@@ -126,6 +141,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
     await controller.completeFromRommPairing(
       sourcesNotifier: notifier,
       source: hydrated,
+      basePath: basePath,
     );
     if (!mounted) return;
     setState(() {
@@ -149,6 +165,9 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
     );
     if (!mounted || saved != true) return;
 
+    final basePath = await _pickRomBaseFolder();
+    if (!mounted || basePath == null) return;
+
     // Read back the system ids the user mapped against this source.
     final cfg = ref.read(bootstrappedConfigProvider).valueOrNull;
     final mappedSystemIds = <String>[];
@@ -168,6 +187,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
     await controller.completeFromManualSource(
       sourceId: source.id,
       mappedSystemIds: mappedSystemIds,
+      basePath: basePath,
     );
   }
 
