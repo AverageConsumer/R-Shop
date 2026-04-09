@@ -152,7 +152,13 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
 
   Future<void> _purgeCachedGamesFor(String sourceId) async {
     try {
-      await _db.deleteGamesBySourceId(sourceId);
+      final folders = <String, String>{
+        for (final s in _cachedConfig.systems) s.id: s.targetFolder,
+      };
+      await _db.purgeOrDetachSource(
+        sourceId,
+        systemTargetFolders: folders,
+      );
     } catch (e) {
       debugPrint('SourcesNotifier: cache purge failed for $sourceId: $e');
     }

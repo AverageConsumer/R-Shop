@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
@@ -513,26 +514,96 @@ class DatabaseService {
         .toList();
   }
 
-  /// Removes every cached game whose stored providerConfig references the
-  /// given sourceId. Used when a [Source] is disabled or removed so the
-  /// system grids stop showing stale entries from a now-inactive source.
+  /// Cleans up cached games when a [Source] is disabled or removed.
   ///
-  /// Match is done via SQL LIKE against the JSON blob. The sourceId is
-  /// validated to be alphanumeric/underscore/dash so the LIKE pattern
-  /// can't be hijacked into a wildcard.
-  Future<int> deleteGamesBySourceId(String sourceId) async {
+  /// We can't simply DELETE every row tagged with the source: a game may
+  /// have been downloaded from that source and now lives on disk as a
+  /// local file the user expects to keep seeing in their library. So for
+  /// each matching row we check whether the file (or its extracted
+  /// folder) exists in the system's [systemTargetFolders] and:
+  ///   - **installed** rows have their `provider_config` and `url` nulled
+  ///     out (the row stays so the library/grid keeps the entry; install
+  ///     detection works off the filesystem so it keeps working);
+  ///   - **non-installed** rows are removed entirely.
+  ///
+  /// The sourceId is validated against `[A-Za-z0-9_-]+` before it hits
+  /// the LIKE pattern so it can't be hijacked into a wildcard.
+  /// Returns `(detached, deleted)` row counts for logging.
+  Future<({int detached, int deleted})> purgeOrDetachSource(
+    String sourceId, {
+    required Map<String, String> systemTargetFolders,
+  }) async {
     if (!RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(sourceId)) {
-      debugPrint('deleteGamesBySourceId: refusing unsafe id "$sourceId"');
-      return 0;
+      debugPrint('purgeOrDetachSource: refusing unsafe id "$sourceId"');
+      return (detached: 0, deleted: 0);
     }
     final db = await database;
     final pattern = '%"source_id":"$sourceId"%';
-    final deleted = await db.rawDelete(
-      'DELETE FROM $_tableName WHERE provider_config LIKE ?',
-      [pattern],
+    final rows = await db.query(
+      _tableName,
+      columns: ['systemSlug', 'filename'],
+      where: 'provider_config LIKE ?',
+      whereArgs: [pattern],
     );
-    debugPrint('deleteGamesBySourceId($sourceId): removed $deleted games');
-    return deleted;
+
+    final installedFilenames = <(String, String)>[];
+    final orphanFilenames = <(String, String)>[];
+    for (final row in rows) {
+      final slug = row['systemSlug'] as String;
+      final filename = row['filename'] as String;
+      final folder = systemTargetFolders[slug];
+      if (folder != null && _isFilenameOnDisk(folder, filename)) {
+        installedFilenames.add((slug, filename));
+      } else {
+        orphanFilenames.add((slug, filename));
+      }
+    }
+
+    int detached = 0;
+    int deleted = 0;
+    await db.transaction((txn) async {
+      for (final (slug, filename) in installedFilenames) {
+        detached += await txn.rawUpdate(
+          'UPDATE $_tableName SET provider_config = NULL, url = NULL '
+          'WHERE systemSlug = ? AND filename = ?',
+          [slug, filename],
+        );
+      }
+      for (final (slug, filename) in orphanFilenames) {
+        deleted += await txn.delete(
+          _tableName,
+          where: 'systemSlug = ? AND filename = ?',
+          whereArgs: [slug, filename],
+        );
+      }
+    });
+    debugPrint(
+      'purgeOrDetachSource($sourceId): detached=$detached deleted=$deleted',
+    );
+    return (detached: detached, deleted: deleted);
+  }
+
+  /// Returns true when [filename] (or its extracted folder counterpart)
+  /// exists in [folder]. Mirrors the install-detection used by the UI:
+  /// archive files like `.zip`/`.7z` are also considered installed when
+  /// their extracted folder is present.
+  static bool _isFilenameOnDisk(String folder, String filename) {
+    try {
+      final direct = File('$folder/$filename');
+      if (direct.existsSync()) return true;
+      final lower = filename.toLowerCase();
+      const archives = ['.zip', '.7z', '.rar'];
+      for (final ext in archives) {
+        if (lower.endsWith(ext)) {
+          final stripped = filename.substring(0, filename.length - ext.length);
+          if (Directory('$folder/$stripped').existsSync()) return true;
+          if (File('$folder/$stripped').existsSync()) return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('_isFilenameOnDisk: $folder/$filename: $e');
+    }
+    return false;
   }
 
   Future<void> deleteGame(String systemSlug, String filename) async {
