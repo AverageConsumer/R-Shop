@@ -233,11 +233,12 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
     return Focus(
       focusNode: _screenFocus,
       onKeyEvent: _onKeyEvent,
-      child: Column(
-        key: const ValueKey('welcome_chooser'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      child: SingleChildScrollView(
+        child: Column(
+          key: const ValueKey('welcome_chooser'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
           const Text(
             'Welcome to R-Shop',
             style: TextStyle(
@@ -307,6 +308,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
             ),
           ],
         ],
+        ),
       ),
     );
   }
