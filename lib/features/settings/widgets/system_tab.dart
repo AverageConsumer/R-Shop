@@ -58,6 +58,7 @@ class SettingsSystemTab extends ConsumerWidget {
               vertical: rs.spacing.md,
             ),
             children: [
+              // --- Library setup (most-touched) ---
               SettingsItem(
                 focusNode: firstSystemTabNode,
                 title: 'Sources',
@@ -68,13 +69,13 @@ class SettingsSystemTab extends ConsumerWidget {
               ),
               SizedBox(height: rs.spacing.md),
               SettingsItem(
-                title: 'RetroAchievements',
-                subtitle: 'Achievement tracking and ROM verification',
-                trailing:
-                    const Icon(Icons.emoji_events_outlined, color: Colors.white70),
-                onTap: onOpenRaConfig,
+                title: 'Edit Systems',
+                subtitle: 'Folder, autoExtract and per-system options',
+                trailing: const Icon(Icons.tune, color: Colors.white70),
+                onTap: onOpenConfigMode,
               ),
               SizedBox(height: rs.spacing.md),
+              // --- Download tuning ---
               _buildSettingsItemWrapper(
                 ref: ref,
                 onNavigate: (dir) {
@@ -199,6 +200,18 @@ class SettingsSystemTab extends ConsumerWidget {
                 ),
               ),
               SizedBox(height: rs.spacing.md),
+              // --- Integrations ---
+              SettingsItem(
+                title: 'RetroAchievements',
+                subtitle: 'Achievement tracking and ROM verification',
+                trailing: const Icon(Icons.emoji_events_outlined,
+                    color: Colors.white70),
+                onTap: onOpenRaConfig,
+              ),
+              SizedBox(height: rs.spacing.md),
+              _buildCoverPreloadTile(ref),
+              SizedBox(height: rs.spacing.md),
+              // --- Advanced / debug (rarely touched) ---
               _buildSettingsItemWrapper(
                 ref: ref,
                 onNavigate: (dir) {
@@ -217,15 +230,6 @@ class SettingsSystemTab extends ConsumerWidget {
                   onTap: onToggleAllowNonLanHttp,
                 ),
               ),
-              SizedBox(height: rs.spacing.md),
-              SettingsItem(
-                title: 'Edit Systems',
-                subtitle: 'Folder, autoExtract and per-system options',
-                trailing: const Icon(Icons.tune, color: Colors.white70),
-                onTap: onOpenConfigMode,
-              ),
-              SizedBox(height: rs.spacing.md),
-              _buildCoverPreloadTile(ref),
               SizedBox(height: rs.spacing.md),
               _buildExportLogTile(ref),
             ],

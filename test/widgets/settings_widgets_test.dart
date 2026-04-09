@@ -358,7 +358,9 @@ void main() {
 
     testWidgets('renders Allow HTTP toggle', (tester) async {
       await tester.pumpWidget(buildSystemTab());
-      expect(find.text('ALLOW HTTP FOR EXTERNAL SERVERS'), findsOneWidget);
+      expect(
+          find.text('ALLOW HTTP FOR EXTERNAL SERVERS', skipOffstage: false),
+          findsOneWidget);
     });
 
     testWidgets('renders Edit Systems item', (tester) async {
