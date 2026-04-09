@@ -20,6 +20,7 @@ import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../pairing/qr_pairing_screen.dart';
 import '../sources/manual_source_add_screen.dart';
+import '../sources/source_mappings_screen.dart';
 
 /// Verwaltungs-Screen für alle gepairten / konfigurierten [Source]s.
 ///
@@ -360,6 +361,25 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     );
   }
 
+  /// Edit per-system path mappings for a manual source. Closes the
+  /// action overlay, opens the mapping editor, and on save invalidates
+  /// the game/config providers so the new mappings take effect.
+  Future<void> _editMappings(Source source) async {
+    setState(() => _activeActionsSource = null);
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => SourceMappingsScreen(source: source)),
+    );
+    if (!mounted) return;
+    if (saved == true) {
+      ref.invalidate(bootstrappedConfigProvider);
+      ref.invalidate(gamesProvider);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusFor(source.id).requestFocus();
+    });
+  }
+
   Future<void> _removeSource(Source source) async {
     final notifier = ref.read(sourcesProvider.notifier);
     await notifier.removeSource(source.id);
@@ -416,6 +436,8 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                     _toggleSourceEnabled(_activeActionsSource!),
                 onRemove: () => _removeSource(_activeActionsSource!),
                 onRepair: () => _repairSource(_activeActionsSource!),
+                onEditMappings: () =>
+                    _editMappings(_activeActionsSource!),
               ),
             if (_showTypePicker)
               _SourceTypePickerOverlay(
@@ -839,6 +861,7 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
     required this.onToggleEnabled,
     required this.onRemove,
     required this.onRepair,
+    required this.onEditMappings,
   });
 
   final Source source;
@@ -846,6 +869,7 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
   final VoidCallback onToggleEnabled;
   final VoidCallback onRemove;
   final VoidCallback onRepair;
+  final VoidCallback onEditMappings;
 
   @override
   ConsumerState<_SourceActionsOverlay> createState() =>
@@ -867,6 +891,12 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
           icon: Icons.qr_code_2,
           label: 'Re-pair',
           onActivate: widget.onRepair,
+        ),
+      if (src.type != SourceType.romm)
+        _OverlayAction(
+          icon: Icons.tune,
+          label: 'Edit mappings',
+          onActivate: widget.onEditMappings,
         ),
       _OverlayAction(
         icon: src.enabled ? Icons.toggle_off : Icons.toggle_on,

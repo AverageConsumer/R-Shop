@@ -135,6 +135,24 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
   /// [mappingsBySystemId] is keyed by R-Shop system slug; the value is
   /// the remote path (relative to the source's base) for that system.
   /// Empty paths are dropped.
+  /// Replaces every [SystemSourceMapping] for [sourceId] across all
+  /// systems with the entries in [mappingsBySystemId]. Empty paths drop
+  /// the mapping. Used by the manual-source mapping editor.
+  Future<void> setMappingsForSource(
+    String sourceId,
+    Map<String, String> mappingsBySystemId,
+  ) async {
+    final cleaned = <String, String>{
+      for (final e in mappingsBySystemId.entries)
+        if (e.value.trim().isNotEmpty) e.key: e.value.trim(),
+    };
+    await _writeAndPublish(
+      state.sources,
+      replaceMappingsForSource: sourceId,
+      addMappings: {sourceId: cleaned},
+    );
+  }
+
   Future<void> addSourceWithMappings(
     Source source,
     Map<String, String> mappingsBySystemId,
@@ -259,6 +277,7 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
   Future<void> _writeAndPublish(
     List<Source> next, {
     Map<String, Map<String, String>> addMappings = const {},
+    String? replaceMappingsForSource,
   }) async {
     // Re-read the config from disk so any writes that happened outside
     // this notifier (e.g. the onboarding flow adding new systems) are
@@ -271,6 +290,21 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     } catch (e) {
       debugPrint('SourcesNotifier: re-read failed, using cache: $e');
       latest = _cachedConfig;
+    }
+
+    // Strip out every existing mapping for the targeted source so the
+    // mapping editor's "replace all" semantics work cleanly.
+    if (replaceMappingsForSource != null) {
+      latest = latest.copyWith(
+        systems: latest.systems.map((s) {
+          if (s.manualMappings.isEmpty) return s;
+          final filtered = s.manualMappings
+              .where((m) => m.sourceId != replaceMappingsForSource)
+              .toList(growable: false);
+          if (filtered.length == s.manualMappings.length) return s;
+          return s.copyWith(manualMappings: filtered);
+        }).toList(growable: false),
+      );
     }
 
     // Inject any caller-supplied SystemSourceMappings before the rebuild
