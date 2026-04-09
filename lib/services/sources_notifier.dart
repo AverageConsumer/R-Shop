@@ -8,6 +8,7 @@ import '../models/config/app_config.dart';
 import '../models/config/source.dart';
 import '../models/config/provider_config.dart';
 import 'config_storage_service.dart';
+import 'database_service.dart';
 import 'romm_pairing_service.dart';
 import 'source_resolver.dart';
 
@@ -54,11 +55,14 @@ class SourcesState {
 /// level). Once the rest of the app moves off the legacy half, this
 /// notifier can become the sole owner of [AppConfig].
 class SourcesNotifier extends StateNotifier<SourcesState> {
-  SourcesNotifier(this._storage) : super(SourcesState.initial) {
+  SourcesNotifier(this._storage, {DatabaseService? db})
+      : _db = db ?? DatabaseService(),
+        super(SourcesState.initial) {
     _bootstrap();
   }
 
   final ConfigStorageService _storage;
+  final DatabaseService _db;
   AppConfig _cachedConfig = AppConfig.empty;
 
   /// Visible for tests so they can await initial load before mutating.
@@ -120,14 +124,20 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     await _writeAndPublish(next);
   }
 
-  /// Removes the source with [id]. No-op if it doesn't exist.
+  /// Removes the source with [id]. No-op if it doesn't exist. Also drops
+  /// every cached game whose providerConfig references the source so the
+  /// system grids stop showing stale entries.
   Future<void> removeSource(String id) async {
     if (!state.sources.any((s) => s.id == id)) return;
     final next = state.sources.where((s) => s.id != id).toList();
     await _writeAndPublish(next);
+    await _purgeCachedGamesFor(id);
   }
 
-  /// Toggle helper for the off-switch in the Sources screen.
+  /// Toggle helper for the off-switch in the Sources screen. When the
+  /// caller disables a source we also drop its cached games — otherwise
+  /// the system grids would keep displaying entries from a source the
+  /// user just turned off until the next manual rescan.
   Future<void> setEnabled(String id, bool enabled) async {
     final src = state.sources.firstWhere(
       (s) => s.id == id,
@@ -135,6 +145,17 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     );
     if (src.enabled == enabled) return;
     await updateSource(src.copyWith(enabled: enabled));
+    if (!enabled) {
+      await _purgeCachedGamesFor(id);
+    }
+  }
+
+  Future<void> _purgeCachedGamesFor(String sourceId) async {
+    try {
+      await _db.deleteGamesBySourceId(sourceId);
+    } catch (e) {
+      debugPrint('SourcesNotifier: cache purge failed for $sourceId: $e');
+    }
   }
 
   /// Caches the platform map a RomM source advertises (slug → numeric

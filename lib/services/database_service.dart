@@ -513,6 +513,28 @@ class DatabaseService {
         .toList();
   }
 
+  /// Removes every cached game whose stored providerConfig references the
+  /// given sourceId. Used when a [Source] is disabled or removed so the
+  /// system grids stop showing stale entries from a now-inactive source.
+  ///
+  /// Match is done via SQL LIKE against the JSON blob. The sourceId is
+  /// validated to be alphanumeric/underscore/dash so the LIKE pattern
+  /// can't be hijacked into a wildcard.
+  Future<int> deleteGamesBySourceId(String sourceId) async {
+    if (!RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(sourceId)) {
+      debugPrint('deleteGamesBySourceId: refusing unsafe id "$sourceId"');
+      return 0;
+    }
+    final db = await database;
+    final pattern = '%"sourceId":"$sourceId"%';
+    final deleted = await db.rawDelete(
+      'DELETE FROM $_tableName WHERE provider_config LIKE ?',
+      [pattern],
+    );
+    debugPrint('deleteGamesBySourceId($sourceId): removed $deleted games');
+    return deleted;
+  }
+
   Future<void> deleteGame(String systemSlug, String filename) async {
     final db = await database;
     await db.transaction((txn) async {
