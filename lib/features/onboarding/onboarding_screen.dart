@@ -526,6 +526,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       final jsonString = const JsonEncoder.withIndent('  ').convert(config.toJson());
       await ref.read(configStorageServiceProvider).saveConfig(jsonString);
       await storage.setOnboardingCompleted(true);
+      // Re-run the SourcesNotifier rebuild so the resolver injects
+      // managed providers into the systems we just wrote. Without this
+      // the systems land on disk with `providers: []` and sync skips
+      // every system because there's nothing to fetch from.
+      final sourcesNotifier = ref.read(sourcesProvider.notifier);
+      await sourcesNotifier
+          .replaceAll(ref.read(sourcesProvider).sources.toList());
       if (!mounted) return;
       ref.invalidate(bootstrappedConfigProvider);
     } catch (e) {
