@@ -4,16 +4,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/console_focusable.dart';
+import '../../../models/system_model.dart';
 import '../../../providers/app_providers.dart';
 import '../../../providers/ra_providers.dart';
 
-/// Lightweight RetroAchievements setup screen for the onboarding flow.
+/// Lightweight RetroAchievements setup screen used by both onboarding and
+/// settings. Matches the visual style of [RommLegacyLoginScreen] — dark
+/// background, ConsoleFocusable fields, D-pad navigation. On successful
+/// connection test the credentials are saved immediately.
 ///
-/// Matches the visual style of [RommLegacyLoginScreen] — dark background,
-/// ConsoleFocusable fields, D-pad navigation. On successful connection test
-/// the credentials are saved immediately and the screen pops.
+/// When [popOnSuccess] is true (default, used by onboarding), the screen
+/// auto-pops after a brief success indicator. When false (settings), it
+/// stays open so the user can also trigger a manual sync.
 class RaOnboardingScreen extends ConsumerStatefulWidget {
-  const RaOnboardingScreen({super.key});
+  const RaOnboardingScreen({super.key, this.popOnSuccess = true});
+
+  final bool popOnSuccess;
 
   @override
   ConsumerState<RaOnboardingScreen> createState() =>
@@ -26,11 +32,14 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
 
   late final List<_Field> _fields;
   final _connectFocus = FocusNode(debugLabel: 'ra_ob_connect');
+  final _syncFocus = FocusNode(debugLabel: 'ra_ob_sync');
+  final _disconnectFocus = FocusNode(debugLabel: 'ra_ob_disconnect');
   final _screenFocus = FocusNode(debugLabel: 'ra_ob_screen');
 
   bool _busy = false;
   bool? _success;
   String? _error;
+  bool _isConfigured = false;
 
   @override
   void initState() {
@@ -39,6 +48,7 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
     final storage = ref.read(storageServiceProvider);
     _userCtl.text = storage.getRaUsername() ?? '';
     _keyCtl.text = storage.getRaApiKey() ?? '';
+    _isConfigured = storage.isRaConfigured;
 
     _fields = [
       _Field('Username', _userCtl, hint: 'your RA username'),
@@ -59,6 +69,8 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
       f.textFocus.dispose();
     }
     _connectFocus.dispose();
+    _syncFocus.dispose();
+    _disconnectFocus.dispose();
     _screenFocus.dispose();
     super.dispose();
   }
@@ -106,8 +118,12 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
     return KeyEventResult.ignored;
   }
 
-  List<FocusNode> get _navOrder =>
-      [..._fields.map((f) => f.consoleFocus), _connectFocus];
+  List<FocusNode> get _navOrder => [
+        ..._fields.map((f) => f.consoleFocus),
+        _connectFocus,
+        if (_isConfigured) _syncFocus,
+        if (_isConfigured) _disconnectFocus,
+      ];
 
   void _moveFocus(int delta) {
     final order = _navOrder;
@@ -130,6 +146,32 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
       }
     }
     if (_connectFocus.hasFocus && !_busy) _connect();
+    if (_syncFocus.hasFocus) _syncNow();
+    if (_disconnectFocus.hasFocus) _disconnect();
+  }
+
+  void _syncNow() {
+    final syncService = ref.read(raSyncServiceProvider.notifier);
+    final raSystems = SystemModel.supportedSystems
+        .where((s) => s.hasRetroAchievements)
+        .toList();
+    syncService.syncAll(raSystems, force: true);
+    ref.read(feedbackServiceProvider).tick();
+  }
+
+  void _disconnect() {
+    final storage = ref.read(storageServiceProvider);
+    storage.setRaUsername('');
+    storage.setRaApiKey('');
+    storage.setRaEnabled(false);
+    setState(() {
+      _userCtl.clear();
+      _keyCtl.clear();
+      _isConfigured = false;
+      _success = null;
+      _error = null;
+    });
+    ref.read(feedbackServiceProvider).tick();
   }
 
   String? _validate() {
@@ -173,12 +215,15 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
         setState(() {
           _busy = false;
           _success = true;
+          _isConfigured = true;
         });
 
-        // Brief pause to show success, then pop
-        await Future<void>.delayed(const Duration(milliseconds: 800));
-        if (!mounted) return;
-        Navigator.of(context).pop();
+        if (widget.popOnSuccess) {
+          // Brief pause to show success, then pop
+          await Future<void>.delayed(const Duration(milliseconds: 800));
+          if (!mounted) return;
+          Navigator.of(context).pop();
+        }
       } else {
         setState(() {
           _busy = false;
@@ -250,41 +295,26 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
                                       color: Colors.redAccent, fontSize: 13)),
                             ],
                             const SizedBox(height: 16),
-                            ConsoleFocusable(
+                            _actionButton(
                               focusNode: _connectFocus,
+                              label: _busy ? 'Testing…' : 'Test & connect',
+                              icon: Icons.wifi_tethering,
+                              busy: _busy,
                               onSelect: _busy ? null : _connect,
-                              child: Container(
-                                width: double.infinity,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryColor
-                                      .withValues(alpha: 0.18),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                      color: AppTheme.primaryColor, width: 2),
-                                ),
-                                child: _busy
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: AppTheme.primaryColor,
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Test & connect',
-                                        style: TextStyle(
-                                          color: AppTheme.primaryColor,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: 1,
-                                        ),
-                                      ),
-                              ),
+                              primary: true,
                             ),
+                            if (_isConfigured) ...[
+                              const SizedBox(height: 12),
+                              _buildSyncButton(),
+                              const SizedBox(height: 12),
+                              _actionButton(
+                                focusNode: _disconnectFocus,
+                                label: 'Disconnect',
+                                icon: Icons.link_off,
+                                onSelect: _disconnect,
+                                destructive: true,
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -295,6 +325,77 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSyncButton() {
+    final syncState = ref.watch(raSyncServiceProvider);
+    final isSyncing = syncState.isSyncing;
+    final label = isSyncing
+        ? 'Syncing ${syncState.currentSystem ?? ''}… '
+            '(${syncState.completedSystems}/${syncState.totalSystems})'
+        : 'Sync achievements now';
+
+    return _actionButton(
+      focusNode: _syncFocus,
+      label: label,
+      icon: Icons.sync,
+      busy: isSyncing,
+      onSelect: isSyncing ? null : _syncNow,
+    );
+  }
+
+  Widget _actionButton({
+    required FocusNode focusNode,
+    required String label,
+    required IconData icon,
+    required VoidCallback? onSelect,
+    bool busy = false,
+    bool primary = false,
+    bool destructive = false,
+  }) {
+    final color = destructive
+        ? Colors.redAccent
+        : primary
+            ? AppTheme.primaryColor
+            : Colors.white70;
+
+    return ConsoleFocusable(
+      focusNode: focusNode,
+      focusScale: 1.0,
+      focusBorderColor: color,
+      borderRadius: 8,
+      onSelect: onSelect,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: busy
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 16, color: color),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }

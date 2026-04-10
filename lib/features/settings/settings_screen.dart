@@ -24,7 +24,7 @@ import '../../widgets/quick_menu.dart';
 import '../onboarding/onboarding_controller.dart';
 import 'config_mode_screen.dart';
 import 'sources_screen.dart';
-import 'ra_config_screen.dart';
+import '../onboarding/widgets/ra_onboarding_screen.dart';
 import 'widgets/about_tab.dart';
 import 'widgets/preferences_tab.dart';
 import 'widgets/settings_tabs.dart';
@@ -250,7 +250,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   void _openRaConfig() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const RaConfigScreen()),
+      MaterialPageRoute(builder: (_) => const RaOnboardingScreen(popOnSuccess: false)),
     );
   }
 
