@@ -365,7 +365,7 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
       focusNode: focusNode,
       focusScale: 1.0,
       focusBorderColor: color,
-      borderRadius: 8,
+      borderRadius: 10,
       onSelect: onSelect,
       child: Container(
         width: double.infinity,
@@ -373,7 +373,7 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: busy
             ? SizedBox(
