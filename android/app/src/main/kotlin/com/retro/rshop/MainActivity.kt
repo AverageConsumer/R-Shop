@@ -1,5 +1,7 @@
 package com.retro.rshop
 
+import android.content.Context
+import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -28,10 +30,25 @@ class MainActivity : FlutterActivity() {
 
     private var progressSink: EventChannel.EventSink? = null
     private var smbProgressSink: EventChannel.EventSink? = null
+    private var multicastLock: WifiManager.MulticastLock? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "MainActivity onCreate")
+        // Acquire a WiFi multicast lock so mDNS / Bonjour discovery (used by
+        // NetworkDiscoveryService for SMB/RomM detection) can actually receive
+        // multicast packets on Android. Without this, Android silently drops
+        // them and the discovery stream stays empty.
+        try {
+            val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            multicastLock = wifi?.createMulticastLock("rshop-mdns")?.apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+            Log.d(TAG, "Multicast lock acquired: ${multicastLock?.isHeld}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to acquire multicast lock: $e")
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -195,6 +212,11 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         extractorPool.shutdown()
         smbService.shutdown()
+        try {
+            multicastLock?.takeIf { it.isHeld }?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to release multicast lock: $e")
+        }
         super.onDestroy()
     }
 

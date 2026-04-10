@@ -461,4 +461,70 @@ void main() {
       expect(src.name, '192.168.1.50');
     });
   });
+
+  group('supportsClientTokens', () {
+    test('returns true for 4.8.x and newer', () {
+      expect(supportsClientTokens('4.8.0'), isTrue);
+      expect(supportsClientTokens('4.8.1'), isTrue);
+      expect(supportsClientTokens('4.9.0'), isTrue);
+      expect(supportsClientTokens('5.0.0'), isTrue);
+      expect(supportsClientTokens('4.10.2'), isTrue);
+    });
+
+    test('returns false for older versions', () {
+      expect(supportsClientTokens('4.7.5'), isFalse);
+      expect(supportsClientTokens('3.5.0'), isFalse);
+      expect(supportsClientTokens('1.0.0'), isFalse);
+    });
+
+    test('handles pre-release suffixes', () {
+      expect(supportsClientTokens('4.8.0-rc1'), isTrue);
+      expect(supportsClientTokens('4.7.0-beta'), isFalse);
+    });
+
+    test('returns false for unparseable input', () {
+      expect(supportsClientTokens(null), isFalse);
+      expect(supportsClientTokens(''), isFalse);
+      expect(supportsClientTokens('garbage'), isFalse);
+    });
+  });
+
+  group('buildLegacyRommSource', () {
+    test('builds a romm source with user/pass auth', () {
+      final src = buildLegacyRommSource(
+        name: 'Home RomM',
+        serverUrl: 'http://192.168.1.10:8080',
+        user: 'admin',
+        pass: 'secret',
+      );
+      expect(src.type, SourceType.romm);
+      expect(src.url, 'http://192.168.1.10:8080');
+      expect(src.auth?.user, 'admin');
+      expect(src.auth?.pass, 'secret');
+      expect(src.auth?.clientToken, isNull);
+      expect(src.autoMap, isTrue);
+      expect(src.borrowed, isFalse);
+    });
+
+    test('omits empty credentials', () {
+      final src = buildLegacyRommSource(
+        name: 'x',
+        serverUrl: 'http://h',
+        user: '',
+        pass: '',
+        apiKey: 'k',
+      );
+      expect(src.auth?.user, isNull);
+      expect(src.auth?.pass, isNull);
+      expect(src.auth?.apiKey, 'k');
+    });
+
+    test('falls back to host label when name is empty', () {
+      final src = buildLegacyRommSource(
+        name: '',
+        serverUrl: 'http://nas.local:8080',
+      );
+      expect(src.name, 'nas.local');
+    });
+  });
 }

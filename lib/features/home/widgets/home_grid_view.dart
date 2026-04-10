@@ -378,7 +378,7 @@ class HomeGridView extends ConsumerWidget {
                                 if (counts.remote > 0) _GridCountPill(
                                   icon: Icons.cloud_outlined,
                                   count: counts.remote,
-                                  color: system.accentColor,
+                                  color: system.textAccentColor,
                                   isSmall: rs.isSmall,
                                 ),
                                 if (counts.remote > 0 && counts.local > 0)
@@ -386,7 +386,7 @@ class HomeGridView extends ConsumerWidget {
                                 if (counts.local > 0) _GridCountPill(
                                   icon: Icons.folder_outlined,
                                   count: counts.local,
-                                  color: system.accentColor,
+                                  color: system.textAccentColor,
                                   isSmall: rs.isSmall,
                                 ),
                               ],

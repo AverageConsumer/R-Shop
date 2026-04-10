@@ -159,6 +159,8 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     } else {
       // Reload controller from freshly imported config
       ref.read(onboardingControllerProvider.notifier).loadFromConfig(result.config!);
+      // Refresh sources so the notifier picks up any imported sources.
+      ref.read(sourcesProvider.notifier).replaceAll(result.config!.sources);
       final count = result.config!.systems
           .expand((s) => s.providers)
           .where((p) => p.needsAuth)

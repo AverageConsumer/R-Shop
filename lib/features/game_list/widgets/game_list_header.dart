@@ -140,14 +140,14 @@ class GameListHeader extends ConsumerWidget {
                             Icon(
                               Icons.filter_list,
                               size: iconSize,
-                              color: system.accentColor,
+                              color: system.textAccentColor,
                             ),
                             SizedBox(width: rs.isSmall ? 4 : 6),
                           ],
                           Icon(
                             Icons.games,
                             size: iconSize,
-                            color: system.accentColor,
+                            color: system.textAccentColor,
                           ),
                           SizedBox(width: rs.isSmall ? 4 : 8),
                           Text(

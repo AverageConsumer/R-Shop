@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import '../../core/widgets/console_focusable.dart';
 import '../../models/config/provider_config.dart';
 import '../../models/config/source.dart';
 import '../../providers/app_providers.dart';
+import '../../services/network_discovery_service.dart';
 
 /// Form to add a manual (non-RomM) [Source]: SMB, FTP, or Web.
 ///
@@ -48,6 +51,10 @@ class _ManualSourceAddScreenState
   bool _busy = false;
   String? _error;
 
+  final List<DiscoveredHost> _discovered = [];
+  bool _discovering = true;
+  StreamSubscription<DiscoveredHost>? _discoverySub;
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +65,43 @@ class _ManualSourceAddScreenState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _fields.first.consoleFocus.requestFocus();
     });
+    _startDiscovery();
+  }
+
+  void _startDiscovery() {
+    if (widget.type == SourceType.web) {
+      setState(() => _discovering = false);
+      return;
+    }
+    final stream = NetworkDiscoveryService().discover(
+      timeout: const Duration(seconds: 4),
+    );
+    _discoverySub = stream.listen(
+      (host) {
+        if (host.kind != DiscoveredKind.smb) return;
+        if (!mounted) return;
+        setState(() => _discovered.add(host));
+      },
+      onDone: () {
+        if (mounted) setState(() => _discovering = false);
+      },
+      onError: (e) {
+        if (mounted) setState(() => _discovering = false);
+      },
+      cancelOnError: false,
+    );
+  }
+
+  void _applyDiscovered(DiscoveredHost host) {
+    setState(() {
+      _hostCtl.text = host.address;
+      if (widget.type == SourceType.smb) _portCtl.text = '445';
+      if (widget.type == SourceType.ftp) _portCtl.text = '21';
+      if (_nameCtl.text.trim().isEmpty || _nameCtl.text == _defaultName()) {
+        _nameCtl.text = host.name.isNotEmpty ? host.name : host.address;
+      }
+    });
+    ref.read(feedbackServiceProvider).tick();
   }
 
   List<_Field> _buildFieldList() {
@@ -94,6 +138,7 @@ class _ManualSourceAddScreenState
 
   @override
   void dispose() {
+    _discoverySub?.cancel();
     _nameCtl.dispose();
     _urlCtl.dispose();
     _hostCtl.dispose();
@@ -272,7 +317,7 @@ class _ManualSourceAddScreenState
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
-              child: SingleChildScrollView(
+              child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -293,50 +338,62 @@ class _ManualSourceAddScreenState
                           color: Colors.grey.shade500, fontSize: 12),
                     ),
                     const SizedBox(height: 20),
-                    for (final f in _fields) ...[
-                      _label(f.label),
-                      _textBox(f),
-                      const SizedBox(height: 12),
-                    ],
-                    if (_error != null) ...[
-                      const SizedBox(height: 4),
-                      Text(_error!,
-                          style: const TextStyle(
-                              color: Colors.redAccent, fontSize: 13)),
-                    ],
-                    const SizedBox(height: 16),
-                    ConsoleFocusable(
-                      focusNode: _saveFocus,
-                      onSelect: _busy ? null : _save,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color:
-                              AppTheme.primaryColor.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: AppTheme.primaryColor, width: 2),
-                        ),
-                        child: _busy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppTheme.primaryColor,
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (widget.type != SourceType.web)
+                              _buildDiscoverySection(),
+                            for (final f in _fields) ...[
+                              _label(f.label),
+                              _textBox(f),
+                              const SizedBox(height: 12),
+                            ],
+                            if (_error != null) ...[
+                              const SizedBox(height: 4),
+                              Text(_error!,
+                                  style: const TextStyle(
+                                      color: Colors.redAccent, fontSize: 13)),
+                            ],
+                            const SizedBox(height: 16),
+                            ConsoleFocusable(
+                              focusNode: _saveFocus,
+                              onSelect: _busy ? null : _save,
+                              child: Container(
+                                width: double.infinity,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryColor
+                                      .withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: AppTheme.primaryColor, width: 2),
                                 ),
-                              )
-                            : const Text(
-                                'Save source',
-                                style: TextStyle(
-                                  color: AppTheme.primaryColor,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1,
-                                ),
+                                child: _busy
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppTheme.primaryColor,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Save source',
+                                        style: TextStyle(
+                                          color: AppTheme.primaryColor,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
                               ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -360,6 +417,102 @@ class _ManualSourceAddScreenState
       default:
         return t.name.toUpperCase();
     }
+  }
+
+  Widget _buildDiscoverySection() {
+    if (_discovered.isEmpty && !_discovering) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppTheme.primaryColor.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                if (_discovering)
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppTheme.primaryColor,
+                    ),
+                  )
+                else
+                  const Icon(Icons.lan_outlined,
+                      size: 14, color: AppTheme.primaryColor),
+                const SizedBox(width: 8),
+                Text(
+                  _discovering
+                      ? 'Searching network…'
+                      : 'Found on your network',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
+            ),
+            if (_discovered.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              for (final host in _discovered)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: ConsoleFocusable(
+                    focusScale: 1.0,
+                    onSelect: () => _applyDiscovered(host),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF252525),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.folder_shared,
+                              size: 16, color: Colors.white54),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(host.name,
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 13)),
+                                Text(
+                                  '${host.address}:${host.port}',
+                                  style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontSize: 11,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward,
+                              size: 14, color: Colors.white38),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _label(String text) => Padding(

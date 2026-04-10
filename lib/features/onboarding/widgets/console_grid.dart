@@ -35,10 +35,8 @@ class ConsoleGrid extends ConsumerWidget {
           final systemConfig = state.configuredSystems[system.id];
           final isConfigured = systemConfig != null;
           final isLocalOnly = systemConfig != null && systemConfig.providers.isEmpty;
-          final hasRommMatch =
-              state.rommSelectedSystemIds.contains(system.id);
-          final hasLocalMatch =
-              state.localOnlySystemIds.contains(system.id) || isLocalOnly;
+          final hasRommMatch = false;
+          final hasLocalMatch = isLocalOnly;
 
           return _ConsoleTile(
             system: system,

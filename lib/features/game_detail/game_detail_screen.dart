@@ -1011,7 +1011,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       case DetailSection.badges:
         content = BadgesRow(
           metadata: richMetadata!,
-          accentColor: widget.system.accentColor,
+          accentColor: widget.system.textAccentColor,
         );
 
       case DetailSection.fileDetails:
@@ -1023,7 +1023,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       case DetailSection.summary:
         content = SummarySection(
           metadata: richMetadata!,
-          accentColor: widget.system.accentColor,
+          accentColor: widget.system.textAccentColor,
           isExpanded: state.summaryExpanded,
           onToggle: controller.toggleSummaryExpanded,
         );
@@ -1039,7 +1039,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           screenshots: richMetadata!.screenshotUrlList,
           focusedIndex: state.screenshotIndex,
           isSectionFocused: isFocused,
-          accentColor: widget.system.accentColor,
+          accentColor: widget.system.textAccentColor,
           onOpenViewer: controller.openScreenshotViewer,
         );
 
@@ -1051,7 +1051,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           focusedIndex: state.siblingIndex,
           isSectionFocused: isFocused,
           installedStatus: state.installedStatus,
-          accentColor: widget.system.accentColor,
+          accentColor: widget.system.textAccentColor,
         );
 
       case DetailSection.details:
@@ -1250,7 +1250,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     required bool isFocused,
   }) {
     return ActionButtonsRow.primaryOnly(
-      accentColor: widget.system.accentColor,
+      accentColor: widget.system.textAccentColor,
       downloadButtonState: _getDownloadButtonState(state, isMultiRom),
       variantCount: isMultiRom ? widget.variants.length : null,
       onPrimaryAction: controller.performAction,
@@ -1268,7 +1268,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         .contains(controller.selectedVariant.filename);
 
     return ActionButtonsRow.iconsOnly(
-      accentColor: widget.system.accentColor,
+      accentColor: widget.system.textAccentColor,
       isFavorite: isFavorite,
       isShareEnabled: state.isVariantInstalled && !state.isSharing,
       focusedButtonIndex: state.actionButtonIndex,

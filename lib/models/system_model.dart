@@ -42,6 +42,15 @@ class SystemModel {
     return hsl.withLightness(hsl.lightness.clamp(0.45, 1.0)).toColor();
   }
 
+  /// Accent color with enough contrast for text on dark backgrounds.
+  /// Higher luminance floor than [iconColor] for small text readability.
+  Color get textAccentColor {
+    final luminance = accentColor.computeLuminance();
+    if (luminance >= 0.2) return accentColor;
+    final hsl = HSLColor.fromColor(accentColor);
+    return hsl.withLightness(hsl.lightness.clamp(0.55, 1.0)).toColor();
+  }
+
   static const List<SystemModel> supportedSystems = [
     // ===== NINTENDO =====
     SystemModel(

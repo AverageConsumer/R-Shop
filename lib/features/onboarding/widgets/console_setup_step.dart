@@ -86,23 +86,12 @@ class ConsoleSetupStep extends ConsumerWidget {
 
     // Grid view
     final configuredCount = state.configuredCount;
-    final rommCount = state.rommSelectedSystemIds.length;
-    final localCount = state.localOnlySystemIds.length;
     String message;
-    if (configuredCount == 0 && rommCount > 0 && localCount > 0) {
-      message =
-          "I found $rommCount RomM and $localCount local ${localCount == 1 ? 'console' : 'consoles'}! Select one to configure.";
-    } else if (configuredCount == 0 && rommCount > 0) {
-      message =
-          "I found $rommCount RomM ${rommCount == 1 ? 'console' : 'consoles'}! Select one to configure \u2013 I'll pre-fill the RomM source.";
-    } else if (configuredCount == 0 && localCount > 0) {
-      message =
-          "I found $localCount local ${localCount == 1 ? 'collection' : 'collections'}! Select one to configure.";
-    } else if (configuredCount == 0) {
+    if (configuredCount == 0) {
       message = "Let's set up your consoles! Select any system to get started.";
     } else {
       message =
-          "Nice! $configuredCount ${configuredCount == 1 ? 'console' : 'consoles'} configured. Select another to add more, or press Start to continue.";
+          "Nice! $configuredCount ${configuredCount == 1 ? 'console' : 'consoles'} configured. Select another to add more, or press B to go back.";
     }
 
     return FocusScope(

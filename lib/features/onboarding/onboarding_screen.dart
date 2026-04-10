@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/responsive/responsive.dart';
-import '../../models/system_model.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/widgets/console_focusable.dart';
 import '../../providers/app_providers.dart';
 import '../../utils/friendly_error.dart';
 import '../../providers/game_providers.dart';
@@ -12,15 +13,8 @@ import '../../providers/ra_providers.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../../widgets/download_overlay.dart';
+import '../settings/ra_config_screen.dart';
 import 'onboarding_controller.dart';
-import 'widgets/console_setup_hud.dart';
-import 'widgets/chat_bubble.dart';
-import 'widgets/console_setup_step.dart';
-import 'widgets/pixel_mascot.dart';
-import 'widgets/local_setup_step.dart';
-import 'widgets/ra_setup_step.dart';
-import 'widgets/remote_setup_step.dart';
-import 'widgets/romm_setup_step.dart';
 import 'widgets/welcome_chooser_step.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -46,17 +40,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
-  bool _areAllRemoteSystemsEnabled(RemoteSetupState rms) {
-    final scanned = rms.scannedFolders ?? [];
-    final matchedIds = scanned
-        .where((f) => f.autoMatchedSystemId != null)
-        .map((f) => f.autoMatchedSystemId!)
-        .toSet()
-      ..addAll(rms.folderAssignments.keys);
-    return matchedIds.isNotEmpty &&
-        matchedIds.every((id) => rms.enabledSystemIds.contains(id));
-  }
-
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (!mounted) return KeyEventResult.ignored;
     final isOverlayExpanded = ref.read(downloadOverlayExpandedProvider);
@@ -68,407 +51,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
 
     final state = ref.read(onboardingControllerProvider);
-    final controller = ref.read(onboardingControllerProvider.notifier);
 
-    // Skip typewriter animation on A/Enter/Space when message is still typing.
-    // Only for non-interactive steps — interactive steps (romm/local/ra/console)
-    // need A to reach their ConsoleFocusable buttons.
-    final isInteractiveStep =
-        state.currentStep == OnboardingStep.welcome ||
-        state.currentStep == OnboardingStep.rommSetup ||
-        state.currentStep == OnboardingStep.localSetup ||
-        state.currentStep == OnboardingStep.remoteSetup ||
-        state.currentStep == OnboardingStep.raSetup ||
-        state.currentStep == OnboardingStep.consoleSetup;
-    if (!state.canProceed &&
-        !isInteractiveStep &&
-        (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-         event.logicalKey == LogicalKeyboardKey.enter ||
-         event.logicalKey == LogicalKeyboardKey.space)) {
-      controller.onMessageComplete();
-      ref.read(audioManagerProvider).stopTyping();
-      return KeyEventResult.handled;
-    }
-
-    // Welcome chooser is fully owned by WelcomeChooserStep — let its own
-    // ConsoleFocusable buttons handle every key.
-    if (state.currentStep == OnboardingStep.welcome) {
+    // Welcome chooser and complete step are fully self-contained —
+    // their ConsoleFocusable buttons handle all input.
+    if (state.currentStep == OnboardingStep.welcome ||
+        state.currentStep == OnboardingStep.complete) {
       return KeyEventResult.ignored;
     }
 
-    // RomM setup step — delegate based on sub-step
-    if (state.currentStep == OnboardingStep.rommSetup) {
-      final rs = state.rommSetupState;
-      if (rs != null) {
-        switch (rs.subStep) {
-          case RommSetupSubStep.ask:
-            // ConsoleFocusable buttons handle A/Enter; only handle B here
-            if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-                event.logicalKey == LogicalKeyboardKey.escape) {
-              _handleBack();
-              return KeyEventResult.handled;
-            }
-            return KeyEventResult.ignored;
-          case RommSetupSubStep.connect:
-            if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-                event.logicalKey == LogicalKeyboardKey.escape) {
-              controller.rommSetupBack();
-              return KeyEventResult.handled;
-            }
-            if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-              if (rs.hasConnection && !state.isTestingConnection) {
-                controller.testRommSetupConnection();
-              }
-              return KeyEventResult.handled;
-            }
-            return KeyEventResult.ignored;
-          case RommSetupSubStep.select:
-            if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-                event.logicalKey == LogicalKeyboardKey.escape) {
-              controller.rommSetupBack();
-              return KeyEventResult.handled;
-            }
-            if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
-              _handleContinue();
-              return KeyEventResult.handled;
-            }
-            if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-              final allSelected =
-                  rs.selectedCount == rs.matchedCount;
-              controller.toggleAllRommSystems(!allSelected);
-              return KeyEventResult.handled;
-            }
-            return KeyEventResult.ignored;
-          case RommSetupSubStep.folder:
-            if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-                event.logicalKey == LogicalKeyboardKey.escape) {
-              controller.rommSetupBack();
-              return KeyEventResult.handled;
-            }
-            if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
-              _handleContinue();
-              return KeyEventResult.handled;
-            }
-            return KeyEventResult.ignored;
-        }
-      }
-    }
-
-    // Local setup step — delegate based on phase
-    if (state.currentStep == OnboardingStep.localSetup) {
-      final ls = state.localSetupState;
-      if (ls != null) {
-        if (ls.isAutoDetecting || ls.isScanningPhase) {
-          return KeyEventResult.handled;
-        }
-        if (ls.isResultsPhase) {
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-              event.logicalKey == LogicalKeyboardKey.escape) {
-            controller.localSetupBack();
-            return KeyEventResult.handled;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
-            _handleContinue();
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        }
-        if (ls.isCreatePhase) {
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-              event.logicalKey == LogicalKeyboardKey.escape) {
-            controller.localSetupBack();
-            return KeyEventResult.handled;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
-            _handleContinue();
-            return KeyEventResult.handled;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-            final allSelected = ls.createSystemIds!.length ==
-                SystemModel.supportedSystems.length;
-            controller.toggleAllCreateSystems(!allSelected);
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        }
-        // Choice phase
-        if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-            event.logicalKey == LogicalKeyboardKey.escape) {
-          _handleBack();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      }
-    }
-
-    // Remote setup step — delegate based on sub-step
-    if (state.currentStep == OnboardingStep.remoteSetup) {
-      final rms = state.remoteSetupState;
-      if (rms != null) {
-        if (rms.subStep == RemoteSetupSubStep.scanning) {
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-              event.logicalKey == LogicalKeyboardKey.escape) {
-            controller.cancelRemoteScan();
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.handled;
-        }
-        if (rms.subStep == RemoteSetupSubStep.ask) {
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-              event.logicalKey == LogicalKeyboardKey.escape) {
-            _handleBack();
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        }
-        if (rms.subStep == RemoteSetupSubStep.connect) {
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-              event.logicalKey == LogicalKeyboardKey.escape) {
-            controller.remoteSetupBack();
-            return KeyEventResult.handled;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-            if (rms.hasConnection && !rms.isTestingConnection && !rms.isScanning) {
-              controller.testAndScanRemote();
-            }
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        }
-        if (rms.subStep == RemoteSetupSubStep.results) {
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-              event.logicalKey == LogicalKeyboardKey.escape) {
-            controller.remoteSetupBack();
-            return KeyEventResult.handled;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-            final allEnabled = _areAllRemoteSystemsEnabled(rms);
-            controller.toggleAllRemoteSystems(!allEnabled);
-            return KeyEventResult.handled;
-          }
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
-            _handleContinue();
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        }
-      }
-    }
-
-    // RA setup step
-    if (state.currentStep == OnboardingStep.raSetup) {
-      final ra = state.raSetupState;
-      if (ra != null) {
-        // In ask phase — buttons handle A/Enter; only handle B here
-        if (!ra.wantsSetup) {
-          if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-              event.logicalKey == LogicalKeyboardKey.escape) {
-            _handleBack();
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-        }
-        // In connect phase
-        if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-            event.logicalKey == LogicalKeyboardKey.escape) {
-          controller.raSetupBack();
-          return KeyEventResult.handled;
-        }
-        if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-          if (ra.hasCredentials && !ra.isTestingConnection) {
-            controller.testRaConnection();
-          }
-          return KeyEventResult.handled;
-        }
-        if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
-          if (ra.connectionSuccess) {
-            _handleContinue();
-          }
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      }
-    }
-
-    // Console setup step — delegate based on sub-state
-    if (state.currentStep == OnboardingStep.consoleSetup) {
-      // Provider form is open
-      if (state.hasProviderForm) {
-        if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-            event.logicalKey == LogicalKeyboardKey.escape) {
-          controller.cancelProviderForm();
-          return KeyEventResult.handled;
-        }
-        if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-          if (!state.isTestingConnection) {
-            controller.testAndSaveProvider();
-          }
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      }
-
-      // Console panel is open
-      if (state.hasConsoleSelected) {
-        if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-            event.logicalKey == LogicalKeyboardKey.escape) {
-          controller.deselectConsole();
-          return KeyEventResult.handled;
-        }
-        if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-          controller.startAddProvider();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      }
-
-      // Grid level: Start = continue, Select = import
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
-        _handleContinue();
-        return KeyEventResult.handled;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonSelect) {
-        _importConfig();
-        return KeyEventResult.handled;
-      }
-    }
-
-    // Complete step: Select = export
-    if (state.isLastStep &&
-        event.logicalKey == LogicalKeyboardKey.gameButtonSelect) {
-      _exportConfig();
-      return KeyEventResult.handled;
-    }
-
-    // Catch-all A/B only for non-interactive steps (welcome, legal, complete).
-    // Interactive steps return ignored above so events reach child widgets.
-    if (!isInteractiveStep) {
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-          event.logicalKey == LogicalKeyboardKey.enter ||
-          event.logicalKey == LogicalKeyboardKey.space) {
-        _handleContinue();
-        return KeyEventResult.handled;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-          event.logicalKey == LogicalKeyboardKey.backspace ||
-          event.logicalKey == LogicalKeyboardKey.escape) {
-        _handleBack();
-        return KeyEventResult.handled;
-      }
-    }
     return KeyEventResult.ignored;
-  }
-
-  void _handleContinue() {
-    final state = ref.read(onboardingControllerProvider);
-    final controller = ref.read(onboardingControllerProvider.notifier);
-    final feedback = ref.read(feedbackServiceProvider);
-    final audioManager = ref.read(audioManagerProvider);
-
-    if (!state.canProceed) return;
-
-    audioManager.stopTyping();
-
-    if (state.isLastStep) {
-      feedback.success();
-      _finishOnboarding();
-    } else if (state.currentStep == OnboardingStep.rommSetup) {
-      final rommState = state.rommSetupState;
-      if (rommState != null) {
-        if (rommState.subStep == RommSetupSubStep.select) {
-          _persistRommCredentials(rommState);
-          feedback.tick();
-          controller.nextStep();
-        } else if (rommState.subStep == RommSetupSubStep.folder) {
-          feedback.tick();
-          controller.rommFolderConfirm();
-        }
-      }
-      return;
-    } else if (state.currentStep == OnboardingStep.localSetup) {
-      final ls = state.localSetupState;
-      if (ls != null && ls.isResultsPhase) {
-        feedback.tick();
-        controller.localSetupConfirm();
-      } else if (ls != null && ls.isCreatePhase && ls.createSystemIds!.isNotEmpty) {
-        feedback.tick();
-        controller.confirmCreateFolders().then((error) {
-          if (error != null && mounted) {
-            showErrorNotification(context, ref, message: error);
-          }
-        });
-      }
-      return;
-    } else if (state.currentStep == OnboardingStep.remoteSetup) {
-      final rms = state.remoteSetupState;
-      if (rms != null && rms.subStep == RemoteSetupSubStep.results) {
-        feedback.tick();
-        controller.remoteSetupConfirm();
-      }
-      return;
-    } else if (state.currentStep == OnboardingStep.raSetup) {
-      final ra = state.raSetupState;
-      if (ra != null && ra.connectionSuccess) {
-        _persistRaCredentials(ra);
-        feedback.tick();
-        controller.nextStep();
-      }
-      return;
-    } else if (state.currentStep == OnboardingStep.consoleSetup) {
-      // Need at least one console configured to proceed
-      if (state.configuredCount == 0) {
-        feedback.cancel();
-        showErrorNotification(context, ref,
-            message: 'Configure at least one console to continue');
-        return;
-      }
-      feedback.tick();
-      controller.nextStep();
-    } else {
-      feedback.tick();
-      controller.nextStep();
-    }
-  }
-
-  void _handleBack() {
-    final state = ref.read(onboardingControllerProvider);
-    final controller = ref.read(onboardingControllerProvider.notifier);
-    final feedback = ref.read(feedbackServiceProvider);
-    final audioManager = ref.read(audioManagerProvider);
-
-    if (state.currentStep == OnboardingStep.rommSetup) {
-      audioManager.stopTyping();
-      feedback.cancel();
-      controller.rommSetupBack();
-      return;
-    }
-
-    if (state.currentStep == OnboardingStep.localSetup) {
-      audioManager.stopTyping();
-      feedback.cancel();
-      controller.localSetupBack();
-      return;
-    }
-
-    if (state.currentStep == OnboardingStep.remoteSetup) {
-      audioManager.stopTyping();
-      feedback.cancel();
-      controller.remoteSetupBack();
-      return;
-    }
-
-    if (state.currentStep == OnboardingStep.raSetup) {
-      audioManager.stopTyping();
-      feedback.cancel();
-      controller.raSetupBack();
-      return;
-    }
-
-    if (!state.isFirstStep) {
-      audioManager.stopTyping();
-      feedback.cancel();
-      controller.previousStep();
-    }
   }
 
   Future<void> _exportConfig() async {
@@ -489,29 +80,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       showErrorNotification(context, ref, message: 'Invalid config: ${result.error}');
     } else {
       ref.read(onboardingControllerProvider.notifier).loadFromConfig(result.config!);
+      // Refresh sources so the notifier picks up any imported sources.
+      ref.read(sourcesProvider.notifier).replaceAll(result.config!.sources);
       showSuccessNotification(context, ref, message: 'Config imported!');
-    }
-  }
-
-  void _persistRaCredentials(RaSetupState raState) {
-    final storage = ref.read(storageServiceProvider);
-    if (raState.hasCredentials && raState.connectionSuccess) {
-      storage.setRaUsername(raState.username.trim());
-      storage.setRaApiKey(raState.apiKey.trim());
-      storage.setRaEnabled(true);
-    }
-  }
-
-  void _persistRommCredentials(RommSetupState rommState) {
-    final storage = ref.read(storageServiceProvider);
-    if (rommState.hasConnection) {
-      storage.setRommUrl(rommState.url.trim());
-      final auth = rommState.authConfig;
-      if (auth != null) {
-        storage.setRommAuth(const JsonEncoder().convert(auth.toJson()));
-      } else {
-        storage.setRommAuth(null);
-      }
     }
   }
 
@@ -549,8 +120,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     // Trigger RA sync after onboarding if RA was configured.
     // Deferred to let HomeView settle and avoid contention with config bootstrap.
-    // Note: no mounted check — syncNotifier and storage are captured above,
-    // and this callback doesn't access context or ref.
     Future.delayed(const Duration(seconds: 3), () {
       triggerRaSync(syncNotifier, storage);
     });
@@ -560,134 +129,38 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(onboardingControllerProvider);
     final rs = context.rs;
-    ref.listen(onboardingControllerProvider.select((s) => s.currentStep), (prev, next) {
-      if (next == OnboardingStep.consoleSetup) return;
-      if (next == OnboardingStep.localSetup) return;
-      // Interactive steps with ConsoleFocusable buttons: move focus to first child
-      if (next == OnboardingStep.rommSetup || next == OnboardingStep.raSetup ||
-          next == OnboardingStep.remoteSetup) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _focusNode.nextFocus();
-        });
-        return;
-      }
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_focusNode.hasFocus) {
-          _focusNode.requestFocus();
-        }
-      });
-    });
-    // Re-focus first child when sub-views change within interactive steps
-    ref.listen(onboardingControllerProvider.select((s) => s.rommSetupState?.subStep), (prev, next) {
-      if (prev == null || next == null || prev == next) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _focusNode.nextFocus();
-      });
-    });
-    ref.listen(onboardingControllerProvider.select((s) => s.remoteSetupState?.subStep), (prev, next) {
-      if (prev == null || next == null || prev == next) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _focusNode.nextFocus();
-      });
-    });
-    ref.listen(onboardingControllerProvider.select((s) => s.raSetupState?.wantsSetup), (prev, next) {
-      if (prev == next) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _focusNode.nextFocus();
-      });
-    });
+
     return Focus(
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
       autofocus: true,
       child: PopScope(
         canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) {
-            _handleBack();
-          }
-        },
+        onPopInvokedWithResult: (didPop, _) {},
         child: Scaffold(
-        backgroundColor: Colors.black,
-        body: Stack(
-          children: [
-            const _AnimatedBackground(),
-            const _RadialGlow(),
-            SafeArea(
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: rs.isSmall ? rs.spacing.md : rs.spacing.lg,
-                  vertical: rs.isSmall ? rs.spacing.md : rs.spacing.xxl,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    rs.isPortrait
-                        ? _buildPortraitContent(state, rs)
-                        : _buildLandscapeContent(state, rs),
-                  ],
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              const _AnimatedBackground(),
+              const _RadialGlow(),
+              SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: rs.isSmall ? rs.spacing.md : rs.spacing.lg,
+                    vertical: rs.isSmall ? rs.spacing.md : rs.spacing.xxl,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _buildContent(state)),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            _buildControls(state, rs),
-          ],
-        ),
-      ),
-      ),
-    );
-  }
-
-  Widget _buildLandscapeContent(OnboardingState state, Responsive rs) {
-    // The welcome chooser is its own self-contained screen — hide the
-    // step indicator + Pixel mascot side rail so it doesn't look like
-    // a stepper page that the user needs to walk through.
-    final isChooser = state.currentStep == OnboardingStep.welcome;
-    return Expanded(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!isChooser) ...[
-            Column(
-              children: [
-                PixelMascot(size: rs.isSmall ? 36 : 48),
-                SizedBox(height: rs.spacing.sm),
-                _StepIndicator(
-                  currentStep: state.currentStep,
-                  isSmall: rs.isSmall,
-                  vertical: true,
-                ),
-              ],
-            ),
-          ],
-          Expanded(
-            child: _buildContent(state),
+              _buildControls(state),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPortraitContent(OnboardingState state, Responsive rs) {
-    final isChooser = state.currentStep == OnboardingStep.welcome;
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!isChooser) ...[
-            Row(
-              children: [
-                PixelMascot(size: rs.isSmall ? 28 : 40),
-                SizedBox(width: rs.spacing.md),
-                _StepIndicator(
-                  currentStep: state.currentStep,
-                  isSmall: rs.isSmall,
-                ),
-              ],
-            ),
-            SizedBox(height: rs.spacing.sm),
-          ],
-          Expanded(child: _buildContent(state)),
-        ],
+        ),
       ),
     );
   }
@@ -704,211 +177,31 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     switch (state.currentStep) {
       case OnboardingStep.welcome:
         return const WelcomeChooserStep();
-      case OnboardingStep.legalNotice:
-        return _LegalNoticeStep(onComplete: controller.onMessageComplete);
-      case OnboardingStep.rommSetup:
-        return RommSetupStep(onComplete: controller.onMessageComplete);
-      case OnboardingStep.localSetup:
-        return LocalSetupStep(onComplete: controller.onMessageComplete);
-      case OnboardingStep.remoteSetup:
-        return RemoteSetupStep(onComplete: controller.onMessageComplete);
       case OnboardingStep.consoleSetup:
-        return ConsoleSetupStep(onComplete: controller.onMessageComplete);
-      case OnboardingStep.raSetup:
-        return RaSetupStep(onComplete: controller.onMessageComplete);
+        // consoleSetup is only reachable via config_mode_screen's
+        // loadFromConfig(), not from the onboarding flow itself.
+        return const SizedBox.shrink();
       case OnboardingStep.complete:
         return _CompleteStep(
           configuredCount: state.configuredCount,
           onComplete: controller.onMessageComplete,
-          onExport: controller.exportConfig,
+          onExport: () => _exportConfig(),
+          onJumpIn: _finishOnboarding,
         );
     }
   }
 
-  Widget _buildControls(OnboardingState state, Responsive rs) {
-    if (state.currentStep == OnboardingStep.rommSetup) {
-      final rommState = state.rommSetupState;
-      if (rommState != null) {
-        switch (rommState.subStep) {
-          case RommSetupSubStep.ask:
-            return ConsoleHud(
-              b: HudAction('Back', onTap: _handleBack),
-            );
-          case RommSetupSubStep.connect:
-            final controller =
-                ref.read(onboardingControllerProvider.notifier);
-            return ConsoleHud(
-              b: HudAction('Back', onTap: () => controller.rommSetupBack()),
-              y: HudAction(
-                'Test & Discover',
-                onTap: rommState.hasConnection && !state.isTestingConnection
-                    ? controller.testRommSetupConnection
-                    : null,
-              ),
-            );
-          case RommSetupSubStep.select:
-            final controller =
-                ref.read(onboardingControllerProvider.notifier);
-            final allSelected =
-                rommState.selectedCount == rommState.matchedCount;
-            return ConsoleHud(
-              start: HudAction('Continue', onTap: _handleContinue,
-                  highlight: true),
-              b: HudAction('Back', onTap: () => controller.rommSetupBack()),
-              y: HudAction(
-                allSelected ? 'Deselect All' : 'Select All',
-                onTap: () =>
-                    controller.toggleAllRommSystems(!allSelected),
-              ),
-            );
-          case RommSetupSubStep.folder:
-            final controller =
-                ref.read(onboardingControllerProvider.notifier);
-            return ConsoleHud(
-              start: HudAction('Continue', onTap: _handleContinue,
-                  highlight: true),
-              b: HudAction('Back', onTap: () => controller.rommSetupBack()),
-            );
-        }
-      }
-    }
-
-    if (state.currentStep == OnboardingStep.localSetup) {
-      final ls = state.localSetupState;
-      if (ls != null && ls.isResultsPhase) {
-        return ConsoleHud(
-          start: HudAction('Continue', onTap: _handleContinue, highlight: true),
-          b: HudAction('Back', onTap: _handleBack),
-        );
-      }
-      if (ls != null && ls.isCreatePhase) {
-        final controller = ref.read(onboardingControllerProvider.notifier);
-        final allSelected = ls.createSystemIds!.length ==
-            SystemModel.supportedSystems.length;
-        return ConsoleHud(
-          start: ls.createSystemIds!.isNotEmpty
-              ? HudAction('Create', onTap: _handleContinue, highlight: true)
-              : null,
-          b: HudAction('Back', onTap: _handleBack),
-          y: HudAction(
-            allSelected ? 'Deselect All' : 'Select All',
-            onTap: () => controller.toggleAllCreateSystems(!allSelected),
-          ),
-        );
-      }
-      // Hide Back during auto-detect to prevent race condition
-      if (ls != null && ls.isAutoDetecting) {
-        return const ConsoleHud();
-      }
-      return ConsoleHud(
-        b: HudAction('Back', onTap: _handleBack),
-      );
-    }
-
-    if (state.currentStep == OnboardingStep.remoteSetup) {
-      final rms = state.remoteSetupState;
-      if (rms != null) {
-        switch (rms.subStep) {
-          case RemoteSetupSubStep.ask:
-            return ConsoleHud(
-              b: HudAction('Back', onTap: _handleBack),
-            );
-          case RemoteSetupSubStep.connect:
-            final controller =
-                ref.read(onboardingControllerProvider.notifier);
-            return ConsoleHud(
-              b: HudAction('Back', onTap: () => controller.remoteSetupBack()),
-              y: HudAction(
-                'Test & Scan',
-                onTap: rms.hasConnection && !rms.isTestingConnection && !rms.isScanning
-                    ? controller.testAndScanRemote
-                    : null,
-              ),
-            );
-          case RemoteSetupSubStep.scanning:
-            final controller =
-                ref.read(onboardingControllerProvider.notifier);
-            return ConsoleHud(
-              b: HudAction('Cancel', onTap: controller.cancelRemoteScan),
-            );
-          case RemoteSetupSubStep.results:
-            final controller =
-                ref.read(onboardingControllerProvider.notifier);
-            final allEnabled = _areAllRemoteSystemsEnabled(rms);
-            return ConsoleHud(
-              start: HudAction('Continue', onTap: _handleContinue,
-                  highlight: true),
-              b: HudAction('Back', onTap: () => controller.remoteSetupBack()),
-              y: HudAction(
-                allEnabled ? 'Deselect All' : 'Select All',
-                onTap: () => controller.toggleAllRemoteSystems(!allEnabled),
-              ),
-            );
-        }
-      }
-    }
-
-    if (state.currentStep == OnboardingStep.raSetup) {
-      final ra = state.raSetupState;
-      if (ra != null) {
-        // Ask phase — A selects focused button, B goes back
-        if (!ra.wantsSetup) {
-          return ConsoleHud(
-            a: HudAction('Select'),
-            b: HudAction('Back', onTap: _handleBack),
-          );
-        }
-        // Connect phase
-        final controller = ref.read(onboardingControllerProvider.notifier);
-        return ConsoleHud(
-          start: ra.connectionSuccess
-              ? HudAction('Continue', onTap: _handleContinue, highlight: true)
-              : null,
-          b: HudAction('Back', onTap: () => controller.raSetupBack()),
-          y: HudAction(
-            'Test',
-            onTap: ra.hasCredentials && !ra.isTestingConnection
-                ? controller.testRaConnection
-                : null,
-          ),
-        );
-      }
-    }
-
-    if (state.currentStep == OnboardingStep.consoleSetup) {
-      final shared = buildConsoleSetupHud(state: state, ref: ref);
-      if (shared != null) return shared;
-
-      // Grid level
-      return ConsoleHud(
-        start: HudAction('Continue',
-            onTap: state.configuredCount > 0 ? _handleContinue : null,
-            highlight: state.configuredCount > 0),
-        b: !state.isFirstStep ? HudAction('Back', onTap: _handleBack) : null,
-        select: HudAction('Import', onTap: _importConfig),
-      );
-    }
-
-    // Welcome chooser owns its own buttons (RomM/Server/Local/Skip) and
-    // doesn't need a global Continue, just an Import shortcut so power
-    // users can still drop in a JSON config without going through any
-    // setup wizard.
+  Widget _buildControls(OnboardingState state) {
+    // Welcome chooser has an Import shortcut so power users can still
+    // drop in a JSON config without going through any setup wizard.
     if (state.currentStep == OnboardingStep.welcome) {
       return ConsoleHud(
         select: HudAction('Import config', onTap: _importConfig),
       );
     }
 
-    // Standard steps
-    return ConsoleHud(
-      a: HudAction(
-        state.isLastStep ? 'Start!' : 'Continue',
-        onTap: state.canProceed ? _handleContinue : null,
-        highlight: state.canProceed,
-      ),
-      b: !state.isFirstStep ? HudAction('Back', onTap: _handleBack) : null,
-      select: state.isLastStep ? HudAction('Export', onTap: _exportConfig) : null,
-    );
+    // Complete step has its own ConsoleFocusable tiles for Jump In / Export.
+    return const SizedBox.shrink();
   }
 }
 
@@ -961,244 +254,213 @@ class _RadialGlow extends StatelessWidget {
   }
 }
 
-class _LegalNoticeStep extends StatelessWidget {
-  final VoidCallback onComplete;
-  const _LegalNoticeStep({required this.onComplete});
-  @override
-  Widget build(BuildContext context) {
-    final rs = context.rs;
-    final labelFontSize = rs.isSmall ? 10.0 : 12.0;
-    final iconSize = rs.isSmall ? 12.0 : 16.0;
-    return Column(
-      key: const ValueKey('legalNotice'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ChatBubble(
-          message:
-              "Heads up! R-Shop connects to file servers YOU configure to browse and download ROMs. Make sure you have the legal right to download any content \u2013 respect copyright laws in your region.",
-          onComplete: onComplete,
-        ),
-        SizedBox(height: rs.spacing.md),
-        Padding(
-          padding: EdgeInsets.only(left: rs.isSmall ? 40 : 60),
-          child: Row(
-            children: [
-              Icon(Icons.warning_amber_rounded,
-                  color: Colors.orange.shade400, size: iconSize),
-              SizedBox(width: rs.spacing.sm),
-              Text(
-                'LEGAL NOTICE',
-                style: TextStyle(
-                  color: Colors.orange.shade400,
-                  fontSize: labelFontSize,
-                  letterSpacing: 2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CompleteStep extends StatelessWidget {
+class _CompleteStep extends StatefulWidget {
   final int configuredCount;
   final VoidCallback onComplete;
-  final Future<void> Function() onExport;
+  final VoidCallback onExport;
+  final VoidCallback onJumpIn;
 
   const _CompleteStep({
     required this.configuredCount,
     required this.onComplete,
     required this.onExport,
+    required this.onJumpIn,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final rs = context.rs;
-    final labelFontSize = rs.isSmall ? 11.0 : 14.0;
-    final iconSize = rs.isSmall ? 16.0 : 20.0;
-    final buttonFontSize = rs.isSmall ? 12.0 : 14.0;
+  State<_CompleteStep> createState() => _CompleteStepState();
+}
 
-    return Column(
-      key: const ValueKey('complete'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ChatBubble(
-          message:
-              "Perfect! $configuredCount ${configuredCount == 1 ? 'console' : 'consoles'} set up. Export your config to use it on other devices. Press A to jump in!",
-          onComplete: onComplete,
+class _CompleteStepState extends State<_CompleteStep> {
+  final FocusNode _jumpFocus = FocusNode(debugLabel: 'complete_jump');
+  final FocusNode _raFocus = FocusNode(debugLabel: 'complete_ra');
+  final FocusNode _exportFocus = FocusNode(debugLabel: 'complete_export');
+  final FocusNode _screenFocus = FocusNode(debugLabel: 'complete_screen');
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onComplete();
+      if (mounted) _jumpFocus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _jumpFocus.dispose();
+    _raFocus.dispose();
+    _exportFocus.dispose();
+    _screenFocus.dispose();
+    super.dispose();
+  }
+
+  void _move(int delta) {
+    final order = [_jumpFocus, _raFocus, _exportFocus];
+    final cur = order.indexWhere((n) => n.hasFocus);
+    final next = (cur < 0 ? 0 : cur + delta).clamp(0, order.length - 1);
+    order[next].requestFocus();
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _move(1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _move(-1);
+      return KeyEventResult.handled;
+    }
+    // Swallow B so the user can't navigate back from the complete screen.
+    if (key == LogicalKeyboardKey.gameButtonB ||
+        key == LogicalKeyboardKey.escape ||
+        key == LogicalKeyboardKey.goBack ||
+        key == LogicalKeyboardKey.backspace) {
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = widget.configuredCount;
+    final label = count == 1 ? 'system' : 'systems';
+
+    return Focus(
+      focusNode: _screenFocus,
+      onKeyEvent: _onKey,
+      child: SingleChildScrollView(
+        child: Column(
+          key: const ValueKey('complete'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "You're all set",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              count == 0
+                  ? 'No systems configured yet — you can add sources later from Settings.'
+                  : '$count $label ready to browse.',
+              style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+            _CompleteTile(
+              focusNode: _jumpFocus,
+              icon: Icons.play_arrow_rounded,
+              title: 'Jump in',
+              subtitle: 'Open the home screen and start syncing',
+              onSelect: widget.onJumpIn,
+            ),
+            const SizedBox(height: 12),
+            _CompleteTile(
+              focusNode: _raFocus,
+              icon: Icons.emoji_events,
+              title: 'RetroAchievements',
+              subtitle: 'Track your retro gaming achievements',
+              onSelect: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RaConfigScreen()),
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _CompleteTile(
+              focusNode: _exportFocus,
+              icon: Icons.share,
+              title: 'Export config',
+              subtitle: 'Re-use this setup on another device',
+              onSelect: widget.onExport,
+            ),
+          ],
         ),
-        SizedBox(height: rs.isSmall ? rs.spacing.lg : rs.spacing.xl),
-        Padding(
-          padding: EdgeInsets.only(left: rs.isSmall ? 40 : 60),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+    );
+  }
+}
+
+class _CompleteTile extends StatelessWidget {
+  const _CompleteTile({
+    required this.focusNode,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onSelect,
+  });
+
+  final FocusNode focusNode;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConsoleFocusable(
+      focusNode: focusNode,
+      onSelect: onSelect,
+      borderRadius: 12,
+      focusScale: 1.0,
+      focusBorderColor: AppTheme.primaryColor,
+      child: GestureDetector(
+        onTap: onSelect,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C1C),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
             children: [
-              // Summary badge
               Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: rs.isSmall ? rs.spacing.md : rs.spacing.lg,
-                  vertical: rs.isSmall ? rs.spacing.sm : rs.spacing.md,
-                ),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(rs.radius.md),
-                  border: Border.all(
-                    color: Colors.green.withValues(alpha: 0.3),
-                  ),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
+                child: Icon(icon, color: AppTheme.primaryColor, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green, size: iconSize),
-                    SizedBox(width: rs.spacing.sm),
                     Text(
-                      'Setup Complete',
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
                       style: TextStyle(
-                        color: Colors.green.shade300,
-                        fontSize: labelFontSize,
-                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade400,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              SizedBox(height: rs.spacing.md),
-              // Export button
-              Focus(
-                onKeyEvent: (node, event) {
-                  if (event is KeyDownEvent &&
-                      (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-                       event.logicalKey == LogicalKeyboardKey.enter)) {
-                    onExport();
-                    return KeyEventResult.handled;
-                  }
-                  return KeyEventResult.ignored;
-                },
-                child: Builder(
-                  builder: (context) {
-                    final hasFocus = Focus.of(context).hasFocus;
-                    return GestureDetector(
-                      onTap: onExport,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: rs.spacing.lg,
-                          vertical: rs.spacing.sm,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(rs.radius.md),
-                          border: Border.all(
-                            color: hasFocus
-                                ? Colors.redAccent
-                                : Colors.redAccent.withValues(alpha: 0.3),
-                            width: hasFocus ? 2 : 1,
-                          ),
-                          boxShadow: hasFocus
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.redAccent.withValues(alpha: 0.3),
-                                    blurRadius: 12,
-                                    spreadRadius: 1,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.share, color: Colors.redAccent, size: iconSize),
-                            SizedBox(width: rs.spacing.sm),
-                            Text(
-                              'Export Config',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: buttonFontSize,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
+              const Icon(Icons.chevron_right, color: Colors.white30),
             ],
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _StepIndicator extends StatelessWidget {
-  const _StepIndicator({
-    required this.currentStep,
-    required this.isSmall,
-    this.vertical = false,
-  });
-
-  final OnboardingStep currentStep;
-  final bool isSmall;
-  final bool vertical;
-
-  @override
-  Widget build(BuildContext context) {
-    final currentIndex = OnboardingStep.values.indexOf(currentStep);
-    final dotSize = isSmall ? 6.0 : 8.0;
-    final spacing = isSmall ? 4.0 : 6.0;
-    final steps = OnboardingStep.values;
-
-    final dots = List.generate(steps.length, (i) {
-      final Color color;
-      final Border? border;
-      if (i < currentIndex) {
-        color = Colors.white.withValues(alpha: 0.4);
-        border = null;
-      } else if (i == currentIndex) {
-        color = Colors.white;
-        border = null;
-      } else {
-        color = Colors.transparent;
-        border = Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
-          width: 1,
-        );
-      }
-
-      return AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: dotSize,
-        height: dotSize,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: border,
-        ),
-      );
-    });
-
-    if (vertical) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (int i = 0; i < dots.length; i++) ...[
-            dots[i],
-            if (i < dots.length - 1) SizedBox(height: spacing),
-          ],
-        ],
-      );
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (int i = 0; i < dots.length; i++) ...[
-          dots[i],
-          if (i < dots.length - 1) SizedBox(width: spacing),
-        ],
-      ],
+      ),
     );
   }
 }

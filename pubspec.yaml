@@ -35,6 +35,7 @@ dependencies:
   flutter_svg: 2.0.17
   archive: 3.6.1
   mobile_scanner: 5.2.3
+  multicast_dns: 0.3.3
 
 
 dev_dependencies:

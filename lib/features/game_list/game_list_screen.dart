@@ -766,7 +766,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       isVisible: _isFiltering,
       onClose: _closeFilter,
       child: FilterOverlay(
-        accentColor: widget.system.accentColor,
+        accentColor: widget.system.textAccentColor,
         availableRegions: state.availableRegions,
         availableLanguages: state.availableLanguages,
         selectedRegions: state.activeFilters.selectedRegions,

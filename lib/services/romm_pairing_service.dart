@@ -48,6 +48,52 @@ Source buildSourceFromPairResult(
   );
 }
 
+/// Parses a RomM `SYSTEM.VERSION` string (e.g. `"4.8.1"`, `"3.5.0-rc1"`) and
+/// returns `true` if the server is on 4.8 or newer — i.e. supports the
+/// Client API Token / QR pairing flow. Returns `false` for unparseable or
+/// older versions so the UI can fall back to username/password gracefully.
+bool supportsClientTokens(String? versionString) {
+  if (versionString == null || versionString.isEmpty) return false;
+  final match = RegExp(r'^(\d+)\.(\d+)').firstMatch(versionString.trim());
+  if (match == null) return false;
+  final major = int.tryParse(match.group(1)!) ?? 0;
+  final minor = int.tryParse(match.group(2)!) ?? 0;
+  if (major > 4) return true;
+  if (major == 4 && minor >= 8) return true;
+  return false;
+}
+
+/// Builds a [Source] from a legacy username/password (or API key) RomM
+/// connection. Mirrors [buildSourceFromPairResult] but for pre-4.8 servers
+/// where the QR flow isn't available. The caller is expected to fetch
+/// platforms separately and pass them via [knownPlatforms].
+Source buildLegacyRommSource({
+  required String name,
+  required String serverUrl,
+  String? user,
+  String? pass,
+  String? apiKey,
+  Map<String, int> knownPlatforms = const {},
+  int priority = 1,
+}) {
+  return Source(
+    id: 'src-romm-${DateTime.now().millisecondsSinceEpoch}',
+    name: name.isNotEmpty ? name : (Uri.tryParse(serverUrl)?.host ?? serverUrl),
+    type: SourceType.romm,
+    url: serverUrl,
+    auth: AuthConfig(
+      user: (user ?? '').isEmpty ? null : user,
+      pass: (pass ?? '').isEmpty ? null : pass,
+      apiKey: (apiKey ?? '').isEmpty ? null : apiKey,
+    ),
+    autoMap: true,
+    priority: priority,
+    enabled: true,
+    borrowed: false,
+    knownPlatforms: knownPlatforms,
+  );
+}
+
 /// Result of a successful pairing-code exchange against a RomM 4.8+ server.
 ///
 /// The token string is the bearer credential that subsequent API calls must

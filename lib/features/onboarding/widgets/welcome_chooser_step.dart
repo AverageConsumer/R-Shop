@@ -16,6 +16,7 @@ import '../../pairing/qr_pairing_screen.dart';
 import '../../sources/manual_source_add_screen.dart';
 import '../../sources/source_mappings_screen.dart';
 import '../onboarding_controller.dart';
+import 'romm_legacy_login_screen.dart';
 
 /// First screen of the onboarding: a single question with four paths.
 ///
@@ -35,6 +36,7 @@ class WelcomeChooserStep extends ConsumerStatefulWidget {
 
 class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
   final FocusNode _qrFocus = FocusNode(debugLabel: 'welcome_qr');
+  final FocusNode _legacyFocus = FocusNode(debugLabel: 'welcome_legacy');
   final FocusNode _serverFocus = FocusNode(debugLabel: 'welcome_server');
   final FocusNode _localFocus = FocusNode(debugLabel: 'welcome_local');
   final FocusNode _screenFocus =
@@ -54,13 +56,15 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
   @override
   void dispose() {
     _qrFocus.dispose();
+    _legacyFocus.dispose();
     _serverFocus.dispose();
     _localFocus.dispose();
     _screenFocus.dispose();
     super.dispose();
   }
 
-  List<FocusNode> get _navOrder => [_qrFocus, _serverFocus, _localFocus];
+  List<FocusNode> get _navOrder =>
+      [_qrFocus, _legacyFocus, _serverFocus, _localFocus];
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
@@ -158,6 +162,46 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
     });
   }
 
+  Future<void> _handleLegacyLogin() async {
+    if (_busy) return;
+    final basePath = await _pickRomBaseFolder();
+    if (!mounted || basePath == null) return;
+
+    setState(() {
+      _busy = true;
+      _busyMessage = 'Scanning local ROM folders…';
+    });
+    final controller =
+        ref.read(onboardingControllerProvider.notifier);
+    await controller.seedLocalSystemsFromBase(basePath);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _busyMessage = null;
+    });
+
+    final source = await Navigator.of(context).push<Source?>(
+      MaterialPageRoute(builder: (_) => const RommLegacyLoginScreen()),
+    );
+    if (!mounted || source == null) return;
+
+    setState(() {
+      _busy = true;
+      _busyMessage = 'Saving source…';
+    });
+    final notifier = ref.read(sourcesProvider.notifier);
+    await controller.completeFromRommPairing(
+      sourcesNotifier: notifier,
+      source: source,
+      basePath: basePath,
+    );
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _busyMessage = null;
+    });
+  }
+
   Future<void> _handleManualServer() async {
     if (_busy) return;
     final basePath = await _pickRomBaseFolder();
@@ -223,21 +267,10 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
           ),
           title: const Text('Server type',
               style: TextStyle(color: Colors.white)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final t in const [
-                SourceType.smb,
-                SourceType.ftp,
-                SourceType.web,
-              ])
-                ListTile(
-                  leading: Icon(_iconFor(t), color: AppTheme.primaryColor),
-                  title: Text(t.name.toUpperCase(),
-                      style: const TextStyle(color: Colors.white)),
-                  onTap: () => Navigator.of(ctx).pop(t),
-                ),
-            ],
+          content: _TypePickerBody(
+            types: const [SourceType.smb, SourceType.ftp, SourceType.web],
+            iconFor: _iconFor,
+            onPick: (t) => Navigator.of(ctx).pop(t),
           ),
         );
       },
@@ -257,9 +290,24 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
     }
   }
 
-  void _handleLocalOnly() {
+  Future<void> _handleLocalOnly() async {
     if (_busy) return;
-    ref.read(onboardingControllerProvider.notifier).startLocalOnlyFromWelcome();
+    final basePath = await _pickRomBaseFolder();
+    if (!mounted || basePath == null) return;
+
+    setState(() {
+      _busy = true;
+      _busyMessage = 'Scanning local ROM folders…';
+    });
+    final controller =
+        ref.read(onboardingControllerProvider.notifier);
+    await controller.seedLocalSystemsFromBase(basePath);
+    if (!mounted) return;
+    controller.completeFromLocalOnly(basePath: basePath);
+    setState(() {
+      _busy = false;
+      _busyMessage = null;
+    });
   }
 
   @override
@@ -296,6 +344,14 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
             title: 'Pair RomM via QR',
             subtitle: 'Scan a code from your RomM server',
             onSelect: _handleQrPair,
+          ),
+          const SizedBox(height: 12),
+          _ChoiceTile(
+            focusNode: _legacyFocus,
+            icon: Icons.password,
+            title: 'RomM login (older servers)',
+            subtitle: 'Username + password for RomM < 4.8',
+            onSelect: _handleLegacyLogin,
           ),
           const SizedBox(height: 12),
           _ChoiceTile(
@@ -412,3 +468,92 @@ class _ChoiceTile extends StatelessWidget {
     );
   }
 }
+
+
+class _TypePickerBody extends StatefulWidget {
+  const _TypePickerBody({
+    required this.types,
+    required this.iconFor,
+    required this.onPick,
+  });
+
+  final List<SourceType> types;
+  final IconData Function(SourceType) iconFor;
+  final ValueChanged<SourceType> onPick;
+
+  @override
+  State<_TypePickerBody> createState() => _TypePickerBodyState();
+}
+
+class _TypePickerBodyState extends State<_TypePickerBody> {
+  late final List<FocusNode> _nodes;
+
+  @override
+  void initState() {
+    super.initState();
+    _nodes = List.generate(
+      widget.types.length,
+      (i) => FocusNode(debugLabel: 'type_picker_$i'),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _nodes.isNotEmpty) _nodes.first.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    for (final n in _nodes) {
+      n.dispose();
+    }
+    super.dispose();
+  }
+
+  void _move(int delta) {
+    final cur = _nodes.indexWhere((n) => n.hasFocus);
+    final next = (cur < 0 ? 0 : cur + delta).clamp(0, _nodes.length - 1);
+    _nodes[next].requestFocus();
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _move(1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _move(-1);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      autofocus: true,
+      onKeyEvent: _onKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < widget.types.length; i++)
+            ConsoleFocusable(
+              focusNode: _nodes[i],
+              focusScale: 1.0,
+              onSelect: () => widget.onPick(widget.types[i]),
+              child: ListTile(
+                leading: Icon(widget.iconFor(widget.types[i]),
+                    color: AppTheme.primaryColor),
+                title: Text(widget.types[i].name.toUpperCase(),
+                    style: const TextStyle(color: Colors.white)),
+                onTap: () => widget.onPick(widget.types[i]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
