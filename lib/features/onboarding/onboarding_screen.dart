@@ -13,8 +13,8 @@ import '../../providers/ra_providers.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../../widgets/download_overlay.dart';
-import '../settings/ra_config_screen.dart';
 import 'onboarding_controller.dart';
+import 'widgets/ra_onboarding_screen.dart';
 import 'widgets/welcome_chooser_step.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -370,7 +370,7 @@ class _CompleteStepState extends State<_CompleteStep> {
               subtitle: 'Track your retro gaming achievements',
               onSelect: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const RaConfigScreen()),
+                  MaterialPageRoute(builder: (_) => const RaOnboardingScreen()),
                 );
               },
             ),
