@@ -26,7 +26,7 @@ R-Shop is a controller-first game manager for Android handhelds and TVs. Connect
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.6.0-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.7.0-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/platform-Android-brightgreen?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
   <img src="https://img.shields.io/github/stars/averageconsumer/R-Shop?style=flat-square&color=yellow" alt="GitHub stars" />
@@ -77,7 +77,7 @@ Merge games from multiple providers into a single clean library instead of juggl
 - **Automatic metadata and cover art** with no manual login required
 - **RetroAchievements integration** with game matching, progress, and badges
 - **Library-wide browsing** with Installed, Favorites, search, and zoom controls
-- **Background-ready download queue** with persistence and extraction support
+- **Background-ready download queue** with live progress on cards and buttons
 - **Per-card source indicators** showing where each game is available
 - **One-question onboarding** that adapts to how users store their ROMs
 
@@ -101,15 +101,16 @@ Merge games from multiple providers into a single clean library instead of juggl
 
 ## Supported systems
 
-R-Shop supports **29 systems** and **200+ file formats**, including Nintendo, PlayStation, Sega, Atari, and more.
+R-Shop supports **66 systems** with icons, RetroAchievements integration, and automatic folder mapping.
 
 Highlights include:
-- NES, SNES, N64, GameCube, Wii, Wii U, Switch
-- GB, GBC, GBA, NDS, 3DS
-- PlayStation, PS2, PS3, PSP, PS Vita
-- Master System, Mega Drive, Game Gear, Sega CD, 32X, Saturn, Dreamcast
-- Atari 2600, 5200, 7800, Lynx
-- PICO-8
+- **Nintendo:** NES, SNES, N64, GameCube, Wii, Wii U, Switch, GB, GBC, GBA, NDS, 3DS, DSi, Virtual Boy, FDS, Game & Watch
+- **Sony:** PlayStation, PS2, PS3, PSP, PS Vita
+- **Sega:** Master System, Mega Drive, Game Gear, Sega CD, 32X, Saturn, Dreamcast, SG-1000
+- **Atari:** 2600, 5200, 7800, Lynx, Jaguar, Jaguar CD, ST
+- **NEC:** TurboGrafx-16, TurboGrafx-CD, PC-FX
+- **SNK:** Neo Geo Pocket, Neo Geo CD
+- **Others:** WonderSwan, ColecoVision, Intellivision, Vectrex, MSX, Amstrad CPC, Commodore 64, Amiga, ZX Spectrum, Arcade, DOS, and more
 
 ---
 
