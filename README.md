@@ -1,119 +1,154 @@
 # 🎮 R-Shop
 
-**The eShop your Retro Handheld was missing.**
-A premium, console-native game manager for Android. Built for handhelds, perfected for controllers, and designed for the retro community.
+**The fastest way to turn your retro library into a console-like experience on Android.**
+
+R-Shop is a controller-first game manager for Android handhelds and TVs. Connect your local folders, RomM server, or network shares, and browse your collection through a polished UI that feels closer to an eShop than a file browser.
 
 <p align="center">
   <a href="https://averageconsumer.github.io/R-Shop/">
-    <img src="screenshots/console_list.png" width="600" alt="R-Shop Console Overview" />
+    <img src="screenshots/console_list.png" width="700" alt="R-Shop Console Overview" />
   </a>
 </p>
 
 <p align="center">
-  <a href="https://averageconsumer.github.io/R-Shop/">
-    <img src="https://img.shields.io/badge/Website-Visit_R--Shop-blueviolet?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website" />
+  <a href="https://github.com/averageconsumer/R-Shop/releases">
+    <img src="https://img.shields.io/badge/Download-Latest_APK-brightgreen?style=for-the-badge&logo=android&logoColor=white" alt="Download latest APK" />
   </a>
   <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/averageconsumer/r-shop">
-    <img src="https://img.shields.io/badge/Get_it_on-Obtainium-blue?style=for-the-badge" alt="Obtainium" />
+    <img src="https://img.shields.io/badge/Get_it_on-Obtainium-blue?style=for-the-badge" alt="Get it on Obtainium" />
   </a>
-  <a href="https://github.com/averageconsumer/r-shop/releases">
-    <img src="https://img.shields.io/badge/Download-Latest_APK-brightgreen?style=for-the-badge&logo=android&logoColor=white" alt="Download" />
+  <a href="https://averageconsumer.github.io/R-Shop/">
+    <img src="https://img.shields.io/badge/Website-Visit_R--Shop-blueviolet?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Visit website" />
   </a>
   <a href="https://discord.gg/xVT26BHGqh">
-    <img src="https://img.shields.io/badge/Discord-Join_Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord" />
+    <img src="https://img.shields.io/badge/Discord-Join_Community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join Discord" />
   </a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.6.0-blue?style=flat-square" alt="Version" />
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
   <img src="https://img.shields.io/badge/platform-Android-brightgreen?style=flat-square" alt="Platform" />
-  <img src="https://img.shields.io/github/stars/averageconsumer/R-Shop?style=flat-square&color=yellow" alt="Stars" />
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/github/stars/averageconsumer/R-Shop?style=flat-square&color=yellow" alt="GitHub stars" />
 </p>
 
 ---
 
-## 🌟 What is R-Shop?
+## Why R-Shop?
 
-R-Shop is a Flutter-based Android application that provides a **seamless, console-like experience** for browsing, downloading, and organizing your retro game library. 
+Most retro setups are powerful, but they still feel like setups.
 
-It bridges the gap between your self-hosted storage (**RomM, SMB, FTP, Web**) and your handheld device, providing a native UI that feels like it was built by a major console manufacturer. Optimized specifically for the **AYN Odin, Retroid Pocket, Anbernic** and other Android-based handhelds.
+R-Shop focuses on the part people actually care about: **getting into their games fast**, with a UI that feels good on a handheld, a controller, or the couch.
 
-> **🛡️ Neutrality Policy:** R-Shop is a technical tool and directory browser. It does **not** host, distribute, or provide links to copyrighted content. You provide the sources; R-Shop provides the experience.
+It removes as much setup friction as possible:
 
----
+- **QR pairing for RomM** so users can connect in seconds
+- **Automatic source and system mapping** using known naming conventions
+- **Automatic metadata and artwork** with no account required
+- **Automatic RetroAchievements matching** when available
+- **Manual overrides only when needed**, not as the default path
 
-## ✨ Key Features
-
-* **🎮 Console-Native UI** – 100% D-pad and analog navigation. Features haptic feedback, mechanical click sounds, and correct controller icons.
-* **🌐 Multi-Source Management** – Add, configure, and manage **RomM, SMB, FTP, or Web** sources from a unified Sources screen. Per-card dots show where each game comes from.
-* **🔑 RomM 4.8 Token Pairing** – Authenticate with your RomM server via QR code or manual token entry. Live connection probe and one-tap re-pairing.
-* **📚 Library Screen** – Unified cross-system browser with All/Installed/Favorites tabs, search, and adjustable grid zoom.
-* **📥 Hardened Download Engine** – Background-ready downloads via Android Foreground Service. Features auto-extraction (ZIP/7z) and queue persistence.
-* **🖼️ Automatic Box Art** – Metadata and covers are fetched automatically via libretro-thumbnails.
-* **🏆 RetroAchievements** – Link your RA account to track achievements, verify ROMs via hash matching, and view per-game progress with mastery badges.
-* **⚡ Quick Menu (Start Button)** – Instant access to Search, Settings, Zoom, and Downloads from any screen.
-* **🔄 Background Sync** – Automatic provider sync on launch with live progress indicators.
-* **🧭 One-Question Onboarding** – Answer how you store your ROMs and R-Shop configures everything: local folder picker, network source setup, or RomM pairing — all in one flow.
+The goal is simple: **scan, connect, browse, play.**
 
 ---
 
-## 📸 Screenshots
+## What makes it different
+
+### 🎮 Console-like by design
+Built around controllers first, not bolted on later. D-pad navigation, focus handling, layout decisions, and game flow are designed to feel native on Android handhelds and TV setups.
+
+### ⚡ Fast setup, low friction
+R-Shop is at its best when it makes complicated retro-library setup feel trivial. Local folders, RomM, SMB, FTP, and Web sources can all feed the same experience.
+
+### 🧠 Smart defaults
+Systems are mapped automatically where possible. RomM sources map automatically. Metadata comes in automatically. RetroAchievements can match automatically. You step in only when something needs correction.
+
+### 🌐 Multi-source library, one front end
+Merge games from multiple providers into a single clean library instead of juggling separate tools, launchers, or source-specific views.
+
+---
+
+## Features
+
+- **Controller-first UI** for Android handhelds and TV devices
+- **Unified Sources screen** for RomM, SMB, FTP, Web, and local libraries
+- **QR-based RomM pairing** with token auth and re-pair support
+- **Automatic system mapping** for local and network libraries
+- **Automatic metadata and cover art** with no manual login required
+- **RetroAchievements integration** with game matching, progress, and badges
+- **Library-wide browsing** with Installed, Favorites, search, and zoom controls
+- **Background-ready download queue** with persistence and extraction support
+- **Per-card source indicators** showing where each game is available
+- **One-question onboarding** that adapts to how users store their ROMs
+
+---
+
+## Screenshots
 
 <p align="center">
-  <img src="screenshots/console_list.png" width="400" alt="Console Overview" />
-  <img src="screenshots/rom_list.png" width="400" alt="ROM List" />
+  <img src="screenshots/console_list.png" width="400" alt="Console overview" />
+  <img src="screenshots/rom_list.png" width="400" alt="ROM list" />
 </p>
 <p align="center">
-  <img src="screenshots/detail_screen.png" width="400" alt="Game Detail Screen" />
-  <img src="screenshots/download_queue.png" width="400" alt="Download Queue" />
+  <img src="screenshots/detail_screen.png" width="400" alt="Game detail screen" />
+  <img src="screenshots/download_queue.png" width="400" alt="Download queue" />
 </p>
 <p align="center">
-  <img src="screenshots/smb_setup.png" width="400" alt="SMB Network Setup" />
+  <img src="screenshots/smb_setup.png" width="400" alt="Source setup" />
 </p>
 
 ---
 
-## 🗂️ Supported Systems (29 systems · 200+ file formats)
+## Supported systems
 
-| Nintendo | Sony | SEGA | Atari | Other |
-|----------|------|------|-------|-------|
-| NES, SNES, N64 | PlayStation | Master System | 2600 | PICO-8 |
-| GameCube, Wii, Wii U | PlayStation 2, PS3 | Mega Drive, Game Gear | 5200, 7800 | |
-| Switch | PSP, PS Vita | Sega CD, 32X | Lynx | |
-| GB, GBC, GBA, NDS, 3DS | | Saturn, Dreamcast | | |
+R-Shop supports **29 systems** and **200+ file formats**, including Nintendo, PlayStation, Sega, Atari, and more.
+
+Highlights include:
+- NES, SNES, N64, GameCube, Wii, Wii U, Switch
+- GB, GBC, GBA, NDS, 3DS
+- PlayStation, PS2, PS3, PSP, PS Vita
+- Master System, Mega Drive, Game Gear, Sega CD, 32X, Saturn, Dreamcast
+- Atari 2600, 5200, 7800, Lynx
+- PICO-8
 
 ---
 
-## 📲 Installation
+## Installation
 
-### 🚀 The Best Way: Obtainium
-Keep R-Shop updated automatically and never miss a release. Click the button below on your Android device to add R-Shop directly to Obtainium:
+### Obtainium
+The easiest way to install and stay up to date:
 
 [![Get it on Obtainium](https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png)](https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/averageconsumer/r-shop)
 
-### 📦 Manual APK
-Download the latest `.apk` from the [**Releases**](../../releases) page and install it manually.
+### Manual APK
+Download the latest APK from the [Releases](../../releases) page.
 
 ---
 
-## 🛠️ Getting Started
+## Getting started
 
-1. **Onboarding:** Answer one question — R-Shop guides you through local folder selection, network source setup, or RomM token pairing based on your answer.
-2. **Library Sync:** Watch R-Shop build your local metadata cache automatically on launch.
-3. **Download & Play:** Hit 'A' to queue a game. R-Shop handles the download, extraction, and organization.
+1. Install R-Shop
+2. Choose how your library is stored
+3. Connect a local folder, network source, or RomM server
+4. Let R-Shop map systems and pull metadata automatically
+5. Browse, download, and play
 
-*For the full walkthrough, see the **[User Guide](docs/USER_GUIDE.md)**.*
-
----
-
-## 🤝 Contributing & License
-
-Contributions make the community thrive! Check out **[CONTRIBUTING.md](CONTRIBUTING.md)**.
-This project is licensed under the **MIT License**.
+For a full walkthrough, see the [User Guide](docs/USER_GUIDE.md).
 
 ---
 
-## ⚠️ Disclaimer
+## Philosophy
 
-R-Shop is a library management tool. It does not provide ROMs. Users must legally own the content they access through their own private servers or directories.
+R-Shop does **not** host or distribute ROMs.
+
+It is a library management and browsing tool for content users already own or legally access through their own servers, directories, and devices.
+
+---
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+MIT
