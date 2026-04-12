@@ -8,6 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../providers/app_providers.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../utils/game_metadata.dart';
 import 'version_card.dart';
 
@@ -271,7 +272,7 @@ class _VariantPickerOverlayState extends ConsumerState<VariantPickerOverlay>
                 child: Text(
                   '${widget.variants.length}',
                   style: TextStyle(
-                    color: widget.system.accentColor,
+                    color: widget.system.accentColor.forText,
                     fontSize: countFontSize,
                     fontWeight: FontWeight.bold,
                   ),

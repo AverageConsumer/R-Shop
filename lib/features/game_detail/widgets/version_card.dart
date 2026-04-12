@@ -38,23 +38,15 @@ class SingleVersionDisplay extends StatelessWidget {
     final List<BoxShadow>? shadows;
 
     if (isFocused) {
-      bgColor = Colors.white.withValues(alpha: 0.12);
-      borderColor = Colors.white.withValues(alpha: 0.9);
-      borderWidth = 2;
+      bgColor = Colors.white.withValues(alpha: 0.08);
+      borderColor = Colors.white.withValues(alpha: 0.7);
+      borderWidth = 1.5;
       shadows = [
         BoxShadow(
           color: isInstalled
-              ? Colors.greenAccent.withValues(alpha: 0.4)
-              : Colors.white.withValues(alpha: 0.35),
-          blurRadius: 16,
-          spreadRadius: 1,
-        ),
-        BoxShadow(
-          color: isInstalled
-              ? Colors.greenAccent.withValues(alpha: 0.3)
-              : system.accentColor.withValues(alpha: 0.25),
-          blurRadius: 24,
-          spreadRadius: 3,
+              ? Colors.greenAccent.withValues(alpha: 0.2)
+              : Colors.white.withValues(alpha: 0.15),
+          blurRadius: 10,
         ),
       ];
     } else if (isInstalled) {
