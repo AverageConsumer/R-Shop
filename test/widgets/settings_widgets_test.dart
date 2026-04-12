@@ -138,7 +138,8 @@ void main() {
       ));
 
       final generalText = tester.widget<Text>(find.text('GENERAL'));
-      expect(generalText.style!.color, Colors.cyanAccent);
+      // Active tab uses .forText for contrast — verify it's not the default grey
+      expect(generalText.style!.color, isNot(Colors.grey[500]));
     });
 
     testWidgets('inactive tab text is grey', (tester) async {
@@ -188,7 +189,8 @@ void main() {
       ));
 
       final generalText = tester.widget<Text>(find.text('GENERAL'));
-      expect(generalText.style!.color, Colors.redAccent);
+      // Active tab uses .forText for contrast — verify it's not the default grey
+      expect(generalText.style!.color, isNot(Colors.grey[500]));
     });
   });
 

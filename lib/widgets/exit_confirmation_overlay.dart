@@ -3,41 +3,47 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/input/input_providers.dart';
 import '../core/responsive/responsive.dart';
-import '../core/theme/app_theme.dart';
+import '../l10n/app_localizations.dart';
+import 'console_hud.dart';
 import 'glass_overlay.dart';
 
 class ExitConfirmationOverlay extends ConsumerStatefulWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
-  final String title;
-  final String message;
+
+  /// Optional overrides for reuse as generic confirmation dialog.
+  final String? title;
+  final String? message;
   final IconData icon;
-  final String confirmLabel;
-  final String cancelLabel;
+  final String? confirmLabel;
+  final String? cancelLabel;
 
   const ExitConfirmationOverlay({
     super.key,
     required this.onConfirm,
     required this.onCancel,
-    this.title = 'EXIT APPLICATION',
-    this.message = 'Are you sure you want to quit?',
+    this.title,
+    this.message,
     this.icon = Icons.power_settings_new_rounded,
-    this.confirmLabel = 'EXIT',
-    this.cancelLabel = 'STAY',
+    this.confirmLabel,
+    this.cancelLabel,
   });
 
   @override
-  ConsumerState<ExitConfirmationOverlay> createState() => _ExitConfirmationOverlayState();
+  ConsumerState<ExitConfirmationOverlay> createState() =>
+      _ExitConfirmationOverlayState();
 }
 
-class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverlay>
+class _ExitConfirmationOverlayState
+    extends ConsumerState<ExitConfirmationOverlay>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
-  int _selectedIndex = 0; // 0 = Stay (Default), 1 = Exit
+  int _selectedIndex = 0; // 0 = Cancel (default safe choice), 1 = Confirm
   OverlayPriorityManager? _overlayManager;
   int? _claimToken;
+  late final FocusNode _focusNode;
 
   @override
   void initState() {
@@ -46,22 +52,17 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-
     _scaleAnimation = CurvedAnimation(
       parent: _controller,
       curve: Curves.easeOutBack,
     );
-
     _fadeAnimation = CurvedAnimation(
       parent: _controller,
       curve: Curves.easeIn,
     );
-
     _focusNode = FocusNode();
-
     _controller.forward();
 
-    // Set overlay priority to dialog
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _overlayManager = ref.read(overlayPriorityProvider.notifier);
@@ -70,8 +71,6 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
       }
     });
   }
-
-  late final FocusNode _focusNode;
 
   @override
   void dispose() {
@@ -121,16 +120,29 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+    final l = L.of(context);
+
+    final title = widget.title ?? l.exit_title;
+    final message = widget.message ?? l.exit_message;
+    final confirmLabel = widget.confirmLabel ?? l.exit_confirmButton;
+    final cancelLabel = widget.cancelLabel ?? l.exit_cancelButton;
 
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.arrowRight, includeRepeats: false): () => _handleNavigate(true),
-        const SingleActivator(LogicalKeyboardKey.arrowLeft, includeRepeats: false): () => _handleNavigate(false),
-        const SingleActivator(LogicalKeyboardKey.enter, includeRepeats: false): _handleConfirm, // A / Enter
-        const SingleActivator(LogicalKeyboardKey.gameButtonA, includeRepeats: false): _handleConfirm,
-        const SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false): _close, // B / Esc
-        const SingleActivator(LogicalKeyboardKey.gameButtonB, includeRepeats: false): _close,
-        const SingleActivator(LogicalKeyboardKey.goBack, includeRepeats: false): _close,
+        const SingleActivator(LogicalKeyboardKey.arrowRight,
+            includeRepeats: false): () => _handleNavigate(true),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft,
+            includeRepeats: false): () => _handleNavigate(false),
+        const SingleActivator(LogicalKeyboardKey.enter,
+            includeRepeats: false): _handleConfirm,
+        const SingleActivator(LogicalKeyboardKey.gameButtonA,
+            includeRepeats: false): _handleConfirm,
+        const SingleActivator(LogicalKeyboardKey.escape,
+            includeRepeats: false): _close,
+        const SingleActivator(LogicalKeyboardKey.gameButtonB,
+            includeRepeats: false): _close,
+        const SingleActivator(LogicalKeyboardKey.goBack,
+            includeRepeats: false): _close,
       },
       child: Focus(
         focusNode: _focusNode,
@@ -139,135 +151,199 @@ class _ExitConfirmationOverlayState extends ConsumerState<ExitConfirmationOverla
           blur: 15,
           opacity: 0.7,
           tint: Colors.black,
-          child: Center(
-            child: ScaleTransition(
-              scale: _scaleAnimation,
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: Container(
-                  width: (rs.isSmall ? 320.0 : 450.0).clamp(0, rs.screenWidth * 0.85),
-                  padding: EdgeInsets.all(rs.spacing.xl),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(rs.radius.lg),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.1),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        widget.icon,
-                        size: rs.isSmall ? 48 : 64,
-                        color: AppTheme.primaryColor,
-                      ),
-                      SizedBox(height: rs.spacing.lg),
-                      Text(
-                        widget.title,
-                        style: AppTheme.headlineMedium.copyWith(
-                          fontSize: rs.isSmall ? 24 : 32,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
+          child: Stack(
+            children: [
+              Center(
+                child: ScaleTransition(
+                  scale: _scaleAnimation,
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Container(
+                      width: (rs.isSmall ? 300.0 : 420.0)
+                          .clamp(0, rs.screenWidth * 0.85),
+                      padding: EdgeInsets.all(rs.isSmall ? 24 : 32),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141414),
+                        borderRadius: BorderRadius.circular(rs.radius.lg),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.08),
                         ),
-                      ),
-                      SizedBox(height: rs.spacing.sm),
-                      Text(
-                        widget.message,
-                        style: AppTheme.bodyLarge.copyWith(
-                          color: Colors.white60,
-                        ),
-                      ),
-                      SizedBox(height: rs.spacing.xl),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildButton(
-                            label: widget.cancelLabel,
-                            isSelected: _selectedIndex == 0,
-                            isPrimary: true,
-                            onTap: () {
-                               if (_selectedIndex != 0) {
-                                  setState(() => _selectedIndex = 0);
-                               } else {
-                                  _close();
-                               }
-                            },
-                          ),
-                          SizedBox(width: rs.spacing.lg),
-                          _buildButton(
-                            label: widget.confirmLabel,
-                            isSelected: _selectedIndex == 1,
-                            isPrimary: false,
-                            onTap: () {
-                                if (_selectedIndex != 1) {
-                                  setState(() => _selectedIndex = 1);
-                                } else {
-                                  widget.onConfirm();
-                                }
-                            },
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            blurRadius: 40,
+                            offset: const Offset(0, 12),
                           ),
                         ],
                       ),
-                    ],
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Icon
+                          Container(
+                            width: rs.isSmall ? 56 : 68,
+                            height: rs.isSmall ? 56 : 68,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withValues(alpha: 0.04),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.08),
+                              ),
+                            ),
+                            child: Icon(
+                              widget.icon,
+                              size: rs.isSmall ? 28 : 34,
+                              color: Colors.white.withValues(alpha: 0.7),
+                            ),
+                          ),
+                          SizedBox(height: rs.isSmall ? 16 : 20),
+                          // Title
+                          Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: rs.isSmall ? 18 : 22,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: rs.spacing.sm),
+                          // Message
+                          Text(
+                            message,
+                            style: TextStyle(
+                              fontSize: rs.isSmall ? 13 : 15,
+                              color: Colors.white.withValues(alpha: 0.5),
+                              height: 1.4,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: rs.isSmall ? 20 : 28),
+                          // Buttons
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _DialogButton(
+                                  label: cancelLabel,
+                                  isSelected: _selectedIndex == 0,
+                                  isDestructive: false,
+                                  isSmall: rs.isSmall,
+                                  onTap: () {
+                                    if (_selectedIndex != 0) {
+                                      setState(() => _selectedIndex = 0);
+                                    } else {
+                                      _close();
+                                    }
+                                  },
+                                ),
+                              ),
+                              SizedBox(width: rs.isSmall ? 10 : 14),
+                              Expanded(
+                                child: _DialogButton(
+                                  label: confirmLabel,
+                                  isSelected: _selectedIndex == 1,
+                                  isDestructive: true,
+                                  isSmall: rs.isSmall,
+                                  onTap: () {
+                                    if (_selectedIndex != 1) {
+                                      setState(() => _selectedIndex = 1);
+                                    } else {
+                                      widget.onConfirm();
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+              // HUD
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SafeArea(
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: ConsoleHud(
+                      a: HudAction(l.common_select),
+                      b: HudAction(l.common_close, onTap: _close),
+                      embedded: true,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildButton({
-    required String label,
-    required bool isSelected,
-    required bool isPrimary,
-    required VoidCallback onTap,
-  }) {
-    final color = isPrimary ? AppTheme.primaryColor : Colors.redAccent;
+class _DialogButton extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final bool isDestructive;
+  final bool isSmall;
+  final VoidCallback onTap;
 
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: isSelected ? color : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected ? color : Colors.white24,
-              width: 2,
-            ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.4),
-                      blurRadius: 15,
-                      spreadRadius: 2,
-                    )
-                  ]
-                : [],
+  const _DialogButton({
+    required this.label,
+    required this.isSelected,
+    required this.isDestructive,
+    required this.isSmall,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDestructive ? Colors.redAccent : Colors.white;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.symmetric(vertical: isSmall ? 12 : 14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDestructive
+                  ? Colors.redAccent.withValues(alpha: 0.15)
+                  : Colors.white.withValues(alpha: 0.08))
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected
+                ? (isDestructive
+                    ? Colors.redAccent.withValues(alpha: 0.5)
+                    : Colors.white.withValues(alpha: 0.3))
+                : Colors.white.withValues(alpha: 0.08),
+            width: isSelected ? 1.5 : 1,
           ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.white70,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-            ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: (isDestructive ? Colors.redAccent : Colors.white)
+                        .withValues(alpha: 0.15),
+                    blurRadius: 12,
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: isSelected ? color : Colors.white.withValues(alpha: 0.4),
+            fontSize: isSmall ? 13 : 15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1,
           ),
         ),
       ),
