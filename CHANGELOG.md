@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.6.0] — 2026-04-12
+
+### Added
+- **Sources management** — unified screen to add, configure, disable, and remove RomM/SMB/FTP/Web sources with controller-grade focus handling and per-system mapping
+- **RomM 4.8 token pairing** — Client API Token authentication via QR code or manual entry, with live server probe and connection validation
+- **Per-card source dots** — colored dot indicators on game cards showing which provider(s) serve each game; stacked dots when available from 2+ sources
+- **Manual source creation** — type picker UI for adding SMB, FTP, or Web directory sources outside of RomM
+- **Per-system mapping editor** — assign which systems a manual source provides, with visual mapping count
+- **Re-pair action** — refresh expired or borrowed RomM tokens directly from the Sources screen
+- **Onboarding chooser** — single-question welcome flow ("How do you store your ROMs?") replacing the old multi-step wizard, with path-specific setup for local, network, and RomM users
+- **ROM folder picker** — select your ROM base folder during onboarding; local filesystem scan runs on every chooser path
+
+### Improved
+- **Merge-only mode** — failover removed entirely; merge is now the sole multi-source strategy (was unused dead code, merge handles all cases better)
+- **Default merge enabled** — new and legacy configs default to `mergeMode: true` without user intervention
+- **Settings restructured** — Sources surfaced as the primary entry point; "Edit Consoles" renamed to "Edit Systems" (read-only, links to Sources for changes)
+- **Unified RA setup** — RetroAchievements configuration consolidated into a single lightweight screen shared between onboarding and settings
+- **Transparent config migration** — v2 configs automatically upgrade to v3 format on first launch with no user action required; dual-write keeps old code paths functional
+
+### Removed
+- **RomM Server tile** — replaced by the more capable Sources management screen
+- **Scan Library tile** — use "Sync All" from the quick menu instead
+- **Failover mode** — merge handles all multi-source scenarios; failover was never exposed in UI
+- **"Skip for now" onboarding option** — led to an empty home screen with no way forward
+
+### Fixed
+- Sync timestamps now persist correctly from `syncAll` and `syncSystem` (were silently lost)
+- Auto-merge providers when a system has 2+ contributing sources
+- Installed games remain visible after disabling their source
+- Legacy providers tagged as managed so disable/remove actually cleans them up
+- Alternative sources persisted in database so multi-source games survive sync cycles
+- RA screen focus clipping (inner borderRadius now smaller than outer)
+
+---
+
 ## [1.5.2] — 2026-04-09
 
 ### Fixed

@@ -25,7 +25,7 @@ A premium, console-native game manager for Android. Built for handhelds, perfect
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.5.2-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.6.0-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
   <img src="https://img.shields.io/badge/platform-Android-brightgreen?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/github/stars/averageconsumer/R-Shop?style=flat-square&color=yellow" alt="Stars" />
@@ -46,14 +46,15 @@ It bridges the gap between your self-hosted storage (**RomM, SMB, FTP, Web**) an
 ## ✨ Key Features
 
 * **🎮 Console-Native UI** – 100% D-pad and analog navigation. Features haptic feedback, mechanical click sounds, and correct controller icons.
-* **🌐 Multi-Protocol Mastery** – Connect to **RomM, SMB, FTP, or Web** directories. Mix and match sources for every single console in your library.
+* **🌐 Multi-Source Management** – Add, configure, and manage **RomM, SMB, FTP, or Web** sources from a unified Sources screen. Per-card dots show where each game comes from.
+* **🔑 RomM 4.8 Token Pairing** – Authenticate with your RomM server via QR code or manual token entry. Live connection probe and one-tap re-pairing.
 * **📚 Library Screen** – Unified cross-system browser with All/Installed/Favorites tabs, search, and adjustable grid zoom.
 * **📥 Hardened Download Engine** – Background-ready downloads via Android Foreground Service. Features auto-extraction (ZIP/7z) and queue persistence.
 * **🖼️ Automatic Box Art** – Metadata and covers are fetched automatically via libretro-thumbnails.
 * **🏆 RetroAchievements** – Link your RA account to track achievements, verify ROMs via hash matching, and view per-game progress with mastery badges.
 * **⚡ Quick Menu (Start Button)** – Instant access to Search, Settings, Zoom, and Downloads from any screen.
 * **🔄 Background Sync** – Automatic provider sync on launch with live progress indicators.
-* **🧭 Smart Onboarding** – Auto-detection of existing ROM folders and guided setup for remote sources.
+* **🧭 One-Question Onboarding** – Answer how you store your ROMs and R-Shop configures everything: local folder picker, network source setup, or RomM pairing — all in one flow.
 
 ---
 
@@ -98,7 +99,7 @@ Download the latest `.apk` from the [**Releases**](../../releases) page and inst
 
 ## 🛠️ Getting Started
 
-1. **Onboarding:** The setup wizard auto-detects existing folders or connects to your RomM, SMB, FTP, or Web sources.
+1. **Onboarding:** Answer one question — R-Shop guides you through local folder selection, network source setup, or RomM token pairing based on your answer.
 2. **Library Sync:** Watch R-Shop build your local metadata cache automatically on launch.
 3. **Download & Play:** Hit 'A' to queue a game. R-Shop handles the download, extraction, and organization.
 
