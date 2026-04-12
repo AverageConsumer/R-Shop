@@ -108,11 +108,13 @@ class GameDetailController extends ChangeNotifier {
       sections.add(DetailSection.screenshots);
     }
 
-    // Other versions (real variants + unmatched siblings shown greyed out)
-    if (variants.length > 1 ||
-        (hasRichMeta && metadata.siblingList.isNotEmpty)) {
-      sections.add(DetailSection.otherVersions);
-    }
+    // Other versions — disabled for now (siblings always show as "not found"
+    // which provides no value to the user). Re-enable when we can show
+    // actionable info like region differences or download availability.
+    // if (variants.length > 1 ||
+    //     (hasRichMeta && metadata.siblingList.isNotEmpty)) {
+    //   sections.add(DetailSection.otherVersions);
+    // }
 
     // Structured details (file tags — single ROM only, when tags exist)
     if (variants.length == 1 &&
