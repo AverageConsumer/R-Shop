@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/config/app_config.dart';
 import '../models/config/source.dart';
+import '../models/config/system_config.dart';
 import '../models/config/provider_config.dart';
+import '../models/system_model.dart';
 import 'config_storage_service.dart';
 import 'database_service.dart';
 import 'romm_pairing_service.dart';
@@ -125,6 +127,61 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     if (state.sources.any((s) => s.id == source.id)) return;
     final next = [...state.sources, source];
     await _writeAndPublish(next);
+  }
+
+  /// Creates [SystemConfig] entries for any platforms in [source.knownPlatforms]
+  /// that don't already have a config. Returns `(ids, names)` of newly
+  /// created systems so callers can queue syncs and notify the user.
+  ///
+  /// Uses [basePath] to build `<basePath>/<systemId>` as the target folder
+  /// for each new system (same convention as onboarding).
+  Future<({List<String> ids, List<String> names})> ensureSystemsForSource(
+    Source source, {
+    required String basePath,
+  }) async {
+    if (source.knownPlatforms.isEmpty) {
+      return (ids: const <String>[], names: const <String>[]);
+    }
+
+    AppConfig latest;
+    try {
+      latest = (await _storage.loadConfig()) ?? _cachedConfig;
+    } catch (e) {
+      debugPrint('SourcesNotifier: re-read failed: $e');
+      latest = _cachedConfig;
+    }
+
+    final existingIds = latest.systems.map((s) => s.id).toSet();
+    final newSystems = <SystemConfig>[];
+    final newIds = <String>[];
+    final newNames = <String>[];
+
+    for (final systemId in source.knownPlatforms.keys) {
+      if (existingIds.contains(systemId)) continue;
+      final model = SystemModel.supportedSystems
+          .where((s) => s.id == systemId)
+          .firstOrNull;
+      if (model == null) continue;
+      newSystems.add(SystemConfig(
+        id: systemId,
+        name: model.name,
+        targetFolder: '$basePath/$systemId',
+        providers: const [],
+        autoExtract: model.isZipped,
+      ));
+      newIds.add(systemId);
+      newNames.add(model.name);
+    }
+
+    if (newSystems.isEmpty) {
+      return (ids: const <String>[], names: const <String>[]);
+    }
+
+    // Use _writeAndPublish with the extra systems so SourceResolver
+    // builds provider lists for them in the same atomic write.
+    await _writeAndPublish(state.sources, addSystems: newSystems);
+
+    return (ids: newIds, names: newNames);
   }
 
   /// Adds a new manual source together with the per-system path mappings
@@ -278,6 +335,7 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     List<Source> next, {
     Map<String, Map<String, String>> addMappings = const {},
     String? replaceMappingsForSource,
+    List<SystemConfig> addSystems = const [],
   }) async {
     // Re-read the config from disk so any writes that happened outside
     // this notifier (e.g. the onboarding flow adding new systems) are
@@ -290,6 +348,19 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     } catch (e) {
       debugPrint('SourcesNotifier: re-read failed, using cache: $e');
       latest = _cachedConfig;
+    }
+
+    // Add any new systems (from ensureSystemsForSource) that don't
+    // already exist in the config. Must happen before the SourceResolver
+    // rebuild so the new systems get their provider lists populated.
+    if (addSystems.isNotEmpty) {
+      final existingIds = latest.systems.map((s) => s.id).toSet();
+      final truly = addSystems.where((s) => !existingIds.contains(s.id));
+      if (truly.isNotEmpty) {
+        latest = latest.copyWith(
+          systems: [...latest.systems, ...truly],
+        );
+      }
     }
 
     // Strip out every existing mapping for the targeted source so the

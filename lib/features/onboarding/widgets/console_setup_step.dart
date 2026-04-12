@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/config/provider_config.dart';
 import '../onboarding_controller.dart';
 import 'chat_bubble.dart';
@@ -16,6 +17,7 @@ class ConsoleSetupStep extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(onboardingControllerProvider);
     final rs = context.rs;
+    final l = L.of(context);
 
     if (state.hasConsoleSelected) {
       final system = state.selectedSystem;
@@ -26,29 +28,29 @@ class ConsoleSetupStep extends ConsumerWidget {
       if (state.hasProviderForm) {
         final isRomm = state.providerForm?.type == ProviderType.romm;
         if (state.isTestingConnection) {
-          message = "Hang on, testing the connection...";
+          message = l.onboarding_hangOn;
         } else if (isRomm && state.rommPlatforms != null && state.rommMatchedPlatform != null) {
-          message = "I found this console on your RomM server! Confirm or pick a different one.";
+          message = l.onboarding_foundConsole;
           accentColor = Colors.green;
         } else if (isRomm && state.rommPlatforms != null && state.rommMatchedPlatform == null) {
-          message = "Pick the matching platform from your RomM server.";
+          message = l.onboarding_pickPlatform;
         } else if (isRomm && state.rommFetchError != null) {
-          message = "Couldn't reach your RomM server. Check the URL and try again.";
+          message = l.onboarding_couldNotReach;
         } else if (!isRomm && state.connectionTestSuccess) {
-          message = "Connection looks good! You're all set to save this source.";
+          message = l.onboarding_connectionGood;
           accentColor = Colors.green;
         } else if (!isRomm && state.connectionTestError != null) {
-          message = "Hmm, couldn't connect. Double-check the address and credentials.";
+          message = l.onboarding_couldNotConnect;
         } else {
-          message = "What kind of source is this? Pick the connection type.";
+          message = l.onboarding_whatKindOfSource;
         }
       } else if (sub != null && sub.providers.isNotEmpty && sub.targetFolder != null) {
-        message = "Looking good! Add more sources or press Done when you're ready.";
+        message = l.onboarding_lookingGood;
       } else if (sub != null && sub.targetFolder != null && sub.providers.isEmpty) {
-        message = "This is a local collection. Add a source to download more, or just hit Done!";
+        message = l.onboarding_localCollection;
         accentColor = Colors.cyanAccent;
       } else if (sub != null && sub.targetFolder != null) {
-        message = "Now add at least one source so I know where to find the ROMs.";
+        message = l.onboarding_addMoreSources;
       } else {
         message = "Cool, ${system?.name ?? 'this one'}! First, pick a folder for your ROMs.";
       }
@@ -88,7 +90,7 @@ class ConsoleSetupStep extends ConsumerWidget {
     final configuredCount = state.configuredCount;
     String message;
     if (configuredCount == 0) {
-      message = "Let's set up your consoles! Select any system to get started.";
+      message = l.onboarding_letsSetUp;
     } else {
       message =
           "Nice! $configuredCount ${configuredCount == 1 ? 'console' : 'consoles'} configured. Select another to add more, or press B to go back.";

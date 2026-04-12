@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/console_focusable.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/app_providers.dart';
 import '../../services/romm_pairing_service.dart';
 import 'pairing_result_screen.dart';
@@ -185,7 +186,7 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
       _probing = false;
       _probeVersion = version;
       _probeError = version == null
-          ? 'Server not reachable or not a RomM instance'
+          ? L.of(context).pairing_serverNotReachable
           : null;
     });
   }
@@ -194,7 +195,7 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
     final url = _urlController.text.trim();
     final code = _codeController.text.trim().toUpperCase();
     if (url.isEmpty || code.isEmpty) {
-      setState(() => _submitError = 'Server URL and code are required');
+      setState(() => _submitError = L.of(context).pairing_serverUrlRequired);
       return;
     }
     setState(() {
@@ -249,9 +250,9 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
-                          'Manual pairing',
-                          style: TextStyle(
+                        Text(
+                          L.of(context).pairing_manualTitle,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 22,
                             fontWeight: FontWeight.w600,
@@ -261,12 +262,12 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Generate the code in your RomM web UI under '
+                      '${L.of(context).pairing_manualInstructions}'
                       'Profile → API Tokens → Pair Device.',
                       style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
                     ),
                     const SizedBox(height: 24),
-                    _label('Server URL'),
+                    _label(L.of(context).pairing_serverUrl),
                     _textField(
                       controller: _urlController,
                       consoleFocus: _urlConsoleFocus,
@@ -277,12 +278,12 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
                     const SizedBox(height: 6),
                     _probeStatus(),
                     const SizedBox(height: 16),
-                    _label('Pairing code'),
+                    _label(L.of(context).pairing_pairingCode),
                     _textField(
                       controller: _codeController,
                       consoleFocus: _codeConsoleFocus,
                       textFocus: _codeTextFocus,
-                      hint: 'ABCD-1234',
+                      hint: L.of(context).pairing_pairingCodeHint,
                       monospace: true,
                       uppercase: true,
                     ),
@@ -319,9 +320,9 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
                                   color: AppTheme.primaryColor,
                                 ),
                               )
-                            : const Text(
-                                'Connect',
-                                style: TextStyle(
+                            : Text(
+                                L.of(context).common_connect,
+                                style: const TextStyle(
                                   color: AppTheme.primaryColor,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
@@ -414,15 +415,15 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
   Widget _probeStatus() {
     if (_probing) {
       return Row(
-        children: const [
-          SizedBox(
+        children: [
+          const SizedBox(
             width: 12,
             height: 12,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
-          SizedBox(width: 8),
-          Text('Probing server…',
-              style: TextStyle(color: Colors.grey, fontSize: 12)),
+          const SizedBox(width: 8),
+          Text(L.of(context).pairing_probingServer,
+              style: const TextStyle(color: Colors.grey, fontSize: 12)),
         ],
       );
     }

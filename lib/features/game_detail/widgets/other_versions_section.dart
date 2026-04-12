@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/game_item.dart';
 import '../../../models/game_metadata_info.dart';
 import '../../../widgets/marquee_text.dart';
@@ -97,12 +98,13 @@ class _OtherVersionsSectionState extends State<OtherVersionsSection> {
     if (entries.isEmpty) return const SizedBox.shrink();
 
     final rs = context.rs;
+    final l = L.of(context);
     final clampedIdx = widget.focusedIndex.clamp(0, entries.length - 1);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(label: 'Other Versions'),
+        SectionHeader(label: l.gameDetail_otherVersions),
         SizedBox(
           height: rs.isSmall ? 52 : 60,
           child: ListView.separated(
@@ -112,7 +114,7 @@ class _OtherVersionsSectionState extends State<OtherVersionsSection> {
             itemBuilder: (context, index) {
               final entry = entries[index];
               final isFocused = widget.isSectionFocused && index == clampedIdx;
-              return _buildItem(rs, entry, isFocused, index);
+              return _buildItem(rs, l, entry, isFocused, index);
             },
           ),
         ),
@@ -120,7 +122,7 @@ class _OtherVersionsSectionState extends State<OtherVersionsSection> {
     );
   }
 
-  Widget _buildItem(Responsive rs, _VersionEntry entry, bool isFocused, int index) {
+  Widget _buildItem(Responsive rs, L l, _VersionEntry entry, bool isFocused, int index) {
     final Color bgColor;
     final Color borderColor;
     final Color textColor;
@@ -135,7 +137,7 @@ class _OtherVersionsSectionState extends State<OtherVersionsSection> {
             ? widget.accentColor.withValues(alpha: 0.5)
             : Colors.greenAccent.withValues(alpha: 0.3);
         textColor = Colors.white.withValues(alpha: isFocused ? 0.9 : 0.7);
-        subtitle = 'Installed';
+        subtitle = l.gameDetail_installedLabel;
       case _VersionStatus.available:
         bgColor = isFocused
             ? widget.accentColor.withValues(alpha: 0.12)
@@ -151,7 +153,7 @@ class _OtherVersionsSectionState extends State<OtherVersionsSection> {
             ? Colors.white.withValues(alpha: 0.2)
             : Colors.white.withValues(alpha: 0.06);
         textColor = Colors.white.withValues(alpha: isFocused ? 0.35 : 0.2);
-        subtitle = 'Not found';
+        subtitle = l.gameDetail_notFound;
     }
 
     final cardWidth = rs.isSmall ? 140.0 : 170.0;

@@ -3,14 +3,11 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/console_focusable.dart';
+import '../../l10n/app_localizations.dart';
 import '../../services/romm_pairing_service.dart';
+import '../../widgets/console_hud.dart';
 
 /// Confirmation screen shown after a successful pairing-code exchange.
-///
-/// Surfaces the most relevant fields from [RommPairResult] (server, name,
-/// scopes, expiry) and asks the user to either accept and store the token
-/// or cancel and discard it. Used by both [QrPairingScreen] and
-/// [ManualPairingScreen].
 class PairingResultScreen extends StatefulWidget {
   const PairingResultScreen({super.key, required this.result});
 
@@ -21,22 +18,51 @@ class PairingResultScreen extends StatefulWidget {
 }
 
 class _PairingResultScreenState extends State<PairingResultScreen> {
+  final FocusNode _screenFocus = FocusNode();
   final FocusNode _confirmFocus = FocusNode();
   final FocusNode _cancelFocus = FocusNode();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _confirmFocus.requestFocus();
+    });
+  }
+
+  @override
   void dispose() {
+    _screenFocus.dispose();
     _confirmFocus.dispose();
     _cancelFocus.dispose();
     super.dispose();
   }
 
-  String? _expiryLabel() {
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowLeft ||
+        key == LogicalKeyboardKey.arrowRight ||
+        key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown) {
+      if (_confirmFocus.hasFocus) {
+        _cancelFocus.requestFocus();
+      } else {
+        _confirmFocus.requestFocus();
+      }
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  String _expiryLabel() {
+    final l = L.of(context);
     final exp = widget.result.expiresAt;
-    if (exp == null) return 'Never expires';
-    final now = DateTime.now();
-    final delta = exp.difference(now);
-    if (delta.isNegative) return 'Already expired';
+    if (exp == null) return l.pairing_neverExpires;
+    final delta = exp.difference(DateTime.now());
+    if (delta.isNegative) return l.pairing_alreadyExpired;
     if (delta.inDays >= 2) return 'Expires in ${delta.inDays} days';
     if (delta.inHours >= 2) return 'Expires in ${delta.inHours} hours';
     return 'Expires in ${delta.inMinutes} minutes';
@@ -44,123 +70,160 @@ class _PairingResultScreenState extends State<PairingResultScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final result = widget.result;
+    final scopes = result.scopes;
+
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.check_circle, color: Colors.greenAccent, size: 28),
-                      SizedBox(width: 12),
-                      Text(
-                        'Pairing successful',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w600,
+      body: Stack(
+        children: [
+          Focus(
+            focusNode: _screenFocus,
+            onKeyEvent: _onKeyEvent,
+            child: SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header
+                        Row(
+                          children: [
+                            const Icon(Icons.check_circle,
+                                color: Colors.greenAccent, size: 24),
+                            const SizedBox(width: 10),
+                            Text(
+                              l.pairing_successTitle,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  _row('Server', _hostOf(result.serverUrl)),
-                  _row('Token name', result.name),
-                  _row('User ID', result.userId.toString()),
-                  _row('Expiry', _expiryLabel() ?? '—'),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Permissions',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                      letterSpacing: 1,
+                        const SizedBox(height: 16),
+
+                        // Info + Permissions side by side
+                        Expanded(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left: connection details
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _row(l.pairing_server,
+                                        _hostOf(result.serverUrl)),
+                                    _row(l.pairing_token, result.name),
+                                    _row(l.pairing_userId,
+                                        result.userId.toString()),
+                                    _row(l.pairing_expiry, _expiryLabel()),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 24),
+                              // Right: permissions
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      l.pairing_permissions,
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 10,
+                                        letterSpacing: 1.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 4,
+                                      runSpacing: 4,
+                                      children: [
+                                        for (final scope in scopes)
+                                          _scopeBadge(scope),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Buttons
+                        Padding(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 4),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: ConsoleFocusable(
+                                  focusNode: _cancelFocus,
+                                  focusScale: 1.0,
+                                  onSelect: () =>
+                                      Navigator.of(context).pop(false),
+                                  child: _button(l.common_cancel, Colors.grey),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: ConsoleFocusable(
+                                  focusNode: _confirmFocus,
+                                  focusScale: 1.0,
+                                  onSelect: () =>
+                                      Navigator.of(context).pop(true),
+                                  child: _button(
+                                      l.pairing_addServer, AppTheme.primaryColor),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 48),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final scope in result.scopes)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: AppTheme.primaryColor.withValues(alpha: 0.4),
-                            ),
-                          ),
-                          child: Text(
-                            scope,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ConsoleFocusable(
-                          focusNode: _cancelFocus,
-                          onSelect: () => Navigator.of(context).pop(false),
-                          child: _button('Cancel', Colors.grey),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ConsoleFocusable(
-                          focusNode: _confirmFocus,
-                          autofocus: true,
-                          onSelect: () => Navigator.of(context).pop(true),
-                          child: _button('Add server', AppTheme.primaryColor),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    '[A] Add   [B] Cancel',
-                    style: TextStyle(color: Colors.grey, fontSize: 11),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          ConsoleHud(
+            a: HudAction(l.pairing_addServer, onTap: () => Navigator.of(context).pop(true)),
+            b: HudAction(l.common_cancel,
+                onTap: () => Navigator.of(context).pop(false)),
+          ),
+        ],
       ),
     );
   }
 
   Widget _row(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 110,
+            width: 64,
             child: Text(
               label,
               style: const TextStyle(
                 color: Colors.grey,
-                fontSize: 12,
-                letterSpacing: 1,
+                fontSize: 11,
+                letterSpacing: 0.8,
               ),
             ),
           ),
@@ -169,12 +232,33 @@ class _PairingResultScreenState extends State<PairingResultScreen> {
               value,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 14,
+                fontSize: 13,
                 fontFamily: 'monospace',
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _scopeBadge(String scope) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(
+          color: AppTheme.primaryColor.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Text(
+        scope,
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 9,
+          fontFamily: 'monospace',
+        ),
       ),
     );
   }
@@ -215,15 +299,7 @@ Future<bool> showPairingResultScreen(
   final accepted = await Navigator.of(context).push<bool>(
     PageRouteBuilder(
       opaque: true,
-      pageBuilder: (_, __, ___) => CallbackShortcuts(
-        bindings: {
-          const SingleActivator(LogicalKeyboardKey.gameButtonB):
-              () => Navigator.of(context).pop(false),
-          const SingleActivator(LogicalKeyboardKey.escape):
-              () => Navigator.of(context).pop(false),
-        },
-        child: PairingResultScreen(result: result),
-      ),
+      pageBuilder: (_, __, ___) => PairingResultScreen(result: result),
     ),
   );
   return accepted ?? false;

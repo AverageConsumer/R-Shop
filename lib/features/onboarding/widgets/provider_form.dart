@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/console_focusable.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/config/provider_config.dart';
 import '../../../providers/app_providers.dart';
 import '../../../services/romm_api_service.dart';
@@ -237,8 +238,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
                   SizedBox(width: rs.spacing.xs),
                   Expanded(
                     child: Text(
-                      'HTTP to non-local servers is blocked. '
-                      'Use HTTPS, or enable after setup in Settings.',
+                      L.of(context).providerForm_httpBlocked,
                       style: TextStyle(
                         color: Colors.red.shade300,
                         fontSize: rs.isSmall ? 10 : 12,
@@ -258,7 +258,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
                   SizedBox(width: rs.spacing.xs),
                   Expanded(
                     child: Text(
-                      'Credentials will be sent unencrypted over HTTP',
+                      L.of(context).providerForm_httpWarning,
                       style: TextStyle(
                         color: Colors.orange.shade300,
                         fontSize: rs.isSmall ? 10 : 12,
@@ -285,8 +285,9 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
 
   Widget _buildHeader(Responsive rs, ProviderFormState form) {
     final fontSize = rs.isSmall ? 14.0 : 16.0;
+    final l = L.of(context);
     return Text(
-      form.isEditing ? 'Edit Source' : 'Add Source',
+      form.isEditing ? l.providerForm_editSource : l.providerForm_addSource,
       style: TextStyle(
         color: Colors.white,
         fontSize: fontSize,
@@ -358,57 +359,58 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
   }
 
   List<Widget> _buildFieldsForType(Responsive rs, ProviderFormState form) {
+    final l = L.of(context);
     switch (form.type) {
       case ProviderType.web:
         return [
-          _buildTextField(rs, 'url', 'URL', 'https://...', form),
+          _buildTextField(rs, 'url', l.providerForm_url, l.providerForm_urlPlaceholder, form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'path', 'Path', '/roms/nes/ (optional)', form),
+          _buildTextField(rs, 'path', l.providerForm_path, l.providerForm_pathPlaceholder, form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'user', 'Username', '(optional)', form),
+          _buildTextField(rs, 'user', l.providerForm_username, l.providerForm_usernameOptional, form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'pass', 'Password', '(optional)', form,
+          _buildTextField(rs, 'pass', l.providerForm_password, l.providerForm_usernameOptional, form,
               obscure: true),
         ];
       case ProviderType.ftp:
         return [
-          _buildTextField(rs, 'host', 'Host', '192.168.1.100', form),
+          _buildTextField(rs, 'host', l.providerForm_host, l.providerForm_hostPlaceholder, form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'port', 'Port', '21', form),
+          _buildTextField(rs, 'port', l.providerForm_port, '21', form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'path', 'Path', '/roms/nes/', form),
+          _buildTextField(rs, 'path', l.providerForm_path, '/roms/nes/', form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'user', 'Username', '(optional)', form),
+          _buildTextField(rs, 'user', l.providerForm_username, l.providerForm_usernameOptional, form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'pass', 'Password', '(optional)', form,
+          _buildTextField(rs, 'pass', l.providerForm_password, l.providerForm_usernameOptional, form,
               obscure: true),
         ];
       case ProviderType.smb:
         return [
-          _buildTextField(rs, 'host', 'Host', '192.168.1.100', form),
+          _buildTextField(rs, 'host', l.providerForm_host, l.providerForm_hostPlaceholder, form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'port', 'Port', '445', form),
+          _buildTextField(rs, 'port', l.providerForm_port, '445', form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'share', 'Share', 'roms', form),
+          _buildTextField(rs, 'share', l.providerForm_share, l.providerForm_sharePlaceholder, form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'path', 'Path', '/nes/', form),
+          _buildTextField(rs, 'path', l.providerForm_path, '/nes/', form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'user', 'Username', '(optional)', form),
+          _buildTextField(rs, 'user', l.providerForm_username, l.providerForm_usernameOptional, form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'pass', 'Password', '(optional)', form,
+          _buildTextField(rs, 'pass', l.providerForm_password, l.providerForm_usernameOptional, form,
               obscure: true),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'domain', 'Domain', '(optional)', form),
+          _buildTextField(rs, 'domain', l.providerForm_domain, l.providerForm_domainOptional, form),
         ];
       case ProviderType.romm:
         return [
-          _buildTextField(rs, 'url', 'URL', 'https://romm.example.com', form),
+          _buildTextField(rs, 'url', l.providerForm_rommUrl, l.providerForm_rommUrlPlaceholder, form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'apiKey', 'API Key', '(optional)', form),
+          _buildTextField(rs, 'apiKey', l.providerForm_apiKey, l.providerForm_apiKeyOptional, form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'user', 'Username', '(optional)', form),
+          _buildTextField(rs, 'user', l.providerForm_username, l.providerForm_usernameOptional, form),
           SizedBox(height: rs.spacing.sm),
-          _buildTextField(rs, 'pass', 'Password', '(optional)', form,
+          _buildTextField(rs, 'pass', l.providerForm_password, l.providerForm_usernameOptional, form,
               obscure: true),
         ];
     }
@@ -436,7 +438,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
           ),
           SizedBox(width: rs.spacing.sm),
           Text(
-            'Fetching platforms...',
+            L.of(context).providerForm_fetchingPlatforms,
             style: TextStyle(color: Colors.grey.shade400, fontSize: fontSize),
           ),
         ],
@@ -453,7 +455,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
       // Not fetched yet or empty
       if (state.connectionTestSuccess && platforms != null && platforms.isEmpty) {
         return Text(
-          'No platforms found on this RomM server.',
+          L.of(context).providerForm_noPlatformsFound,
           style: TextStyle(color: Colors.orange.shade300, fontSize: fontSize),
         );
       }
@@ -466,7 +468,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'PLATFORM',
+          L.of(context).providerForm_platform,
           style: TextStyle(
             color: Colors.grey.shade400,
             fontSize: labelFontSize,
@@ -539,7 +541,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
           isExpanded: true,
           dropdownColor: const Color(0xFF1A1A1A),
           hint: Text(
-            'Pick a platform...',
+            L.of(context).providerForm_pickPlatform,
             style: TextStyle(
               color: Colors.grey.shade700,
               fontSize: fontSize,

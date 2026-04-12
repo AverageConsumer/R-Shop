@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/input/input.dart';
+import '../../l10n/app_localizations.dart';
 import '../../core/responsive/responsive.dart';
 import '../../models/game_item.dart';
 import '../../models/game_metadata_info.dart';
@@ -148,7 +149,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
     final error = _controller?.state.error;
     if (error != null) {
-      showErrorNotification(context, ref, message: 'Error: $error');
+      showErrorNotification(context, ref, message: L.of(context).gameDetail_errorPrefix(error));
     }
   }
 
@@ -328,7 +329,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     if (controller.state.isOverlayOpen || controller.state.isSharing) return;
 
     if (!controller.state.isVariantInstalled) {
-      showConsoleNotification(context, message: 'Game is not installed');
+      showConsoleNotification(context, message: L.of(context).gameDetail_gameNotInstalled);
       ref.read(feedbackServiceProvider).cancel();
       return;
     }
@@ -352,7 +353,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     } catch (e) {
       debugPrint('Share failed: $e');
       if (mounted) {
-        showConsoleNotification(context, message: 'Could not share game file');
+        showConsoleNotification(context, message: L.of(context).gameDetail_couldNotShare);
       }
     } finally {
       controller.setSharing(false);
@@ -390,7 +391,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         context: context,
         ref: ref,
         shelves: containingShelves,
-        title: 'REMOVE FROM SHELF',
+        title: L.of(context).gameDetail_removeFromShelfTitle,
         onSelect: (shelfId) {
           final shelf = containingShelves.firstWhere((s) => s.id == shelfId);
           final matchesFilter = shelf.filterRules.any(
@@ -499,7 +500,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final raMatch = raMatches[variant.filename];
     return [
       QuickMenuItem(
-        label: isFavorite ? 'Unfavorite' : 'Favorite',
+        label: isFavorite ? L.of(context).common_unfavorite : L.of(context).common_favorite,
         icon: isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
         shortcutHint: '−',
         onSelect: _handleFavorite,
@@ -507,31 +508,31 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       ),
       if (metadata.allTags.isNotEmpty || hasDetails)
         QuickMenuItem(
-          label: 'Game Info',
+          label: L.of(context).gameDetail_gameInfo,
           icon: Icons.info_outline_rounded,
           onSelect: () => controller.openGameInfo(),
         ),
       if (raMatch != null && raMatch.hasMatch && raMatch.raGameId != null)
         QuickMenuItem(
-          label: 'Achievements',
+          label: L.of(context).gameDetail_achievements,
           icon: Icons.emoji_events_rounded,
           onSelect: () => _navigateToAchievements(raMatch),
         ),
       QuickMenuItem(
-        label: controller.state.showFullFilename ? 'Show Title' : 'Show Filename',
+        label: controller.state.showFullFilename ? L.of(context).gameDetail_showTitle : L.of(context).gameDetail_showFilename,
         icon: Icons.text_fields_rounded,
         onSelect: _handleFilenameToggle,
       ),
       if (hasAlternatives && !controller.state.isVariantInstalled) ...[
         null,
         QuickMenuItem(
-          label: 'from ${variant.providerConfig?.detailLabel ?? "Primary"}',
+          label: L.of(context).gameDetail_fromProvider(variant.providerConfig?.detailLabel ?? 'Primary'),
           icon: Icons.cloud_download_outlined,
           onSelect: () => controller.performAction(),
         ),
         for (final alt in variant.alternativeSources)
           QuickMenuItem(
-            label: 'from ${alt.providerConfig.detailLabel}',
+            label: L.of(context).gameDetail_fromProvider(alt.providerConfig.detailLabel),
             icon: Icons.cloud_download_outlined,
             onSelect: () => _downloadFromSource(alt),
           ),
@@ -546,7 +547,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               .toList();
           if (addable.isNotEmpty) {
             return QuickMenuItem(
-              label: 'Add to Shelf',
+              label: L.of(context).gameDetail_addToShelf,
               icon: Icons.shelves,
               onSelect: () {
                 showShelfPickerDialog(
@@ -566,14 +567,14 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                     variant.filename, variant.displayName, widget.system.id))
                 .toList();
             return QuickMenuItem(
-              label: 'Remove from Shelf',
+              label: L.of(context).gameDetail_removeFromShelf,
               icon: Icons.shelves,
               onSelect: () {
                 showShelfPickerDialog(
                   context: context,
                   ref: ref,
                   shelves: containing,
-                  title: 'REMOVE FROM SHELF',
+                  title: L.of(context).gameDetail_removeFromShelfTitle,
                   onSelect: (shelfId) {
                     final shelf = containing.firstWhere((s) => s.id == shelfId);
                     final matchesFilter = shelf.filterRules.any(
@@ -596,7 +597,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       if (hasDownloads) ...[
         null,
         QuickMenuItem(
-          label: 'Downloads',
+          label: L.of(context).common_downloads,
           icon: Icons.download_rounded,
           onSelect: () => toggleDownloadOverlay(ref),
           highlight: true,
@@ -1063,7 +1064,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         content = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionHeader(label: 'Achievements'),
+            SectionHeader(label: L.of(context).gameDetail_achievements),
             RaInfoSection(
               match: raMatch!,
               filename: controller.selectedVariant.filename,
@@ -1105,6 +1106,8 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   Widget _buildControls(GameDetailState state, GameDetailController controller) {
     if (showQuickMenu) return const SizedBox.shrink();
 
+    final l = L.of(context);
+
     // Context-sensitive A-button hint per focused section
     String aHint;
     final section = controller.focusedSection;
@@ -1116,18 +1119,18 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       case DetailSection.otherVersions:
         aHint = 'View';
       case DetailSection.primaryAction:
-        aHint = 'Select';
+        aHint = l.common_select;
       case DetailSection.actions:
         // Show hint based on focused icon button
         switch (state.actionButtonIndex) {
           case 0:
-            aHint = 'Favorite';
+            aHint = l.common_favorite;
           case 1:
             aHint = 'Share';
           case 2:
-            aHint = 'Add to Shelf';
+            aHint = l.gameDetail_addToShelf;
           default:
-            aHint = 'Select';
+            aHint = l.common_select;
         }
       case DetailSection.achievements:
         aHint = 'View';
@@ -1144,13 +1147,13 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         section == DetailSection.actions;
 
     return ConsoleHud(
-      b: HudAction('Back', onTap: () => Navigator.pop(context)),
+      b: HudAction(l.common_back, onTap: () => Navigator.pop(context)),
       a: aHint.isNotEmpty ? HudAction(aHint) : null,
       dpad: hasHorizontalNav
-          ? (label: '', action: 'Navigate')
+          ? (label: '', action: l.common_navigate)
           : null,
-      select: HudAction('Favorite', onTap: _handleFavorite),
-      start: HudAction('Menu', onTap: toggleQuickMenu),
+      select: HudAction(l.common_favorite, onTap: _handleFavorite),
+      start: HudAction(l.common_menu, onTap: toggleQuickMenu),
     );
   }
 
@@ -1305,10 +1308,11 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   }
 
   String _getButtonHintText(GameDetailState state, bool isMultiRom) {
+    final l = L.of(context);
     if (state.isAddingToQueue) return '';
-    if (isMultiRom) return 'Press A to pick a version';
-    if (state.isVariantInstalled) return 'Press A to manage';
-    return 'Press A to download';
+    if (isMultiRom) return l.gameDetail_pressAPickVersion;
+    if (state.isVariantInstalled) return l.gameDetail_pressAManage;
+    return l.gameDetail_pressADownload;
   }
 }
 

@@ -68,14 +68,19 @@ class ControlButton extends StatelessWidget {
           else
             svgWidget,
           SizedBox(width: spacing),
-          Text(
-            action,
-            style: TextStyle(
-              fontSize: actionFontSize,
-              color: highlight
-                  ? Colors.redAccent.withValues(alpha: 0.7)
-                  : Colors.white.withValues(alpha: 0.7),
-              letterSpacing: 0.5,
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: rs.isSmall ? 72 : 96),
+            child: Text(
+              action,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: actionFontSize,
+                color: highlight
+                    ? Colors.redAccent.withValues(alpha: 0.7)
+                    : Colors.white.withValues(alpha: 0.7),
+                letterSpacing: 0.5,
+              ),
             ),
           ),
         ],
@@ -153,14 +158,19 @@ class ControlButton extends StatelessWidget {
           ),
         ),
         SizedBox(width: spacing),
-        Text(
-          action,
-          style: TextStyle(
-            fontSize: actionFontSize,
-            color: highlight
-                ? Colors.redAccent.withValues(alpha: 0.7)
-                : Colors.white.withValues(alpha: 0.7),
-            letterSpacing: 0.5,
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: rs.isSmall ? 72 : 96),
+          child: Text(
+            action,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: actionFontSize,
+              color: highlight
+                  ? Colors.redAccent.withValues(alpha: 0.7)
+                  : Colors.white.withValues(alpha: 0.7),
+              letterSpacing: 0.5,
+            ),
           ),
         ),
       ],

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/ra_models.dart';
 import '../../../providers/ra_providers.dart';
 import '../../../services/database_service.dart';
@@ -27,6 +28,7 @@ class RaInfoSection extends ConsumerWidget {
     if (!match.hasMatch) return const SizedBox.shrink();
 
     final rs = context.rs;
+    final l = L.of(context);
     final progress = match.raGameId != null
         ? ref.watch(raGameProgressProvider(match.raGameId!))
         : null;
@@ -45,15 +47,15 @@ class RaInfoSection extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildHeader(rs),
+          _buildHeader(rs, l),
           SizedBox(height: rs.spacing.sm),
-          _buildMatchBadge(rs),
+          _buildMatchBadge(rs, l),
           if (progress != null)
             progress.when(
               data: (data) {
                 if (data != null && data.achievements.isNotEmpty) {
                   _persistMasteredIfNeeded(ref, data);
-                  return _buildProgressSection(rs, data);
+                  return _buildProgressSection(rs, data, l);
                 }
                 return const SizedBox.shrink();
               },
@@ -72,7 +74,7 @@ class RaInfoSection extends ConsumerWidget {
             ),
           if (onViewAchievements != null && match.raGameId != null) ...[
             SizedBox(height: rs.spacing.sm),
-            _buildViewButton(rs),
+            _buildViewButton(rs, l),
           ],
         ],
       ),
@@ -106,7 +108,7 @@ class RaInfoSection extends ConsumerWidget {
     });
   }
 
-  Widget _buildHeader(Responsive rs) {
+  Widget _buildHeader(Responsive rs, L l) {
     final iconSize = rs.isSmall ? 28.0 : 36.0;
     final titleFontSize = rs.isSmall ? 10.0 : 12.0;
     final subtitleFontSize = rs.isSmall ? 8.0 : 9.0;
@@ -163,7 +165,7 @@ class RaInfoSection extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'RETROACHIEVEMENTS',
+                l.gameDetail_retroachievements,
                 style: TextStyle(
                   fontSize: subtitleFontSize,
                   fontWeight: FontWeight.w700,
@@ -197,20 +199,20 @@ class RaInfoSection extends ConsumerWidget {
     );
   }
 
-  Widget _buildMatchBadge(Responsive rs) {
+  Widget _buildMatchBadge(Responsive rs, L l) {
     final (String label, Color color, IconData icon) = switch (match.type) {
       RaMatchType.hashVerified => (
-          'ROM Verified',
+          l.gameDetail_romVerified,
           Colors.greenAccent,
           Icons.verified,
         ),
       RaMatchType.hashIncompatible => (
-          'Incompatible ROM',
+          l.gameDetail_incompatibleRom,
           Colors.redAccent,
           Icons.warning_amber_rounded,
         ),
       RaMatchType.nameMatch => (
-          'Game Has Achievements',
+          l.gameDetail_gameHasAchievements,
           const Color(0xFFFFD54F),
           Icons.emoji_events_outlined,
         ),
@@ -249,7 +251,7 @@ class RaInfoSection extends ConsumerWidget {
     );
   }
 
-  Widget _buildProgressSection(Responsive rs, RaGameProgress progress) {
+  Widget _buildProgressSection(Responsive rs, RaGameProgress progress, L l) {
     final earned = progress.earnedCount;
     final total = progress.numAchievements;
     final pct = progress.completionPercent;
@@ -261,7 +263,7 @@ class RaInfoSection extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (isMastered) _buildMasteredBanner(rs),
+          if (isMastered) _buildMasteredBanner(rs, l),
           Row(
             children: [
               Text(
@@ -316,7 +318,7 @@ class RaInfoSection extends ConsumerWidget {
     );
   }
 
-  Widget _buildMasteredBanner(Responsive rs) {
+  Widget _buildMasteredBanner(Responsive rs, L l) {
     final fontSize = rs.isSmall ? 9.0 : 11.0;
     return Padding(
       padding: EdgeInsets.only(bottom: rs.spacing.sm),
@@ -342,7 +344,7 @@ class RaInfoSection extends ConsumerWidget {
             ),
             SizedBox(width: rs.isSmall ? 4 : 6),
             Text(
-              'MASTERED',
+              l.gameDetail_mastered,
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w700,
@@ -356,7 +358,7 @@ class RaInfoSection extends ConsumerWidget {
     );
   }
 
-  Widget _buildViewButton(Responsive rs) {
+  Widget _buildViewButton(Responsive rs, L l) {
     final fontSize = rs.isSmall ? 9.0 : 10.0;
 
     return GestureDetector(
@@ -381,7 +383,7 @@ class RaInfoSection extends ConsumerWidget {
             ),
             SizedBox(width: rs.isSmall ? 4 : 5),
             Text(
-              'View Achievements',
+              l.gameDetail_viewAchievements,
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w600,

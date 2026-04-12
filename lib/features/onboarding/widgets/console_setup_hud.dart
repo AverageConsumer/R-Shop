@@ -1,4 +1,6 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../providers/app_providers.dart';
 import '../../../widgets/console_hud.dart';
 import '../onboarding_controller.dart';
@@ -20,15 +22,17 @@ bool isNonLanHttpBlocked(OnboardingState state, WidgetRef ref) {
 ConsoleHud? buildConsoleSetupHud({
   required OnboardingState state,
   required WidgetRef ref,
+  required BuildContext context,
 }) {
+  final l = L.of(context);
   final controller = ref.read(onboardingControllerProvider.notifier);
 
   if (state.hasProviderForm) {
     final isBlocked = state.isTestingConnection || isNonLanHttpBlocked(state, ref);
     return ConsoleHud(
-      b: HudAction('Cancel', onTap: controller.cancelProviderForm),
+      b: HudAction(l.common_cancel, onTap: controller.cancelProviderForm),
       y: HudAction(
-        'Test & Save',
+        l.providerForm_testAndSave,
         onTap: isBlocked ? null : controller.testAndSaveProvider,
       ),
     );
@@ -38,7 +42,7 @@ ConsoleHud? buildConsoleSetupHud({
     // Source add/remove/reorder lives in Settings → Sources now;
     // this panel only handles system-level options.
     return ConsoleHud(
-      b: HudAction('Close', onTap: controller.deselectConsole),
+      b: HudAction(l.common_close, onTap: controller.deselectConsole),
     );
   }
 

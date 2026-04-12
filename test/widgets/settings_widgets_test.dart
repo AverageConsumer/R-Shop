@@ -1,21 +1,19 @@
-import 'dart:io';
-
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:retro_eshop/features/settings/widgets/about_tab.dart';
 import 'package:retro_eshop/features/settings/widgets/device_info_card.dart';
-import 'package:retro_eshop/features/settings/widgets/preferences_tab.dart';
+import 'package:retro_eshop/features/settings/widgets/general_tab.dart';
+import 'package:retro_eshop/features/settings/widgets/settings_switch.dart';
 import 'package:retro_eshop/features/settings/widgets/settings_tabs.dart';
-import 'package:retro_eshop/features/settings/widgets/system_tab.dart';
+import 'package:retro_eshop/models/sound_settings.dart';
 import 'package:retro_eshop/providers/app_providers.dart';
 import 'package:retro_eshop/services/audio_manager.dart';
-import 'package:retro_eshop/services/cover_preload_service.dart';
-import 'package:retro_eshop/services/crash_log_service.dart';
 import 'package:retro_eshop/services/device_info_service.dart';
 import 'package:retro_eshop/services/feedback_service.dart';
 import 'package:retro_eshop/services/haptic_service.dart';
+import 'package:retro_eshop/services/storage_service.dart';
 import '../helpers/pump_helpers.dart';
 
 // ─── Fakes ───────────────────────────────────────────────
@@ -38,12 +36,59 @@ class _FakeHapticService extends HapticService {
   void success() {}
 }
 
-class _FakeCrashLogService extends CrashLogService {
-  final File? _file;
-  _FakeCrashLogService({File? logFile}) : _file = logFile;
+class _FakeStorageService extends StorageService {
+  _FakeStorageService() : super();
 
   @override
-  File? getLogFile() => _file;
+  Future<void> init() async {}
+
+  @override
+  bool getHapticEnabled() => true;
+  @override
+  Future<void> setHapticEnabled(bool enabled) async {}
+  @override
+  bool getHideEmptyConsoles() => false;
+  @override
+  Future<void> setHideEmptyConsoles(bool value) async {}
+  @override
+  bool getAllowNonLanHttp() => false;
+  @override
+  Future<void> setAllowNonLanHttp(bool allowed) async {}
+  @override
+  ControllerLayout getControllerLayout() => ControllerLayout.nintendo;
+  @override
+  Future<void> setControllerLayout(ControllerLayout layout) async {}
+  @override
+  bool getHomeLayoutIsGrid() => false;
+  @override
+  Future<void> setHomeLayoutIsGrid(bool value) async {}
+  @override
+  String? getLocaleOverride() => null;
+  @override
+  Future<void> setLocaleOverride(String? code) async {}
+  @override
+  int getSyncTimeoutSeconds() => 60;
+  @override
+  Future<void> setSyncTimeoutSeconds(int value) async {}
+  @override
+  int getSyncCooldownMinutes() => 60;
+  @override
+  Future<void> setSyncCooldownMinutes(int value) async {}
+  @override
+  int getMaxConcurrentDownloads() => 2;
+  @override
+  Future<void> setMaxConcurrentDownloads(int value) async {}
+  @override
+  SoundSettings getSoundSettings() =>
+      const SoundSettings(enabled: true, bgmVolume: 0.5, sfxVolume: 0.5);
+  @override
+  Future<void> setSoundSettings(SoundSettings settings) async {}
+  @override
+  List<String> getFavorites() => [];
+  @override
+  Future<void> setFavorites(List<String> favorites) async {}
+  @override
+  bool isRaConfigured = false;
 }
 
 // ─── Tests ───────────────────────────────────────────────
@@ -52,15 +97,16 @@ void main() {
   // ─── SettingsTabs ────────────────────────────────────────
 
   group('SettingsTabs', () {
-    const tabs = ['Preferences', 'Systems', 'About'];
+    const tabs = ['General', 'Audio', 'Advanced', 'About'];
 
     testWidgets('renders all tab labels in uppercase', (tester) async {
       await tester.pumpWidget(createTestApp(
         const SettingsTabs(selectedTab: 0, tabs: tabs),
       ));
 
-      expect(find.text('PREFERENCES'), findsOneWidget);
-      expect(find.text('SYSTEMS'), findsOneWidget);
+      expect(find.text('GENERAL'), findsOneWidget);
+      expect(find.text('AUDIO'), findsOneWidget);
+      expect(find.text('ADVANCED'), findsOneWidget);
       expect(find.text('ABOUT'), findsOneWidget);
     });
 
@@ -69,8 +115,8 @@ void main() {
         const SettingsTabs(selectedTab: 1, tabs: tabs),
       ));
 
-      final systemsText = tester.widget<Text>(find.text('SYSTEMS'));
-      expect(systemsText.style!.fontWeight, FontWeight.w700);
+      final audioText = tester.widget<Text>(find.text('AUDIO'));
+      expect(audioText.style!.fontWeight, FontWeight.w700);
     });
 
     testWidgets('inactive tab has normal weight text', (tester) async {
@@ -78,8 +124,8 @@ void main() {
         const SettingsTabs(selectedTab: 1, tabs: tabs),
       ));
 
-      final prefsText = tester.widget<Text>(find.text('PREFERENCES'));
-      expect(prefsText.style!.fontWeight, FontWeight.w500);
+      final generalText = tester.widget<Text>(find.text('GENERAL'));
+      expect(generalText.style!.fontWeight, FontWeight.w500);
     });
 
     testWidgets('active tab text uses accent color', (tester) async {
@@ -91,8 +137,8 @@ void main() {
         ),
       ));
 
-      final prefsText = tester.widget<Text>(find.text('PREFERENCES'));
-      expect(prefsText.style!.color, Colors.cyanAccent);
+      final generalText = tester.widget<Text>(find.text('GENERAL'));
+      expect(generalText.style!.color, Colors.cyanAccent);
     });
 
     testWidgets('inactive tab text is grey', (tester) async {
@@ -114,11 +160,11 @@ void main() {
         ),
       ));
 
-      await tester.tap(find.text('SYSTEMS'));
+      await tester.tap(find.text('AUDIO'));
       expect(tappedIndex, 1);
     });
 
-    testWidgets('tapping third tab fires index 2', (tester) async {
+    testWidgets('tapping About tab fires index 3', (tester) async {
       int? tappedIndex;
       await tester.pumpWidget(createTestApp(
         SettingsTabs(
@@ -129,7 +175,7 @@ void main() {
       ));
 
       await tester.tap(find.text('ABOUT'));
-      expect(tappedIndex, 2);
+      expect(tappedIndex, 3);
     });
 
     testWidgets('custom accentColor is used for active tab', (tester) async {
@@ -141,155 +187,17 @@ void main() {
         ),
       ));
 
-      final prefsText = tester.widget<Text>(find.text('PREFERENCES'));
-      expect(prefsText.style!.color, Colors.redAccent);
+      final generalText = tester.widget<Text>(find.text('GENERAL'));
+      expect(generalText.style!.color, Colors.redAccent);
     });
   });
 
-  // ─── SettingsPreferencesTab ─────────────────────────────
+  // ─── SettingsGeneralTab ─────────────────────────────────
 
-  group('SettingsPreferencesTab', () {
-    late FocusNode homeNode, layoutNode, hapticNode, hideEmptyNode;
-    late FeedbackService fakeFeedback;
-
-    setUp(() {
-      homeNode = FocusNode();
-      layoutNode = FocusNode();
-      hapticNode = FocusNode();
-      hideEmptyNode = FocusNode();
-      fakeFeedback = FeedbackService(
-        _FakeAudioManager(),
-        _FakeHapticService(),
-      );
-    });
-
-    tearDown(() {
-      homeNode.dispose();
-      layoutNode.dispose();
-      hapticNode.dispose();
-      hideEmptyNode.dispose();
-    });
-
-    Widget buildTab({
-      ControllerLayout layout = ControllerLayout.nintendo,
-      bool isHomeGrid = false,
-      bool hapticEnabled = true,
-      bool soundEnabled = true,
-      bool hideEmptyConsoles = false,
-      double bgmVolume = 0.5,
-      double sfxVolume = 0.5,
-      VoidCallback? onToggleHomeLayout,
-      VoidCallback? onCycleLayout,
-      VoidCallback? onToggleHaptic,
-      VoidCallback? onToggleSound,
-      VoidCallback? onToggleHideEmpty,
-    }) {
-      return createTestAppWithProviders(
-        SettingsPreferencesTab(
-          controllerLayout: layout,
-          isHomeGrid: isHomeGrid,
-          hapticEnabled: hapticEnabled,
-          soundEnabled: soundEnabled,
-          hideEmptyConsoles: hideEmptyConsoles,
-          bgmVolume: bgmVolume,
-          sfxVolume: sfxVolume,
-          homeLayoutFocusNode: homeNode,
-          layoutFocusNode: layoutNode,
-          hapticFocusNode: hapticNode,
-          hideEmptyFocusNode: hideEmptyNode,
-          onToggleHomeLayout: onToggleHomeLayout ?? () {},
-          onCycleLayout: onCycleLayout ?? () {},
-          onToggleHaptic: onToggleHaptic ?? () {},
-          onToggleSound: onToggleSound ?? () {},
-          onToggleHideEmpty: onToggleHideEmpty ?? () {},
-          onAdjustBgmVolume: (_) {},
-          onAdjustSfxVolume: (_) {},
-          onSetBgmVolume: (_) {},
-          onSetSfxVolume: (_) {},
-        ),
-        overrides: [
-          feedbackServiceProvider.overrideWithValue(fakeFeedback),
-        ],
-      );
-    }
-
-    testWidgets('renders all setting titles', (tester) async {
-      await tester.pumpWidget(buildTab());
-
-      expect(find.text('HOME SCREEN LAYOUT'), findsOneWidget);
-      expect(find.text('HIDE EMPTY CONSOLES'), findsOneWidget);
-      expect(find.text('CONTROLLER LAYOUT'), findsOneWidget);
-      expect(find.text('HAPTIC FEEDBACK'), findsOneWidget);
-      expect(find.text('SOUND EFFECTS'), findsOneWidget);
-      expect(find.text('BACKGROUND MUSIC'), findsOneWidget);
-      expect(find.text('SFX VOLUME'), findsOneWidget);
-    });
-
-    testWidgets('shows carousel subtitle when not grid', (tester) async {
-      await tester.pumpWidget(buildTab(isHomeGrid: false));
-      expect(find.text('Horizontal Carousel'), findsOneWidget);
-    });
-
-    testWidgets('shows grid view subtitle when grid', (tester) async {
-      await tester.pumpWidget(buildTab(isHomeGrid: true));
-      expect(find.text('Grid View'), findsOneWidget);
-    });
-
-    testWidgets('shows Nintendo layout label', (tester) async {
-      await tester.pumpWidget(
-          buildTab(layout: ControllerLayout.nintendo));
-      expect(find.text('NIN'), findsOneWidget);
-      expect(find.text('Nintendo (default)'), findsOneWidget);
-    });
-
-    testWidgets('shows Xbox layout label', (tester) async {
-      await tester.pumpWidget(buildTab(layout: ControllerLayout.xbox));
-      expect(find.text('XBOX'), findsOneWidget);
-    });
-
-    testWidgets('shows PlayStation layout label', (tester) async {
-      await tester.pumpWidget(
-          buildTab(layout: ControllerLayout.playstation));
-      expect(find.text('PS'), findsOneWidget);
-    });
-
-    testWidgets('onToggleHomeLayout fires on tap', (tester) async {
-      bool toggled = false;
-      await tester.pumpWidget(
-          buildTab(onToggleHomeLayout: () => toggled = true));
-
-      // Find the SettingsItem for Home Screen Layout and tap it
-      await tester.tap(find.text('HOME SCREEN LAYOUT'));
-      await tester.pumpAndSettle();
-      expect(toggled, true);
-    });
-
-    testWidgets('onToggleHaptic fires on tap', (tester) async {
-      bool toggled = false;
-      await tester.pumpWidget(
-          buildTab(onToggleHaptic: () => toggled = true));
-
-      await tester.tap(find.text('HAPTIC FEEDBACK'));
-      await tester.pumpAndSettle();
-      expect(toggled, true);
-    });
-
-    testWidgets('renders volume sliders', (tester) async {
-      await tester.pumpWidget(buildTab(bgmVolume: 0.8, sfxVolume: 0.3));
-
-      // Volume settings should be present (titles are uppercased by SettingsItem)
-      expect(find.text('BACKGROUND MUSIC'), findsOneWidget);
-      expect(find.text('SFX VOLUME'), findsOneWidget);
-      expect(find.text('Ambient background music volume'), findsOneWidget);
-      expect(find.text('Interface sound effects volume'), findsOneWidget);
-    });
-  });
-
-  // ─── SettingsSystemTab ──────────────────────────────────
-
-  group('SettingsSystemTab', () {
+  group('SettingsGeneralTab', () {
     late FocusNode firstNode;
     late FeedbackService fakeFeedback;
+    late _FakeStorageService fakeStorage;
 
     setUp(() {
       firstNode = FocusNode();
@@ -297,112 +205,88 @@ void main() {
         _FakeAudioManager(),
         _FakeHapticService(),
       );
+      fakeStorage = _FakeStorageService();
     });
 
     tearDown(() => firstNode.dispose());
 
-    Widget buildSystemTab({
-      int maxDownloads = 2,
-      bool allowNonLanHttp = false,
-      String coverSubtitle = 'Download covers for all games',
-      File? logFile,
-    }) {
+    Widget buildTab() {
       return createTestAppWithProviders(
-        SettingsSystemTab(
-          firstSystemTabNode: firstNode,
-          maxDownloads: maxDownloads,
-          syncTimeout: 60,
-          syncCooldown: 60,
-          allowNonLanHttp: allowNonLanHttp,
-          coverSubtitle: coverSubtitle,
-          onOpenPairing: () {},
-          onOpenRaConfig: () {},
-          onOpenConfigMode: () {},
-          onStartCoverPreload: () {},
-          onExportErrorLog: () {},
-          onAdjustMaxDownloads: (_) {},
-          onCycleSyncTimeout: () {},
-          onCycleSyncCooldown: () {},
-          onToggleAllowNonLanHttp: () {},
-        ),
+        SettingsGeneralTab(firstFocusNode: firstNode),
         overrides: [
+          storageServiceProvider.overrideWithValue(fakeStorage),
           feedbackServiceProvider.overrideWithValue(fakeFeedback),
-          crashLogServiceProvider
-              .overrideWithValue(_FakeCrashLogService(logFile: logFile)),
-          coverPreloadServiceProvider.overrideWith(
-            (ref) => CoverPreloadService(),
-          ),
+          hapticServiceProvider.overrideWithValue(_FakeHapticService()),
+          audioManagerProvider.overrideWithValue(_FakeAudioManager()),
         ],
       );
     }
 
-    testWidgets('renders Sources item', (tester) async {
-      await tester.pumpWidget(buildSystemTab());
-      // SettingsItem uppercases titles
-      expect(find.text('SOURCES'), findsOneWidget);
-      expect(find.text('Manage RomM, SMB, FTP and Web sources'),
+    testWidgets('renders Library section header', (tester) async {
+      await tester.pumpWidget(buildTab());
+      expect(find.text('LIBRARY'), findsOneWidget);
+    });
+
+    testWidgets('renders Display section header', (tester) async {
+      await tester.pumpWidget(buildTab());
+      expect(find.text('DISPLAY'), findsOneWidget);
+    });
+
+    testWidgets('renders My Sources navigation tile', (tester) async {
+      await tester.pumpWidget(buildTab());
+      expect(find.text('My Sources'), findsOneWidget);
+      expect(find.text('Add or manage RomM, SMB, FTP servers'),
           findsOneWidget);
     });
 
-    testWidgets('renders RetroAchievements item', (tester) async {
-      await tester.pumpWidget(buildSystemTab());
-      expect(find.text('RETROACHIEVEMENTS'), findsOneWidget);
+    testWidgets('renders Console Settings navigation tile', (tester) async {
+      await tester.pumpWidget(buildTab());
+      expect(find.text('Console Settings'), findsOneWidget);
     });
 
-    testWidgets('renders Max Concurrent Downloads with counter',
-        (tester) async {
-      await tester.pumpWidget(buildSystemTab(maxDownloads: 3));
-      expect(find.text('MAX CONCURRENT DOWNLOADS'), findsOneWidget);
-      expect(find.text('3'), findsOneWidget);
+    testWidgets('renders RetroAchievements navigation tile', (tester) async {
+      await tester.pumpWidget(buildTab());
+      expect(find.text('RetroAchievements'), findsOneWidget);
     });
 
-    testWidgets('renders Allow HTTP toggle', (tester) async {
-      await tester.pumpWidget(buildSystemTab());
-      expect(
-          find.text('ALLOW HTTP FOR EXTERNAL SERVERS', skipOffstage: false),
-          findsOneWidget);
+    testWidgets('renders Home Layout toggle', (tester) async {
+      await tester.pumpWidget(buildTab());
+      expect(find.text('HOME LAYOUT'), findsOneWidget);
+      expect(find.text('Horizontal Carousel'), findsOneWidget);
     });
 
-    testWidgets('renders Edit Systems item', (tester) async {
-      await tester.pumpWidget(buildSystemTab());
-      expect(find.text('EDIT SYSTEMS'), findsOneWidget);
+    testWidgets('renders Hide Empty Consoles toggle', (tester) async {
+      await tester.pumpWidget(buildTab());
+      expect(find.text('HIDE EMPTY CONSOLES'), findsOneWidget);
     });
 
-    testWidgets('renders Fetch All Covers when idle', (tester) async {
-      await tester.pumpWidget(buildSystemTab(
-        coverSubtitle: 'Pre-load box art for all configured systems',
-      ));
-      expect(find.text('FETCH ALL COVERS', skipOffstage: false), findsOneWidget);
+    testWidgets('renders Controller Buttons cycle', (tester) async {
+      await tester.pumpWidget(buildTab());
+      expect(find.text('CONTROLLER BUTTONS'), findsOneWidget);
+      expect(find.text('NIN'), findsOneWidget);
     });
 
-    testWidgets('shows Export Error Log when log file exists',
-        (tester) async {
-      final tempDir = Directory.systemTemp.createTempSync('rshop_test_');
-      final logFile = File('${tempDir.path}/test.log')
-        ..writeAsStringSync('error log');
-      try {
-        await tester.pumpWidget(buildSystemTab(logFile: logFile));
-        // Scroll to reveal items at the bottom of the ListView
-        await tester.scrollUntilVisible(
-          find.text('EXPORT ERROR LOG'),
-          200,
-          scrollable: find.byType(Scrollable).first,
-        );
-        expect(find.text('EXPORT ERROR LOG'), findsOneWidget);
-      } finally {
-        tempDir.deleteSync(recursive: true);
-      }
+    testWidgets('has chevron icons for nav tiles', (tester) async {
+      await tester.pumpWidget(buildTab());
+      expect(find.byIcon(Icons.chevron_right), findsNWidgets(3));
+    });
+  });
+
+  // ─── SettingsSwitch ────────────────────────────────────
+
+  group('SettingsSwitch', () {
+    testWidgets('renders on state', (tester) async {
+      await tester.pumpWidget(
+        createTestApp(const SettingsSwitch(value: true)),
+      );
+      expect(find.byType(AnimatedContainer), findsWidgets);
     });
 
-    testWidgets('hides Export Error Log when no log file', (tester) async {
-      await tester.pumpWidget(buildSystemTab());
-      expect(find.text('EXPORT ERROR LOG', skipOffstage: false), findsNothing);
-    });
-
-    testWidgets('displays sync timeout value', (tester) async {
-      await tester.pumpWidget(buildSystemTab(maxDownloads: 2));
-      expect(find.text('SYNC TIMEOUT'), findsOneWidget);
-      expect(find.text('1 min'), findsOneWidget);
+    testWidgets('renders off state', (tester) async {
+      await tester.pumpWidget(
+        createTestApp(const SettingsSwitch(value: false)),
+      );
+      expect(find.byType(AnimatedContainer), findsWidgets);
     });
   });
 
@@ -448,14 +332,13 @@ void main() {
 
     testWidgets('renders GitHub link', (tester) async {
       await tester.pumpWidget(buildAboutTab());
-      // SettingsItem uppercases titles
-      expect(find.text('GITHUB'), findsOneWidget);
+      expect(find.text('GitHub'), findsOneWidget);
       expect(find.text('View source code on GitHub'), findsOneWidget);
     });
 
     testWidgets('renders Issues link', (tester) async {
       await tester.pumpWidget(buildAboutTab());
-      expect(find.text('ISSUES'), findsOneWidget);
+      expect(find.text('Issues'), findsOneWidget);
       expect(find.text('Report bugs or request features'), findsOneWidget);
     });
 

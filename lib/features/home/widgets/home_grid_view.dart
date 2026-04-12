@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/system_model.dart';
 import '../../../providers/game_providers.dart';
 
@@ -217,7 +218,7 @@ class HomeGridView extends ConsumerWidget {
                             ),
                           ),
                         Text(
-                          'ALL GAMES',
+                          L.of(context).home_allGames,
                           style: TextStyle(
                             fontSize: titleFontSize,
                             fontWeight: FontWeight.w600,
@@ -234,7 +235,7 @@ class HomeGridView extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          'Library',
+                          L.of(context).home_library,
                           style: TextStyle(
                             fontSize: subFontSize,
                             color: accentColor.withValues(alpha: 0.7),

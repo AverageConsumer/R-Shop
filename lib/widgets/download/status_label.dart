@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/responsive/responsive.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/download_item.dart';
 
 /// Status label (Downloading, Queued, etc.)
@@ -10,19 +11,23 @@ class StatusLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
-    final (label, color, icon) = _getInfo();
+    final (label, color, icon) = _getInfo(L.of(context));
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, color: color, size: rs.isSmall ? 12 : 14),
         const SizedBox(width: 3),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: rs.isSmall ? 10 : 12,
-            fontWeight: FontWeight.w500,
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color,
+              fontSize: rs.isSmall ? 10 : 12,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
         if (item.isActive && item.speedText != null) ...[
@@ -47,22 +52,22 @@ class StatusLabel extends StatelessWidget {
     );
   }
 
-  (String, Color, IconData) _getInfo() {
+  (String, Color, IconData) _getInfo(L l) {
     switch (item.status) {
       case DownloadStatus.downloading:
-        return ('Downloading...', Colors.green, Icons.arrow_downward_rounded);
+        return (l.downloadStatus_downloading, Colors.green, Icons.arrow_downward_rounded);
       case DownloadStatus.extracting:
-        return ('Extracting...', Colors.amber, Icons.unarchive_rounded);
+        return (l.downloadStatus_extracting, Colors.amber, Icons.unarchive_rounded);
       case DownloadStatus.moving:
-        return ('Installing...', Colors.amber, Icons.drive_file_move_rounded);
+        return (l.downloadStatus_installing, Colors.amber, Icons.drive_file_move_rounded);
       case DownloadStatus.queued:
-        return ('Waiting...', Colors.white38, Icons.schedule_rounded);
+        return (l.downloadStatus_waiting, Colors.white38, Icons.schedule_rounded);
       case DownloadStatus.completed:
-        return ('Complete', Colors.green, Icons.check_circle_rounded);
+        return (l.downloadStatus_complete, Colors.green, Icons.check_circle_rounded);
       case DownloadStatus.cancelled:
-        return ('Cancelled', Colors.grey, Icons.cancel_rounded);
+        return (l.downloadStatus_cancelled, Colors.grey, Icons.cancel_rounded);
       case DownloadStatus.error:
-        return ('Failed', Colors.red, Icons.error_rounded);
+        return (l.downloadStatus_failed, Colors.red, Icons.error_rounded);
     }
   }
 }

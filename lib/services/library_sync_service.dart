@@ -117,6 +117,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
       isSyncing: true,
       totalSystems: config.systems.length,
       completedSystems: 0,
+      isUserTriggered: true,
     );
 
     final db = DatabaseService();
@@ -159,7 +160,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           } else {
             games = remoteGames;
           }
-          await db.saveGames(systemConfig.id, games, deleteOrphans: true);
+          await db.saveGames(systemConfig.id, games,
+              deleteOrphans: true, forceDeleteOrphans: true);
           perSystem[systemConfig.id] = games.length;
           totalGames += games.length;
         }
@@ -563,7 +565,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         } else {
           games = remoteGames;
         }
-        await db.saveGames(systemConfig.id, games, deleteOrphans: true);
+        await db.saveGames(systemConfig.id, games,
+            deleteOrphans: true, forceDeleteOrphans: true);
       }
 
       final perSystem = Map<String, int>.of(state.gamesPerSystem);

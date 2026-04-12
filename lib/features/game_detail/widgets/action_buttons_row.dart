@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import 'download_action_button.dart';
 
 /// Action section split into two independently focusable parts:
@@ -162,6 +163,7 @@ class _PrimaryActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+    final l = L.of(context);
     final isMulti = variantCount != null && variantCount! > 1;
 
     final Color bgColor;
@@ -176,31 +178,31 @@ class _PrimaryActionButton extends StatelessWidget {
         borderColor = accentColor.withValues(alpha: isFocused ? 0.7 : 0.4);
         textColor = accentColor;
         icon = Icons.download_rounded;
-        label = isMulti ? 'MANAGE FILES' : 'DOWNLOAD';
+        label = isMulti ? l.gameDetail_manageFiles : l.gameDetail_download;
       case DownloadButtonState.adding:
         bgColor = accentColor.withValues(alpha: 0.1);
         borderColor = accentColor.withValues(alpha: 0.3);
         textColor = accentColor.withValues(alpha: 0.7);
         icon = Icons.download_rounded;
-        label = 'ADDING...';
+        label = l.gameDetail_adding;
       case DownloadButtonState.delete:
         bgColor = Colors.red.withValues(alpha: isFocused ? 0.18 : 0.1);
         borderColor = Colors.red.withValues(alpha: isFocused ? 0.5 : 0.3);
         textColor = Colors.redAccent;
         icon = Icons.delete_outline_rounded;
-        label = 'DELETE';
+        label = l.gameDetail_delete;
       case DownloadButtonState.installed:
         bgColor = accentColor.withValues(alpha: isFocused ? 0.2 : 0.1);
         borderColor = accentColor.withValues(alpha: isFocused ? 0.6 : 0.3);
         textColor = accentColor;
         icon = Icons.folder_open_rounded;
-        label = 'MANAGE FILES';
+        label = l.gameDetail_manageFiles;
       case DownloadButtonState.unavailable:
         bgColor = Colors.white.withValues(alpha: 0.04);
         borderColor = Colors.white.withValues(alpha: 0.08);
         textColor = Colors.white.withValues(alpha: 0.3);
         icon = Icons.block_rounded;
-        label = 'UNAVAILABLE';
+        label = l.gameDetail_unavailable;
     }
 
     final isDisabled = state == DownloadButtonState.adding ||

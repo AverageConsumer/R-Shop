@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/storage_service.dart';
@@ -292,6 +293,35 @@ final hideEmptyConsolesProvider =
   return HideEmptyConsolesNotifier(storage);
 });
 
+// ==========================================
+// Locale Override (null = system default)
+// ==========================================
+class LocaleNotifier extends StateNotifier<Locale?> {
+  final StorageService _storage;
+
+  LocaleNotifier(this._storage) : super(_initLocale(_storage));
+
+  static Locale? _initLocale(StorageService s) {
+    final code = s.getLocaleOverride();
+    return code == null ? null : Locale(code);
+  }
+
+  Future<void> cycle(List<Locale> supported) async {
+    final codes = [null, ...supported.map((l) => l.languageCode)];
+    final current = state?.languageCode;
+    final idx = codes.indexOf(current);
+    final next = codes[(idx + 1) % codes.length];
+    state = next == null ? null : Locale(next);
+    await _storage.setLocaleOverride(next);
+  }
+}
+
+final localeProvider =
+    StateNotifierProvider<LocaleNotifier, Locale?>((ref) {
+  final storage = ref.read(storageServiceProvider);
+  return LocaleNotifier(storage);
+});
+
 final favoriteGamesProvider =
     StateNotifierProvider<FavoriteGamesNotifier, List<String>>((ref) {
   return FavoriteGamesNotifier(ref.read(storageServiceProvider));
@@ -361,6 +391,52 @@ String formatSyncCooldown(int minutes) => switch (minutes) {
       360 => '6 hours',
       _ => '${minutes}m',
     };
+
+// --- Haptic Enabled ---
+
+class HapticEnabledNotifier extends StateNotifier<bool> {
+  final StorageService _storage;
+  final HapticService _haptic;
+
+  HapticEnabledNotifier(this._storage, this._haptic)
+      : super(_storage.getHapticEnabled());
+
+  Future<void> toggle() async {
+    final newValue = !state;
+    state = newValue;
+    _haptic.setEnabled(newValue);
+    await _storage.setHapticEnabled(newValue);
+    if (newValue) _haptic.tick();
+  }
+}
+
+final hapticEnabledProvider =
+    StateNotifierProvider<HapticEnabledNotifier, bool>((ref) {
+  return HapticEnabledNotifier(
+    ref.read(storageServiceProvider),
+    ref.read(hapticServiceProvider),
+  );
+});
+
+// --- Allow Non-LAN HTTP ---
+
+class AllowNonLanHttpNotifier extends StateNotifier<bool> {
+  final StorageService _storage;
+
+  AllowNonLanHttpNotifier(this._storage)
+      : super(_storage.getAllowNonLanHttp());
+
+  Future<void> toggle() async {
+    final newValue = !state;
+    state = newValue;
+    await _storage.setAllowNonLanHttp(newValue);
+  }
+}
+
+final allowNonLanHttpProvider =
+    StateNotifierProvider<AllowNonLanHttpNotifier, bool>((ref) {
+  return AllowNonLanHttpNotifier(ref.read(storageServiceProvider));
+});
 
 final deviceMemoryProvider = Provider<DeviceMemoryInfo>((ref) {
   throw UnimplementedError('Must be overridden in main.dart');

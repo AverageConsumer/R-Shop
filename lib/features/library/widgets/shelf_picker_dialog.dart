@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/input/overlay_scope.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/custom_shelf.dart';
 import '../../../providers/app_providers.dart';
 
@@ -12,7 +13,7 @@ void showShelfPickerDialog({
   required WidgetRef ref,
   required List<CustomShelf> shelves,
   required void Function(String shelfId) onSelect,
-  String title = 'ADD TO SHELF',
+  String? title,
 }) {
   showDialog(
     context: context,
@@ -20,7 +21,7 @@ void showShelfPickerDialog({
     builder: (ctx) => _ShelfPickerDialog(
       shelves: shelves,
       onSelect: onSelect,
-      title: title,
+      title: title ?? L.of(ctx).shelfPicker_title,
     ),
   );
 }

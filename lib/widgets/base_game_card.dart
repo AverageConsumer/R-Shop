@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/responsive/responsive.dart';
+import '../l10n/app_localizations.dart';
 import '../models/ra_models.dart';
 import 'installed_indicator.dart';
 import 'smart_cover_image.dart';
@@ -243,7 +244,7 @@ class BaseGameCard extends StatelessWidget {
                             children: [
                               if (variantCount > 1)
                                 Text(
-                                  '$variantCount variants',
+                                  L.of(context).gameCard_variantCount(variantCount),
                                   style: TextStyle(
                                     fontSize: variantFontSize,
                                     color: Colors.grey[400],
@@ -378,7 +379,7 @@ class _InstalledBadge extends StatelessWidget {
           ),
           SizedBox(width: isSmall ? 2 : 3),
           Text(
-            'INSTALLED',
+            L.of(context).common_installed,
             style: TextStyle(
               fontSize: fontSize,
               fontWeight: FontWeight.w700,

@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/util/source_color.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
 import '../../models/config/source.dart';
@@ -112,7 +113,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   Color get searchAccentColor => Colors.cyanAccent;
 
   @override
-  String get searchHintText => 'Search library...';
+  String get searchHintText => L.of(context).library_searchHint;
 
   @override
   void onSearchQueryChanged(String query) {
@@ -902,32 +903,33 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   List<QuickMenuItem?> _buildQuickMenuItems() {
+    final l = L.of(context);
     final sortLabel = _isShelfTab
         ? switch (_activeShelf?.sortMode ?? ShelfSortMode.alphabetical) {
-            ShelfSortMode.alphabetical => 'Sort by System',
-            ShelfSortMode.bySystem => 'Sort Manual',
-            ShelfSortMode.manual => 'Sort A-Z',
+            ShelfSortMode.alphabetical => l.library_sortSystem,
+            ShelfSortMode.bySystem => l.library_sortManual,
+            ShelfSortMode.manual => l.library_sortAZ,
           }
         : _sortMode == LibrarySortMode.alphabetical
-            ? 'Sort by System'
-            : 'Sort A-Z';
+            ? l.library_sortSystem
+            : l.library_sortAZ;
     final hasDownloads = ref.read(hasQueueItemsProvider);
     final shelf = _activeShelf;
     return [
       QuickMenuItem(
-        label: 'Zoom In',
+        label: l.library_zoomIn,
         icon: Icons.zoom_in_rounded,
         shortcutHint: 'L',
         onSelect: () => _adjustColumns(true),
       ),
       QuickMenuItem(
-        label: 'Zoom Out',
+        label: l.library_zoomOut,
         icon: Icons.zoom_out_rounded,
         shortcutHint: 'R',
         onSelect: () => _adjustColumns(false),
       ),
       QuickMenuItem(
-        label: 'Search',
+        label: l.common_search,
         icon: Icons.search_rounded,
         shortcutHint: 'Y',
         onSelect: openSearch,
@@ -935,7 +937,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       if (_filteredGames.isNotEmpty) ...[
         QuickMenuItem(
           label: _favoriteIds.contains(_filteredGames[_currentIndex].filename)
-              ? 'Unfavorite' : 'Favorite',
+              ? l.common_unfavorite : l.common_favorite,
           icon: _favoriteIds.contains(_filteredGames[_currentIndex].filename)
               ? Icons.favorite_rounded : Icons.favorite_border_rounded,
           shortcutHint: '−',
@@ -950,13 +952,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       // --- Shelf management ---
       null,
       QuickMenuItem(
-        label: 'New Shelf',
+        label: l.library_newShelf,
         icon: Icons.create_new_folder_rounded,
         onSelect: _createShelf,
       ),
       if (shelf != null)
         QuickMenuItem(
-          label: 'Edit Shelf',
+          label: l.library_editShelf,
           icon: Icons.edit_rounded,
           onSelect: _editShelf,
         ),
@@ -965,19 +967,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           _filteredGames[_currentIndex].displayName,
           _filteredGames[_currentIndex].systemSlug)))
         QuickMenuItem(
-          label: 'Add to Shelf',
+          label: l.library_addToShelf,
           icon: Icons.add_rounded,
           onSelect: _addCurrentGameToShelf,
         ),
       if (shelf != null && _filteredGames.isNotEmpty)
         QuickMenuItem(
-          label: 'Remove from Shelf',
+          label: l.library_removeFromShelf,
           icon: Icons.remove_rounded,
           onSelect: _removeCurrentGameFromShelf,
         ),
       if (shelf != null && shelf.sortMode == ShelfSortMode.manual && _filteredGames.length > 1)
         QuickMenuItem(
-          label: 'Reorder Games',
+          label: l.library_reorderGames,
           icon: Icons.swap_vert_rounded,
           onSelect: _enterReorderMode,
         ),
@@ -985,7 +987,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       if (hasDownloads) ...[
         null,
         QuickMenuItem(
-          label: 'Downloads',
+          label: l.common_downloads,
           icon: Icons.download_rounded,
           onSelect: () => toggleDownloadOverlay(ref),
           highlight: true,
@@ -1108,7 +1110,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   Widget _buildHeader(Responsive rs) {
-    final fixedLabels = ['All', 'Installed', 'Favorites'];
+    final l = L.of(context);
+    final fixedLabels = [l.library_tabAll, l.library_tabInstalled, l.library_tabFavorites];
     final fixedCounts = [_allCount, _installedCount, _favoritesCount];
 
     final tabs = <LibraryTab>[
@@ -1154,7 +1157,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 Row(
                   children: [
                     Text(
-                      'LIBRARY',
+                      l.library_title,
                       style: TextStyle(
                         fontSize: rs.isSmall ? 18 : 22,
                         fontWeight: FontWeight.w900,
@@ -1176,13 +1179,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                       child: Text(
                         _isShelfTab
                             ? switch (_activeShelf?.sortMode ?? ShelfSortMode.alphabetical) {
-                                ShelfSortMode.alphabetical => 'A-Z',
-                                ShelfSortMode.bySystem => 'BY SYSTEM',
-                                ShelfSortMode.manual => 'MANUAL',
+                                ShelfSortMode.alphabetical => l.library_sortIndicatorAZ,
+                                ShelfSortMode.bySystem => l.library_sortIndicatorBySystem,
+                                ShelfSortMode.manual => l.library_sortIndicatorManual,
                               }
                             : _sortMode == LibrarySortMode.alphabetical
-                                ? 'A-Z'
-                                : 'BY SYSTEM',
+                                ? l.library_sortIndicatorAZ
+                                : l.library_sortIndicatorBySystem,
                         style: TextStyle(
                           fontSize: rs.isSmall ? 9 : 10,
                           fontWeight: FontWeight.w600,
@@ -1231,23 +1234,24 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     }
 
     if (_filteredGames.isEmpty) {
+      final l = L.of(context);
       final String title;
       final String? subtitle;
       if (_searchQuery.isNotEmpty) {
-        title = 'No results for "$_searchQuery"';
-        subtitle = 'Try a shorter search term';
+        title = l.library_noResults(_searchQuery);
+        subtitle = l.library_tryShorterSearch;
       } else if (_selectedTab == 1) {
-        title = 'No installed games';
-        subtitle = 'Download games to see them here';
+        title = l.library_noInstalledGames;
+        subtitle = l.library_downloadGamesToSee;
       } else if (_selectedTab == 2) {
-        title = 'No favorites yet';
-        subtitle = 'Press SELECT on a game to favorite it';
+        title = l.library_noFavoritesYet;
+        subtitle = l.library_pressFavoriteHint;
       } else if (_isShelfTab) {
-        title = 'No games in this shelf';
-        subtitle = 'Add games via the shelf editor';
+        title = l.library_noGamesInShelf;
+        subtitle = l.library_addGamesViaEditor;
       } else {
-        title = 'No games in library';
-        subtitle = _allGames.isEmpty ? 'Games will appear after sync completes' : null;
+        title = l.library_noGamesInLibrary;
+        subtitle = _allGames.isEmpty ? l.library_gamesAfterSync : null;
       }
       return Center(
         child: Column(
@@ -1417,29 +1421,30 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   Widget _buildHud() {
+    final l = L.of(context);
     if (_reorderState == ReorderState.grabbed) {
       return ConsoleHud(
-        dpad: (label: '\u2190\u2191\u2193\u2192', action: 'Move'),
-        a: HudAction('Drop', onTap: _dropItem),
-        b: HudAction('Cancel', onTap: _dropItem),
+        dpad: (label: '\u2190\u2191\u2193\u2192', action: l.common_move),
+        a: HudAction(l.common_drop, onTap: _dropItem),
+        b: HudAction(l.common_cancel, onTap: _dropItem),
       );
     }
     if (_reorderState == ReorderState.selecting) {
       return ConsoleHud(
-        a: HudAction('Grab', onTap: _grabItem),
-        b: HudAction('Done', onTap: _exitReorderMode),
+        a: HudAction(l.common_grab, onTap: _grabItem),
+        b: HudAction(l.common_done, onTap: _exitReorderMode),
       );
     }
     if (isSearchActive) {
       return buildSearchHud(
-        aAction: HudAction('Select', onTap: _openSelectedGame),
+        aAction: HudAction(l.common_select, onTap: _openSelectedGame),
       );
     }
 
     return ConsoleHud(
-      a: HudAction('Select', onTap: _openSelectedGame),
-      b: HudAction('Back', onTap: () => Navigator.pop(context)),
-      start: HudAction('Menu', onTap: toggleQuickMenu),
+      a: HudAction(l.common_select, onTap: _openSelectedGame),
+      b: HudAction(l.common_back, onTap: () => Navigator.pop(context)),
+      start: HudAction(l.common_menu, onTap: toggleQuickMenu),
     );
   }
 

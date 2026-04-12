@@ -52,7 +52,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('No sources yet'), findsOneWidget);
-      expect(find.text('Add source'), findsOneWidget);
+      expect(find.text('Add source'), findsWidgets);
       expect(find.byIcon(Icons.cloud_off_outlined), findsOneWidget);
       expect(find.text('No sources configured'), findsOneWidget);
     });

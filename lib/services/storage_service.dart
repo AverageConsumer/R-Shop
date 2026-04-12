@@ -35,6 +35,7 @@ class StorageService {
   static const _raLastSyncKey = 'ra_last_sync';
   static const _hideEmptyConsolesKey = 'hide_empty_consoles';
   static const _startHintShownKey = 'start_hint_shown';
+  static const _localeOverrideKey = 'locale_override';
   static const _syncTimeoutSecondsKey = 'sync_timeout_seconds';
   static const _syncCooldownMinutesKey = 'sync_cooldown_minutes';
   static const _lastSyncPrefix = 'last_sync_';
@@ -400,6 +401,21 @@ class StorageService {
   Future<void> setHomeLayoutIsGrid(bool value) async {
     _ensureInitialized();
     await _prefs!.setBool(_homeLayoutKey, value);
+  }
+
+  // Locale override (null = follow system)
+  String? getLocaleOverride() {
+    _ensureInitialized();
+    return _prefs!.getString(_localeOverrideKey);
+  }
+
+  Future<void> setLocaleOverride(String? code) async {
+    _ensureInitialized();
+    if (code == null) {
+      await _prefs!.remove(_localeOverrideKey);
+    } else {
+      await _prefs!.setString(_localeOverrideKey, code);
+    }
   }
 
   // Hide Empty Consoles

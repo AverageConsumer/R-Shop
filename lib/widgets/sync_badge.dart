@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/responsive/responsive.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/app_providers.dart';
 import '../providers/library_providers.dart';
 import '../providers/ra_providers.dart';
@@ -20,14 +21,17 @@ class SyncBadge extends ConsumerWidget {
 
     return Positioned(
       top: rs.safeAreaTop + (rs.isSmall ? 8 : 12),
-      left: rs.isSmall ? 12 : 16,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          _LibrarySyncPill(),
-          _RaSyncPill(),
-        ],
+      right: rs.isSmall ? 12 : 16,
+      child: DefaultTextStyle(
+        style: const TextStyle(decoration: TextDecoration.none),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: const [
+            _LibrarySyncPill(),
+            _RaSyncPill(),
+          ],
+        ),
       ),
     );
   }
@@ -84,14 +88,15 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
           icon: Icons.sync,
           color: Colors.cyanAccent,
         ),
-        label: 'Syncing ${state.completedSystems}/${state.totalSystems}',
+        label: L.of(context).sync_progress(state.completedSystems, state.totalSystems),
         systemName: state.currentSystem,
       );
     }
 
+    final l = L.of(context);
     final label = _failedSystems.length == 1
-        ? '${_failedSystems.keys.first} sync failed'
-        : '${_failedSystems.length} systems failed to sync';
+        ? l.sync_singleSystemFailed(_failedSystems.keys.first)
+        : l.sync_multipleSystemsFailed(_failedSystems.length);
 
     return _PulsingPill(
       key: const ValueKey('library-error'),
@@ -215,7 +220,7 @@ class _RaSyncPillState extends ConsumerState<_RaSyncPill> {
           color: _raColor,
         ),
         label:
-            'Achievements ${state.completedSystems}/${state.totalSystems}',
+            L.of(context).sync_raProgress(state.completedSystems, state.totalSystems),
         systemName: state.currentSystem,
       );
     } else {
@@ -224,7 +229,7 @@ class _RaSyncPillState extends ConsumerState<_RaSyncPill> {
         accentColor: Colors.redAccent,
         leadingIcon:
             Icon(Icons.error_outline, size: iconSize, color: Colors.redAccent),
-        label: _lastError ?? 'RA sync failed',
+        label: _lastError ?? L.of(context).sync_raFailed,
       );
     }
 

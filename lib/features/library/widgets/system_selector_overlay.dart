@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/input/overlay_scope.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/system_model.dart';
 import '../../../providers/app_providers.dart';
 
@@ -151,6 +152,7 @@ class _SystemSelectorOverlayState
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+    final l = L.of(context);
 
     return OverlayFocusScope(
       priority: OverlayPriority.dialog,
@@ -186,7 +188,7 @@ class _SystemSelectorOverlayState
                         child: Row(
                           children: [
                             Text(
-                              'SELECT SYSTEMS',
+                              l.systemSelector_title,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: rs.isSmall ? 12 : 14,
@@ -196,7 +198,7 @@ class _SystemSelectorOverlayState
                             ),
                             const Spacer(),
                             Text(
-                              '${_selected.length} selected',
+                              l.systemSelector_selectedCount(_selected.length),
                               style: TextStyle(
                                 color: Colors.cyanAccent,
                                 fontSize: rs.isSmall ? 10 : 12,

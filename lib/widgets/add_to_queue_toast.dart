@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/responsive/responsive.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/download_providers.dart';
 import 'download_overlay.dart';
 
@@ -175,7 +176,7 @@ class _AddToQueueToastState extends ConsumerState<AddToQueueToast>
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Added to queue',
+                            L.of(context).toast_addedToQueue,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.5),
                               fontSize: 12,

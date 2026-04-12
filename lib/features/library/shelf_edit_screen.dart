@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/custom_shelf.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/shelf_providers.dart';
@@ -193,7 +194,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => TextInputDialog(
-        title: 'Shelf Name',
+        title: L.of(ctx).shelfEdit_shelfName,
         initialValue: _name,
         onSubmit: (value) => Navigator.pop(ctx, value),
       ),
@@ -209,7 +210,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => TextInputDialog(
-        title: 'Filter Text',
+        title: L.of(ctx).shelfEdit_filterText,
         hintText: 'e.g. Pokemon',
         initialValue: rule.textQuery ?? '',
         onSubmit: (value) => Navigator.pop(ctx, value),
@@ -270,6 +271,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+    final l = L.of(context);
 
     return buildWithActions(
       PopScope(
@@ -289,7 +291,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
                     children: [
                       SizedBox(height: rs.spacing.md),
                       Text(
-                        _isEditing ? 'EDIT SHELF' : 'NEW SHELF',
+                        _isEditing ? l.shelfEdit_title : l.shelfEdit_titleNew,
                         style: TextStyle(
                           fontSize: rs.isSmall ? 18 : 22,
                           fontWeight: FontWeight.w900,
@@ -303,15 +305,15 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
                           children: [
                             _buildField(
                               index: 0,
-                              label: 'NAME',
-                              value: _name.isEmpty ? 'Tap to set...' : _name,
+                              label: l.shelfEdit_nameSection,
+                              value: _name.isEmpty ? l.shelfEdit_tapToSet : _name,
                               icon: Icons.label_rounded,
                               rs: rs,
                             ),
                             SizedBox(height: rs.spacing.md),
                             // Filter rules header
                             Text(
-                              'FILTER RULES',
+                              l.shelfEdit_filterRules,
                               style: TextStyle(
                                 color: Colors.grey[500],
                                 fontSize: rs.isSmall ? 9 : 11,
@@ -321,10 +323,10 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
                             ),
                             SizedBox(height: rs.spacing.sm),
                             for (int i = 0; i < _filterRules.length; i++)
-                              _buildFilterRuleField(i, rs),
+                              _buildFilterRuleField(i, rs, l),
                             _buildField(
                               index: _addFilterIndex,
-                              label: '+ ADD FILTER',
+                              label: l.shelfEdit_addFilter,
                               value: '',
                               icon: Icons.add_rounded,
                               rs: rs,
@@ -335,7 +337,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
                                 padding: EdgeInsets.only(top: rs.spacing.sm),
                                 child: _buildField(
                                   index: _hiddenGamesIndex,
-                                  label: 'Hidden Games (${_excludedGameIds.length})',
+                                  label: l.shelfEdit_hiddenGamesCount(_excludedGameIds.length),
                                   value: '',
                                   icon: Icons.visibility_off_rounded,
                                   rs: rs,
@@ -347,7 +349,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
                                 padding: EdgeInsets.only(top: rs.spacing.sm),
                                 child: _buildField(
                                   index: _addedGamesIndex,
-                                  label: 'Added Games (${_trulyManualGameIds.length})',
+                                  label: l.shelfEdit_addedGamesCount(_trulyManualGameIds.length),
                                   value: '',
                                   icon: Icons.checklist_rounded,
                                   rs: rs,
@@ -359,7 +361,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
                                 padding: EdgeInsets.only(top: rs.spacing.sm),
                                 child: _buildField(
                                   index: _resetOrderIndex,
-                                  label: 'Reset Manual Order',
+                                  label: l.shelfEdit_resetManualOrder,
                                   value: '',
                                   icon: Icons.restart_alt_rounded,
                                   rs: rs,
@@ -370,7 +372,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
                             SizedBox(height: rs.spacing.lg),
                             _buildField(
                               index: _saveIndex,
-                              label: 'SAVE',
+                              label: l.shelfEdit_saveButton,
                               value: '',
                               icon: Icons.check_rounded,
                               rs: rs,
@@ -381,7 +383,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
                               SizedBox(height: rs.spacing.sm),
                               _buildField(
                                 index: _deleteIndex,
-                                label: 'DELETE SHELF',
+                                label: l.shelfEdit_deleteShelf,
                                 value: '',
                                 icon: Icons.delete_rounded,
                                 rs: rs,
@@ -442,8 +444,8 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
                 ),
               if (!_showSystemSelector && !_showGameListOverlay)
                 ConsoleHud(
-                  a: HudAction('Select', onTap: _confirm),
-                  b: HudAction('Back', onTap: _handleBack),
+                  a: HudAction(l.common_select, onTap: _confirm),
+                  b: HudAction(l.common_back, onTap: _handleBack),
                 ),
             ],
           ),
@@ -452,15 +454,15 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
     );
   }
 
-  Widget _buildFilterRuleField(int ruleIndex, Responsive rs) {
+  Widget _buildFilterRuleField(int ruleIndex, Responsive rs, L l) {
     final rule = _filterRules[ruleIndex];
     final fieldIndex = 1 + ruleIndex;
     final isFocused = _focusedField == fieldIndex;
     final textPart = rule.textQuery?.isNotEmpty == true
         ? '"${rule.textQuery}"'
-        : 'Any text';
+        : l.shelfEdit_anyText;
     final systemPart = rule.systemSlugs.isEmpty
-        ? 'All systems'
+        ? l.shelfEdit_allSystems
         : rule.systemSlugs.map((s) => s.toUpperCase()).join(', ');
 
     return Padding(
@@ -529,7 +531,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
               ),
               if (isFocused)
                 Text(
-                  '\u2190 Text  Sys \u2192',
+                  l.shelfEdit_textHint,
                   style: TextStyle(
                     fontSize: 9,
                     color: Colors.grey[500],

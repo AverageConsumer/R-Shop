@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../core/widgets/console_focusable.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/system_model.dart';
 import '../onboarding_controller.dart';
 import 'provider_form.dart';
@@ -162,21 +163,22 @@ class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
     final fontSize = rs.isSmall ? 12.0 : 14.0;
     final labelFontSize = rs.isSmall ? 10.0 : 12.0;
 
+    final l = L.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ROM Folder
-        _buildSectionLabel('ROM FOLDER', labelFontSize),
+        _buildSectionLabel(l.onboarding_romFolder, labelFontSize),
         SizedBox(height: rs.spacing.sm),
         _buildFolderRow(rs, sub, controller, fontSize),
         SizedBox(height: rs.spacing.lg),
 
         // Auto-Extract toggle
-        _buildSectionLabel('OPTIONS', labelFontSize),
+        _buildSectionLabel(l.onboarding_options, labelFontSize),
         SizedBox(height: rs.spacing.sm),
         _buildToggleRow(
           rs: rs,
-          label: 'Auto-extract zipped ROMs',
+          label: l.onboarding_autoExtractZips,
           value: sub.autoExtract,
           onChanged: controller.setAutoExtract,
           fontSize: fontSize,
@@ -186,13 +188,13 @@ class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
         // Auto-sync toggle
         _buildToggleRow(
           rs: rs,
-          label: 'Auto-sync on app launch',
+          label: l.onboarding_autoSyncLabel,
           value: sub.autoSync,
           onChanged: controller.setAutoSync,
           fontSize: fontSize,
           subtitle: sub.autoSync
-              ? 'Syncs automatically (respects cooldown)'
-              : 'Only syncs manually via Start menu',
+              ? l.onboarding_autoSyncEnabled
+              : l.onboarding_autoSyncDisabled,
         ),
         SizedBox(height: rs.spacing.lg),
 
@@ -295,7 +297,7 @@ class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
               ),
               child: Center(
                 child: Text(
-                  'Done',
+                  l.common_done,
                   style: TextStyle(
                     color: sub.isComplete ? Colors.white : Colors.white38,
                     fontSize: fontSize,
@@ -372,7 +374,7 @@ class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
               SizedBox(width: rs.spacing.sm),
               Expanded(
                 child: Text(
-                  sub.targetFolder ?? 'Select folder...',
+                  sub.targetFolder ?? L.of(context).onboarding_selectFolder,
                   style: TextStyle(
                     color: sub.targetFolder != null ? Colors.white : Colors.white38,
                     fontSize: fontSize,

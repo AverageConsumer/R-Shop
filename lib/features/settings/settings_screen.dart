@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../core/input/input.dart';
+import '../../l10n/app_localizations.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/screen_layout.dart';
@@ -13,7 +13,6 @@ import '../../utils/friendly_error.dart';
 import '../../providers/download_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../widgets/download_overlay.dart';
-import '../../services/cover_preload_service.dart';
 import '../../services/database_service.dart';
 import '../../services/image_cache_service.dart';
 import '../../services/thumbnail_service.dart';
@@ -22,13 +21,11 @@ import '../../widgets/console_notification.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
 import '../../widgets/quick_menu.dart';
 import '../onboarding/onboarding_controller.dart';
-import 'config_mode_screen.dart';
-import 'sources_screen.dart';
-import '../onboarding/widgets/ra_onboarding_screen.dart';
 import 'widgets/about_tab.dart';
-import 'widgets/preferences_tab.dart';
+import 'widgets/advanced_tab.dart';
+import 'widgets/audio_feedback_tab.dart';
+import 'widgets/general_tab.dart';
 import 'widgets/settings_tabs.dart';
-import 'widgets/system_tab.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   final VoidCallback? onResetOnboarding;
@@ -39,28 +36,16 @@ class SettingsScreen extends ConsumerStatefulWidget {
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen>
     with ConsoleScreenMixin {
-  late bool _hapticEnabled;
-  late bool _soundEnabled;
-  late double _bgmVolume;
-  late double _sfxVolume;
-  late int _maxDownloads;
-  late int _syncTimeout;
-  late int _syncCooldown;
-  late bool _allowNonLanHttp;
-  late bool _hideEmptyConsoles;
+  static const _tabCount = 4;
   bool _showResetConfirm = false;
-  ProviderSubscription<CoverPreloadState>? _coverPreloadSub;
-  ThumbnailDiskUsage? _thumbnailUsage;
-  int? _gamesNeedingCovers;
-  final FocusNode _hapticFocusNode = FocusNode();
-  final FocusNode _layoutFocusNode = FocusNode();
-  final FocusNode _homeLayoutFocusNode = FocusNode();
-  final FocusNode _hideEmptyFocusNode = FocusNode();
-  final FocusNode _firstSystemTabNode = FocusNode();
-  final FocusNode _firstAboutTabNode = FocusNode();
   late final ConfettiController _confettiController;
   String _appVersion = '';
   int _selectedTab = 0;
+
+  final FocusNode _firstGeneralNode = FocusNode();
+  final FocusNode _firstAudioNode = FocusNode();
+  final FocusNode _firstAdvancedNode = FocusNode();
+  final FocusNode _firstAboutNode = FocusNode();
 
   @override
   String get routeId => 'settings';
@@ -90,18 +75,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   @override
   void initState() {
     super.initState();
-    final storage = ref.read(storageServiceProvider);
-    _hapticEnabled = storage.getHapticEnabled();
-    _maxDownloads = storage.getMaxConcurrentDownloads();
-    _syncTimeout = storage.getSyncTimeoutSeconds();
-    _syncCooldown = storage.getSyncCooldownMinutes();
-    _allowNonLanHttp = storage.getAllowNonLanHttp();
-    _hideEmptyConsoles = storage.getHideEmptyConsoles();
-    final soundSettings = ref.read(soundSettingsProvider);
-    _soundEnabled = soundSettings.enabled;
-    _bgmVolume = soundSettings.bgmVolume;
-    _sfxVolume = soundSettings.sfxVolume;
-
     _confettiController =
         ConfettiController(duration: const Duration(seconds: 2));
     PackageInfo.fromPlatform().then((info) {
@@ -109,23 +82,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     }).catchError((e) {
       debugPrint('Failed to get package info: $e');
     });
-    _loadCoverStats();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _homeLayoutFocusNode.requestFocus();
+      _firstGeneralNode.requestFocus();
     });
   }
 
   @override
   void dispose() {
-    _coverPreloadSub?.close();
     _confettiController.dispose();
-    _hapticFocusNode.dispose();
-    _layoutFocusNode.dispose();
-    _homeLayoutFocusNode.dispose();
-    _hideEmptyFocusNode.dispose();
-    _firstSystemTabNode.dispose();
-    _firstAboutTabNode.dispose();
+    _firstGeneralNode.dispose();
+    _firstAudioNode.dispose();
+    _firstAdvancedNode.dispose();
+    _firstAboutNode.dispose();
     super.dispose();
   }
 
@@ -134,14 +103,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   // ---------------------------------------------------------------------------
 
   void _nextTab() {
-    final next = (_selectedTab + 1) % 3;
+    final next = (_selectedTab + 1) % _tabCount;
     ref.read(feedbackServiceProvider).tick();
     setState(() => _selectedTab = next);
     _focusFirstItemInTab(next);
   }
 
   void _prevTab() {
-    final next = (_selectedTab - 1 + 3) % 3;
+    final next = (_selectedTab - 1 + _tabCount) % _tabCount;
     ref.read(feedbackServiceProvider).tick();
     setState(() => _selectedTab = next);
     _focusFirstItemInTab(next);
@@ -159,109 +128,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       if (!mounted) return;
       switch (tab) {
         case 0:
-          _homeLayoutFocusNode.requestFocus();
+          _firstGeneralNode.requestFocus();
         case 1:
-          _firstSystemTabNode.requestFocus();
+          _firstAudioNode.requestFocus();
         case 2:
-          _firstAboutTabNode.requestFocus();
+          _firstAdvancedNode.requestFocus();
+        case 3:
+          _firstAboutNode.requestFocus();
       }
     });
   }
 
   // ---------------------------------------------------------------------------
-  // Settings actions
+  // Reset
   // ---------------------------------------------------------------------------
-
-  void _toggleHideEmpty() {
-    ref.read(hideEmptyConsolesProvider.notifier).toggle();
-    setState(() => _hideEmptyConsoles = !_hideEmptyConsoles);
-    ref.read(feedbackServiceProvider).tick();
-  }
-
-  Future<void> _toggleHaptic() async {
-    final value = !_hapticEnabled;
-    final storage = ref.read(storageServiceProvider);
-    final haptic = ref.read(hapticServiceProvider);
-    await storage.setHapticEnabled(value);
-    haptic.setEnabled(value);
-    setState(() => _hapticEnabled = value);
-    if (value) haptic.tick();
-  }
-
-  Future<void> _toggleSound() async {
-    final value = !_soundEnabled;
-    setState(() => _soundEnabled = value);
-    await ref.read(soundSettingsProvider.notifier).setEnabled(value);
-    if (value) {
-      ref.read(audioManagerProvider).playConfirm();
-    }
-  }
-
-  Future<void> _adjustBgmVolume(double delta) async {
-    final newVolume = (_bgmVolume + delta).clamp(0.0, 1.0);
-    setState(() => _bgmVolume = newVolume);
-    await ref.read(soundSettingsProvider.notifier).setBgmVolume(newVolume);
-  }
-
-  Future<void> _adjustSfxVolume(double delta) async {
-    final newVolume = (_sfxVolume + delta).clamp(0.0, 1.0);
-    setState(() => _sfxVolume = newVolume);
-    await ref.read(soundSettingsProvider.notifier).setSfxVolume(newVolume);
-  }
-
-  Future<void> _setBgmVolume(double volume) async {
-    final clamped = volume.clamp(0.0, 1.0);
-    setState(() => _bgmVolume = clamped);
-    await ref.read(soundSettingsProvider.notifier).setBgmVolume(clamped);
-  }
-
-  Future<void> _setSfxVolume(double volume) async {
-    final clamped = volume.clamp(0.0, 1.0);
-    setState(() => _sfxVolume = clamped);
-    await ref.read(soundSettingsProvider.notifier).setSfxVolume(clamped);
-  }
-
-  void _adjustMaxDownloads(int delta) {
-    final newValue = (_maxDownloads + delta).clamp(1, 3);
-    if (newValue == _maxDownloads) return;
-    setState(() => _maxDownloads = newValue);
-    ref.read(downloadQueueManagerProvider).setMaxConcurrent(newValue);
-  }
-
-  void _cycleSyncTimeout() {
-    ref.read(syncTimeoutProvider.notifier).cycle();
-    setState(() => _syncTimeout = ref.read(syncTimeoutProvider));
-    ref.read(feedbackServiceProvider).tick();
-  }
-
-  void _cycleSyncCooldown() {
-    ref.read(syncCooldownProvider.notifier).cycle();
-    setState(() => _syncCooldown = ref.read(syncCooldownProvider));
-    ref.read(feedbackServiceProvider).tick();
-  }
-
-  Future<void> _toggleAllowNonLanHttp() async {
-    final value = !_allowNonLanHttp;
-    await ref.read(storageServiceProvider).setAllowNonLanHttp(value);
-    setState(() => _allowNonLanHttp = value);
-    ref.read(feedbackServiceProvider).tick();
-  }
-
-  void _openRaConfig() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const RaOnboardingScreen(popOnSuccess: false)),
-    );
-  }
-
-  void _openPairing() {
-    // Now opens the full Sources management screen. The DEV-era inline
-    // pairing flow has been moved into SourcesScreen itself ([Y] = add).
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SourcesScreen()),
-    );
-  }
 
   void _showResetDialog() {
     ref.read(feedbackServiceProvider).tick();
@@ -292,7 +172,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     } catch (e) {
       _hideResetDialog();
       if (mounted) {
-        showErrorNotification(context, ref, message: 'Reset error: ${getUserFriendlyError(e)}');
+        showErrorNotification(context, ref,
+            message: 'Reset error: ${getUserFriendlyError(e)}');
       }
     }
   }
@@ -301,139 +182,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     Navigator.pop(context);
   }
 
-  void _openConfigMode() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const ConfigModeScreen()),
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // Quick menu
+  // ---------------------------------------------------------------------------
 
-  Future<void> _loadCoverStats() async {
-    final usage = await ThumbnailService.getDiskUsage();
-    final pending = await DatabaseService().getGamesNeedingCovers();
-    if (mounted) {
-      setState(() {
-        _thumbnailUsage = usage;
-        _gamesNeedingCovers = pending.length;
-      });
-    }
-  }
-
-  String _buildCoverSubtitle() {
-    final parts = <String>[];
-    if (_thumbnailUsage != null && _thumbnailUsage!.fileCount > 0) {
-      parts.add(
-          '${_thumbnailUsage!.formattedSize} (${_thumbnailUsage!.fileCount} cached)');
-    }
-    if (_gamesNeedingCovers != null && _gamesNeedingCovers! > 0) {
-      final estBytes = _gamesNeedingCovers! * 30 * 1024;
-      final estMb = (estBytes / (1024 * 1024)).toStringAsFixed(1);
-      parts.add('$_gamesNeedingCovers remaining (~$estMb MB)');
-    }
-    if (parts.isEmpty) {
-      return _thumbnailUsage != null
-          ? 'All covers cached'
-          : 'Download cover art for all games';
-    }
-    return parts.join(' · ');
-  }
-
-  void _startCoverPreload() {
-    final preloadState = ref.read(coverPreloadServiceProvider);
-    if (preloadState.isRunning) {
-      ref.read(coverPreloadServiceProvider.notifier).cancel();
-      return;
-    }
-
-    showConsoleNotification(context,
-        message: 'Fetching covers...', isError: false);
-
-    _coverPreloadSub?.close();
-    _coverPreloadSub =
-        ref.listenManual(coverPreloadServiceProvider, (prev, next) {
-      if (prev != null && prev.isRunning && !next.isRunning) {
-        _coverPreloadSub?.close();
-        _coverPreloadSub = null;
-        if (!mounted) return;
-        _loadCoverStats();
-        if (next.failed > 0) {
-          showErrorNotification(
-            context,
-            ref,
-            message: 'Covers: ${next.succeeded} ok, ${next.failed} failed',
-          );
-        } else {
-          showSuccessNotification(
-            context,
-            ref,
-            message: '${next.succeeded} covers loaded!',
-          );
-        }
-      }
-    });
-
-    final deviceMemory = ref.read(deviceMemoryProvider);
-    ref
-        .read(coverPreloadServiceProvider.notifier)
-        .preloadAll(
-          DatabaseService(),
-          phase1Pool: deviceMemory.preloadPhase1Pool,
-          phase2Pool: deviceMemory.preloadPhase2Pool,
-        );
-  }
-
-  void _cycleLayout() {
-    ref.read(feedbackServiceProvider).tick();
-    ref.read(controllerLayoutProvider.notifier).cycle();
-  }
-
-  void _toggleHomeLayout() {
-    ref.read(feedbackServiceProvider).tick();
-    ref.read(homeLayoutProvider.notifier).toggle();
-  }
-
-  Future<void> _exportErrorLog() async {
-    final logFile = ref.read(crashLogServiceProvider).getLogFile();
-    if (logFile == null) {
-      if (mounted) {
-        showConsoleNotification(context, message: 'No error log available');
-      }
-      return;
-    }
-    try {
-      await Share.shareXFiles([XFile(logFile.path)]);
-    } catch (e) {
-      if (mounted) {
-        showErrorNotification(context, ref,
-            message: 'Share failed: ${getUserFriendlyError(e)}');
-      }
-    }
-  }
-
-  List<QuickMenuItem?> _buildQuickMenuItems() {
+  List<QuickMenuItem?> _buildQuickMenuItems(L l) {
     final hasDownloads = ref.read(hasQueueItemsProvider);
     return [
       QuickMenuItem(
-        label: 'Previous Tab',
+        label: l.settings_previousTab,
         icon: Icons.arrow_back_rounded,
         shortcutHint: 'L',
         onSelect: _prevTab,
       ),
       QuickMenuItem(
-        label: 'Next Tab',
+        label: l.settings_nextTab,
         icon: Icons.arrow_forward_rounded,
         shortcutHint: 'R',
         onSelect: _nextTab,
       ),
       null,
       QuickMenuItem(
-        label: 'Reset App',
+        label: l.settings_resetApp,
         icon: Icons.restart_alt_rounded,
         onSelect: _showResetDialog,
       ),
       if (hasDownloads)
         QuickMenuItem(
-          label: 'Downloads',
+          label: l.common_downloads,
           icon: Icons.download_rounded,
           onSelect: () => toggleDownloadOverlay(ref),
           highlight: true,
@@ -447,41 +223,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final rs = context.rs;
-    final controllerLayout = ref.watch(controllerLayoutProvider);
-    final isHomeGrid = ref.watch(homeLayoutProvider);
     final topPadding = rs.safeAreaTop + (rs.isSmall ? 72 : 96);
 
     return buildWithActions(
       PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) {
-            _exitSettings();
-          }
+          if (!didPop) _exitSettings();
         },
         child: ScreenLayout(
           backgroundColor: Colors.black,
           accentColor: AppTheme.primaryColor,
           body: Stack(
             children: [
-              // Background decoration
               Positioned.fill(
                 child: Container(
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF1A1A1A),
-                        Colors.black,
-                      ],
+                      colors: [Color(0xFF1A1A1A), Colors.black],
                     ),
                   ),
                 ),
               ),
-
-              // Tab content (behind header)
               Column(
                 children: [
                   SizedBox(height: topPadding),
@@ -489,65 +256,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 150),
                       child: switch (_selectedTab) {
-                        0 => SettingsPreferencesTab(
-                            controllerLayout: controllerLayout,
-                            isHomeGrid: isHomeGrid,
-                            hapticEnabled: _hapticEnabled,
-                            soundEnabled: _soundEnabled,
-                            hideEmptyConsoles: _hideEmptyConsoles,
-                            bgmVolume: _bgmVolume,
-                            sfxVolume: _sfxVolume,
-                            homeLayoutFocusNode: _homeLayoutFocusNode,
-                            layoutFocusNode: _layoutFocusNode,
-                            hapticFocusNode: _hapticFocusNode,
-                            hideEmptyFocusNode: _hideEmptyFocusNode,
-                            onToggleHomeLayout: _toggleHomeLayout,
-                            onCycleLayout: _cycleLayout,
-                            onToggleHaptic: _toggleHaptic,
-                            onToggleSound: _toggleSound,
-                            onToggleHideEmpty: _toggleHideEmpty,
-                            onAdjustBgmVolume: _adjustBgmVolume,
-                            onAdjustSfxVolume: _adjustSfxVolume,
-                            onSetBgmVolume: _setBgmVolume,
-                            onSetSfxVolume: _setSfxVolume,
-                          ),
-                        1 => SettingsSystemTab(
-                            firstSystemTabNode: _firstSystemTabNode,
-                            maxDownloads: _maxDownloads,
-                            syncTimeout: _syncTimeout,
-                            syncCooldown: _syncCooldown,
-                            allowNonLanHttp: _allowNonLanHttp,
-                            coverSubtitle: _buildCoverSubtitle(),
-                            onOpenPairing: _openPairing,
-                            onOpenRaConfig: _openRaConfig,
-                            onOpenConfigMode: _openConfigMode,
-                            onStartCoverPreload: _startCoverPreload,
-                            onExportErrorLog: _exportErrorLog,
-                            onAdjustMaxDownloads: _adjustMaxDownloads,
-                            onCycleSyncTimeout: _cycleSyncTimeout,
-                            onCycleSyncCooldown: _cycleSyncCooldown,
-                            onToggleAllowNonLanHttp: _toggleAllowNonLanHttp,
-                          ),
+                        0 => SettingsGeneralTab(
+                            key: const ValueKey('general'),
+                            firstFocusNode: _firstGeneralNode),
+                        1 => SettingsAudioTab(
+                            key: const ValueKey('audio'),
+                            firstFocusNode: _firstAudioNode),
+                        2 => SettingsAdvancedTab(
+                            key: const ValueKey('advanced'),
+                            firstFocusNode: _firstAdvancedNode),
                         _ => SettingsAboutTab(
+                            key: const ValueKey('about'),
                             appVersion: _appVersion,
-                            firstAboutTabNode: _firstAboutTabNode,
-                            confettiController: _confettiController,
-                          ),
+                            firstAboutTabNode: _firstAboutNode,
+                            confettiController: _confettiController),
                       },
                     ),
                   ),
                   if (!showQuickMenu)
                     ConsoleHud(
-                      b: HudAction('Back', onTap: _exitSettings),
-                      start: HudAction('Menu', onTap: toggleQuickMenu),
+                      b: HudAction(l.common_back, onTap: _exitSettings),
+                      start: HudAction(l.common_menu, onTap: toggleQuickMenu),
                       embedded: true,
                     ),
                 ],
               ),
-
-              // Header (over content, with gradient fade)
-              _buildHeader(rs),
-
+              _buildHeader(rs, l),
               Align(
                 alignment: Alignment.topCenter,
                 child: ConfettiWidget(
@@ -563,21 +297,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                   gravity: 0.2,
                 ),
               ),
-
               if (showQuickMenu)
                 QuickMenuOverlay(
-                  items: _buildQuickMenuItems(),
+                  items: _buildQuickMenuItems(l),
                   onClose: closeQuickMenu,
                 ),
-
               if (_showResetConfirm)
                 ExitConfirmationOverlay(
-                  title: 'RESET APPLICATION',
-                  message:
-                      'This will delete all settings and restart the setup.',
+                  title: l.settings_resetDialogTitle,
+                  message: l.settings_resetDialogMessage,
                   icon: Icons.restart_alt_rounded,
-                  confirmLabel: 'RESET',
-                  cancelLabel: 'CANCEL',
+                  confirmLabel: l.settings_resetDialogConfirm,
+                  cancelLabel: l.settings_resetDialogCancel,
                   onConfirm: _performReset,
                   onCancel: _hideResetDialog,
                 ),
@@ -588,11 +319,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Header
-  // ---------------------------------------------------------------------------
-
-  Widget _buildHeader(Responsive rs) {
+  Widget _buildHeader(Responsive rs, L l) {
     return Positioned(
       top: 0,
       left: 0,
@@ -623,7 +350,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'SETTINGS',
+                  l.settings_title,
                   style: TextStyle(
                     fontSize: rs.isSmall ? 18 : 22,
                     fontWeight: FontWeight.w900,
@@ -634,7 +361,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                 SizedBox(height: rs.isSmall ? 6 : 10),
                 SettingsTabs(
                   selectedTab: _selectedTab,
-                  tabs: const ['Preferences', 'System', 'About'],
+                  tabs: [l.settings_tabGeneral, l.settings_tabAudio, l.settings_tabAdvanced, l.settings_tabAbout],
                   accentColor: AppTheme.primaryColor,
                   onTap: _selectTab,
                 ),
@@ -645,8 +372,4 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       ),
     );
   }
-
-  // ---------------------------------------------------------------------------
-  // Cover subtitle (used by system tab)
-  // ---------------------------------------------------------------------------
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/responsive/responsive.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/download_item.dart';
 import '../../providers/app_providers.dart';
 
@@ -25,14 +26,15 @@ class LowSpaceWarning extends ConsumerWidget {
         if (info == null || info.isHealthy) return const SizedBox.shrink();
 
         final rs = context.rs;
+        final l = L.of(context);
         final Color color;
         final String message;
         if (info.isLow) {
           color = Colors.red;
-          message = 'Very low storage: ${info.freeSpaceText}';
+          message = l.storage_veryLow(info.freeSpaceText);
         } else {
           color = Colors.amber;
-          message = 'Storage getting low: ${info.freeSpaceText}';
+          message = l.storage_gettingLow(info.freeSpaceText);
         }
 
         return Container(

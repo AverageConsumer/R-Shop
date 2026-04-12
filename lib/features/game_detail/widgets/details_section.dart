@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../utils/game_metadata.dart';
 import 'metadata_badges.dart';
 import 'section_header.dart';
@@ -24,7 +25,7 @@ class DetailsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(label: 'Details'),
+        SectionHeader(label: L.of(context).gameDetail_details),
         Container(
           width: double.infinity,
           padding: EdgeInsets.all(rs.spacing.md),

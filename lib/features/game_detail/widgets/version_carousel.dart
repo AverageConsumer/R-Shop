@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import 'version_card.dart';
@@ -89,7 +90,7 @@ class _VersionCarouselState extends State<VersionCarousel> {
           child: Row(
             children: [
               Text(
-                'VERSIONS',
+                L.of(context).gameDetail_versions,
                 style: TextStyle(
                   color: Colors.grey.shade500,
                   fontSize: labelFontSize,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../../../utils/game_metadata.dart';
 
 class RegionBadge extends StatelessWidget {
@@ -107,7 +108,7 @@ class TagBadges extends StatelessWidget {
   Widget build(BuildContext context) {
     if (tags.isEmpty) {
       return Text(
-        'Standard',
+        L.of(context).gameDetail_standard,
         style: TextStyle(
           color: Colors.grey.shade500,
           fontSize: compact ? 10 : 12,

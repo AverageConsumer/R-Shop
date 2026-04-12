@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../../../core/widgets/console_focusable.dart';
 import '../../../providers/app_providers.dart';
 import '../../../services/device_info_service.dart';
@@ -17,12 +18,13 @@ class DeviceInfoCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = L.of(context);
     final memoryInfo = ref.watch(deviceMemoryProvider);
 
     final (tierLabel, tierColor) = switch (memoryInfo.tier) {
-      MemoryTier.low => ('LOW', Colors.amber),
-      MemoryTier.standard => ('STANDARD', Colors.cyanAccent),
-      MemoryTier.high => ('HIGH', Colors.greenAccent),
+      MemoryTier.low => (l.settings_deviceMemoryLow, Colors.amber),
+      MemoryTier.standard => (l.settings_deviceMemoryStandard, Colors.cyanAccent),
+      MemoryTier.high => (l.settings_deviceMemoryHigh, Colors.greenAccent),
     };
 
     final ramText = '${memoryInfo.totalGB.toStringAsFixed(0)} GB RAM';

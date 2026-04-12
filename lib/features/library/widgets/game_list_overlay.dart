@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/input/input.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../providers/app_providers.dart';
 import '../../../utils/game_metadata.dart';
 
@@ -140,10 +141,11 @@ class _GameListOverlayState extends ConsumerState<GameListOverlay> {
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+    final l = L.of(context);
     final isHidden = widget.mode == GameListOverlayMode.hidden;
-    final title = isHidden ? 'HIDDEN GAMES' : 'ADDED GAMES';
+    final title = isHidden ? l.gameListOverlay_hiddenGames : l.gameListOverlay_addedGames;
     final accentColor = isHidden ? Colors.amber : Colors.tealAccent;
-    final actionLabel = isHidden ? 'Restore' : 'Remove';
+    final actionLabel = isHidden ? l.gameListOverlay_restore : l.common_remove;
 
     return OverlayFocusScope(
       priority: OverlayPriority.dialog,
@@ -192,7 +194,7 @@ class _GameListOverlayState extends ConsumerState<GameListOverlay> {
                             ),
                             const Spacer(),
                             Text(
-                              '${widget.gameIds.length} game${widget.gameIds.length == 1 ? '' : 's'}',
+                              l.gameListOverlay_gameCount(widget.gameIds.length),
                               style: TextStyle(
                                 color: accentColor,
                                 fontSize: rs.isSmall ? 10 : 12,
@@ -206,7 +208,7 @@ class _GameListOverlayState extends ConsumerState<GameListOverlay> {
                         Padding(
                           padding: EdgeInsets.all(rs.spacing.lg),
                           child: Text(
-                            'No games',
+                            l.gameListOverlay_noGames,
                             style: TextStyle(
                               color: Colors.grey[500],
                               fontSize: rs.isSmall ? 12 : 14,
@@ -265,7 +267,7 @@ class _GameListOverlayState extends ConsumerState<GameListOverlay> {
                                               size: 14, color: accentColor),
                                           const SizedBox(width: 6),
                                           Text(
-                                            'Clear All',
+                                            l.gameListOverlay_clearAll,
                                             style: TextStyle(
                                               fontSize: rs.isSmall ? 11 : 12,
                                               fontWeight: FontWeight.w600,
@@ -350,7 +352,7 @@ class _GameListOverlayState extends ConsumerState<GameListOverlay> {
                                         ),
                                         if (isFocused)
                                           Text(
-                                            'A: $actionLabel',
+                                            l.gameListOverlay_actionHint(actionLabel),
                                             style: TextStyle(
                                               fontSize: 9,
                                               color: Colors.grey[500],

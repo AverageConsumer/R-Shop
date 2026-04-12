@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/game_metadata_info.dart';
 
 class SummarySection extends StatelessWidget {
@@ -72,7 +73,7 @@ class SummarySection extends StatelessWidget {
                   GestureDetector(
                     onTap: onToggle,
                     child: Text(
-                      isExpanded ? 'Show less' : 'Read more...',
+                      isExpanded ? L.of(context).gameDetail_showLess : L.of(context).gameDetail_readMore,
                       style: TextStyle(
                         color: accentColor.withValues(alpha: 0.7),
                         fontSize: rs.isSmall ? 10 : 12,

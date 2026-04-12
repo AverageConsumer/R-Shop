@@ -10,6 +10,7 @@ import '../services/ra_api_service.dart';
 import '../services/ra_hash_service.dart';
 import '../services/rom_manager.dart';
 import 'app_providers.dart';
+import 'library_providers.dart';
 import 'ra_providers.dart';
 
 final downloadQueueManagerProvider =
@@ -19,15 +20,18 @@ final downloadQueueManagerProvider =
     ref.read(nativeSmbServiceProvider),
   );
 
-  // Wire up post-download RA hash verification
+  // Wire up post-download hooks: refresh game counts + RA hash verification.
   final storage = ref.read(storageServiceProvider);
-  if (storage.isRaConfigured) {
-    final raService = ref.read(raApiServiceProvider);
-    final apiKey = storage.getRaApiKey();
-    qm.onItemCompleted = (item) {
+  final raConfigured = storage.isRaConfigured;
+  final raService = raConfigured ? ref.read(raApiServiceProvider) : null;
+  final apiKey = raConfigured ? storage.getRaApiKey() : null;
+  qm.onItemCompleted = (item) {
+    // Bump game counts so the home screen updates immediately.
+    ref.read(gameDbChangedProvider.notifier).state++;
+    if (raService != null) {
       _verifyRaHash(item, raService, apiKey, ref);
-    };
-  }
+    }
+  };
 
   return qm;
 });

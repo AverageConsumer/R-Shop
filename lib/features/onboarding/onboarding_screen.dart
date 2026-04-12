@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/console_focusable.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/app_providers.dart';
 import '../../utils/friendly_error.dart';
 import '../../providers/game_providers.dart';
@@ -68,7 +69,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       await controller.exportConfig();
     } catch (e) {
       if (!mounted) return;
-      showErrorNotification(context, ref, message: 'Export failed: ${getUserFriendlyError(e)}');
+      showErrorNotification(context, ref, message: L.of(context).onboarding_exportFailed(getUserFriendlyError(e)));
     }
   }
 
@@ -77,12 +78,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     if (!mounted) return;
     if (result.cancelled) return;
     if (result.error != null) {
-      showErrorNotification(context, ref, message: 'Invalid config: ${result.error}');
+      showErrorNotification(context, ref, message: L.of(context).onboarding_invalidConfig(result.error!));
     } else {
       ref.read(onboardingControllerProvider.notifier).loadFromConfig(result.config!);
       // Refresh sources so the notifier picks up any imported sources.
       ref.read(sourcesProvider.notifier).replaceAll(result.config!.sources);
-      showSuccessNotification(context, ref, message: 'Config imported!');
+      showSuccessNotification(context, ref, message: L.of(context).onboarding_configImported);
     }
   }
 
@@ -108,7 +109,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ref.invalidate(bootstrappedConfigProvider);
     } catch (e) {
       if (!mounted) return;
-      showErrorNotification(context, ref, message: 'Failed to save: ${getUserFriendlyError(e)}');
+      showErrorNotification(context, ref, message: L.of(context).onboarding_failedToSave(getUserFriendlyError(e)));
       return;
     }
     if (!mounted) return;
@@ -196,7 +197,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // drop in a JSON config without going through any setup wizard.
     if (state.currentStep == OnboardingStep.welcome) {
       return ConsoleHud(
-        select: HudAction('Import config', onTap: _importConfig),
+        select: HudAction(L.of(context).onboarding_importConfig, onTap: _importConfig),
       );
     }
 
@@ -327,8 +328,8 @@ class _CompleteStepState extends State<_CompleteStep> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final count = widget.configuredCount;
-    final label = count == 1 ? 'system' : 'systems';
 
     return Focus(
       focusNode: _screenFocus,
@@ -339,9 +340,9 @@ class _CompleteStepState extends State<_CompleteStep> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              "You're all set",
-              style: TextStyle(
+            Text(
+              l.onboarding_allSet,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 26,
                 fontWeight: FontWeight.w700,
@@ -350,24 +351,24 @@ class _CompleteStepState extends State<_CompleteStep> {
             const SizedBox(height: 6),
             Text(
               count == 0
-                  ? 'No systems configured yet — you can add sources later from Settings.'
-                  : '$count $label ready to browse.',
+                  ? l.onboarding_noSystems
+                  : l.onboarding_systemsReady(count),
               style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
             ),
             const SizedBox(height: 24),
             _CompleteTile(
               focusNode: _jumpFocus,
               icon: Icons.play_arrow_rounded,
-              title: 'Jump in',
-              subtitle: 'Open the home screen and start syncing',
+              title: l.onboarding_jumpIn,
+              subtitle: l.onboarding_jumpInSubtitle,
               onSelect: widget.onJumpIn,
             ),
             const SizedBox(height: 12),
             _CompleteTile(
               focusNode: _raFocus,
               icon: Icons.emoji_events,
-              title: 'RetroAchievements',
-              subtitle: 'Track your retro gaming achievements',
+              title: l.onboarding_retroachievements,
+              subtitle: l.onboarding_retroachievementsSubtitle,
               onSelect: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const RaOnboardingScreen()),
@@ -378,8 +379,8 @@ class _CompleteStepState extends State<_CompleteStep> {
             _CompleteTile(
               focusNode: _exportFocus,
               icon: Icons.share,
-              title: 'Export config',
-              subtitle: 'Re-use this setup on another device',
+              title: l.onboarding_exportConfig,
+              subtitle: l.onboarding_exportConfigSubtitle,
               onSelect: widget.onExport,
             ),
           ],

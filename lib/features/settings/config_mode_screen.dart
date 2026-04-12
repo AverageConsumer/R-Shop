@@ -1,21 +1,23 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
+import '../../l10n/app_localizations.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/widgets/console_focusable.dart';
+import '../../core/widgets/screen_layout.dart';
+import '../../models/config/system_config.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../utils/friendly_error.dart';
-import '../../providers/ra_providers.dart';
-import '../../services/audio_manager.dart';
 import '../../providers/game_providers.dart';
+import '../../providers/library_providers.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../onboarding/onboarding_controller.dart';
-import '../onboarding/widgets/console_setup_hud.dart';
-import '../onboarding/widgets/console_setup_step.dart';
-import '../onboarding/widgets/pixel_mascot.dart';
+import 'widgets/system_detail_view.dart';
 
 class ConfigModeScreen extends ConsumerStatefulWidget {
   const ConfigModeScreen({super.key});
@@ -23,26 +25,27 @@ class ConfigModeScreen extends ConsumerStatefulWidget {
   ConsumerState<ConfigModeScreen> createState() => _ConfigModeScreenState();
 }
 
-class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
-  final FocusNode _focusNode = FocusNode();
+class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen>
+    with ConsoleScreenMixin {
   bool _initialized = false;
-  late final AudioManager _audioManager;
+  final FocusNode _firstListNode = FocusNode();
+  final FocusNode _firstDetailNode = FocusNode();
 
   @override
-  void initState() {
-    super.initState();
-    _audioManager = ref.read(audioManagerProvider);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
-    });
-  }
+  String get routeId => 'config_mode';
+
+  @override
+  Map<Type, Action<Intent>> get screenActions => {
+        BackIntent: CallbackAction<BackIntent>(onInvoke: (_) {
+          _handleBack();
+          return null;
+        }),
+      };
 
   @override
   void dispose() {
-    try {
-      _audioManager.stopTyping();
-    } catch (e) { debugPrint('ConfigModeScreen: stopTyping failed: $e'); }
-    _focusNode.dispose();
+    _firstListNode.dispose();
+    _firstDetailNode.dispose();
     super.dispose();
   }
 
@@ -53,91 +56,41 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     if (configAsync case AsyncData(value: final config)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          ref.read(onboardingControllerProvider.notifier).loadFromConfig(config);
+          ref.read(onboardingControllerProvider.notifier)
+              .loadFromConfig(config);
+          // Focus the first system card after config is loaded and the
+          // list has been built.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _firstListNode.canRequestFocus) {
+              _firstListNode.requestFocus();
+            }
+          });
         }
       });
     }
   }
 
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-
-    if (!ref.read(inputDebouncerProvider).canPerformAction()) {
-      return KeyEventResult.handled;
-    }
-
+  void _handleBack() {
     final state = ref.read(onboardingControllerProvider);
-    final controller = ref.read(onboardingControllerProvider.notifier);
-
-    // Provider form is open
-    if (state.hasProviderForm) {
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-          event.logicalKey == LogicalKeyboardKey.escape) {
-        controller.cancelProviderForm();
-        return KeyEventResult.handled;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonY) {
-        if (state.canTest && !state.isTestingConnection) {
-          controller.testAndSaveProvider();
-        }
-        return KeyEventResult.handled;
-      }
-      return KeyEventResult.ignored;
-    }
-
-    // Console panel is open — only system-level options here, source
-    // management has moved to Settings → Sources.
     if (state.hasConsoleSelected) {
-      if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-          event.logicalKey == LogicalKeyboardKey.escape) {
-        controller.deselectConsole();
-        return KeyEventResult.handled;
-      }
-      return KeyEventResult.ignored;
-    }
-
-    // Grid level: B = save and go back
-    if (event.logicalKey == LogicalKeyboardKey.gameButtonB ||
-        event.logicalKey == LogicalKeyboardKey.escape) {
+      ref.read(onboardingControllerProvider.notifier).deselectConsole();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _firstListNode.requestFocus();
+      });
+    } else {
       _saveAndGoBack();
-      return KeyEventResult.handled;
     }
-    if (event.logicalKey == LogicalKeyboardKey.gameButtonStart) {
-      _exportConfig();
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.gameButtonSelect) {
-      _importConfig();
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
   }
 
   Future<void> _saveAndGoBack() async {
-    final audioManager = ref.read(audioManagerProvider);
-    audioManager.stopTyping();
     final controller = ref.read(onboardingControllerProvider.notifier);
     final config = await controller.buildFinalConfig();
     final jsonString =
         const JsonEncoder.withIndent('  ').convert(config.toJson());
     await ref.read(configStorageServiceProvider).saveConfig(jsonString);
     ref.invalidate(bootstrappedConfigProvider);
-    _triggerRaSync();
     if (!mounted) return;
     Navigator.pop(context);
-  }
-
-  /// Trigger RA sync for newly added systems after config change.
-  void _triggerRaSync() {
-    final storage = ref.read(storageServiceProvider);
-    if (!storage.isRaConfigured) return;
-    final raSystems = SystemModel.supportedSystems
-        .where((s) => s.raConsoleId != null)
-        .toList();
-    if (raSystems.isNotEmpty) {
-      ref.read(raSyncServiceProvider.notifier).syncAll(raSystems, force: true);
-    }
   }
 
   Future<void> _exportConfig() async {
@@ -146,7 +99,8 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
       await controller.exportConfig();
     } catch (e) {
       if (!mounted) return;
-      showErrorNotification(context, ref, message: 'Export failed: ${getUserFriendlyError(e)}');
+      showErrorNotification(context, ref,
+          message: 'Export failed: ${getUserFriendlyError(e)}');
     }
   }
 
@@ -155,12 +109,15 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
     if (!mounted) return;
     if (result.cancelled) return;
     if (result.error != null) {
-      showErrorNotification(context, ref, message: 'Invalid config: ${result.error}');
+      showErrorNotification(context, ref,
+          message: 'Invalid config: ${result.error}');
     } else {
-      // Reload controller from freshly imported config
-      ref.read(onboardingControllerProvider.notifier).loadFromConfig(result.config!);
-      // Refresh sources so the notifier picks up any imported sources.
+      ref
+          .read(onboardingControllerProvider.notifier)
+          .loadFromConfig(result.config!);
       ref.read(sourcesProvider.notifier).replaceAll(result.config!.sources);
+      ref.invalidate(gamesProvider);
+      ref.read(gameDbChangedProvider.notifier).state++;
       final count = result.config!.systems
           .expand((s) => s.providers)
           .where((p) => p.needsAuth)
@@ -170,140 +127,257 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen> {
         ref,
         message: count > 0
             ? 'Config imported — $count provider${count > 1 ? 's' : ''} need credentials'
-            : 'Config imported!',
+            : L.of(context).settings_configImported,
       );
     }
   }
 
+  void _selectSystem(String id) {
+    ref.read(onboardingControllerProvider.notifier).selectConsole(id);
+    ref.read(feedbackServiceProvider).tick();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _firstDetailNode.requestFocus();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final state = ref.watch(onboardingControllerProvider);
     final rs = context.rs;
 
-    // Initialize on first build once config is available
     if (ref.watch(bootstrappedConfigProvider) case AsyncData()) {
       _initFromConfig();
     }
 
-    // Re-request focus only after structural changes (console select/deselect,
-    // form open/close). Skip minor changes (folder path, toggles, merge mode)
-    // to avoid fighting with child focus restoration (e.g. after folder picker).
-    ref.listen(onboardingControllerProvider, (prev, next) {
-      if (next.hasProviderForm) return;
-      if (prev != null &&
-          prev.hasConsoleSelected == next.hasConsoleSelected &&
-          prev.hasProviderForm == next.hasProviderForm) {
-        return; // Minor change — don't steal focus
-      }
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_focusNode.hasFocus) {
-          _focusNode.requestFocus();
-        }
-      });
-    });
+    final topPadding = rs.safeAreaTop + (rs.isSmall ? 56 : 72);
 
-    return Focus(
-      focusNode: _focusNode,
-      onKeyEvent: _handleKeyEvent,
-      autofocus: true,
-      child: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) _saveAndGoBack();
-        },
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
-            children: [
-              const _ConfigModeBackground(),
-              SafeArea(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: rs.isSmall ? rs.spacing.md : rs.spacing.lg,
-                    vertical: rs.isSmall ? rs.spacing.md : rs.spacing.xxl,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      rs.isPortrait
-                          ? _buildPortraitContent(state, rs)
-                          : _buildLandscapeContent(state, rs),
-                    ],
+    return buildWithActions(
+      ScreenLayout(
+        backgroundColor: Colors.black,
+        accentColor: AppTheme.primaryColor,
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1A1A1A), Colors.black],
                   ),
                 ),
               ),
-              _buildControls(state, rs),
-            ],
-          ),
+            ),
+            Column(
+              children: [
+                SizedBox(height: topPadding),
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: state.hasConsoleSelected
+                        ? SystemDetailView(
+                            key: ValueKey(
+                                'detail_${state.selectedConsoleId}'),
+                            firstFocusNode: _firstDetailNode,
+                          )
+                        : _SystemList(
+                            key: const ValueKey('system_list'),
+                            systems: state.configuredSystems,
+                            firstFocusNode: _firstListNode,
+                            onSelect: _selectSystem,
+                          ),
+                  ),
+                ),
+              ],
+            ),
+            _buildHeader(rs, state, l),
+            ConsoleHud(
+              b: HudAction(l.common_back, onTap: _handleBack),
+              start: state.hasConsoleSelected
+                  ? null
+                  : HudAction(l.configMode_export, onTap: _exportConfig),
+              select: state.hasConsoleSelected
+                  ? null
+                  : HudAction(l.configMode_import, onTap: _importConfig),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildLandscapeContent(OnboardingState state, Responsive rs) {
-    return Expanded(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          PixelMascot(size: rs.isSmall ? 36 : 48),
-          Expanded(child: _buildContent(state)),
-        ],
+  Widget _buildHeader(Responsive rs, OnboardingState state, L l) {
+    final system = state.selectedSystem;
+    final title = system != null
+        ? system.name.toUpperCase()
+        : l.configMode_title;
+
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black,
+              Color.fromRGBO(0, 0, 0, 0.9),
+              Color.fromRGBO(0, 0, 0, 0.6),
+              Colors.transparent,
+            ],
+            stops: [0.0, 0.5, 0.8, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: rs.isSmall ? 16.0 : 24.0,
+              vertical: rs.isSmall ? 8.0 : 12.0,
+            ),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: rs.isSmall ? 18 : 22,
+                fontWeight: FontWeight.w900,
+                color: system != null
+                    ? (system.accentColor)
+                    : Colors.white,
+                letterSpacing: 4,
+              ),
+            ),
+          ),
+        ),
       ),
-    );
-  }
-
-  Widget _buildPortraitContent(OnboardingState state, Responsive rs) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          PixelMascot(size: rs.isSmall ? 28 : 40),
-          SizedBox(height: rs.spacing.sm),
-          Expanded(child: _buildContent(state)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContent(OnboardingState state) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 400),
-      child: ConsoleSetupStep(
-        onComplete: () {}, // No message animation needed in config mode
-      ),
-    );
-  }
-
-  Widget _buildControls(OnboardingState state, Responsive rs) {
-    final shared = buildConsoleSetupHud(state: state, ref: ref);
-    if (shared != null) return shared;
-
-    // Grid level
-    return ConsoleHud(
-      b: HudAction('Save & Back', onTap: _saveAndGoBack),
-      start: HudAction('Export', onTap: _exportConfig),
-      select: HudAction('Import', onTap: _importConfig),
     );
   }
 }
 
-class _ConfigModeBackground extends StatelessWidget {
-  const _ConfigModeBackground();
+class _SystemList extends ConsumerWidget {
+  final Map<String, SystemConfig> systems;
+  final FocusNode firstFocusNode;
+  final ValueChanged<String> onSelect;
+
+  const _SystemList({
+    super.key,
+    required this.systems,
+    required this.firstFocusNode,
+    required this.onSelect,
+  });
+
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.redAccent.withValues(alpha: 0.25),
-            Colors.redAccent.withValues(alpha: 0.12),
-            const Color(0xFF080808),
-            const Color(0xFF030303),
-            Colors.black,
-          ],
-          stops: const [0.0, 0.15, 0.35, 0.6, 1.0],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = L.of(context);
+    final rs = context.rs;
+    final allSystems = SystemModel.supportedSystems;
+    // Show configured systems first, then unconfigured ones.
+    final configured = allSystems
+        .where((s) => systems.containsKey(s.id))
+        .toList();
+    final unconfigured = allSystems
+        .where((s) => !systems.containsKey(s.id))
+        .toList();
+    final sorted = [...configured, ...unconfigured];
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720),
+        child: FocusTraversalGroup(
+          child: ListView.separated(
+            padding: EdgeInsets.symmetric(
+              horizontal: rs.spacing.lg,
+              vertical: rs.spacing.md,
+            ),
+            itemCount: sorted.length,
+            separatorBuilder: (_, __) => SizedBox(height: rs.spacing.sm),
+            itemBuilder: (context, index) {
+              final system = sorted[index];
+              final config = systems[system.id];
+              final isConfigured = config != null;
+              final accent = system.accentColor;
+
+              return ConsoleFocusable(
+                focusNode: index == 0 ? firstFocusNode : null,
+                onSelect: () => onSelect(system.id),
+                borderRadius: 12,
+                focusScale: 1.0,
+                focusBorderColor: accent,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1C1C1C),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isConfigured
+                          ? accent.withValues(alpha: 0.3)
+                          : Colors.white12,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          isConfigured
+                              ? Icons.sports_esports
+                              : Icons.sports_esports_outlined,
+                          color: accent,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              system.name,
+                              style: TextStyle(
+                                color: isConfigured
+                                    ? Colors.white
+                                    : Colors.white54,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              isConfigured
+                                  ? config.targetFolder.isEmpty ? l.configMode_noFolderSet : config.targetFolder
+                                  : l.configMode_notConfigured,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isConfigured)
+                        Icon(Icons.check_circle,
+                            color: accent.withValues(alpha: 0.6),
+                            size: 18),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.chevron_right,
+                          color: Colors.white30),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

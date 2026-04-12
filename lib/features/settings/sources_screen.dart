@@ -7,17 +7,21 @@ import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/console_focusable.dart';
 import '../../core/widgets/screen_layout.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/config/provider_config.dart';
 import '../../models/config/source.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
+import '../../providers/library_providers.dart';
+import '../../providers/source_health_providers.dart';
 import '../../services/romm_api_service.dart';
 import '../../services/romm_pairing_service.dart';
 import '../../services/romm_platform_matcher.dart';
 import '../../services/sources_notifier.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
+import '../onboarding/widgets/romm_legacy_login_screen.dart';
 import '../pairing/qr_pairing_screen.dart';
 import '../sources/manual_source_add_screen.dart';
 import '../sources/source_mappings_screen.dart';
@@ -199,12 +203,14 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _showTypePicker = false);
   }
 
-  Future<void> _onTypePicked(SourceType type) async {
+  Future<void> _onTypePicked(_TypeOption option) async {
     setState(() => _showTypePicker = false);
-    if (type == SourceType.romm) {
+    if (option.type == SourceType.romm && !option.isLegacy) {
       await _addRommSource();
+    } else if (option.type == SourceType.romm && option.isLegacy) {
+      await _addRommLegacy();
     } else {
-      await _addManualSource(type);
+      await _addManualSource(option.type);
     }
   }
 
@@ -252,7 +258,18 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final notifier = ref.read(sourcesProvider.notifier);
     final addedSource = source.copyWith(knownPlatforms: knownPlatforms);
     await notifier.addSource(addedSource);
+
+    // Auto-create SystemConfigs for platforms the user doesn't have yet.
+    final basePath = ref.read(storageServiceProvider).getRomPath()
+        ?? '/storage/emulated/0/ROMs';
+    final newConsoles = await notifier.ensureSystemsForSource(
+      addedSource,
+      basePath: basePath,
+    );
+
     ref.invalidate(bootstrappedConfigProvider);
+    ref.invalidate(gamesProvider);
+    ref.read(gameDbChangedProvider.notifier).state++;
 
     if (!mounted) return;
 
@@ -264,15 +281,62 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
       _initialFocusClaimed = true;
     });
 
-    showSuccessNotification(
-      context,
-      ref,
-      message: discoveryError != null
-          ? 'Added ${source.name}, but platform discovery failed'
-          : 'Added ${source.name} '
-              '(${knownPlatforms.length} '
-              '${knownPlatforms.length == 1 ? "platform" : "platforms"})',
+    final String message;
+    if (discoveryError != null) {
+      message = 'Added ${source.name}, but platform discovery failed';
+    } else if (newConsoles.names.isNotEmpty) {
+      message = 'Added ${source.name} — '
+          '${newConsoles.names.length} new console${newConsoles.names.length == 1 ? '' : 's'}: '
+          '${newConsoles.names.join(', ')}';
+    } else {
+      message = 'Added ${source.name} '
+          '(${knownPlatforms.length} '
+          '${knownPlatforms.length == 1 ? "platform" : "platforms"})';
+    }
+
+    showSuccessNotification(context, ref, message: message);
+  }
+
+  Future<void> _addRommLegacy() async {
+    final source = await Navigator.of(context).push<Source?>(
+      MaterialPageRoute(builder: (_) => const RommLegacyLoginScreen()),
     );
+    if (!mounted || source == null) return;
+
+    final notifier = ref.read(sourcesProvider.notifier);
+    await notifier.addSource(source);
+
+    final basePath = ref.read(storageServiceProvider).getRomPath()
+        ?? '/storage/emulated/0/ROMs';
+    final newConsoles = await notifier.ensureSystemsForSource(
+      source,
+      basePath: basePath,
+    );
+
+    ref.invalidate(bootstrappedConfigProvider);
+    ref.invalidate(gamesProvider);
+    ref.read(gameDbChangedProvider.notifier).state++;
+
+    if (!mounted) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusFor(source.id).requestFocus();
+      _initialFocusClaimed = true;
+    });
+
+    final String message;
+    if (newConsoles.names.isNotEmpty) {
+      message = 'Added ${source.name} — '
+          '${newConsoles.names.length} new console${newConsoles.names.length == 1 ? '' : 's'}: '
+          '${newConsoles.names.join(', ')}';
+    } else {
+      message = 'Added ${source.name} '
+          '(${source.knownPlatforms.length} '
+          '${source.knownPlatforms.length == 1 ? "platform" : "platforms"})';
+    }
+
+    showSuccessNotification(context, ref, message: message);
   }
 
   void _openSourceActions(Source source) {
@@ -296,9 +360,8 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final notifier = ref.read(sourcesProvider.notifier);
     await notifier.setEnabled(source.id, !source.enabled);
     ref.invalidate(bootstrappedConfigProvider);
-    // gamesProvider doesn't watch bootstrappedConfig, so the DB-cached
-    // game lists in HomeView/Library wouldn't refresh on their own.
     ref.invalidate(gamesProvider);
+    ref.read(gameDbChangedProvider.notifier).state++;
     if (mounted) _closeSourceActions();
   }
 
@@ -339,6 +402,8 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
         knownPlatforms: platforms,
       );
       ref.invalidate(bootstrappedConfigProvider);
+      ref.invalidate(gamesProvider);
+      ref.read(gameDbChangedProvider.notifier).state++;
     } catch (e) {
       debugPrint('SourcesScreen: refreshTokenFromPair failed: $e');
       if (mounted) {
@@ -373,6 +438,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     if (saved == true) {
       ref.invalidate(bootstrappedConfigProvider);
       ref.invalidate(gamesProvider);
+      ref.read(gameDbChangedProvider.notifier).state++;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -385,6 +451,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     await notifier.removeSource(source.id);
     ref.invalidate(bootstrappedConfigProvider);
     ref.invalidate(gamesProvider);
+    ref.read(gameDbChangedProvider.notifier).state++;
     if (mounted) {
       // Skip the focus-restore-on-deleted-card path.
       setState(() => _activeActionsSource = null);
@@ -425,8 +492,8 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
               ],
             ),
             ConsoleHud(
-              b: HudAction('Back', onTap: _goBack),
-              y: HudAction('Add Source', onTap: _addSource),
+              b: HudAction(L.of(context).common_back, onTap: _goBack),
+              y: HudAction(L.of(context).sources_addSource, onTap: _addSource),
             ),
             if (_activeActionsSource != null)
               _SourceActionsOverlay(
@@ -469,7 +536,7 @@ class _Header extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'SOURCES',
+            L.of(context).sources_title,
             style: TextStyle(
               fontSize: rs.isSmall ? 22 : 28,
               fontWeight: FontWeight.w900,
@@ -480,7 +547,7 @@ class _Header extends StatelessWidget {
           SizedBox(height: rs.spacing.xs),
           Text(
             count == 0
-                ? 'No sources configured'
+                ? L.of(context).sources_noSourcesConfigured
                 : '$count source${count == 1 ? "" : "s"} · [Y] add new',
             style: TextStyle(
               fontSize: rs.isSmall ? 10 : 12,
@@ -519,7 +586,7 @@ class _EmptyState extends StatelessWidget {
             ),
             SizedBox(height: rs.spacing.lg),
             Text(
-              'No sources yet',
+              L.of(context).sources_noSourcesYet,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: rs.isSmall ? 16 : 20,
@@ -530,8 +597,7 @@ class _EmptyState extends StatelessWidget {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: rs.spacing.lg),
               child: Text(
-                'Pair a RomM server to start downloading games. '
-                'Press [Y] or tap below to add one.',
+                L.of(context).sources_noSourcesDescription,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.grey.shade500,
@@ -556,12 +622,12 @@ class _EmptyState extends StatelessWidget {
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.add, color: AppTheme.primaryColor),
-                    SizedBox(width: 8),
+                  children: [
+                    const Icon(Icons.add, color: AppTheme.primaryColor),
+                    const SizedBox(width: 8),
                     Text(
-                      'Add source',
-                      style: TextStyle(
+                      L.of(context).sources_addSource,
+                      style: const TextStyle(
                         color: AppTheme.primaryColor,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1,
@@ -638,7 +704,7 @@ class _SourceList extends ConsumerWidget {
   }
 }
 
-class _SourceCard extends StatelessWidget {
+class _SourceCard extends ConsumerWidget {
   const _SourceCard({
     super.key,
     required this.source,
@@ -687,18 +753,18 @@ class _SourceCard extends StatelessWidget {
     }
   }
 
-  String? _expiryLabel() {
+  String? _expiryLabel(BuildContext context) {
     final exp = source.tokenExpiresAt;
     if (exp == null) return null;
     final delta = exp.difference(DateTime.now());
-    if (delta.isNegative) return 'EXPIRED';
+    if (delta.isNegative) return L.of(context).sources_expired;
     if (delta.inDays >= 2) return 'Expires in ${delta.inDays}d';
     if (delta.inHours >= 2) return 'Expires in ${delta.inHours}h';
     return 'Expires in ${delta.inMinutes}m';
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     // RomM auto-discovers platforms; everything else lives off manual
     // mappings, so the same "N entries" badge means different things
     // depending on the source type.
@@ -706,10 +772,15 @@ class _SourceCard extends StatelessWidget {
     final entryCount =
         isAutoMapped ? source.knownPlatforms.length : mappingCount;
     final entryNoun = isAutoMapped ? 'platform' : 'mapping';
-    final expiry = _expiryLabel();
+    final expiry = _expiryLabel(context);
     final expiryUrgent = expiry != null &&
         source.tokenExpiresAt != null &&
         source.tokenExpiresAt!.difference(DateTime.now()).inDays < 7;
+
+    // Token health from proactive background check.
+    final healthState = ref.watch(sourceHealthProvider);
+    final health = healthState.statusFor(source.id);
+    final healthError = healthState.errorFor(source.id);
 
     return ConsoleFocusable(
       focusNode: focusNode,
@@ -774,8 +845,8 @@ class _SourceCard extends StatelessWidget {
                                   .withValues(alpha: 0.5),
                             ),
                           ),
-                          child: const Text(
-                            'BORROWED',
+                          child: Text(
+                            L.of(context).sources_borrowed,
                             style: TextStyle(
                               color: Colors.lightBlueAccent,
                               fontSize: 9,
@@ -794,8 +865,8 @@ class _SourceCard extends StatelessWidget {
                             color: Colors.white12,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
-                            'OFF',
+                          child: Text(
+                            L.of(context).sources_off,
                             style: TextStyle(
                               color: Colors.white54,
                               fontSize: 9,
@@ -826,7 +897,7 @@ class _SourceCard extends StatelessWidget {
                       Text(
                         entryCount == 0
                             ? (isAutoMapped
-                                ? 'No platforms'
+                                ? L.of(context).sources_noPlatforms
                                 : 'No mappings — [A] to add')
                             : '$entryCount '
                                 '${entryCount == 1 ? entryNoun : "${entryNoun}s"}',
@@ -835,7 +906,34 @@ class _SourceCard extends StatelessWidget {
                           fontSize: 11,
                         ),
                       ),
-                      if (expiry != null) ...[
+                      if (health == SourceHealth.invalid) ...[
+                        const SizedBox(width: 10),
+                        const Icon(Icons.error_outline,
+                            size: 11, color: Colors.redAccent),
+                        const SizedBox(width: 3),
+                        Flexible(
+                          child: Text(
+                            healthError ?? 'Token invalid — re-pair',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ] else if (health == SourceHealth.checking) ...[
+                        const SizedBox(width: 10),
+                        const SizedBox(
+                          width: 10,
+                          height: 10,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            color: Colors.white38,
+                          ),
+                        ),
+                      ] else if (expiry != null) ...[
                         const SizedBox(width: 10),
                         Icon(
                           Icons.schedule,
@@ -905,35 +1003,36 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
 
   /// Build the ordered list of actions for the current source. Re-pair is
   /// only offered for RomM sources because the QR/code flow is RomM-only.
-  List<_OverlayAction> get _actions {
+  List<_OverlayAction> _actions(BuildContext context) {
     final src = widget.source;
+    final l = L.of(context);
     return [
       if (src.type == SourceType.romm)
         _OverlayAction(
           icon: Icons.qr_code_2,
-          label: 'Re-pair',
+          label: l.sources_rePair,
           onActivate: widget.onRepair,
         ),
       if (src.type != SourceType.romm)
         _OverlayAction(
           icon: Icons.tune,
-          label: 'Edit mappings',
+          label: l.sources_editMappings,
           onActivate: widget.onEditMappings,
         ),
       _OverlayAction(
         icon: src.enabled ? Icons.toggle_off : Icons.toggle_on,
-        label: src.enabled ? 'Disable' : 'Enable',
+        label: src.enabled ? l.sources_disable : l.sources_enable,
         onActivate: widget.onToggleEnabled,
       ),
       _OverlayAction(
         icon: Icons.delete_outline,
-        label: 'Remove',
+        label: l.common_remove,
         destructive: true,
         onActivate: widget.onRemove,
       ),
       _OverlayAction(
         icon: Icons.close,
-        label: 'Cancel',
+        label: l.common_cancel,
         cancelStyle: true,
         onActivate: widget.onClose,
       ),
@@ -952,7 +1051,7 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
     }
     final key = event.logicalKey;
 
-    final count = _actions.length;
+    final count = _actions(context).length;
     if (key == LogicalKeyboardKey.arrowUp) {
       setState(() {
         _selectedIndex = (_selectedIndex - 1 + count) % count;
@@ -984,7 +1083,7 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
   }
 
   void _activate() {
-    final action = _actions[_selectedIndex];
+    final action = _actions(context)[_selectedIndex];
     if (action.cancelStyle) {
       ref.read(feedbackServiceProvider).cancel();
     } else {
@@ -996,6 +1095,7 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
   @override
   Widget build(BuildContext context) {
     final src = widget.source;
+    final actions = _actions(context);
     return OverlayFocusScope(
       priority: OverlayPriority.dialog,
       isVisible: true,
@@ -1040,14 +1140,14 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      for (int i = 0; i < _actions.length; i++) ...[
+                      for (int i = 0; i < actions.length; i++) ...[
                         if (i > 0) const SizedBox(height: 8),
                         _OverlayButton(
-                          icon: _actions[i].icon,
-                          label: _actions[i].label,
+                          icon: actions[i].icon,
+                          label: actions[i].label,
                           selected: _selectedIndex == i,
-                          destructive: _actions[i].destructive,
-                          subdued: _actions[i].cancelStyle,
+                          destructive: actions[i].destructive,
+                          subdued: actions[i].cancelStyle,
                         ),
                       ],
                       const SizedBox(height: 12),
@@ -1161,7 +1261,7 @@ class _SourceTypePickerOverlay extends ConsumerStatefulWidget {
   });
 
   final VoidCallback onClose;
-  final void Function(SourceType type) onPick;
+  final void Function(_TypeOption option) onPick;
 
   @override
   ConsumerState<_SourceTypePickerOverlay> createState() =>
@@ -1173,31 +1273,39 @@ class _SourceTypePickerOverlayState
   final FocusNode _scopeFocus =
       FocusNode(debugLabel: 'source_type_picker');
   int _selectedIndex = 0;
+  List<_TypeOption> _options = const [];
 
-  static const List<_TypeOption> _options = [
+  static List<_TypeOption> _buildOptions(L l) => [
     _TypeOption(
       type: SourceType.romm,
       icon: Icons.qr_code_2,
-      label: 'RomM Server',
-      hint: 'Pair via QR or 8-digit code',
+      label: l.sources_sourceTypeRomm,
+      hint: l.sources_sourceTypeRommHint,
+    ),
+    _TypeOption(
+      type: SourceType.romm,
+      icon: Icons.password,
+      label: l.sources_sourceTypeRommLegacy,
+      hint: l.onboarding_legacyLoginSubtitle,
+      isLegacy: true,
     ),
     _TypeOption(
       type: SourceType.smb,
       icon: Icons.folder_shared,
-      label: 'SMB Share',
+      label: l.sources_sourceTypeSmb,
       hint: 'Windows / NAS network share',
     ),
     _TypeOption(
       type: SourceType.ftp,
       icon: Icons.cloud_queue,
-      label: 'FTP Server',
+      label: l.sources_sourceTypeFtp,
       hint: 'Classic FTP/FTPS host',
     ),
     _TypeOption(
       type: SourceType.web,
       icon: Icons.public,
-      label: 'Web Mirror',
-      hint: 'HTTPS directory listing',
+      label: l.sources_sourceTypeWeb,
+      hint: l.sources_sourceTypeWebHint,
     ),
   ];
 
@@ -1228,7 +1336,7 @@ class _SourceTypePickerOverlayState
         key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.select) {
       ref.read(feedbackServiceProvider).confirm();
-      widget.onPick(_options[_selectedIndex].type);
+      widget.onPick(_options[_selectedIndex]);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.gameButtonB ||
@@ -1243,6 +1351,8 @@ class _SourceTypePickerOverlayState
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
+    _options = _buildOptions(l);
     return OverlayFocusScope(
       priority: OverlayPriority.dialog,
       isVisible: true,
@@ -1265,12 +1375,13 @@ class _SourceTypePickerOverlayState
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.white12),
                   ),
-                  child: Column(
+                  child: SingleChildScrollView(
+                    child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Add a source',
+                      Text(
+                        l.sources_addSource,
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -1279,7 +1390,7 @@ class _SourceTypePickerOverlayState
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Where do your games come from?',
+                        l.sources_whereDoGamesComeFrom,
                         style: TextStyle(
                           color: Colors.grey.shade500,
                           fontSize: 12,
@@ -1306,6 +1417,7 @@ class _SourceTypePickerOverlayState
                       ),
                     ],
                   ),
+                  ),
                 ),
               ),
             ),
@@ -1322,11 +1434,13 @@ class _TypeOption {
     required this.icon,
     required this.label,
     required this.hint,
+    this.isLegacy = false,
   });
   final SourceType type;
   final IconData icon;
   final String label;
   final String hint;
+  final bool isLegacy;
 }
 
 class _TypeOptionTile extends StatelessWidget {

@@ -195,13 +195,17 @@ class GameListController extends ChangeNotifier {
   }
 
   Future<void> _backgroundRefresh() async {
-    if (LibrarySyncService.isFresh(system.id)) return;
     if (LibrarySyncService.isSyncingSystem(system.id)) return;
-    // Also check persistent sync time (survives app restart)
-    final lastPersistent = _storage?.getLastSyncTime(system.id);
-    if (lastPersistent != null &&
-        DateTime.now().difference(lastPersistent).inMinutes < 5) {
-      return;
+    // Skip if recently synced — unless the system has no games yet
+    // (newly discovered systems should always sync on first visit).
+    final hasGames = _state.allGames.isNotEmpty;
+    if (hasGames) {
+      if (LibrarySyncService.isFresh(system.id)) return;
+      final lastPersistent = _storage?.getLastSyncTime(system.id);
+      if (lastPersistent != null &&
+          DateTime.now().difference(lastPersistent).inMinutes < 5) {
+        return;
+      }
     }
     try {
       final remoteGames = await _unifiedService.fetchGamesForSystem(systemConfig);
@@ -435,7 +439,11 @@ class GameListController extends ChangeNotifier {
       installedCache[entry.key] = _isAnyVariantInSet(entry.value, installedFilenames);
     }
     _state = _state.copyWith(installedCache: installedCache, isLoading: false);
-    notifyListeners();
+    if (_state.activeFilters.localOnly) {
+      _applyFilters();
+    } else {
+      notifyListeners();
+    }
   }
 
   bool _isAnyVariantInSet(List<GameItem> variants, Set<String> filenames) {

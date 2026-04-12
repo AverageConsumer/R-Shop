@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../logic/filter_state.dart';
 
 enum _FilterItemType { header, option }
@@ -262,9 +263,20 @@ class _FilterOverlayState extends State<FilterOverlay>
     return widget.selectedLanguages.contains(item.option!.id);
   }
 
+  String _localizeLabel(L l, _FilterItem item) {
+    switch (item.label) {
+      case 'Favorites Only': return l.filter_favoritesOnly;
+      case 'Installed Only': return l.filter_installedOnly;
+      case 'REGIONS': return l.filter_regions;
+      case 'LANGUAGES': return l.filter_languages;
+      default: return item.label;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+    final l = L.of(context);
     final totalActive = widget.selectedRegions.length + widget.selectedLanguages.length + (widget.favoritesOnly ? 1 : 0) + (widget.localOnly ? 1 : 0);
 
     return FadeTransition(
@@ -322,7 +334,7 @@ class _FilterOverlayState extends State<FilterOverlay>
                   child: Focus(
                     focusNode: _focusNode,
                     autofocus: true,
-                    child: _buildPanel(rs, totalActive),
+                    child: _buildPanel(rs, totalActive, l),
                   ),
                 ),
               ),
@@ -333,7 +345,7 @@ class _FilterOverlayState extends State<FilterOverlay>
     );
   }
 
-  Widget _buildPanel(Responsive rs, int totalActive) {
+  Widget _buildPanel(Responsive rs, int totalActive, L l) {
     final padding = rs.isSmall ? rs.spacing.md : rs.spacing.lg;
     final headerFontSize = rs.isSmall ? 16.0 : 20.0;
     final badgeFontSize = rs.isSmall ? 11.0 : 13.0;
@@ -366,7 +378,7 @@ class _FilterOverlayState extends State<FilterOverlay>
               child: Row(
                 children: [
                   Text(
-                    'FILTER',
+                    l.filter_title,
                     style: TextStyle(
                       fontSize: headerFontSize,
                       fontWeight: FontWeight.w900,
@@ -389,7 +401,7 @@ class _FilterOverlayState extends State<FilterOverlay>
                         ),
                       ),
                       child: Text(
-                        '$totalActive active',
+                        l.filter_activeCount(totalActive),
                         style: TextStyle(
                           fontSize: badgeFontSize,
                           fontWeight: FontWeight.w600,
@@ -414,11 +426,12 @@ class _FilterOverlayState extends State<FilterOverlay>
                 itemBuilder: (context, index) {
                   final item = _items[index];
                   if (item.type == _FilterItemType.header) {
-                    return _buildHeader(rs, item);
+                    return _buildHeader(rs, item, l);
                   }
                   return _buildOption(
                     rs,
                     item,
+                    l,
                     isFocused: index == _focusedIndex,
                     isSelected: _isSelected(item),
                     index: index,
@@ -432,14 +445,14 @@ class _FilterOverlayState extends State<FilterOverlay>
     );
   }
 
-  Widget _buildHeader(Responsive rs, _FilterItem item) {
+  Widget _buildHeader(Responsive rs, _FilterItem item, L l) {
     final fontSize = rs.isSmall ? 10.0 : 11.0;
     final padding = rs.isSmall ? rs.spacing.md : rs.spacing.lg;
 
     return Padding(
       padding: EdgeInsets.fromLTRB(padding, 12, padding, 4),
       child: Text(
-        item.label,
+        _localizeLabel(l, item),
         style: TextStyle(
           fontSize: fontSize,
           fontWeight: FontWeight.w700,
@@ -452,7 +465,8 @@ class _FilterOverlayState extends State<FilterOverlay>
 
   Widget _buildOption(
     Responsive rs,
-    _FilterItem item, {
+    _FilterItem item,
+    L l, {
     required bool isFocused,
     required bool isSelected,
     required int index,
@@ -536,7 +550,7 @@ class _FilterOverlayState extends State<FilterOverlay>
             // Label
             Expanded(
               child: Text(
-                isToggle ? item.label : option.label,
+                isToggle ? _localizeLabel(l, item) : option.label,
                 style: TextStyle(
                   fontSize: fontSize,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,

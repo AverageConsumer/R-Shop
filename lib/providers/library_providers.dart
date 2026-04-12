@@ -24,8 +24,8 @@ final lastSyncHadFailuresProvider = Provider<bool>((ref) {
 
 /// Game counts per system, auto-refreshes when sync starts or completes.
 final gameCountsPerSystemProvider = FutureProvider<Map<String, int>>((ref) async {
-  // Only re-fetch when isSyncing changes (not on every completedSystems++)
-  ref.watch(librarySyncServiceProvider.select((s) => s.isSyncing));
+  // Re-fetch after each system completes sync
+  ref.watch(librarySyncServiceProvider.select((s) => s.completedSystems));
   ref.watch(gameDbChangedProvider);
   return ref.read(libraryDbProvider).getGameCountsPerSystem();
 });

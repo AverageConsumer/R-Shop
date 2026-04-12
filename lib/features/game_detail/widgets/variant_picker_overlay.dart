@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/input/overlay_scope.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/game_item.dart';
 import '../../../models/system_model.dart';
 import '../../../providers/app_providers.dart';
@@ -252,7 +253,7 @@ class _VariantPickerOverlayState extends ConsumerState<VariantPickerOverlay>
           Row(
             children: [
               Text(
-                'VERSIONS',
+                L.of(context).gameDetail_versions,
                 style: TextStyle(
                   color: Colors.grey.shade400,
                   fontSize: labelFontSize,

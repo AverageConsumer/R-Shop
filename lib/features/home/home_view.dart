@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/widgets/screen_layout.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/download_providers.dart';
@@ -16,7 +17,6 @@ import '../../services/input_debouncer.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/download_overlay.dart';
-import '../../widgets/sync_badge.dart';
 import '../library/library_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 import '../settings/settings_screen.dart';
@@ -438,36 +438,37 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   List<QuickMenuItem?> _buildQuickMenuItems() {
+    final l = L.of(context);
     final hasDownloads = ref.read(hasQueueItemsProvider);
     return [
       QuickMenuItem(
-        label: 'Search',
+        label: l.common_search,
         icon: Icons.search_rounded,
         shortcutHint: 'Y',
         onSelect: _openLibrarySearch,
       ),
       if (!_isLibraryIndex && _configuredSystems.isNotEmpty)
         QuickMenuItem(
-          label: 'Sync ${_getSystem(_currentIndex).name}',
+          label: l.home_syncSystem(_getSystem(_currentIndex).name),
           subtitle: _lastSyncLabel(_getSystem(_currentIndex).id),
           icon: Icons.sync_rounded,
           onSelect: _syncCurrentSystem,
         ),
       if (_configuredSystems.length > 1)
         QuickMenuItem(
-          label: 'Sync All',
+          label: l.home_syncAll,
           icon: Icons.sync_rounded,
           onSelect: _syncAll,
         ),
       QuickMenuItem(
-        label: 'Settings',
+        label: l.home_settings,
         icon: Icons.settings_rounded,
         onSelect: _openSettings,
       ),
       if (hasDownloads) ...[
         null,
         QuickMenuItem(
-          label: 'Downloads',
+          label: l.common_downloads,
           icon: Icons.download_rounded,
           shortcutHint: null,
           onSelect: () => toggleDownloadOverlay(ref),
@@ -502,8 +503,8 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   void _syncAll() async {
-    final config = ref.read(bootstrappedConfigProvider).valueOrNull;
-    if (config == null || config.systems.isEmpty) return;
+    final config = await ref.read(bootstrappedConfigProvider.future);
+    if (config.systems.isEmpty) return;
     final syncService = ref.read(librarySyncServiceProvider.notifier);
     if (ref.read(librarySyncServiceProvider).isSyncing) {
       syncService.cancel();
@@ -524,13 +525,14 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   String _lastSyncLabel(String systemId) {
+    final l = L.of(context);
     final lastSync = ref.read(storageServiceProvider).getLastSyncTime(systemId);
-    if (lastSync == null) return 'Never synced';
+    if (lastSync == null) return l.home_lastSyncNever;
     final diff = DateTime.now().difference(lastSync);
-    if (diff.inMinutes < 1) return 'Synced just now';
-    if (diff.inMinutes < 60) return 'Synced ${diff.inMinutes}min ago';
-    if (diff.inHours < 24) return 'Synced ${diff.inHours}h ago';
-    return 'Synced ${diff.inDays}d ago';
+    if (diff.inMinutes < 1) return l.home_lastSyncJustNow;
+    if (diff.inMinutes < 60) return l.home_lastSyncMinutes(diff.inMinutes);
+    if (diff.inHours < 24) return l.home_lastSyncHours(diff.inHours);
+    return l.home_lastSyncDays(diff.inDays);
   }
 
   void _exitApp() {
@@ -572,12 +574,12 @@ class _HomeViewState extends ConsumerState<HomeView>
                       const Icon(Icons.videogame_asset_off, size: 64, color: Colors.white24),
                       const SizedBox(height: 16),
                       Text(
-                        'No consoles configured',
+                        L.of(context).home_noConsoles,
                         style: TextStyle(color: Colors.grey[500], fontSize: 18),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Press Start for Menu',
+                        L.of(context).home_pressStartForMenu,
                         style: TextStyle(color: Colors.grey[600], fontSize: 13),
                       ),
                     ],
@@ -586,8 +588,8 @@ class _HomeViewState extends ConsumerState<HomeView>
               ),
               ConsoleHud(
                 embedded: true,
-                b: HudAction('Exit', onTap: _showExitDialogOverlay),
-                start: HudAction('Menu', onTap: toggleQuickMenu),
+                b: HudAction(L.of(context).common_exit, onTap: _showExitDialogOverlay),
+                start: HudAction(L.of(context).common_menu, onTap: toggleQuickMenu),
               ),
             ],
           ),
@@ -655,7 +657,6 @@ class _HomeViewState extends ConsumerState<HomeView>
               else
                 _buildLandscapeLayout(rs, currentSystem, isLibrary),
               if (isGrid) _buildControls(rs),
-              const SyncBadge(),
               if (showQuickMenu)
                 QuickMenuOverlay(
                   items: _buildQuickMenuItems(),
@@ -803,7 +804,7 @@ class _HomeViewState extends ConsumerState<HomeView>
       children: [
         _buildLibraryCountBadges(),
         Text(
-          'ALL GAMES',
+          L.of(context).home_allGames,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: rs.isSmall ? 28 : (rs.isMedium ? 36 : 42),
@@ -825,7 +826,7 @@ class _HomeViewState extends ConsumerState<HomeView>
         ),
         SizedBox(height: rs.spacing.sm),
         Text(
-          'Library',
+          L.of(context).home_library,
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: rs.isSmall ? 11 : 14,
@@ -1006,10 +1007,11 @@ class _HomeViewState extends ConsumerState<HomeView>
       return const SizedBox.shrink();
     }
 
+    final l = L.of(context);
     return ConsoleHud(
-      a: HudAction('Select', onTap: _navigateToCurrentSystem),
-      b: HudAction('Exit', onTap: _showExitDialogOverlay),
-      start: HudAction('Menu', onTap: toggleQuickMenu),
+      a: HudAction(l.common_select, onTap: _navigateToCurrentSystem),
+      b: HudAction(l.common_exit, onTap: _showExitDialogOverlay),
+      start: HudAction(l.common_menu, onTap: toggleQuickMenu),
     );
   }
 }

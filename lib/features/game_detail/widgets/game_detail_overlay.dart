@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../../../models/game_metadata_info.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../utils/game_metadata.dart';
@@ -26,6 +27,7 @@ class GameDetailOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+    final l = L.of(context);
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.gameButtonB,
@@ -65,7 +67,7 @@ class GameDetailOverlay extends StatelessWidget {
                     Flexible(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.all(16),
-                        child: _buildContent(),
+                        child: _buildContent(l),
                       ),
                     ),
                   ],
@@ -115,7 +117,7 @@ class GameDetailOverlay extends StatelessWidget {
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(L l) {
     final meta = richMetadata;
     final hasTags = fileMetadata.allTags.isNotEmpty;
 
@@ -155,16 +157,16 @@ class GameDetailOverlay extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.08), height: 1),
             ),
             if (meta.franchiseList.isNotEmpty)
-              _buildDetailRow('Franchise', meta.franchiseList.join(', ')),
+              _buildDetailRow(l.gameDetail_franchise, meta.franchiseList.join(', ')),
             if (meta.gameModeList.isNotEmpty)
-              _buildDetailRow('Game Modes', meta.gameModeList.join(', ')),
+              _buildDetailRow(l.gameDetail_gameModes, meta.gameModeList.join(', ')),
             if (meta.playerPerspectiveList.isNotEmpty)
               _buildDetailRow(
-                  'Perspective', meta.playerPerspectiveList.join(', ')),
+                  l.gameDetail_perspective, meta.playerPerspectiveList.join(', ')),
             if (meta.ageRating != null)
-              _buildDetailRow('Age Rating', meta.ageRating!),
+              _buildDetailRow(l.gameDetail_ageRating, meta.ageRating!),
             if (meta.themeList.isNotEmpty)
-              _buildDetailRow('Themes', meta.themeList.join(', ')),
+              _buildDetailRow(l.gameDetail_themes, meta.themeList.join(', ')),
           ],
 
           // Full genre list
@@ -191,14 +193,14 @@ class GameDetailOverlay extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.08), height: 1),
             const SizedBox(height: 14),
           ],
-          _buildSectionLabel('FILE TAGS'),
+          _buildSectionLabel(l.gameDetail_fileTags),
           const SizedBox(height: 8),
-          _buildTagSection('Version', TagType.version),
-          _buildTagSection('Build', TagType.build),
-          _buildTagSection('Disc', TagType.disc),
-          _buildTagSection('Quality', TagType.quality),
-          _buildTagSection('Info', TagType.other),
-          _buildTagSection('Technical', TagType.secondary),
+          _buildTagSection(l.gameDetail_tagVersion, TagType.version),
+          _buildTagSection(l.gameDetail_tagBuild, TagType.build),
+          _buildTagSection(l.gameDetail_tagDisc, TagType.disc),
+          _buildTagSection(l.gameDetail_tagQuality, TagType.quality),
+          _buildTagSection(l.gameDetail_tagInfo, TagType.other),
+          _buildTagSection(l.gameDetail_tagTechnical, TagType.secondary),
           _buildHiddenTagsSection(),
         ],
       ],

@@ -67,7 +67,9 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
   if (!hideEmpty) return withConfig;
 
   // Re-query when games are saved outside of sync (e.g. by GameListController)
+  // or when a system finishes syncing (new games may populate an empty system).
   ref.watch(gameDbChangedProvider);
+  ref.watch(librarySyncServiceProvider.select((s) => s.completedSystems));
 
   // Single batch query instead of N individual hasCache() calls
   final db = ref.read(libraryDbProvider);
@@ -91,8 +93,8 @@ final visibleSystemsProvider = FutureProvider<List<SystemModel>>((ref) async {
 /// Local = filesystem count of ROM files in each system's targetFolder.
 final systemSourceCountsProvider =
     FutureProvider<Map<String, ({int remote, int local})>>((ref) async {
-  // Re-fetch when sync finishes, files change on disk, or games saved outside sync
-  ref.watch(librarySyncServiceProvider.select((s) => s.isSyncing));
+  // Re-fetch after each system completes sync (not just on isSyncing transition)
+  ref.watch(librarySyncServiceProvider.select((s) => s.completedSystems));
   ref.watch(gameDbChangedProvider);
   final db = ref.read(libraryDbProvider);
   final remoteCounts = await db.getRemoteGameCountsPerSystem();

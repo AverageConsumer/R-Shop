@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/console_focusable.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/config/app_config.dart';
 import '../../models/config/source.dart';
 import '../../models/system_model.dart';
@@ -202,7 +203,7 @@ class _SourceMappingsScreenState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'System mappings',
+                      L.of(context).sourceMappings_title,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 22,
@@ -220,8 +221,7 @@ class _SourceMappingsScreenState
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Enter the remote folder for each system you want '
-                      'this source to serve. Leave empty to skip.',
+                      L.of(context).sourceMappings_instruction,
                       style: TextStyle(
                           color: Colors.grey.shade500, fontSize: 12),
                     ),
@@ -276,9 +276,9 @@ class _SourceMappingsScreenState
                                   color: AppTheme.primaryColor,
                                 ),
                               )
-                            : const Text(
-                                'Save mappings',
-                                style: TextStyle(
+                            : Text(
+                                L.of(context).sourceMappings_save,
+                                style: const TextStyle(
                                   color: AppTheme.primaryColor,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,

@@ -4,9 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/console_focusable.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/system_model.dart';
 import '../../../providers/app_providers.dart';
 import '../../../providers/ra_providers.dart';
+import '../../../widgets/console_hud.dart';
 
 /// Lightweight RetroAchievements setup screen used by both onboarding and
 /// settings. Matches the visual style of [RommLegacyLoginScreen] — dark
@@ -30,7 +32,7 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
   final _userCtl = TextEditingController();
   final _keyCtl = TextEditingController();
 
-  late final List<_Field> _fields;
+  late List<_Field> _fields;
   final _connectFocus = FocusNode(debugLabel: 'ra_ob_connect');
   final _syncFocus = FocusNode(debugLabel: 'ra_ob_sync');
   final _disconnectFocus = FocusNode(debugLabel: 'ra_ob_disconnect');
@@ -40,6 +42,7 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
   bool? _success;
   String? _error;
   bool _isConfigured = false;
+  bool _fieldsInitialized = false;
 
   @override
   void initState() {
@@ -49,15 +52,24 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
     _userCtl.text = storage.getRaUsername() ?? '';
     _keyCtl.text = storage.getRaApiKey() ?? '';
     _isConfigured = storage.isRaConfigured;
+    _fields = [];
+  }
 
-    _fields = [
-      _Field('Username', _userCtl, hint: 'your RA username'),
-      _Field('API Key', _keyCtl, hint: 'paste from retroachievements.org',
-          monospace: true),
-    ];
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _fields.first.consoleFocus.requestFocus();
-    });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_fieldsInitialized) {
+      _fieldsInitialized = true;
+      final l = L.of(context);
+      _fields = [
+        _Field(l.ra_usernameLabel, _userCtl, hint: l.ra_usernameHint),
+        _Field(l.ra_apiKeyLabel, _keyCtl, hint: l.ra_apiKeyHint,
+            monospace: true),
+      ];
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _fields.first.consoleFocus.requestFocus();
+      });
+    }
   }
 
   @override
@@ -175,8 +187,9 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
   }
 
   String? _validate() {
-    if (_userCtl.text.trim().isEmpty) return 'Username is required';
-    if (_keyCtl.text.trim().isEmpty) return 'API Key is required';
+    final l = L.of(context);
+    if (_userCtl.text.trim().isEmpty) return l.ra_usernameRequired;
+    if (_keyCtl.text.trim().isEmpty) return l.ra_apiKeyRequired;
     return null;
   }
 
@@ -228,7 +241,7 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
         setState(() {
           _busy = false;
           _success = false;
-          _error = result.error ?? 'Connection failed';
+          _error = result.error ?? L.of(context).ra_connectionFailed;
         });
       }
     } catch (e) {
@@ -236,95 +249,107 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
       setState(() {
         _busy = false;
         _success = false;
-        _error = 'Connection failed: $e';
+        _error = '${L.of(context).ra_connectionFailed}: $e';
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: SafeArea(
-        child: Focus(
-          focusNode: _screenFocus,
-          autofocus: true,
-          onKeyEvent: _handleScreenKey,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'RetroAchievements',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Track your retro gaming achievements. '
-                      'Get your API key at retroachievements.org/controlpanel.php',
-                      style: TextStyle(
-                          color: Colors.grey.shade500, fontSize: 12),
-                    ),
-                    const SizedBox(height: 20),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (final f in _fields) ...[
-                              _label(f.label),
-                              _textBox(f),
-                              const SizedBox(height: 12),
-                            ],
-                            if (_success != null) ...[
-                              const SizedBox(height: 4),
-                              _resultBanner(),
-                            ],
-                            if (_error != null && _success == null) ...[
-                              const SizedBox(height: 4),
-                              Text(_error!,
-                                  style: const TextStyle(
-                                      color: Colors.redAccent, fontSize: 13)),
-                            ],
-                            const SizedBox(height: 16),
-                            _actionButton(
-                              focusNode: _connectFocus,
-                              label: _busy ? 'Testing…' : 'Test & connect',
-                              icon: Icons.wifi_tethering,
-                              busy: _busy,
-                              onSelect: _busy ? null : _connect,
-                              primary: true,
-                            ),
-                            if (_isConfigured) ...[
-                              const SizedBox(height: 12),
-                              _buildSyncButton(),
-                              const SizedBox(height: 12),
-                              _actionButton(
-                                focusNode: _disconnectFocus,
-                                label: 'Disconnect',
-                                icon: Icons.link_off,
-                                onSelect: _disconnect,
-                                destructive: true,
-                              ),
-                            ],
-                          ],
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Focus(
+              focusNode: _screenFocus,
+              autofocus: true,
+              onKeyEvent: _handleScreenKey,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l.ra_title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${l.ra_subtitle}'
+                          'Get your API key at retroachievements.org/controlpanel.php',
+                          style: TextStyle(
+                              color: Colors.grey.shade500, fontSize: 12),
+                        ),
+                        const SizedBox(height: 20),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (final f in _fields) ...[
+                                  _textBox(f),
+                                  const SizedBox(height: 12),
+                                ],
+                                if (_success != null) ...[
+                                  const SizedBox(height: 4),
+                                  _resultBanner(),
+                                ],
+                                if (_error != null && _success == null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(_error!,
+                                      style: const TextStyle(
+                                          color: Colors.redAccent,
+                                          fontSize: 13)),
+                                ],
+                                const SizedBox(height: 16),
+                                _actionButton(
+                                  focusNode: _connectFocus,
+                                  label:
+                                      _busy ? l.providerForm_testingConnection : 'Test & connect',
+                                  icon: Icons.wifi_tethering,
+                                  busy: _busy,
+                                  onSelect: _busy ? null : _connect,
+                                  primary: true,
+                                ),
+                                if (_isConfigured) ...[
+                                  const SizedBox(height: 12),
+                                  _buildSyncButton(),
+                                  const SizedBox(height: 12),
+                                  _actionButton(
+                                    focusNode: _disconnectFocus,
+                                    label: l.ra_disconnect,
+                                    icon: Icons.link_off,
+                                    onSelect: _disconnect,
+                                    destructive: true,
+                                  ),
+                                ],
+                                // Extra bottom padding so content doesn't
+                                // hide behind the HUD.
+                                const SizedBox(height: 56),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+          ConsoleHud(
+            b: HudAction(l.common_back, onTap: () => Navigator.maybePop(context)),
+          ),
+        ],
       ),
     );
   }
@@ -335,7 +360,7 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
     final label = isSyncing
         ? 'Syncing ${syncState.currentSystem ?? ''}… '
             '(${syncState.completedSystems}/${syncState.totalSystems})'
-        : 'Sync achievements now';
+        : L.of(context).ra_syncNow;
 
     return _actionButton(
       focusNode: _syncFocus,
@@ -427,7 +452,7 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
             child: Text(
               ok
                   ? 'Connected — achievements will show on your games'
-                  : _error ?? 'Connection failed',
+                  : _error ?? L.of(context).ra_connectionFailed,
               style: TextStyle(
                 color: ok ? Colors.white70 : Colors.redAccent,
                 fontSize: 12,
@@ -451,43 +476,50 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
       focusNode: f.consoleFocus,
       focusScale: 1.0,
       onSelect: () => f.textFocus.requestFocus(),
-      child: ListenableBuilder(
-        listenable: f.textFocus,
-        builder: (context, _) {
-          final hasFocus = f.textFocus.hasFocus;
-          return Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF252525),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: hasFocus
-                    ? AppTheme.primaryColor
-                    : AppTheme.primaryColor.withValues(alpha: 0.4),
-                width: 2,
-              ),
-            ),
-            child: TextField(
-              controller: f.controller,
-              focusNode: f.textFocus,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontFamily: f.monospace ? 'monospace' : null,
-              ),
-              decoration: InputDecoration(
-                hintText: f.hint,
-                hintStyle: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontSize: 14,
-                  fontFamily: f.monospace ? 'monospace' : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _label(f.label),
+          ListenableBuilder(
+            listenable: f.textFocus,
+            builder: (context, _) {
+              final hasFocus = f.textFocus.hasFocus;
+              return Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF252525),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: hasFocus
+                        ? AppTheme.primaryColor
+                        : AppTheme.primaryColor.withValues(alpha: 0.4),
+                    width: 2,
+                  ),
                 ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 14),
-              ),
-            ),
-          );
-        },
+                child: TextField(
+                  controller: f.controller,
+                  focusNode: f.textFocus,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontFamily: f.monospace ? 'monospace' : null,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: f.hint,
+                    hintStyle: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontSize: 14,
+                      fontFamily: f.monospace ? 'monospace' : null,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 14),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

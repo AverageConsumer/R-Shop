@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/console_focusable.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/config/source.dart';
+import '../../../widgets/console_hud.dart';
 import '../../../models/system_model.dart';
 import '../../../providers/app_providers.dart';
 import '../../../services/romm_api_service.dart';
@@ -34,12 +36,12 @@ class RommLegacyLoginScreen extends ConsumerStatefulWidget {
 
 class _RommLegacyLoginScreenState
     extends ConsumerState<RommLegacyLoginScreen> {
-  final _nameCtl = TextEditingController(text: 'My RomM');
+  final _nameCtl = TextEditingController();
   final _urlCtl = TextEditingController();
   final _userCtl = TextEditingController();
   final _passCtl = TextEditingController();
 
-  late final List<_Field> _fields;
+  late List<_Field> _fields;
   final _saveFocus = FocusNode(debugLabel: 'romm_legacy_save');
   final _screenFocus = FocusNode(debugLabel: 'romm_legacy_screen');
 
@@ -48,21 +50,33 @@ class _RommLegacyLoginScreenState
   String? _probedVersion;
   bool _probeSupportsTokens = false;
   Timer? _probeDebounce;
+  bool _fieldsInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _fields = [
-      _Field('Name', _nameCtl, hint: 'My RomM'),
-      _Field('Server URL', _urlCtl,
-          hint: 'http://192.168.1.10:8080', monospace: true),
-      _Field('Username', _userCtl, hint: 'admin'),
-      _Field('Password', _passCtl, hint: '••••••••', obscure: true),
-    ];
+    _fields = [];
     _urlCtl.addListener(_scheduleProbe);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _fields.first.consoleFocus.requestFocus();
-    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_fieldsInitialized) {
+      _fieldsInitialized = true;
+      final l = L.of(context);
+      _nameCtl.text = l.rommLogin_nameDefault;
+      _fields = [
+        _Field(l.rommLogin_name, _nameCtl, hint: l.rommLogin_nameDefault),
+        _Field(l.rommLogin_serverUrl, _urlCtl,
+            hint: 'http://192.168.1.10:8080', monospace: true),
+        _Field(l.rommLogin_username, _userCtl, hint: l.rommLogin_usernameHint),
+        _Field(l.rommLogin_password, _passCtl, hint: l.rommLogin_passwordHint, obscure: true),
+      ];
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _fields.first.consoleFocus.requestFocus();
+      });
+    }
   }
 
   @override
@@ -174,14 +188,15 @@ class _RommLegacyLoginScreenState
   }
 
   String? _validate() {
-    if (_nameCtl.text.trim().isEmpty) return 'Name is required';
+    final l = L.of(context);
+    if (_nameCtl.text.trim().isEmpty) return l.rommLogin_nameRequired;
     final url = _urlCtl.text.trim();
-    if (url.isEmpty) return 'Server URL is required';
+    if (url.isEmpty) return l.rommLogin_serverUrlRequired;
     if (!url.startsWith(RegExp(r'https?://'))) {
       return 'URL must start with http:// or https://';
     }
     if (_userCtl.text.trim().isEmpty && _passCtl.text.isEmpty) {
-      return 'Username or password required';
+      return l.rommLogin_credentialsRequired;
     }
     return null;
   }
@@ -239,7 +254,9 @@ class _RommLegacyLoginScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: SafeArea(
+      body: Stack(
+        children: [
+          SafeArea(
         child: Focus(
           focusNode: _screenFocus,
           autofocus: true,
@@ -252,9 +269,9 @@ class _RommLegacyLoginScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Log in to RomM',
-                      style: TextStyle(
+                    Text(
+                      L.of(context).rommLogin_title,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.w600,
@@ -272,7 +289,6 @@ class _RommLegacyLoginScreenState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                     for (final f in _fields) ...[
-                      _label(f.label),
                       _textBox(f),
                       const SizedBox(height: 12),
                     ],
@@ -329,6 +345,7 @@ class _RommLegacyLoginScreenState
                     const SizedBox(height: 16),
                     ConsoleFocusable(
                       focusNode: _saveFocus,
+                      focusScale: 1.0,
                       onSelect: _busy ? null : _save,
                       child: Container(
                         width: double.infinity,
@@ -349,9 +366,9 @@ class _RommLegacyLoginScreenState
                                   color: AppTheme.primaryColor,
                                 ),
                               )
-                            : const Text(
-                                'Connect',
-                                style: TextStyle(
+                            : Text(
+                                L.of(context).common_connect,
+                                style: const TextStyle(
                                   color: AppTheme.primaryColor,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
@@ -369,6 +386,12 @@ class _RommLegacyLoginScreenState
           ),
         ),
       ),
+          ConsoleHud(
+            b: HudAction(L.of(context).common_back,
+                onTap: () => Navigator.maybePop(context)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -384,44 +407,51 @@ class _RommLegacyLoginScreenState
       focusNode: f.consoleFocus,
       focusScale: 1.0,
       onSelect: () => f.textFocus.requestFocus(),
-      child: ListenableBuilder(
-        listenable: f.textFocus,
-        builder: (context, _) {
-          final hasFocus = f.textFocus.hasFocus;
-          return Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF252525),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: hasFocus
-                    ? AppTheme.primaryColor
-                    : AppTheme.primaryColor.withValues(alpha: 0.4),
-                width: 2,
-              ),
-            ),
-            child: TextField(
-              controller: f.controller,
-              focusNode: f.textFocus,
-              obscureText: f.obscure,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontFamily: f.monospace ? 'monospace' : null,
-              ),
-              decoration: InputDecoration(
-                hintText: f.hint,
-                hintStyle: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontSize: 14,
-                  fontFamily: f.monospace ? 'monospace' : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _label(f.label),
+          ListenableBuilder(
+            listenable: f.textFocus,
+            builder: (context, _) {
+              final hasFocus = f.textFocus.hasFocus;
+              return Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF252525),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: hasFocus
+                        ? AppTheme.primaryColor
+                        : AppTheme.primaryColor.withValues(alpha: 0.4),
+                    width: 2,
+                  ),
                 ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 14),
-              ),
-            ),
+                child: TextField(
+                  controller: f.controller,
+                  focusNode: f.textFocus,
+                  obscureText: f.obscure,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontFamily: f.monospace ? 'monospace' : null,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: f.hint,
+                    hintStyle: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontSize: 14,
+                      fontFamily: f.monospace ? 'monospace' : null,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 14),
+                  ),
+                ),
           );
         },
+      ),
+        ],
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/responsive/responsive.dart';
+import '../l10n/app_localizations.dart';
 
 /// Green LED strip at the bottom edge — like a console power indicator.
 class InstalledLedStrip extends StatelessWidget {
@@ -68,7 +69,7 @@ class InstalledBadge extends StatelessWidget {
           ),
           SizedBox(width: compact ? 3 : 4),
           Text(
-            'INSTALLED',
+            L.of(context).common_installed,
             style: TextStyle(
               color: Colors.greenAccent,
               fontSize: fontSize,

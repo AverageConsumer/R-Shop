@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/responsive/responsive.dart';
+import '../l10n/app_localizations.dart';
 
 enum ConfirmDialogType { delete, exitApp, resetApp }
 
@@ -19,28 +20,27 @@ class ConfirmDialog extends StatelessWidget {
     required this.onSecondary,
   });
 
-  String get _title {
+  String _title(L l) {
     return switch (type) {
-      ConfirmDialogType.delete => 'Delete ROM?',
-      ConfirmDialogType.exitApp => 'Exit App?',
-      ConfirmDialogType.resetApp => 'Reset App?',
+      ConfirmDialogType.delete => l.confirm_deleteTitle,
+      ConfirmDialogType.exitApp => l.confirm_exitTitle,
+      ConfirmDialogType.resetApp => l.confirm_resetTitle,
     };
   }
 
-  String get _message {
+  String _message(L l) {
     return switch (type) {
-      ConfirmDialogType.delete =>
-        'Do you really want to delete this version of $gameTitle?',
-      ConfirmDialogType.exitApp => 'Do you really want to exit Retro eShop?',
-      ConfirmDialogType.resetApp => 'This will return to the onboarding screen.',
+      ConfirmDialogType.delete => l.confirm_deleteMessage(gameTitle ?? ''),
+      ConfirmDialogType.exitApp => l.confirm_exitMessage,
+      ConfirmDialogType.resetApp => l.confirm_resetMessage,
     };
   }
 
-  String get _primaryLabel {
+  String _primaryLabel(L l) {
     return switch (type) {
-      ConfirmDialogType.delete => 'DELETE',
-      ConfirmDialogType.exitApp => 'EXIT',
-      ConfirmDialogType.resetApp => 'RESET',
+      ConfirmDialogType.delete => l.confirm_deleteButton,
+      ConfirmDialogType.exitApp => l.confirm_exitButton,
+      ConfirmDialogType.resetApp => l.confirm_resetButton,
     };
   }
 
@@ -55,6 +55,7 @@ class ConfirmDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+    final l = L.of(context);
     final titleFontSize = rs.isSmall ? 18.0 : rs.typography.titleSmall;
     final messageFontSize = rs.isSmall ? 13.0 : rs.typography.bodySmall;
     final dialogPadding = rs.isSmall ? rs.spacing.md : rs.spacing.lg;
@@ -82,7 +83,7 @@ class ConfirmDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _title,
+                _title(l),
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: titleFontSize,
@@ -91,7 +92,7 @@ class ConfirmDialog extends StatelessWidget {
               ),
               SizedBox(height: rs.spacing.sm),
               Text(
-                _message,
+                _message(l),
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: messageFontSize,
@@ -102,26 +103,30 @@ class ConfirmDialog extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _DialogButton(
-                    label: 'CANCEL',
-                    color: Colors.grey,
-                    isSelected: selection == 1,
-                    onTap: onSecondary,
-                    padding: buttonPadding,
+                  Flexible(
+                    child: _DialogButton(
+                      label: l.common_cancelUpper,
+                      color: Colors.grey,
+                      isSelected: selection == 1,
+                      onTap: onSecondary,
+                      padding: buttonPadding,
+                    ),
                   ),
                   SizedBox(width: rs.spacing.md),
-                  _DialogButton(
-                    label: _primaryLabel,
+                  Flexible(
+                    child: _DialogButton(
+                      label: _primaryLabel(l),
                     color: _primaryColor,
                     isSelected: selection == 0,
-                    onTap: onPrimary,
-                    padding: buttonPadding,
+                      onTap: onPrimary,
+                      padding: buttonPadding,
+                    ),
                   ),
                 ],
               ),
               SizedBox(height: rs.spacing.sm),
               Text(
-                '← → Select   A Confirm   B Cancel',
+                l.confirm_gamepadHint,
                 style: TextStyle(
                   color: Colors.grey.shade600,
                   fontSize: rs.typography.caption,

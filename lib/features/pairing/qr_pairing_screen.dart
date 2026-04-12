@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/console_focusable.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/app_providers.dart';
 import '../../services/romm_pairing_service.dart';
 import 'manual_pairing_screen.dart';
@@ -89,6 +90,7 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
   }
 
   Future<void> _handlePayload(String payload) async {
+    final l = L.of(context);
     final svc = ref.read(rommPairingServiceProvider);
     try {
       final result = await svc.pairFromQr(payload);
@@ -103,7 +105,7 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
       setState(() => _processing = false);
       await _controller.start();
     } on RommPairInvalidQrException {
-      _showError('QR code is not a valid RomM pairing link');
+      _showError(l.pairing_invalidQr);
     } on RommPairCodeExpiredException catch (e) {
       _showError(e.message);
     } on RommPairServerUnreachableException catch (e) {
@@ -191,8 +193,8 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      const Text(
-                        'Scan QR code',
+                      Text(
+                        L.of(context).pairing_scanQrTitle,
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -256,8 +258,8 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
                         ),
                         const SizedBox(height: 12),
                       ],
-                      const Text(
-                        'Hold the QR code inside the frame',
+                      Text(
+                        L.of(context).pairing_scanQrHint,
                         style: TextStyle(color: Colors.white, fontSize: 14),
                       ),
                       const SizedBox(height: 12),
@@ -274,8 +276,8 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
                               width: 1.5,
                             ),
                           ),
-                          child: const Text(
-                            'Enter code manually',
+                          child: Text(
+                            L.of(context).pairing_enterManually,
                             style: TextStyle(
                                 color: Colors.white, fontSize: 13),
                           ),

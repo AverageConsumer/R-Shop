@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/input/input.dart';
+import '../../l10n/app_localizations.dart';
 import '../../services/input_debouncer.dart';
 import '../../core/responsive/responsive.dart';
 import '../../models/ra_models.dart';
@@ -181,8 +182,8 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
               ),
             ),
             ConsoleHud(
-              b: HudAction('Back', onTap: () => Navigator.pop(context)),
-              dpad: (label: '\u2191\u2193', action: 'Navigate'),
+              b: HudAction(L.of(context).common_back, onTap: () => Navigator.pop(context)),
+              dpad: (label: '\u2191\u2193', action: L.of(context).common_navigate),
             ),
           ],
         ),
@@ -238,7 +239,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.raTitle ?? 'Achievements',
+                  widget.raTitle ?? L.of(context).gameDetail_achievements,
                   style: TextStyle(
                     fontSize: titleFontSize,
                     fontWeight: FontWeight.bold,
@@ -297,7 +298,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
               ),
               SizedBox(width: rs.isSmall ? 3 : 4),
               Text(
-                'MASTERED',
+                L.of(context).gameDetail_mastered,
                 style: TextStyle(
                   fontSize: fontSize,
                   fontWeight: FontWeight.w700,
@@ -431,7 +432,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
           ),
           SizedBox(height: rs.spacing.md),
           Text(
-            'No achievements found',
+            L.of(context).gameDetail_noAchievementsFound,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.3),
               fontSize: rs.isSmall ? 14 : 18,

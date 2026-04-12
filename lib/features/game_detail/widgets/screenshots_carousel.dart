@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 import 'section_header.dart';
 
 class ScreenshotsCarousel extends StatefulWidget {
@@ -60,7 +61,7 @@ class _ScreenshotsCarouselState extends State<ScreenshotsCarousel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionHeader(label: 'Screenshots'),
+        SectionHeader(label: L.of(context).gameDetail_screenshots),
         SizedBox(
           height: rs.isSmall ? 80 : 100,
           child: ListView.separated(

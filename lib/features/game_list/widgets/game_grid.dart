@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/responsive/responsive.dart';
 import '../../../core/util/source_color.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/config/source.dart';
 import '../../../models/game_item.dart';
 import '../../../models/ra_models.dart';
@@ -196,16 +197,17 @@ class _GameGridState extends ConsumerState<GameGrid> {
   }
 
   (IconData, String, String?) _emptyStateContent() {
+    final l = L.of(context);
     if (widget.searchQuery.isNotEmpty) {
-      return (Icons.search_off, "No games match '${widget.searchQuery}'", 'Try a shorter search term');
+      return (Icons.search_off, l.gameList_noGamesMatchSearch(widget.searchQuery), l.gameList_tryShorterSearch);
     }
     if (widget.hasActiveFilters) {
-      return (Icons.filter_list_off, 'No games match current filters', 'Change or reset filters in the menu');
+      return (Icons.filter_list_off, l.gameList_noGamesMatchFilters, l.gameList_changeFilters);
     }
     if (widget.isLocalOnly) {
-      return (Icons.folder_open, 'No ROMs found in ${widget.targetFolder}', 'Add ROM files to this folder and refresh');
+      return (Icons.folder_open, l.gameList_noRomsFound(widget.targetFolder), l.gameList_addRomFiles);
     }
-    return (Icons.cloud_off, 'Could not load games', 'Check your connection and try again');
+    return (Icons.cloud_off, l.gameList_couldNotLoadGames, l.gameList_checkConnection);
   }
 
   Widget _buildItem(BuildContext context, int index) {
@@ -477,7 +479,7 @@ class GameGridError extends StatelessWidget {
           ),
           SizedBox(height: rs.spacing.md),
           Text(
-            'Error loading games',
+            L.of(context).gameList_errorLoadingGames,
             style: TextStyle(
               color: Colors.white,
               fontSize: titleFontSize,
@@ -501,7 +503,7 @@ class GameGridError extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: accentColor,
             ),
-            child: const Text('Retry'),
+            child: Text(L.of(context).common_retry),
           ),
         ],
       ),
@@ -561,7 +563,7 @@ class _GameGridSyncingState extends State<GameGridSyncing>
           ),
           SizedBox(height: rs.spacing.md),
           Text(
-            'Syncing library\u2026',
+            L.of(context).gameList_syncingLibrary,
             style: TextStyle(
               color: Colors.white,
               fontSize: titleFontSize,
@@ -571,7 +573,7 @@ class _GameGridSyncingState extends State<GameGridSyncing>
           Padding(
             padding: EdgeInsets.symmetric(horizontal: rs.spacing.xl),
             child: Text(
-              'Games will appear shortly',
+              L.of(context).gameList_gamesAppearShortly,
               style: TextStyle(
                 color: Colors.grey[500],
                 fontSize: subtitleFontSize,

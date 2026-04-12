@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/console_focusable.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/config/provider_config.dart';
 import '../../models/config/source.dart';
 import '../../providers/app_providers.dart';
 import '../../services/network_discovery_service.dart';
+import '../../widgets/console_hud.dart';
 
 /// Form to add a manual (non-RomM) [Source]: SMB, FTP, or Web.
 ///
@@ -44,7 +46,7 @@ class _ManualSourceAddScreenState
   final _passCtl = TextEditingController();
 
   // --- Wrapper focus nodes (controller traverses these) ---
-  late final List<_Field> _fields;
+  late List<_Field> _fields;
   final _saveFocus = FocusNode(debugLabel: 'manual_add_save');
   final _screenFocus = FocusNode(debugLabel: 'manual_add_screen');
 
@@ -52,8 +54,10 @@ class _ManualSourceAddScreenState
   String? _error;
 
   final List<DiscoveredHost> _discovered = [];
+  final List<FocusNode> _discoveredFocusNodes = [];
   bool _discovering = true;
   StreamSubscription<DiscoveredHost>? _discoverySub;
+  bool _fieldsInitialized = false;
 
   @override
   void initState() {
@@ -61,11 +65,20 @@ class _ManualSourceAddScreenState
     // Default ports keep parity with the legacy onboarding flow.
     if (widget.type == SourceType.smb) _portCtl.text = '445';
     if (widget.type == SourceType.ftp) _portCtl.text = '21';
-    _fields = _buildFieldList();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _fields.first.consoleFocus.requestFocus();
-    });
+    _fields = [];
     _startDiscovery();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_fieldsInitialized) {
+      _fieldsInitialized = true;
+      _fields = _buildFieldList();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _fields.isNotEmpty) _fields.first.consoleFocus.requestFocus();
+      });
+    }
   }
 
   void _startDiscovery() {
@@ -80,7 +93,22 @@ class _ManualSourceAddScreenState
       (host) {
         if (host.kind != DiscoveredKind.smb) return;
         if (!mounted) return;
-        setState(() => _discovered.add(host));
+        final isFirst = _discovered.isEmpty;
+        setState(() {
+          _discovered.add(host);
+          _discoveredFocusNodes.add(
+            FocusNode(debugLabel: 'discovered_${host.address}'),
+          );
+        });
+        // Auto-focus the first discovered host so the user sees it
+        // immediately instead of having to scroll up.
+        if (isFirst) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _discoveredFocusNodes.isNotEmpty) {
+              _discoveredFocusNodes.first.requestFocus();
+            }
+          });
+        }
       },
       onDone: () {
         if (mounted) setState(() => _discovering = false);
@@ -105,34 +133,36 @@ class _ManualSourceAddScreenState
   }
 
   List<_Field> _buildFieldList() {
+    final l = L.of(context);
     final t = widget.type;
     return [
-      _Field('Name', _nameCtl, hint: _defaultName()),
+      _Field(l.manualSource_name, _nameCtl, hint: _defaultName()),
       if (t == SourceType.web)
-        _Field('URL', _urlCtl, hint: 'https://example.com/roms', monospace: true),
+        _Field(l.manualSource_url, _urlCtl, hint: l.manualSource_urlHint, monospace: true),
       if (t == SourceType.smb || t == SourceType.ftp) ...[
-        _Field('Host', _hostCtl, hint: 'nas.local or 192.168.1.10', monospace: true),
-        _Field('Port', _portCtl, hint: t == SourceType.smb ? '445' : '21',
+        _Field(l.manualSource_host, _hostCtl, hint: l.manualSource_hostHint, monospace: true),
+        _Field(l.manualSource_port, _portCtl, hint: t == SourceType.smb ? '445' : '21',
             keyboardType: TextInputType.number),
       ],
       if (t == SourceType.smb)
-        _Field('Share', _shareCtl, hint: 'roms', monospace: true),
-      _Field('Username (optional)', _userCtl, hint: 'leave blank for guest'),
-      _Field('Password (optional)', _passCtl,
+        _Field(l.manualSource_share, _shareCtl, hint: l.manualSource_shareHint, monospace: true),
+      _Field(l.manualSource_usernameOptional, _userCtl, hint: l.manualSource_usernameHint),
+      _Field(l.manualSource_passwordOptional, _passCtl,
           hint: '••••••••', obscure: true),
     ];
   }
 
   String _defaultName() {
+    final l = L.of(context);
     switch (widget.type) {
       case SourceType.smb:
-        return 'My NAS';
+        return l.manualSource_defaultNameSmb;
       case SourceType.ftp:
-        return 'My FTP';
+        return l.manualSource_defaultNameFtp;
       case SourceType.web:
-        return 'Web Mirror';
+        return l.manualSource_defaultNameWeb;
       default:
-        return 'Source';
+        return l.manualSource_defaultNameOther;
     }
   }
 
@@ -149,6 +179,9 @@ class _ManualSourceAddScreenState
     for (final f in _fields) {
       f.consoleFocus.dispose();
       f.textFocus.dispose();
+    }
+    for (final n in _discoveredFocusNodes) {
+      n.dispose();
     }
     _saveFocus.dispose();
     _screenFocus.dispose();
@@ -199,7 +232,7 @@ class _ManualSourceAddScreenState
   }
 
   List<FocusNode> get _navOrder =>
-      [..._fields.map((f) => f.consoleFocus), _saveFocus];
+      [..._discoveredFocusNodes, ..._fields.map((f) => f.consoleFocus), _saveFocus];
 
   void _moveFocus(int delta) {
     final order = _navOrder;
@@ -215,6 +248,12 @@ class _ManualSourceAddScreenState
   }
 
   void _activateFocused() {
+    for (int i = 0; i < _discoveredFocusNodes.length; i++) {
+      if (_discoveredFocusNodes[i].hasFocus) {
+        _applyDiscovered(_discovered[i]);
+        return;
+      }
+    }
     for (final f in _fields) {
       if (f.consoleFocus.hasFocus) {
         f.textFocus.requestFocus();
@@ -225,22 +264,23 @@ class _ManualSourceAddScreenState
   }
 
   String? _validate() {
+    final l = L.of(context);
     final name = _nameCtl.text.trim();
-    if (name.isEmpty) return 'Name is required';
+    if (name.isEmpty) return l.manualSource_nameRequired;
     switch (widget.type) {
       case SourceType.web:
         final url = _urlCtl.text.trim();
-        if (url.isEmpty) return 'URL is required';
+        if (url.isEmpty) return l.manualSource_urlRequired;
         if (!url.startsWith(RegExp(r'https?://'))) {
           return 'URL must start with http:// or https://';
         }
         break;
       case SourceType.smb:
-        if (_hostCtl.text.trim().isEmpty) return 'Host is required';
-        if (_shareCtl.text.trim().isEmpty) return 'Share is required';
+        if (_hostCtl.text.trim().isEmpty) return l.manualSource_hostRequired;
+        if (_shareCtl.text.trim().isEmpty) return l.manualSource_shareRequired;
         break;
       case SourceType.ftp:
-        if (_hostCtl.text.trim().isEmpty) return 'Host is required';
+        if (_hostCtl.text.trim().isEmpty) return l.manualSource_hostRequired;
         break;
       default:
         break;
@@ -309,44 +349,45 @@ class _ManualSourceAddScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: SafeArea(
-        child: Focus(
-          focusNode: _screenFocus,
-          autofocus: true,
-          onKeyEvent: _handleScreenKey,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Add ${_typeLabel(widget.type)} source',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Connection only — map systems to remote folders '
-                      'after saving from the source actions menu.',
-                      style: TextStyle(
-                          color: Colors.grey.shade500, fontSize: 12),
-                    ),
-                    const SizedBox(height: 20),
-                    Expanded(
-                      child: SingleChildScrollView(
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Focus(
+              focusNode: _screenFocus,
+              autofocus: true,
+              onKeyEvent: _handleScreenKey,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Add ${_typeLabel(widget.type)} source',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Connection only — map systems to remote folders '
+                          'after saving from the source actions menu.',
+                          style: TextStyle(
+                              color: Colors.grey.shade500, fontSize: 12),
+                        ),
+                        const SizedBox(height: 20),
+                        Expanded(
+                          child: SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (widget.type != SourceType.web)
                               _buildDiscoverySection(),
                             for (final f in _fields) ...[
-                              _label(f.label),
                               _textBox(f),
                               const SizedBox(height: 12),
                             ],
@@ -359,6 +400,7 @@ class _ManualSourceAddScreenState
                             const SizedBox(height: 16),
                             ConsoleFocusable(
                               focusNode: _saveFocus,
+                              focusScale: 1.0,
                               onSelect: _busy ? null : _save,
                               child: Container(
                                 width: double.infinity,
@@ -381,9 +423,9 @@ class _ManualSourceAddScreenState
                                           color: AppTheme.primaryColor,
                                         ),
                                       )
-                                    : const Text(
-                                        'Save source',
-                                        style: TextStyle(
+                                    : Text(
+                                        L.of(context).manualSource_saveSource,
+                                        style: const TextStyle(
                                           color: AppTheme.primaryColor,
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
@@ -392,6 +434,9 @@ class _ManualSourceAddScreenState
                                       ),
                               ),
                             ),
+                            // Extra bottom padding so content doesn't
+                            // hide behind the HUD.
+                            const SizedBox(height: 56),
                           ],
                         ),
                       ),
@@ -403,24 +448,79 @@ class _ManualSourceAddScreenState
           ),
         ),
       ),
+      ConsoleHud(
+        b: HudAction(L.of(context).common_back, onTap: () => Navigator.maybePop(context)),
+      ),
+        ],
+      ),
     );
   }
 
   String _typeLabel(SourceType t) {
+    final l = L.of(context);
     switch (t) {
       case SourceType.smb:
-        return 'SMB';
+        return l.manualSource_smb;
       case SourceType.ftp:
-        return 'FTP';
+        return l.manualSource_ftp;
       case SourceType.web:
-        return 'Web';
+        return l.manualSource_web;
       default:
         return t.name.toUpperCase();
     }
   }
 
+  Widget _discoveryHeader() {
+    return Row(
+      children: [
+        if (_discovering)
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppTheme.primaryColor,
+            ),
+          )
+        else
+          const Icon(Icons.lan_outlined,
+              size: 14, color: AppTheme.primaryColor),
+        const SizedBox(width: 8),
+        Text(
+          _discovering ? L.of(context).manualSource_searchingNetwork : L.of(context).manualSource_foundOnNetwork,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 11,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDiscoverySection() {
     if (_discovered.isEmpty && !_discovering) return const SizedBox.shrink();
+
+    // Show only the spinner/label when no hosts found yet.
+    if (_discovered.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1A),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppTheme.primaryColor.withValues(alpha: 0.3),
+            ),
+          ),
+          child: _discoveryHeader(),
+        ),
+      );
+    }
+
+    // Hosts found: header is part of the first focusable tile so
+    // ensureVisible scrolls both header + tile into view together.
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
@@ -436,62 +536,44 @@ class _ManualSourceAddScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                if (_discovering)
-                  const SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppTheme.primaryColor,
-                    ),
-                  )
-                else
-                  const Icon(Icons.lan_outlined,
-                      size: 14, color: AppTheme.primaryColor),
-                const SizedBox(width: 8),
-                Text(
-                  _discovering
-                      ? 'Searching network…'
-                      : 'Found on your network',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ],
-            ),
-            if (_discovered.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              for (final host in _discovered)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: ConsoleFocusable(
-                    focusScale: 1.0,
-                    onSelect: () => _applyDiscovered(host),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF252525),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.folder_shared,
-                              size: 16, color: Colors.white54),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(host.name,
-                                    style: const TextStyle(
+            for (int i = 0; i < _discovered.length; i++)
+              Padding(
+                padding: EdgeInsets.only(top: i == 0 ? 0 : 6),
+                child: ConsoleFocusable(
+                  focusNode: _discoveredFocusNodes[i],
+                  focusScale: 1.0,
+                  onSelect: () => _applyDiscovered(_discovered[i]),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Include header above first host tile so
+                      // ensureVisible scrolls it into view.
+                      if (i == 0) ...[
+                        _discoveryHeader(),
+                        const SizedBox(height: 8),
+                      ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF252525),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.folder_shared,
+                                size: 16, color: Colors.white54),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(_discovered[i].name,
+                                      style: const TextStyle(
                                         color: Colors.white, fontSize: 13)),
                                 Text(
-                                  '${host.address}:${host.port}',
+                                  '${_discovered[i].address}:${_discovered[i].port}',
                                   style: TextStyle(
                                     color: Colors.grey.shade500,
                                     fontSize: 11,
@@ -506,9 +588,10 @@ class _ManualSourceAddScreenState
                         ],
                       ),
                     ),
+                    ],
                   ),
                 ),
-            ],
+              ),
           ],
         ),
       ),
@@ -527,45 +610,52 @@ class _ManualSourceAddScreenState
       focusNode: f.consoleFocus,
       focusScale: 1.0,
       onSelect: () => f.textFocus.requestFocus(),
-      child: ListenableBuilder(
-        listenable: f.textFocus,
-        builder: (context, _) {
-          final hasFocus = f.textFocus.hasFocus;
-          return Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF252525),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: hasFocus
-                    ? AppTheme.primaryColor
-                    : AppTheme.primaryColor.withValues(alpha: 0.4),
-                width: 2,
-              ),
-            ),
-            child: TextField(
-              controller: f.controller,
-              focusNode: f.textFocus,
-              obscureText: f.obscure,
-              keyboardType: f.keyboardType,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontFamily: f.monospace ? 'monospace' : null,
-              ),
-              decoration: InputDecoration(
-                hintText: f.hint,
-                hintStyle: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontSize: 14,
-                  fontFamily: f.monospace ? 'monospace' : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _label(f.label),
+          ListenableBuilder(
+            listenable: f.textFocus,
+            builder: (context, _) {
+              final hasFocus = f.textFocus.hasFocus;
+              return Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF252525),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: hasFocus
+                        ? AppTheme.primaryColor
+                        : AppTheme.primaryColor.withValues(alpha: 0.4),
+                    width: 2,
+                  ),
                 ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 14),
-              ),
-            ),
-          );
-        },
+                child: TextField(
+                  controller: f.controller,
+                  focusNode: f.textFocus,
+                  obscureText: f.obscure,
+                  keyboardType: f.keyboardType,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontFamily: f.monospace ? 'monospace' : null,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: f.hint,
+                    hintStyle: TextStyle(
+                      color: Colors.grey.shade700,
+                      fontSize: 14,
+                      fontFamily: f.monospace ? 'monospace' : null,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 14),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

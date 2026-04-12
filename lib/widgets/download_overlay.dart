@@ -10,6 +10,7 @@ import '../providers/app_providers.dart';
 import '../providers/download_providers.dart';
 import '../services/download_queue_manager.dart';
 import '../services/input_debouncer.dart';
+import '../l10n/app_localizations.dart';
 import '../widgets/console_hud.dart';
 import 'download/download_item_card.dart';
 import 'download/low_space_warning.dart';
@@ -595,15 +596,16 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
     final targetItem = targetIdx >= 0 ? items[targetIdx] : null;
     final hasFinished = items.any((i) => i.isFinished);
 
+    final l = L.of(context);
     final HudAction? aAction;
     if (targetItem != null) {
       final label = targetItem.isActive
-          ? 'Cancel'
+          ? l.downloads_actionCancel
           : targetItem.isFailed
-              ? 'Retry'
+              ? l.downloads_actionRetry
               : targetItem.status == DownloadStatus.queued
-                  ? 'Remove'
-                  : 'Clear';
+                  ? l.downloads_actionRemove
+                  : l.downloads_actionClear;
       aAction = HudAction(label, onTap: () => _performAction(targetItem));
     } else {
       aAction = null;
@@ -620,9 +622,9 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
           child: ConsoleHud(
             key: _hudKey,
             a: aAction,
-            b: HudAction('Close', onTap: _close),
+            b: HudAction(l.common_close, onTap: _close),
             y: hasFinished
-                ? HudAction('Clear Done', onTap: () {
+                ? HudAction(l.downloads_clearDone, onTap: () {
                     ref.read(downloadQueueManagerProvider).clearCompleted();
                   })
                 : null,
@@ -661,7 +663,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Downloads',
+                  L.of(context).downloads_title,
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: rs.isSmall ? 22 : 28,
@@ -673,7 +675,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
-                      '$activeCount active',
+                      L.of(context).downloads_activeCount(activeCount),
                       style: TextStyle(
                         color: Colors.green.withValues(alpha: 0.8),
                         fontSize: rs.isSmall ? 12 : 14,
@@ -722,7 +724,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
             ),
             const SizedBox(height: 16),
             Text(
-              'No downloads',
+              L.of(context).downloads_noDownloads,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.3),
                 fontSize: rs.isSmall ? 16 : 18,
@@ -741,7 +743,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
 
     // Section: DOWNLOADING
     if (widget.activeDownloads.isNotEmpty) {
-      widgets.add(_buildSectionHeader('Downloading', rs));
+      widgets.add(_buildSectionHeader(L.of(context).downloads_sectionDownloading, rs));
       for (final item in widget.activeDownloads) {
         _itemKeys.putIfAbsent(item.id, () => GlobalKey());
         seenIds.add(item.id);
@@ -752,7 +754,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
 
     // Section: QUEUED
     if (widget.queuedItems.isNotEmpty) {
-      widgets.add(_buildSectionHeader('Queued', rs));
+      widgets.add(_buildSectionHeader(L.of(context).downloads_sectionQueued, rs));
       for (final item in widget.queuedItems) {
         _itemKeys.putIfAbsent(item.id, () => GlobalKey());
         seenIds.add(item.id);
@@ -764,7 +766,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
     // Section: COMPLETE (includes completed, failed, cancelled)
     final finishedItems = widget.recentItems.where((i) => i.isFinished).toList();
     if (finishedItems.isNotEmpty) {
-      widgets.add(_buildSectionHeader('Complete', rs));
+      widgets.add(_buildSectionHeader(L.of(context).downloads_sectionComplete, rs));
       for (final item in finishedItems) {
         _itemKeys.putIfAbsent(item.id, () => GlobalKey());
         seenIds.add(item.id);

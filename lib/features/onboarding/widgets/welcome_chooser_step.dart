@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/console_focusable.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../models/config/source.dart';
 import '../../../providers/app_providers.dart';
 import '../../../providers/game_providers.dart';
@@ -100,7 +101,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
   Future<String?> _pickRomBaseFolder() async {
     try {
       return await FilePicker.platform.getDirectoryPath(
-        dialogTitle: 'Pick the folder where ROMs should be saved',
+        dialogTitle: L.of(context).onboarding_selectFolderPrompt,
       );
     } catch (e) {
       debugPrint('WelcomeChooser: folder picker failed: $e');
@@ -115,7 +116,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
 
     setState(() {
       _busy = true;
-      _busyMessage = 'Scanning local ROM folders…';
+      _busyMessage = L.of(context).onboarding_scanningFolders;
     });
     final controller =
         ref.read(onboardingControllerProvider.notifier);
@@ -133,7 +134,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
 
     setState(() {
       _busy = true;
-      _busyMessage = 'Discovering platforms…';
+      _busyMessage = L.of(context).onboarding_discoveringPlatforms;
     });
     final source = buildSourceFromPairResult(result);
     Map<String, int> knownPlatforms = const {};
@@ -169,7 +170,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
 
     setState(() {
       _busy = true;
-      _busyMessage = 'Scanning local ROM folders…';
+      _busyMessage = L.of(context).onboarding_scanningFolders;
     });
     final controller =
         ref.read(onboardingControllerProvider.notifier);
@@ -187,7 +188,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
 
     setState(() {
       _busy = true;
-      _busyMessage = 'Saving source…';
+      _busyMessage = L.of(context).onboarding_savingSource;
     });
     final notifier = ref.read(sourcesProvider.notifier);
     await controller.completeFromRommPairing(
@@ -209,7 +210,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
 
     setState(() {
       _busy = true;
-      _busyMessage = 'Scanning local ROM folders…';
+      _busyMessage = L.of(context).onboarding_scanningFolders;
     });
     final controller =
         ref.read(onboardingControllerProvider.notifier);
@@ -265,8 +266,8 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
             borderRadius: BorderRadius.circular(12),
             side: const BorderSide(color: Colors.white12),
           ),
-          title: const Text('Server type',
-              style: TextStyle(color: Colors.white)),
+          title: Text(L.of(context).onboarding_serverType,
+              style: const TextStyle(color: Colors.white)),
           content: _TypePickerBody(
             types: const [SourceType.smb, SourceType.ftp, SourceType.web],
             iconFor: _iconFor,
@@ -297,7 +298,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
 
     setState(() {
       _busy = true;
-      _busyMessage = 'Scanning local ROM folders…';
+      _busyMessage = L.of(context).onboarding_scanningFolders;
     });
     final controller =
         ref.read(onboardingControllerProvider.notifier);
@@ -312,6 +313,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     return Focus(
       focusNode: _screenFocus,
       onKeyEvent: _onKeyEvent,
@@ -321,9 +323,9 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-          const Text(
-            'Welcome to R-Shop',
-            style: TextStyle(
+          Text(
+            l.onboarding_welcomeTitle,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 26,
               fontWeight: FontWeight.w700,
@@ -331,7 +333,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Where do your games come from?',
+            l.onboarding_welcomeSubtitle,
             style: TextStyle(
               color: Colors.grey.shade400,
               fontSize: 14,
@@ -341,32 +343,32 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
           _ChoiceTile(
             focusNode: _qrFocus,
             icon: Icons.qr_code_2,
-            title: 'Pair RomM via QR',
-            subtitle: 'Scan a code from your RomM server',
+            title: l.onboarding_pairQrTitle,
+            subtitle: l.onboarding_pairQrSubtitle,
             onSelect: _handleQrPair,
           ),
           const SizedBox(height: 12),
           _ChoiceTile(
             focusNode: _legacyFocus,
             icon: Icons.password,
-            title: 'RomM login (older servers)',
-            subtitle: 'Username + password for RomM < 4.8',
+            title: l.onboarding_legacyLoginTitle,
+            subtitle: l.onboarding_legacyLoginSubtitle,
             onSelect: _handleLegacyLogin,
           ),
           const SizedBox(height: 12),
           _ChoiceTile(
             focusNode: _serverFocus,
             icon: Icons.dns_outlined,
-            title: 'Add my own server',
-            subtitle: 'SMB, FTP or Web mirror — map systems manually',
+            title: l.onboarding_addServerTitle,
+            subtitle: l.onboarding_addServerSubtitle,
             onSelect: _handleManualServer,
           ),
           const SizedBox(height: 12),
           _ChoiceTile(
             focusNode: _localFocus,
             icon: Icons.sd_card,
-            title: 'Local games only',
-            subtitle: 'ROMs already on this device',
+            title: l.onboarding_localOnlyTitle,
+            subtitle: l.onboarding_localOnlySubtitle,
             onSelect: _handleLocalOnly,
           ),
           if (_busy) ...[
@@ -383,7 +385,7 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  _busyMessage ?? 'Working…',
+                  _busyMessage ?? l.onboarding_working,
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
               ],

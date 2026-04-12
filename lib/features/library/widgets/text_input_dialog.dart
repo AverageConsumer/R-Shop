@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../l10n/app_localizations.dart';
+
 class TextInputDialog extends StatefulWidget {
   final String title;
   final String? hintText;
@@ -40,6 +42,7 @@ class _TextInputDialogState extends State<TextInputDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     return Dialog(
       backgroundColor: const Color(0xFF1A1A1A),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -64,7 +67,7 @@ class _TextInputDialogState extends State<TextInputDialog> {
               autofocus: true,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: widget.hintText ?? 'Enter text...',
+                hintText: widget.hintText ?? l.textInput_hint,
                 hintStyle: TextStyle(color: Colors.grey[600]),
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(
@@ -90,16 +93,16 @@ class _TextInputDialogState extends State<TextInputDialog> {
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: Text(
-                    'Cancel',
+                    l.common_cancel,
                     style: TextStyle(color: Colors.grey[400]),
                   ),
                 ),
                 const SizedBox(width: 8),
                 TextButton(
                   onPressed: () => widget.onSubmit(_controller.text),
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(color: Colors.cyanAccent),
+                  child: Text(
+                    l.textInput_ok,
+                    style: const TextStyle(color: Colors.cyanAccent),
                   ),
                 ),
               ],

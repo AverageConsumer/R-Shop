@@ -9,6 +9,8 @@ import 'providers/app_providers.dart';
 import 'providers/download_providers.dart';
 import 'providers/game_providers.dart';
 import 'providers/ra_providers.dart';
+import 'providers/library_providers.dart';
+import 'providers/source_health_providers.dart';
 import 'providers/rom_status_providers.dart';
 import 'features/home/home_view.dart';
 import 'features/onboarding/onboarding_screen.dart';
@@ -28,6 +30,8 @@ import 'services/thumbnail_service.dart';
 import 'utils/rom_share_helper.dart';
 import 'widgets/add_to_queue_toast.dart';
 import 'widgets/download_overlay.dart';
+import 'widgets/sync_badge.dart';
+import 'l10n/app_localizations.dart';
 
 class NoGlowScrollBehavior extends ScrollBehavior {
   @override
@@ -144,12 +148,76 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
       if (mounted && ref.read(configRecoveredProvider)) {
         final messenger = ScaffoldMessenger.maybeOf(context);
         messenger?.showSnackBar(
-          const SnackBar(
-            content: Text('Config recovered from backup'),
-            duration: Duration(seconds: 4),
+          SnackBar(
+            content: Text(L.of(context).toast_configRecovered),
+            duration: const Duration(seconds: 4),
           ),
         );
       }
+
+      // Proactive RomM health check: validates tokens AND discovers new
+      // platforms in a single call per source. Auto-creates SystemConfigs
+      // for any newly discovered consoles.
+      Future.delayed(const Duration(seconds: 2), () async {
+        if (!mounted) return;
+        final sourcesState = ref.read(sourcesProvider);
+        if (sourcesState.loading || sourcesState.sources.isEmpty) {
+          await ref.read(sourcesProvider.notifier).ready;
+          if (!mounted) return;
+        }
+        final sources = ref.read(sourcesProvider).sources;
+        final discovered = await ref
+            .read(sourceHealthProvider.notifier)
+            .checkAll(sources);
+
+        if (discovered.isEmpty || !mounted) return;
+
+        final notifier = ref.read(sourcesProvider.notifier);
+        final basePath = ref.read(storageServiceProvider).getRomPath()
+            ?? '/storage/emulated/0/ROMs';
+        var totalNew = 0;
+        final allNewIds = <String>[];
+        final allNewNames = <String>[];
+
+        for (final entry in discovered.entries) {
+          final sourceId = entry.key;
+          final platforms = entry.value;
+          final source = sources.firstWhere((s) => s.id == sourceId);
+
+          if (!mapEquals(source.knownPlatforms, platforms)) {
+            await notifier.updateKnownPlatforms(sourceId, platforms);
+          }
+
+          // Auto-create SystemConfigs for newly discovered consoles.
+          final updatedSource = source.copyWith(knownPlatforms: platforms);
+          final result = await notifier.ensureSystemsForSource(
+            updatedSource,
+            basePath: basePath,
+          );
+          if (result.names.isNotEmpty) {
+            totalNew += result.names.length;
+            allNewIds.addAll(result.ids);
+            allNewNames.addAll(result.names);
+          }
+        }
+
+        if (totalNew > 0 && mounted) {
+          ref.invalidate(bootstrappedConfigProvider);
+
+          // Queue a sync for the newly created systems so they populate
+          // immediately instead of requiring a manual "Sync All".
+          final freshConfig =
+              await ref.read(bootstrappedConfigProvider.future);
+          final syncService =
+              ref.read(librarySyncServiceProvider.notifier);
+          final timeout = Duration(
+              seconds: ref.read(syncTimeoutProvider));
+          for (final id in allNewIds) {
+            syncService.syncSystem(id, freshConfig, syncTimeout: timeout);
+          }
+        }
+      });
+
 
       // Defer thumbnail migration to avoid DB contention at startup
       Future.delayed(const Duration(seconds: 3), () {
@@ -193,6 +261,14 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
             } else {
               restoreMainFocus(ref);
             }
+            // Re-check RomM token health if stale (> 5min since last check).
+            final health = ref.read(sourceHealthProvider);
+            if (health.isStale) {
+              final sources = ref.read(sourcesProvider).sources;
+              // Fire-and-forget — platform discovery on resume is
+              // best-effort, the startup check already covered it.
+              ref.read(sourceHealthProvider.notifier).checkAll(sources);
+            }
           }
         });
         break;
@@ -207,13 +283,34 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
   @override
   Widget build(BuildContext context) {
     ref.watch(romWatcherProvider);
+
+    // Reactive: when sync finishes with auth errors, re-check RomM tokens.
+    ref.listen(librarySyncServiceProvider, (prev, next) {
+      if (prev == null || prev.isSyncing || !next.hadFailures) return;
+      if (next.isSyncing) return;
+      final authKeywords = ['authentication', 'credentials', 'access denied'];
+      final hasAuthFailure = next.failedSystems.values.any(
+        (msg) => authKeywords.any(
+            (kw) => msg.toLowerCase().contains(kw)),
+      );
+      if (hasAuthFailure) {
+        final sources = ref.read(sourcesProvider).sources;
+        ref.read(sourceHealthProvider.notifier).checkAll(sources);
+      }
+    });
+
     final storage = ref.read(storageServiceProvider);
     final onboardingCompleted = storage.getOnboardingCompleted();
+
+    final localeOverride = ref.watch(localeProvider);
 
     return GlobalInputWrapper(
       child: MaterialApp(
         title: 'R-Shop',
         debugShowCheckedModeBanner: false,
+        localizationsDelegates: L.localizationsDelegates,
+        supportedLocales: L.supportedLocales,
+        locale: localeOverride,
         theme: AppTheme.darkTheme,
         builder: (context, child) {
           return ScrollConfiguration(
@@ -225,6 +322,7 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
                   builder: (context) => const DownloadOverlay(),
                 ),
                 const AddToQueueToast(),
+                const SyncBadge(),
               ],
             ),
           );

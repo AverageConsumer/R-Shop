@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 
 enum DownloadButtonState { download, adding, delete, installed, unavailable }
 
@@ -21,6 +22,7 @@ class DownloadActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
+    final l = L.of(context);
     final isMulti = variantCount != null && variantCount! > 1;
 
     final Color bgColor;
@@ -35,31 +37,31 @@ class DownloadActionButton extends StatelessWidget {
         borderColor = accentColor.withValues(alpha: 0.5);
         textColor = accentColor;
         icon = Icons.download_rounded;
-        label = 'Download';
+        label = l.gameDetail_download;
       case DownloadButtonState.adding:
         bgColor = accentColor.withValues(alpha: 0.15);
         borderColor = accentColor.withValues(alpha: 0.3);
         textColor = accentColor.withValues(alpha: 0.7);
         icon = Icons.download_rounded;
-        label = 'Adding...';
+        label = l.gameDetail_adding;
       case DownloadButtonState.delete:
         bgColor = Colors.red.withValues(alpha: 0.12);
         borderColor = Colors.red.withValues(alpha: 0.35);
         textColor = Colors.redAccent;
         icon = Icons.delete_outline_rounded;
-        label = 'Delete';
+        label = l.gameDetail_delete;
       case DownloadButtonState.installed:
         bgColor = Colors.green.withValues(alpha: 0.1);
         borderColor = Colors.greenAccent.withValues(alpha: 0.3);
         textColor = Colors.greenAccent;
         icon = Icons.check_circle_outline_rounded;
-        label = 'Installed';
+        label = l.gameDetail_installedLabel;
       case DownloadButtonState.unavailable:
         bgColor = Colors.white.withValues(alpha: 0.04);
         borderColor = Colors.white.withValues(alpha: 0.08);
         textColor = Colors.white.withValues(alpha: 0.3);
         icon = Icons.block_rounded;
-        label = 'Unavailable';
+        label = l.gameDetail_unavailable;
     }
 
     final isDisabled =

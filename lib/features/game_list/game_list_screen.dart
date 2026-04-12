@@ -8,6 +8,7 @@ import '../../models/config/system_config.dart';
 
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
@@ -453,30 +454,31 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   }
 
   List<QuickMenuItem?> _buildQuickMenuItems() {
+    final l = L.of(context);
     final state = _controller.state;
     final hasDownloads = ref.read(hasQueueItemsProvider);
     return [
       QuickMenuItem(
-        label: 'Zoom In',
+        label: l.gameList_zoomIn,
         icon: Icons.zoom_in_rounded,
         shortcutHint: 'L',
         onSelect: () => _adjustColumns(true),
       ),
       QuickMenuItem(
-        label: 'Zoom Out',
+        label: l.gameList_zoomOut,
         icon: Icons.zoom_out_rounded,
         shortcutHint: 'R',
         onSelect: () => _adjustColumns(false),
       ),
       QuickMenuItem(
-        label: 'Search',
+        label: l.common_search,
         icon: Icons.search_rounded,
         shortcutHint: 'Y',
         onSelect: openSearch,
       ),
       if (_selectedIsSingleVariant()) ...[
         QuickMenuItem(
-          label: _selectedIsFavorite() ? 'Unfavorite' : 'Favorite',
+          label: _selectedIsFavorite() ? l.common_unfavorite : l.common_favorite,
           icon: _selectedIsFavorite()
               ? Icons.favorite_rounded : Icons.favorite_border_rounded,
           shortcutHint: '−',
@@ -485,19 +487,19 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       ],
       if (_canAddToShelf())
         QuickMenuItem(
-          label: 'Add to Shelf',
+          label: l.gameDetail_addToShelf,
           icon: Icons.shelves,
           onSelect: _handleAddToShelf,
         ),
       QuickMenuItem(
-        label: state.activeFilters.isNotEmpty ? 'Filter (active)' : 'Filter',
+        label: state.activeFilters.isNotEmpty ? l.gameList_filterActive : l.gameList_filter,
         icon: Icons.filter_list_rounded,
         onSelect: _toggleFilter,
       ),
       if (hasDownloads) ...[
         null,
         QuickMenuItem(
-          label: 'Downloads',
+          label: l.common_downloads,
           icon: Icons.download_rounded,
           onSelect: () => toggleDownloadOverlay(ref),
           highlight: true,
@@ -610,9 +612,9 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
               if (_isFiltering) _buildFilterContent(state),
               if (_isFiltering)
                 ConsoleHud(
-                  a: const HudAction('Toggle'),
-                  b: HudAction('Close', onTap: _closeFilter),
-                  x: HudAction('Clear', onTap: () {
+                  a: HudAction(L.of(context).common_toggle),
+                  b: HudAction(L.of(context).common_close, onTap: _closeFilter),
+                  x: HudAction(L.of(context).common_clear, onTap: () {
                     _controller.clearFilters();
                     _resetFocusAfterFilterChange();
                     setState(() {});
@@ -620,13 +622,13 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
                 )
               else if (isSearchActive)
                 buildSearchHud(
-                  aAction: HudAction('Select', onTap: _openSelectedGame),
+                  aAction: HudAction(L.of(context).common_select, onTap: _openSelectedGame),
                 )
               else if (!showQuickMenu)
                 ConsoleHud(
-                  a: HudAction('Select', onTap: _openSelectedGame),
-                  b: HudAction('Back', onTap: () => Navigator.pop(context)),
-                  start: HudAction('Menu', onTap: () {
+                  a: HudAction(L.of(context).common_select, onTap: _openSelectedGame),
+                  b: HudAction(L.of(context).common_back, onTap: () => Navigator.pop(context)),
+                  start: HudAction(L.of(context).common_menu, onTap: () {
                     _dismissStartHint();
                     toggleQuickMenu();
                   }),
@@ -647,7 +649,6 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   }
 
   Widget _buildNormalContent(GameListState state, double topPadding) {
-    // Watch sync state so we rebuild when it changes
     final syncState = ref.watch(librarySyncServiceProvider);
     final syncActive = syncState.isSyncing && (
       LibrarySyncService.isSyncingSystem(widget.system.id) ||
@@ -666,7 +667,6 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
           hasActiveFilters: state.activeFilters.isNotEmpty,
           isLocalOnly: state.isLocalOnly,
           isOffline: state.isOffline,
-          isSyncing: syncActive,
           targetFolder: widget.targetFolder,
         ),
       ],
@@ -827,7 +827,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
               ),
             ),
             child: Text(
-              'Press  +  for menu',
+              L.of(context).gameList_pressMenuHint,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.8),
                 fontSize: rs.isSmall ? 11 : 13,

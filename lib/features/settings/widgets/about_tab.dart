@@ -2,12 +2,13 @@ import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../core/responsive/responsive.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../core/widgets/console_focusable.dart';
 import '../../../providers/app_providers.dart';
+import '../models/settings_entry.dart';
 import 'device_info_card.dart';
-import 'settings_item.dart';
+import 'settings_list_view.dart';
 
 class SettingsAboutTab extends ConsumerStatefulWidget {
   final String appVersion;
@@ -30,72 +31,63 @@ class _SettingsAboutTabState extends ConsumerState<SettingsAboutTab> {
 
   @override
   Widget build(BuildContext context) {
-    final rs = context.rs;
-
-    return FocusTraversalGroup(
-      key: const ValueKey(2),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: ListView(
-            padding: EdgeInsets.symmetric(
-              horizontal: rs.spacing.lg,
-              vertical: rs.spacing.md,
+    final l = L.of(context);
+    return SettingsListView(
+      firstFocusNode: widget.firstAboutTabNode,
+      sections: [
+        SettingsSection(l.settings_sectionInfo, [
+          SettingsEntry.custom(
+            child: DeviceInfoCard(
+              appVersion: widget.appVersion,
+              focusNode: widget.firstAboutTabNode,
             ),
-            children: [
-              DeviceInfoCard(
-                appVersion: widget.appVersion,
-                focusNode: widget.firstAboutTabNode,
-              ),
-              SizedBox(height: rs.spacing.md),
-              SettingsItem(
-                title: 'GitHub',
-                subtitle: 'View source code on GitHub',
-                trailing: const Icon(Icons.open_in_new_rounded,
-                    color: Colors.white70),
-                onTap: () => launchUrl(
-                    Uri.parse('https://github.com/AverageConsumer/R-Shop')),
-              ),
-              SizedBox(height: rs.spacing.md),
-              SettingsItem(
-                title: 'Issues',
-                subtitle: 'Report bugs or request features',
-                trailing: const Icon(Icons.bug_report_outlined,
-                    color: Colors.white70),
-                onTap: () => launchUrl(Uri.parse(
-                    'https://github.com/AverageConsumer/R-Shop/issues')),
-              ),
-              SizedBox(height: rs.spacing.md),
-              ConsoleFocusableListItem(
-                onSelect: () {
-                  _taglineTapCount++;
-                  if (_taglineTapCount >= 5) {
-                    widget.confettiController.play();
-                    _taglineTapCount = 0;
-                    ref.read(feedbackServiceProvider).confirm();
-                  } else {
-                    ref.read(feedbackServiceProvider).tick();
-                  }
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 20, vertical: 12),
-                  child: Center(
-                    child: Text(
-                      'INTENSIV, AGGRESSIV, MUTIG',
-                      style: AppTheme.titleMedium.copyWith(
-                        color: Colors.white54,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                      ),
+          ),
+        ]),
+        SettingsSection(l.settings_sectionLinks, [
+          SettingsEntry.nav(
+            icon: Icons.open_in_new_rounded,
+            title: l.settings_github,
+            subtitle: l.settings_githubSubtitle,
+            onSelect: () => launchUrl(
+                Uri.parse('https://github.com/AverageConsumer/R-Shop')),
+          ),
+          SettingsEntry.nav(
+            icon: Icons.bug_report_outlined,
+            title: l.settings_issues,
+            subtitle: l.settings_issuesSubtitle,
+            onSelect: () => launchUrl(Uri.parse(
+                'https://github.com/AverageConsumer/R-Shop/issues')),
+          ),
+          SettingsEntry.custom(
+            child: ConsoleFocusableListItem(
+              onSelect: () {
+                _taglineTapCount++;
+                if (_taglineTapCount >= 5) {
+                  widget.confettiController.play();
+                  _taglineTapCount = 0;
+                  ref.read(feedbackServiceProvider).confirm();
+                } else {
+                  ref.read(feedbackServiceProvider).tick();
+                }
+              },
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Center(
+                  child: Text(
+                    l.settings_tagline,
+                    style: AppTheme.titleMedium.copyWith(
+                      color: Colors.white54,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
                     ),
                   ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        ]),
+      ],
     );
   }
 }

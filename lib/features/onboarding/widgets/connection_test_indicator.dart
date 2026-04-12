@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../l10n/app_localizations.dart';
 
 class ConnectionTestIndicator extends StatelessWidget {
   final bool isTesting;
@@ -32,7 +33,7 @@ class ConnectionTestIndicator extends StatelessWidget {
           ),
           SizedBox(width: rs.spacing.sm),
           Text(
-            'Testing connection...',
+            L.of(context).providerForm_testingConnection,
             style: TextStyle(color: Colors.grey.shade400, fontSize: fontSize),
           ),
         ],
@@ -45,7 +46,7 @@ class ConnectionTestIndicator extends StatelessWidget {
           Icon(Icons.check_circle, color: Colors.green, size: iconSize),
           SizedBox(width: rs.spacing.sm),
           Text(
-            'Connection successful!',
+            L.of(context).providerForm_connectionSuccessful,
             style: TextStyle(color: Colors.green.shade300, fontSize: fontSize),
           ),
         ],
