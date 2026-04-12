@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/responsive/responsive.dart';
 import '../l10n/app_localizations.dart';
+import '../models/download_item.dart';
 import '../models/ra_models.dart';
 import 'installed_indicator.dart';
 import 'smart_cover_image.dart';
@@ -38,6 +39,10 @@ class BaseGameCard extends StatelessWidget {
   /// glyph instead of a solid circle, marking games that came from a
   /// borrowed (read-only / shared) source.
   final bool sourceDotBorrowed;
+
+  // Download status overlay
+  final DownloadStatus? downloadStatus;
+  final double downloadProgress;
 
   // Thumbnail pipeline
   final bool hasThumbnail;
@@ -80,6 +85,8 @@ class BaseGameCard extends StatelessWidget {
     this.sourceDotColor,
     this.sourceDotBorrowed = false,
     this.extraSourceDots,
+    this.downloadStatus,
+    this.downloadProgress = 0.0,
   });
 
   @override
@@ -126,6 +133,16 @@ class BaseGameCard extends StatelessWidget {
                     scrollSuppression: scrollSuppression,
                   ),
                 ),
+                // Download progress overlay — cover reveals from bottom to top
+                if (downloadStatus != null &&
+                    !downloadStatus!.isTerminal)
+                  Positioned.fill(
+                    child: _DownloadRevealOverlay(
+                      status: downloadStatus!,
+                      progress: downloadProgress,
+                      accentColor: accentColor,
+                    ),
+                  ),
                 // Top-left badges (system + installed)
                 if (systemLabel != null || isInstalled)
                   Positioned(
@@ -568,6 +585,112 @@ class _SourceDot extends StatelessWidget {
               ),
             )
           : null,
+    );
+  }
+}
+
+/// eShop-style download overlay: a dark curtain that reveals the cover
+/// from bottom to top as the download progresses.
+class _DownloadRevealOverlay extends StatelessWidget {
+  final DownloadStatus status;
+  final double progress;
+  final Color accentColor;
+
+  const _DownloadRevealOverlay({
+    required this.status,
+    required this.progress,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isQueued = status == DownloadStatus.queued;
+    final isIndeterminate =
+        status == DownloadStatus.extracting || status == DownloadStatus.moving;
+    final isDownloading = status == DownloadStatus.downloading;
+
+    // Curtain covers (1 - progress) of the card from the top.
+    // At 0% → fully covered. At 100% → fully revealed.
+    final curtainFraction =
+        isQueued ? 1.0 : (isIndeterminate ? 0.1 : 1.0 - progress.clamp(0.0, 1.0));
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 1.0, end: curtainFraction),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+      builder: (context, value, _) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            // Dark curtain from top — shrinks as download progresses
+            if (value > 0.005)
+              Align(
+                alignment: Alignment.topCenter,
+                child: FractionallySizedBox(
+                  heightFactor: value.clamp(0.0, 1.0),
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.85),
+                  ),
+                ),
+              ),
+            // Accent glow line at the reveal edge
+            if (isDownloading && value > 0.01 && value < 0.99)
+              Positioned(
+                top: null,
+                left: 0,
+                right: 0,
+                bottom: (1.0 - value) *
+                    (context.findRenderObject()?.paintBounds.height ?? 200) -
+                    1,
+                child: Container(
+                  height: 2,
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: accentColor.withValues(alpha: 0.7),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                    color: accentColor.withValues(alpha: 0.9),
+                  ),
+                ),
+              ),
+            // Center info
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isDownloading && progress > 0.01)
+                    Text(
+                      '${(progress * 100).toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    )
+                  else if (isQueued)
+                    Icon(
+                      Icons.schedule_rounded,
+                      size: 22,
+                      color: Colors.white.withValues(alpha: 0.6),
+                    )
+                  else if (isIndeterminate)
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.amber.withValues(alpha: 0.8),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

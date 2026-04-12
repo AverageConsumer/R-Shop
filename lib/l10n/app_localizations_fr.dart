@@ -271,6 +271,12 @@ class LFr extends L {
   String get gameDetail_adding => 'AJOUT...';
 
   @override
+  String get gameDetail_queued => 'EN ATTENTE';
+
+  @override
+  String get gameDetail_extracting => 'EXTRACTION...';
+
+  @override
   String get gameDetail_delete => 'SUPPRIMER';
 
   @override

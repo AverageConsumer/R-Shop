@@ -272,6 +272,12 @@ class LDe extends L {
   String get gameDetail_adding => 'WIRD HINZUGEFÜGT...';
 
   @override
+  String get gameDetail_queued => 'WARTESCHLANGE';
+
+  @override
+  String get gameDetail_extracting => 'ENTPACKEN...';
+
+  @override
   String get gameDetail_delete => 'LÖSCHEN';
 
   @override

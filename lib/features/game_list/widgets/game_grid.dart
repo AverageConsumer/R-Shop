@@ -9,6 +9,7 @@ import '../../../models/game_item.dart';
 import '../../../models/ra_models.dart';
 import '../../../models/system_model.dart';
 import '../../../providers/app_providers.dart';
+import '../../../providers/download_providers.dart';
 import '../../../utils/image_helper.dart';
 import '../../../widgets/base_game_card.dart';
 import '../../../widgets/selection_aware_item.dart';
@@ -260,6 +261,12 @@ class _GameGridState extends ConsumerState<GameGrid> {
       ));
     }
 
+    // Download status for first variant
+    final gameId = '${widget.system.name}_${first.filename}';
+    final dlStatus = ref.watch(
+      downloadStatusForGameProvider((gameId: gameId)),
+    );
+
     return RepaintBoundary(
       key: widget.itemKeys[index],
       child: SelectionAwareItem(
@@ -285,6 +292,8 @@ class _GameGridState extends ConsumerState<GameGrid> {
           sourceDotColor: dotColor,
           sourceDotBorrowed: dotBorrowed,
           extraSourceDots: extraDots,
+          downloadStatus: dlStatus?.status,
+          downloadProgress: dlStatus?.progress ?? 0.0,
           onTap: () => widget.onOpenGame(displayName, variants),
           onTapSelect: () => widget.onSelectionChanged(index),
           onCoverFound: (url) => widget.onCoverFound(url, variants),

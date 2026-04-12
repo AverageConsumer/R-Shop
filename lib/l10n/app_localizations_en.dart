@@ -271,6 +271,12 @@ class LEn extends L {
   String get gameDetail_adding => 'ADDING...';
 
   @override
+  String get gameDetail_queued => 'QUEUED';
+
+  @override
+  String get gameDetail_extracting => 'EXTRACTING...';
+
+  @override
   String get gameDetail_delete => 'DELETE';
 
   @override

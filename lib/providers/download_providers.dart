@@ -119,6 +119,35 @@ final hasQueueItemsProvider = Provider<bool>((ref) {
   return !ref.watch(downloadQueueManagerProvider).state.isEmpty;
 });
 
+/// Whether any downloads are currently active (downloading/extracting/moving).
+final hasActiveDownloadsProvider = Provider<bool>((ref) {
+  return ref.watch(downloadQueueManagerProvider).state.hasActiveDownloads;
+});
+
+/// Aggregate progress across all active downloads (0.0–1.0).
+/// Returns null when nothing is active.
+final globalDownloadProgressProvider = Provider<double?>((ref) {
+  final queue = ref.watch(downloadQueueProvider);
+  final active = queue.where((item) => item.isActive).toList();
+  if (active.isEmpty) return null;
+  return active.map((d) => d.progress).reduce((a, b) => a + b) / active.length;
+});
+
+/// Lightweight download status for a single game variant.
+/// Uses a value record so Riverpod detects actual changes even though
+/// DownloadItem.== compares by ID only.
+final downloadStatusForGameProvider = Provider.family<
+    ({DownloadStatus status, double progress, String? error})?,
+    ({String gameId})>((ref, key) {
+  final queue = ref.watch(downloadQueueProvider);
+  for (final item in queue) {
+    if (item.id == key.gameId) {
+      return (status: item.status, progress: item.progress, error: item.error);
+    }
+  }
+  return null;
+});
+
 /// Event data for the "added to queue" animation.
 class AddToQueueEvent {
   final String gameTitle;

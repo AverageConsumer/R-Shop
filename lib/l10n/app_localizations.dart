@@ -579,6 +579,18 @@ abstract class L {
   /// **'ADDING...'**
   String get gameDetail_adding;
 
+  /// No description provided for @gameDetail_queued.
+  ///
+  /// In en, this message translates to:
+  /// **'QUEUED'**
+  String get gameDetail_queued;
+
+  /// No description provided for @gameDetail_extracting.
+  ///
+  /// In en, this message translates to:
+  /// **'EXTRACTING...'**
+  String get gameDetail_extracting;
+
   /// No description provided for @gameDetail_delete.
   ///
   /// In en, this message translates to:

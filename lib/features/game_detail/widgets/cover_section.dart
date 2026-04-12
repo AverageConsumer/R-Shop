@@ -14,7 +14,6 @@ class CoverSection extends StatelessWidget {
   final bool isFavorite;
   final bool isInstalled;
   final bool hasThumbnail;
-
   const CoverSection({
     super.key,
     required this.game,

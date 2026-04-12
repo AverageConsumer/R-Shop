@@ -33,6 +33,9 @@ class ActionButtonsRow extends StatelessWidget {
   // Primary-only: whether the section is focused
   final bool isSectionFocused;
 
+  /// Download progress (0.0–1.0) when [downloadButtonState] is [DownloadButtonState.downloading].
+  final double downloadProgress;
+
   /// Renders only the primary action button (Download/Delete/Manage).
   const ActionButtonsRow.primaryOnly({
     super.key,
@@ -42,6 +45,7 @@ class ActionButtonsRow extends StatelessWidget {
     required this.onPrimaryAction,
     required this.hintText,
     this.isSectionFocused = false,
+    this.downloadProgress = 0.0,
   })  : _mode = _Mode.primary,
         isFavorite = null,
         isShareEnabled = null,
@@ -65,7 +69,8 @@ class ActionButtonsRow extends StatelessWidget {
         downloadButtonState = null,
         variantCount = null,
         onPrimaryAction = null,
-        hintText = null;
+        hintText = null,
+        downloadProgress = 0.0;
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +92,7 @@ class ActionButtonsRow extends StatelessWidget {
           variantCount: variantCount,
           isFocused: isSectionFocused,
           onTap: onPrimaryAction,
+          progress: downloadProgress,
         ),
         if (hintText != null && hintText!.isNotEmpty) ...[
           SizedBox(height: rs.spacing.xs),
@@ -151,6 +157,7 @@ class _PrimaryActionButton extends StatelessWidget {
   final int? variantCount;
   final bool isFocused;
   final VoidCallback? onTap;
+  final double progress;
 
   const _PrimaryActionButton({
     required this.state,
@@ -158,6 +165,7 @@ class _PrimaryActionButton extends StatelessWidget {
     this.variantCount,
     required this.isFocused,
     this.onTap,
+    this.progress = 0.0,
   });
 
   @override
@@ -171,6 +179,7 @@ class _PrimaryActionButton extends StatelessWidget {
     final Color textColor;
     final IconData icon;
     final String label;
+    final bool showProgressFill;
 
     switch (state) {
       case DownloadButtonState.download:
@@ -179,46 +188,74 @@ class _PrimaryActionButton extends StatelessWidget {
         textColor = accentColor;
         icon = Icons.download_rounded;
         label = isMulti ? l.gameDetail_manageFiles : l.gameDetail_download;
+        showProgressFill = false;
       case DownloadButtonState.adding:
         bgColor = accentColor.withValues(alpha: 0.1);
         borderColor = accentColor.withValues(alpha: 0.3);
         textColor = accentColor.withValues(alpha: 0.7);
         icon = Icons.download_rounded;
         label = l.gameDetail_adding;
+        showProgressFill = false;
+      case DownloadButtonState.queued:
+        bgColor = accentColor.withValues(alpha: 0.08);
+        borderColor = accentColor.withValues(alpha: 0.4);
+        textColor = accentColor.withValues(alpha: 0.8);
+        icon = Icons.schedule_rounded;
+        label = l.gameDetail_queued;
+        showProgressFill = false;
+      case DownloadButtonState.downloading:
+        bgColor = accentColor.withValues(alpha: 0.06);
+        borderColor = accentColor.withValues(alpha: 0.5);
+        textColor = Colors.white;
+        icon = Icons.downloading_rounded;
+        label = '${(progress * 100).toStringAsFixed(0)}%';
+        showProgressFill = true;
+      case DownloadButtonState.extracting:
+        bgColor = Colors.amber.withValues(alpha: 0.08);
+        borderColor = Colors.amber.withValues(alpha: 0.4);
+        textColor = Colors.amber;
+        icon = Icons.unarchive_rounded;
+        label = l.gameDetail_extracting;
+        showProgressFill = false;
       case DownloadButtonState.delete:
         bgColor = Colors.red.withValues(alpha: isFocused ? 0.18 : 0.1);
         borderColor = Colors.red.withValues(alpha: isFocused ? 0.5 : 0.3);
         textColor = Colors.redAccent;
         icon = Icons.delete_outline_rounded;
         label = l.gameDetail_delete;
+        showProgressFill = false;
       case DownloadButtonState.installed:
         bgColor = accentColor.withValues(alpha: isFocused ? 0.2 : 0.1);
         borderColor = accentColor.withValues(alpha: isFocused ? 0.6 : 0.3);
         textColor = accentColor;
         icon = Icons.folder_open_rounded;
         label = l.gameDetail_manageFiles;
+        showProgressFill = false;
       case DownloadButtonState.unavailable:
         bgColor = Colors.white.withValues(alpha: 0.04);
         borderColor = Colors.white.withValues(alpha: 0.08);
         textColor = Colors.white.withValues(alpha: 0.3);
         icon = Icons.block_rounded;
         label = l.gameDetail_unavailable;
+        showProgressFill = false;
     }
 
     final isDisabled = state == DownloadButtonState.adding ||
-        state == DownloadButtonState.unavailable;
+        state == DownloadButtonState.unavailable ||
+        state == DownloadButtonState.queued ||
+        state == DownloadButtonState.downloading ||
+        state == DownloadButtonState.extracting;
+
+    final radius = BorderRadius.circular(rs.radius.md);
 
     return GestureDetector(
       onTap: isDisabled ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: EdgeInsets.symmetric(
-          horizontal: rs.isSmall ? 14 : 18,
-          vertical: rs.isSmall ? 10 : 12,
-        ),
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(rs.radius.md),
+          borderRadius: radius,
           border: Border.all(
             color: isFocused ? Colors.white.withValues(alpha: 0.9) : borderColor,
             width: isFocused ? 2 : 1.5,
@@ -241,55 +278,91 @@ class _PrimaryActionButton extends StatelessWidget {
                 ]
               : null,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (state == DownloadButtonState.adding)
-              SizedBox(
-                width: rs.isSmall ? 14 : 16,
-                height: rs.isSmall ? 14 : 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: textColor,
-                ),
-              )
-            else
-              Icon(icon, color: textColor, size: rs.isSmall ? 16 : 18),
-            SizedBox(width: rs.spacing.sm),
-            Flexible(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: rs.isSmall ? 12 : 14,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ),
-            if (isMulti &&
-                state == DownloadButtonState.download) ...[
-              SizedBox(width: rs.spacing.sm),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '$variantCount',
-                  style: TextStyle(
-                    color: accentColor,
-                    fontSize: rs.isSmall ? 9 : 11,
-                    fontWeight: FontWeight.w700,
+        child: IntrinsicHeight(
+          child: Stack(
+            children: [
+              // Progress fill — slides left to right behind the content
+              if (showProgressFill)
+                Positioned.fill(
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(end: progress.clamp(0.0, 1.0)),
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeInOut,
+                    builder: (context, value, _) {
+                      return FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: value,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                accentColor.withValues(alpha: 0.3),
+                                accentColor.withValues(alpha: 0.15),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
+                ),
+              // Button content — full width so button size stays stable
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: rs.isSmall ? 14 : 18,
+                  vertical: rs.isSmall ? 10 : 12,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (state == DownloadButtonState.adding)
+                      SizedBox(
+                        width: rs.isSmall ? 14 : 16,
+                        height: rs.isSmall ? 14 : 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: textColor,
+                        ),
+                      )
+                    else
+                      Icon(icon, color: textColor, size: rs.isSmall ? 16 : 18),
+                    SizedBox(width: rs.spacing.sm),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: rs.isSmall ? 12 : 14,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                    if (isMulti &&
+                        state == DownloadButtonState.download) ...[
+                      SizedBox(width: rs.spacing.sm),
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '$variantCount',
+                          style: TextStyle(
+                            color: accentColor,
+                            fontSize: rs.isSmall ? 9 : 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
-          ],
+          ),
         ),
       ),
     );

@@ -29,6 +29,7 @@ import 'services/thumbnail_migration_service.dart';
 import 'services/thumbnail_service.dart';
 import 'utils/rom_share_helper.dart';
 import 'widgets/add_to_queue_toast.dart';
+import 'widgets/download/global_progress_bar.dart';
 import 'widgets/download_overlay.dart';
 import 'widgets/sync_badge.dart';
 import 'l10n/app_localizations.dart';
@@ -318,6 +319,12 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
             child: Stack(
               children: [
                 child!,
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: GlobalDownloadProgressBar(),
+                ),
                 Builder(
                   builder: (context) => const DownloadOverlay(),
                 ),

@@ -271,6 +271,12 @@ class LEs extends L {
   String get gameDetail_adding => 'AÑADIENDO...';
 
   @override
+  String get gameDetail_queued => 'EN COLA';
+
+  @override
+  String get gameDetail_extracting => 'EXTRAYENDO...';
+
+  @override
   String get gameDetail_delete => 'BORRAR';
 
   @override

@@ -79,6 +79,8 @@
   "gameDetail_versions": "VERSIONS",
   "gameDetail_download": "TÉLÉCHARGER",
   "gameDetail_adding": "AJOUT...",
+  "gameDetail_queued": "EN ATTENTE",
+  "gameDetail_extracting": "EXTRACTION...",
   "gameDetail_delete": "SUPPRIMER",
   "gameDetail_manageFiles": "GÉRER FICHIERS",
   "gameDetail_unavailable": "INDISPONIBLE",

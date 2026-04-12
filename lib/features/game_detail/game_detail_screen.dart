@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/input/input.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/responsive/responsive.dart';
+import '../../models/download_item.dart';
 import '../../models/game_item.dart';
 import '../../models/game_metadata_info.dart';
 import '../../models/system_model.dart';
@@ -1252,9 +1253,51 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     bool isMultiRom, {
     required bool isFocused,
   }) {
+    final baseState = _getDownloadButtonState(state, isMultiRom);
+    var buttonState = baseState;
+    var progress = 0.0;
+
+    // Check if any variant is actively downloading/queued.
+    // For single-ROM: check the selected variant.
+    // For multi-ROM: check all variants, pick the most "active" one.
+    if (baseState == DownloadButtonState.download ||
+        baseState == DownloadButtonState.delete) {
+      final variantsToCheck = isMultiRom
+          ? widget.variants
+          : [controller.selectedVariant];
+
+      for (final variant in variantsToCheck) {
+        final gameId = '${widget.system.name}_${variant.filename}';
+        final dlStatus = ref.watch(
+          downloadStatusForGameProvider((gameId: gameId)),
+        );
+        if (dlStatus == null) continue;
+        switch (dlStatus.status) {
+          case DownloadStatus.downloading:
+            buttonState = DownloadButtonState.downloading;
+            progress = dlStatus.progress;
+          case DownloadStatus.extracting:
+          case DownloadStatus.moving:
+            if (buttonState != DownloadButtonState.downloading) {
+              buttonState = DownloadButtonState.extracting;
+            }
+          case DownloadStatus.queued:
+            if (buttonState != DownloadButtonState.downloading &&
+                buttonState != DownloadButtonState.extracting) {
+              buttonState = DownloadButtonState.queued;
+            }
+          case DownloadStatus.completed:
+          case DownloadStatus.cancelled:
+          case DownloadStatus.error:
+            break;
+        }
+      }
+    }
+
     return ActionButtonsRow.primaryOnly(
       accentColor: widget.system.textAccentColor,
-      downloadButtonState: _getDownloadButtonState(state, isMultiRom),
+      downloadButtonState: buttonState,
+      downloadProgress: progress,
       variantCount: isMultiRom ? widget.variants.length : null,
       onPrimaryAction: controller.performAction,
       hintText: _getButtonHintText(state, isMultiRom),

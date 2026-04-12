@@ -91,6 +91,8 @@
   "gameDetail_versions": "VERS\u00d5ES",
   "gameDetail_download": "BAIXAR",
   "gameDetail_adding": "ADICIONANDO...",
+  "gameDetail_queued": "NA FILA",
+  "gameDetail_extracting": "EXTRAINDO...",
   "gameDetail_delete": "APAGAR",
   "gameDetail_manageFiles": "GERENCIAR ARQUIVOS",
   "gameDetail_unavailable": "INDISPON\u00cdVEL",

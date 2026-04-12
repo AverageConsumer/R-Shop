@@ -3,7 +3,16 @@ import 'package:flutter/material.dart';
 import '../../../core/responsive/responsive.dart';
 import '../../../l10n/app_localizations.dart';
 
-enum DownloadButtonState { download, adding, delete, installed, unavailable }
+enum DownloadButtonState {
+  download,
+  adding,
+  queued,
+  downloading,
+  extracting,
+  delete,
+  installed,
+  unavailable,
+}
 
 class DownloadActionButton extends StatelessWidget {
   final DownloadButtonState state;
@@ -44,6 +53,24 @@ class DownloadActionButton extends StatelessWidget {
         textColor = accentColor.withValues(alpha: 0.7);
         icon = Icons.download_rounded;
         label = l.gameDetail_adding;
+      case DownloadButtonState.queued:
+        bgColor = accentColor.withValues(alpha: 0.08);
+        borderColor = accentColor.withValues(alpha: 0.4);
+        textColor = accentColor.withValues(alpha: 0.8);
+        icon = Icons.schedule_rounded;
+        label = l.gameDetail_download;
+      case DownloadButtonState.downloading:
+        bgColor = accentColor.withValues(alpha: 0.06);
+        borderColor = accentColor.withValues(alpha: 0.5);
+        textColor = Colors.white;
+        icon = Icons.downloading_rounded;
+        label = l.gameDetail_download;
+      case DownloadButtonState.extracting:
+        bgColor = Colors.amber.withValues(alpha: 0.08);
+        borderColor = Colors.amber.withValues(alpha: 0.4);
+        textColor = Colors.amber;
+        icon = Icons.unarchive_rounded;
+        label = l.gameDetail_download;
       case DownloadButtonState.delete:
         bgColor = Colors.red.withValues(alpha: 0.12);
         borderColor = Colors.red.withValues(alpha: 0.35);

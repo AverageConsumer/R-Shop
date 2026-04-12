@@ -79,6 +79,8 @@
   "gameDetail_versions": "VERSIONES",
   "gameDetail_download": "DESCARGAR",
   "gameDetail_adding": "AÑADIENDO...",
+  "gameDetail_queued": "EN COLA",
+  "gameDetail_extracting": "EXTRAYENDO...",
   "gameDetail_delete": "BORRAR",
   "gameDetail_manageFiles": "GESTIONAR ARCHIVOS",
   "gameDetail_unavailable": "NO DISPONIBLE",

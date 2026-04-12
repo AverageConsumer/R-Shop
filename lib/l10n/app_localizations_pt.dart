@@ -271,6 +271,12 @@ class LPt extends L {
   String get gameDetail_adding => 'ADICIONANDO...';
 
   @override
+  String get gameDetail_queued => 'NA FILA';
+
+  @override
+  String get gameDetail_extracting => 'EXTRAINDO...';
+
+  @override
   String get gameDetail_delete => 'APAGAR';
 
   @override

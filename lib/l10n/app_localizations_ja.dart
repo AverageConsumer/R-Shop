@@ -270,6 +270,12 @@ class LJa extends L {
   String get gameDetail_adding => '追加中...';
 
   @override
+  String get gameDetail_queued => '待機中';
+
+  @override
+  String get gameDetail_extracting => '展開中...';
+
+  @override
   String get gameDetail_delete => '削除';
 
   @override

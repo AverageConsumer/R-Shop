@@ -9,7 +9,11 @@ enum DownloadStatus {
   moving,
   completed,
   cancelled,
-  error,
+  error;
+
+  /// Whether this status represents a final state (no more progress).
+  bool get isTerminal =>
+      this == completed || this == cancelled || this == error;
 }
 
 class DownloadItem {

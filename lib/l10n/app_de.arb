@@ -91,6 +91,8 @@
   "gameDetail_versions": "VERSIONEN",
   "gameDetail_download": "DOWNLOAD",
   "gameDetail_adding": "WIRD HINZUGEFÜGT...",
+  "gameDetail_queued": "WARTESCHLANGE",
+  "gameDetail_extracting": "ENTPACKEN...",
   "gameDetail_delete": "LÖSCHEN",
   "gameDetail_manageFiles": "DATEIEN VERWALTEN",
   "gameDetail_unavailable": "NICHT VERFÜGBAR",

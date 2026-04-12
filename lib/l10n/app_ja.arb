@@ -91,6 +91,8 @@
   "gameDetail_versions": "\u30d0\u30fc\u30b8\u30e7\u30f3",
   "gameDetail_download": "\u30c0\u30a6\u30f3\u30ed\u30fc\u30c9",
   "gameDetail_adding": "\u8ffd\u52a0\u4e2d...",
+  "gameDetail_queued": "待機中",
+  "gameDetail_extracting": "展開中...",
   "gameDetail_delete": "\u524a\u9664",
   "gameDetail_manageFiles": "\u30d5\u30a1\u30a4\u30eb\u7ba1\u7406",
   "gameDetail_unavailable": "\u5229\u7528\u4e0d\u53ef",
