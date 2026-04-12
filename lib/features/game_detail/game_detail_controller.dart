@@ -165,6 +165,7 @@ class GameDetailController extends ChangeNotifier {
   int _screenshotMax = 0;
   int _siblingMax = 0;
   int _actionButtonMax = 0;
+  Set<int> _disabledActionButtons = const {};
 
   static const _leftColumnSections = {
     DetailSection.primaryAction,
@@ -252,7 +253,13 @@ class GameDetailController extends ChangeNotifier {
           return false;
 
         case DetailSection.actions:
-          final newIdx = _state.actionButtonIndex + delta;
+          // Skip disabled buttons in the navigation direction
+          var newIdx = _state.actionButtonIndex + delta;
+          while (newIdx >= 0 &&
+              (_actionButtonMax == 0 || newIdx < _actionButtonMax) &&
+              _disabledActionButtons.contains(newIdx)) {
+            newIdx += delta;
+          }
           if (newIdx >= 0 && (_actionButtonMax == 0 || newIdx < _actionButtonMax)) {
             _state = _state.copyWith(actionButtonIndex: newIdx);
             notifyListeners();
@@ -343,10 +350,12 @@ class GameDetailController extends ChangeNotifier {
     int screenshotCount = 0,
     int siblingCount = 0,
     int actionButtonCount = 0,
+    Set<int> disabledActionButtons = const {},
   }) {
     _screenshotMax = screenshotCount;
     _siblingMax = siblingCount;
     _actionButtonMax = actionButtonCount;
+    _disabledActionButtons = disabledActionButtons;
 
     var changed = false;
     var si = _state.screenshotIndex;
@@ -364,6 +373,29 @@ class GameDetailController extends ChangeNotifier {
     if (actionButtonCount > 0 && ab >= actionButtonCount) {
       ab = actionButtonCount - 1;
       changed = true;
+    }
+
+    // If current action button is disabled, find nearest enabled one
+    if (disabledActionButtons.contains(ab)) {
+      // Try forward first, then backward
+      var found = false;
+      for (var i = ab + 1; i < actionButtonCount; i++) {
+        if (!disabledActionButtons.contains(i)) {
+          ab = i;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        for (var i = ab - 1; i >= 0; i--) {
+          if (!disabledActionButtons.contains(i)) {
+            ab = i;
+            found = true;
+            break;
+          }
+        }
+      }
+      if (found) changed = true;
     }
 
     if (changed) {

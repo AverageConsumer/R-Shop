@@ -50,10 +50,14 @@ class ActionButtonsRow extends StatelessWidget {
   })  : _mode = _Mode.primary,
         isFavorite = null,
         isShareEnabled = null,
+        isCollectionEnabled = null,
         focusedButtonIndex = null,
         onFavorite = null,
         onShare = null,
         onCollection = null;
+
+  /// Whether the collection/shelf button is enabled.
+  final bool? isCollectionEnabled;
 
   /// Renders only the icon action buttons (Favorite/Share/Shelf).
   const ActionButtonsRow.iconsOnly({
@@ -61,6 +65,7 @@ class ActionButtonsRow extends StatelessWidget {
     required this.accentColor,
     required this.isFavorite,
     this.isShareEnabled = true,
+    this.isCollectionEnabled = true,
     required this.focusedButtonIndex,
     this.isSectionFocused = false,
     required this.onFavorite,
@@ -111,8 +116,12 @@ class ActionButtonsRow extends StatelessWidget {
   }
 
   Widget _buildIcons(Responsive rs) {
+    final shareEnabled = isShareEnabled ?? true;
+    final collectionEnabled = isCollectionEnabled ?? true;
+
     return Row(
       children: [
+        // Favorite — always enabled
         Expanded(
           child: _IconActionButton(
             icon: isFavorite!
@@ -125,23 +134,26 @@ class ActionButtonsRow extends StatelessWidget {
           ),
         ),
         SizedBox(width: rs.spacing.xs),
+        // Share — disabled when game not installed
         Expanded(
           child: _IconActionButton(
             icon: Icons.share_rounded,
-            color: isShareEnabled! ? Colors.white54 : Colors.white24,
-            isFocused: isSectionFocused && focusedButtonIndex == 1,
+            color: shareEnabled ? Colors.white54 : Colors.white12,
+            isFocused: shareEnabled && isSectionFocused && focusedButtonIndex == 1,
             accentColor: accentColor,
-            enabled: isShareEnabled!,
+            enabled: shareEnabled,
             onTap: onShare!,
           ),
         ),
         SizedBox(width: rs.spacing.xs),
+        // Collection — disabled when no shelves exist
         Expanded(
           child: _IconActionButton(
             icon: Icons.shelves,
-            color: Colors.white54,
-            isFocused: isSectionFocused && focusedButtonIndex == 2,
+            color: collectionEnabled ? Colors.white54 : Colors.white12,
+            isFocused: collectionEnabled && isSectionFocused && focusedButtonIndex == 2,
             accentColor: accentColor,
+            enabled: collectionEnabled,
             onTap: onCollection!,
           ),
         ),

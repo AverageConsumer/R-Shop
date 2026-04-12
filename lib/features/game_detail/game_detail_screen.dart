@@ -698,10 +698,18 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     controller.skipActionsInVerticalNav = !rs.isPortrait;
 
     // Clamp horizontal indices
+    final hasShelves = ref.watch(customShelvesProvider).isNotEmpty;
+    final isShareable = state.isVariantInstalled && !state.isSharing;
+    final disabledButtons = <int>{
+      if (!isShareable) 1,  // Share button index
+      if (!hasShelves) 2,    // Collection button index
+    };
+
     controller.clampHorizontalIndices(
       screenshotCount: richMetadata?.screenshotUrlList.length ?? 0,
       siblingCount: _getSiblingOrVariantCount(richMetadata, isMultiRom),
       actionButtonCount: ActionButtonsRow.itemCount,
+      disabledActionButtons: disabledButtons,
     );
 
     return buildWithActions(
@@ -1313,10 +1321,14 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final isFavorite = ref.watch(favoriteGamesProvider)
         .contains(controller.selectedVariant.filename);
 
+    final hasShelves = ref.watch(customShelvesProvider).isNotEmpty;
+    final shareEnabled = state.isVariantInstalled && !state.isSharing;
+
     return ActionButtonsRow.iconsOnly(
       accentColor: widget.system.textAccentColor,
       isFavorite: isFavorite,
-      isShareEnabled: state.isVariantInstalled && !state.isSharing,
+      isShareEnabled: shareEnabled,
+      isCollectionEnabled: hasShelves,
       focusedButtonIndex: state.actionButtonIndex,
       isSectionFocused: isFocused,
       onFavorite: _handleFavorite,
