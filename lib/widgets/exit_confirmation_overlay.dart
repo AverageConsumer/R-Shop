@@ -271,7 +271,7 @@ class _ExitConfirmationOverlayState
                   child: FadeTransition(
                     opacity: _fadeAnimation,
                     child: ConsoleHud(
-                      a: HudAction(l.common_select),
+                      a: HudAction(l.common_select, onTap: _handleConfirm),
                       b: HudAction(l.common_close, onTap: _close),
                       embedded: true,
                     ),

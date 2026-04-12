@@ -612,7 +612,7 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
               if (_isFiltering) _buildFilterContent(state),
               if (_isFiltering)
                 ConsoleHud(
-                  a: HudAction(L.of(context).common_toggle),
+                  a: null,
                   b: HudAction(L.of(context).common_close, onTap: _closeFilter),
                   x: HudAction(L.of(context).common_clear, onTap: () {
                     _controller.clearFilters();

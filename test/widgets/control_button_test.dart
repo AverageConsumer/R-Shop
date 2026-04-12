@@ -9,7 +9,7 @@ void main() {
   group('ControlButton', () {
     testWidgets('renders label text (legacy mode)', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const ControlButton(label: 'A', action: 'Confirm'),
+        ControlButton(label: 'A', action: 'Confirm', onTap: () {}),
       ));
 
       expect(find.text('A'), findsOneWidget);
@@ -17,7 +17,7 @@ void main() {
 
     testWidgets('renders action text', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const ControlButton(label: 'A', action: 'Confirm'),
+        ControlButton(label: 'A', action: 'Confirm', onTap: () {}),
       ));
 
       expect(find.text('Confirm'), findsOneWidget);
@@ -25,7 +25,7 @@ void main() {
 
     testWidgets('face button "A" gets circle shape (legacy mode)', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const ControlButton(label: 'A', action: 'Confirm'),
+        ControlButton(label: 'A', action: 'Confirm', onTap: () {}),
       ));
 
       final containers = tester.widgetList<Container>(
@@ -40,7 +40,7 @@ void main() {
 
     testWidgets('shoulder button "LB" gets pill shape (legacy mode)', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const ControlButton(label: 'LB', action: 'Prev'),
+        ControlButton(label: 'LB', action: 'Prev', onTap: () {}),
       ));
 
       final containers = tester.widgetList<Container>(
@@ -55,7 +55,7 @@ void main() {
 
     testWidgets('highlight=true uses redAccent action color', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const ControlButton(label: 'B', action: 'Back', highlight: true),
+        ControlButton(label: 'B', action: 'Back', highlight: true, onTap: () {}),
       ));
 
       final actionText = tester.widget<Text>(find.text('Back'));
@@ -67,10 +67,11 @@ void main() {
 
     testWidgets('custom buttonColor is applied (legacy mode)', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const ControlButton(
+        ControlButton(
           label: 'A',
           action: 'OK',
           buttonColor: Colors.green,
+          onTap: () {},
         ),
       ));
 
@@ -94,12 +95,14 @@ void main() {
       expect(tapped, true);
     });
 
-    testWidgets('onTap null means no InkWell wrapper', (tester) async {
+    testWidgets('onTap null renders nothing', (tester) async {
       await tester.pumpWidget(createTestApp(
         const ControlButton(label: 'A', action: 'OK'),
       ));
 
       expect(find.byType(InkWell), findsNothing);
+      expect(find.text('A'), findsNothing);
+      expect(find.text('OK'), findsNothing);
     });
 
     testWidgets('onTap non-null wraps in InkWell', (tester) async {
@@ -112,10 +115,11 @@ void main() {
 
     testWidgets('icon is shown instead of label text when set', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const ControlButton(
+        ControlButton(
           label: 'X',
           action: 'Menu',
           icon: Icons.menu,
+          onTap: () {},
         ),
       ));
 
@@ -125,10 +129,11 @@ void main() {
 
     testWidgets('svgAsset renders SvgPicture instead of label', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const ControlButton(
+        ControlButton(
           label: '',
           action: 'Confirm',
           svgAsset: 'assets/gamepad/nintendo/switch_button_a.svg',
+          onTap: () {},
         ),
       ));
 
@@ -138,16 +143,16 @@ void main() {
 
     testWidgets('svgAsset with highlight shows red glow border', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const ControlButton(
+        ControlButton(
           label: '',
           action: 'Save',
           svgAsset: 'assets/gamepad/nintendo/switch_button_a.svg',
           highlight: true,
+          onTap: () {},
         ),
       ));
 
       expect(find.byType(SvgPicture), findsOneWidget);
-      // Highlight wraps SVG in a Container with circle border
       final containers = tester.widgetList<Container>(
         find.descendant(
           of: find.byType(ControlButton),
@@ -182,10 +187,11 @@ void main() {
 
     testWidgets('labelColor is applied to label text (legacy mode)', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const ControlButton(
+        ControlButton(
           label: 'A',
           action: 'OK',
           labelColor: Colors.blue,
+          onTap: () {},
         ),
       ));
 

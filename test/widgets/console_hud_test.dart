@@ -43,10 +43,10 @@ void main() {
     testWidgets('Nintendo layout renders SVG buttons for A/B', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.nintendo);
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
+        Stack(children: [
           ConsoleHud(
-            a: HudAction('Confirm'),
-            b: HudAction('Back'),
+            a: HudAction('Confirm', onTap: () {}),
+            b: HudAction('Back', onTap: () {}),
           ),
         ]),
         overrides: _overrides(storage),
@@ -61,10 +61,10 @@ void main() {
     testWidgets('Xbox layout renders SVG buttons (swapped display positions)', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.xbox);
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
+        Stack(children: [
           ConsoleHud(
-            a: HudAction('Confirm'),
-            b: HudAction('Back'),
+            a: HudAction('Confirm', onTap: () {}),
+            b: HudAction('Back', onTap: () {}),
           ),
         ]),
         overrides: _overrides(storage),
@@ -78,10 +78,10 @@ void main() {
     testWidgets('PlayStation layout renders SVG icons', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.playstation);
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
+        Stack(children: [
           ConsoleHud(
-            a: HudAction('Confirm'),
-            b: HudAction('Back'),
+            a: HudAction('Confirm', onTap: () {}),
+            b: HudAction('Back', onTap: () {}),
           ),
         ]),
         overrides: _overrides(storage),
@@ -95,12 +95,12 @@ void main() {
     testWidgets('Xbox face buttons all render SVGs', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.xbox);
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
+        Stack(children: [
           ConsoleHud(
-            a: HudAction('Go'),
-            b: HudAction('Stop'),
-            x: HudAction('Special'),
-            y: HudAction('Alt'),
+            a: HudAction('Go', onTap: () {}),
+            b: HudAction('Stop', onTap: () {}),
+            x: HudAction('Special', onTap: () {}),
+            y: HudAction('Alt', onTap: () {}),
           ),
         ]),
         overrides: _overrides(storage),
@@ -113,8 +113,8 @@ void main() {
     testWidgets('Nintendo Start renders SVG (plus button)', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.nintendo);
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
-          ConsoleHud(start: HudAction('Menu')),
+        Stack(children: [
+          ConsoleHud(start: HudAction('Menu', onTap: () {})),
         ]),
         overrides: _overrides(storage),
       ));
@@ -125,8 +125,8 @@ void main() {
     testWidgets('Xbox Start renders SVG (menu button)', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.xbox);
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
-          ConsoleHud(start: HudAction('Menu')),
+        Stack(children: [
+          ConsoleHud(start: HudAction('Menu', onTap: () {})),
         ]),
         overrides: _overrides(storage),
       ));
@@ -137,10 +137,10 @@ void main() {
     testWidgets('PlayStation Start/Select render SVGs', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.playstation);
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
+        Stack(children: [
           ConsoleHud(
-            start: HudAction('Options'),
-            select: HudAction('Share'),
+            start: HudAction('Options', onTap: () {}),
+            select: HudAction('Share', onTap: () {}),
           ),
         ]),
         overrides: _overrides(storage),
@@ -152,10 +152,10 @@ void main() {
     testWidgets('Nintendo LB/RB render SVGs', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.nintendo);
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
+        Stack(children: [
           ConsoleHud(
-            lb: HudAction('Prev'),
-            rb: HudAction('Next'),
+            lb: HudAction('Prev', onTap: () {}),
+            rb: HudAction('Next', onTap: () {}),
           ),
         ]),
         overrides: _overrides(storage),
@@ -167,10 +167,10 @@ void main() {
     testWidgets('Xbox LB/RB render SVGs', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.xbox);
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
+        Stack(children: [
           ConsoleHud(
-            lb: HudAction('Prev'),
-            rb: HudAction('Next'),
+            lb: HudAction('Prev', onTap: () {}),
+            rb: HudAction('Next', onTap: () {}),
           ),
         ]),
         overrides: _overrides(storage),
@@ -182,10 +182,10 @@ void main() {
     testWidgets('PlayStation LB/RB render SVGs', (tester) async {
       final storage = await _createMockStorage(layout: ControllerLayout.playstation);
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
+        Stack(children: [
           ConsoleHud(
-            lb: HudAction('Prev'),
-            rb: HudAction('Next'),
+            lb: HudAction('Prev', onTap: () {}),
+            rb: HudAction('Next', onTap: () {}),
           ),
         ]),
         overrides: _overrides(storage),
@@ -197,8 +197,8 @@ void main() {
     testWidgets('embedded=true has no Positioned wrapper', (tester) async {
       final storage = await _createMockStorage();
       await tester.pumpWidget(createTestAppWithProviders(
-        const ConsoleHud(
-          a: HudAction('Confirm'),
+        ConsoleHud(
+          a: HudAction('Confirm', onTap: () {}),
           embedded: true,
         ),
         overrides: _overrides(storage),
@@ -211,9 +211,9 @@ void main() {
     testWidgets('embedded=false has Positioned wrapper', (tester) async {
       final storage = await _createMockStorage();
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
+        Stack(children: [
           ConsoleHud(
-            a: HudAction('Confirm'),
+            a: HudAction('Confirm', onTap: () {}),
             embedded: false,
           ),
         ]),
@@ -226,9 +226,9 @@ void main() {
     testWidgets('only set buttons are rendered', (tester) async {
       final storage = await _createMockStorage();
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
+        Stack(children: [
           ConsoleHud(
-            a: HudAction('Confirm'),
+            a: HudAction('Confirm', onTap: () {}),
           ),
         ]),
         overrides: _overrides(storage),
@@ -240,9 +240,9 @@ void main() {
     testWidgets('HudAction.highlight passes highlight=true to ControlButton', (tester) async {
       final storage = await _createMockStorage();
       await tester.pumpWidget(createTestAppWithProviders(
-        const Stack(children: [
+        Stack(children: [
           ConsoleHud(
-            a: HudAction('Delete', highlight: true),
+            a: HudAction('Delete', onTap: () {}, highlight: true),
           ),
         ]),
         overrides: _overrides(storage),

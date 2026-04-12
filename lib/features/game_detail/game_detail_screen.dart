@@ -1149,7 +1149,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
 
     return ConsoleHud(
       b: HudAction(l.common_back, onTap: () => Navigator.pop(context)),
-      a: aHint.isNotEmpty ? HudAction(aHint) : null,
+      a: aHint.isNotEmpty ? HudAction(aHint, onTap: _handleConfirm) : null,
       dpad: hasHorizontalNav
           ? (label: '', action: l.common_navigate)
           : null,
