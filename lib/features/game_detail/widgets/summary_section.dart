@@ -11,7 +11,7 @@ class SummarySection extends StatelessWidget {
   final bool isExpanded;
   final VoidCallback onToggle;
 
-  static const int _maxLines = 4;
+  static const int _maxLines = 6;
 
   const SummarySection({
     super.key,

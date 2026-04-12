@@ -856,9 +856,11 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left column: Cover + action buttons (scrollable on small screens)
+          // Left column: Cover + action buttons (wider when no metadata)
           SizedBox(
-            width: (rs.screenWidth * (rs.isSmall ? 0.28 : 0.22)).clamp(150, 280),
+            width: richMetadata?.hasContent == true
+                ? (rs.screenWidth * (rs.isSmall ? 0.28 : 0.22)).clamp(150, 280)
+                : (rs.screenWidth * (rs.isSmall ? 0.35 : 0.30)).clamp(180, 340),
             child: Column(
               children: [
                 // Cover takes available space, buttons anchor to bottom
