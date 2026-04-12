@@ -56,25 +56,7 @@ class _HomeViewState extends ConsumerState<HomeView>
   @override
   String get routeId => 'home';
 
-  @override
-  Map<ShortcutActivator, Intent>? get additionalShortcuts {
-    if (!ref.read(homeLayoutProvider)) return null;
-    // LB = Zoom Out (more columns), RB = Zoom In (fewer columns)
-    return {
-      const SingleActivator(LogicalKeyboardKey.gameButtonLeft1,
-              includeRepeats: false):
-          const AdjustColumnsIntent(increase: true),
-      const SingleActivator(LogicalKeyboardKey.gameButtonRight1,
-              includeRepeats: false):
-          const AdjustColumnsIntent(increase: false),
-      const SingleActivator(LogicalKeyboardKey.pageUp,
-              includeRepeats: false):
-          const AdjustColumnsIntent(increase: true),
-      const SingleActivator(LogicalKeyboardKey.pageDown,
-              includeRepeats: false):
-          const AdjustColumnsIntent(increase: false),
-    };
-  }
+  // L1/R1 zoom shortcuts are handled by global shortcuts.
 
   @override
   Map<Type, Action<Intent>> get screenActions => {

@@ -115,23 +115,6 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
   }
 
   @override
-  Map<ShortcutActivator, Intent>? get additionalShortcuts => {
-        // LB = Zoom Out (more columns), RB = Zoom In (fewer columns)
-        const SingleActivator(LogicalKeyboardKey.gameButtonLeft1,
-                includeRepeats: false):
-            const AdjustColumnsIntent(increase: true),
-        const SingleActivator(LogicalKeyboardKey.gameButtonRight1,
-                includeRepeats: false):
-            const AdjustColumnsIntent(increase: false),
-        const SingleActivator(LogicalKeyboardKey.pageUp,
-                includeRepeats: false):
-            const AdjustColumnsIntent(increase: true),
-        const SingleActivator(LogicalKeyboardKey.pageDown,
-                includeRepeats: false):
-            const AdjustColumnsIntent(increase: false),
-      };
-
-  @override
   Map<Type, Action<Intent>> get screenActions {
     return {
         NavigateIntent: OverlayGuardedAction<NavigateIntent>(ref,

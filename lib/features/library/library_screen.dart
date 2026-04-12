@@ -131,23 +131,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   @override
   void onSearchSelectionReset() => _currentIndex = 0;
 
-  @override
-  Map<ShortcutActivator, Intent>? get additionalShortcuts => {
-        // L1/R1 = Zoom (overrides global tab mapping for this screen)
-        const SingleActivator(LogicalKeyboardKey.gameButtonLeft1,
-                includeRepeats: false):
-            const AdjustColumnsIntent(increase: true), // L1 = more columns
-        const SingleActivator(LogicalKeyboardKey.gameButtonRight1,
-                includeRepeats: false):
-            const AdjustColumnsIntent(increase: false), // R1 = fewer columns
-        // L2/R2 = Tab switch
-        const SingleActivator(LogicalKeyboardKey.gameButtonLeft2,
-                includeRepeats: false):
-            const TabLeftIntent(),
-        const SingleActivator(LogicalKeyboardKey.gameButtonRight2,
-                includeRepeats: false):
-            const TabRightIntent(),
-      };
+  // L1/R1 zoom and L2/R2 tabs are handled by global shortcuts.
 
   @override
   Map<Type, Action<Intent>> get screenActions {

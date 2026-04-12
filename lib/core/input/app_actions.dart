@@ -282,11 +282,15 @@ class AppShortcuts {
     const SingleActivator(LogicalKeyboardKey.arrowLeft): const NavigateIntent(GridDirection.left),
     const SingleActivator(LogicalKeyboardKey.arrowRight): const NavigateIntent(GridDirection.right),
 
-    // Tabs / L1 R1 (no repeat)
-    const SingleActivator(LogicalKeyboardKey.gameButtonLeft1, includeRepeats: false): const TabLeftIntent(),
-    const SingleActivator(LogicalKeyboardKey.gameButtonRight1, includeRepeats: false): const TabRightIntent(),
-    const SingleActivator(LogicalKeyboardKey.pageUp, includeRepeats: false): const TabLeftIntent(),
-    const SingleActivator(LogicalKeyboardKey.pageDown, includeRepeats: false): const TabRightIntent(),
+    // Zoom / L1 R1 (no repeat) — column count in grids
+    const SingleActivator(LogicalKeyboardKey.gameButtonLeft1, includeRepeats: false): const AdjustColumnsIntent(increase: true),
+    const SingleActivator(LogicalKeyboardKey.gameButtonRight1, includeRepeats: false): const AdjustColumnsIntent(increase: false),
+    const SingleActivator(LogicalKeyboardKey.pageUp, includeRepeats: false): const AdjustColumnsIntent(increase: true),
+    const SingleActivator(LogicalKeyboardKey.pageDown, includeRepeats: false): const AdjustColumnsIntent(increase: false),
+
+    // Tabs / L2 R2 (no repeat) — switch tabs
+    const SingleActivator(LogicalKeyboardKey.gameButtonLeft2, includeRepeats: false): const TabLeftIntent(),
+    const SingleActivator(LogicalKeyboardKey.gameButtonRight2, includeRepeats: false): const TabRightIntent(),
     const SingleActivator(LogicalKeyboardKey.bracketLeft, includeRepeats: false): const TabLeftIntent(),
     const SingleActivator(LogicalKeyboardKey.bracketRight, includeRepeats: false): const TabRightIntent(),
 

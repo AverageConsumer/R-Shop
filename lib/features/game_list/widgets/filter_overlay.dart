@@ -72,8 +72,6 @@ class _FilterOverlayState extends State<FilterOverlay>
   int _focusedIndex = 0;
   late List<_FilterItem> _items;
   late List<int> _selectableIndices;
-  int _regionSectionStart = -1;
-  int _languageSectionStart = -1;
 
   @override
   void initState() {
@@ -137,7 +135,6 @@ class _FilterOverlayState extends State<FilterOverlay>
     }
 
     if (widget.availableRegions.isNotEmpty) {
-      _regionSectionStart = _items.length;
       _items.add(const _FilterItem(
         type: _FilterItemType.header,
         category: _FilterCategory.region,
@@ -155,7 +152,6 @@ class _FilterOverlayState extends State<FilterOverlay>
     }
 
     if (widget.availableLanguages.isNotEmpty) {
-      _languageSectionStart = _items.length;
       _items.add(const _FilterItem(
         type: _FilterItemType.header,
         category: _FilterCategory.language,
@@ -192,21 +188,6 @@ class _FilterOverlayState extends State<FilterOverlay>
       setState(() => _focusedIndex = _selectableIndices[newPos]);
       _ensureVisible(_focusedIndex);
     }
-  }
-
-  void _jumpToSection(_FilterCategory category) {
-    final targetStart = category == _FilterCategory.region
-        ? _regionSectionStart
-        : _languageSectionStart;
-    if (targetStart < 0) return;
-
-    // Find first selectable index after the section header
-    final firstSelectable = _selectableIndices.firstWhere(
-      (i) => i > targetStart,
-      orElse: () => _focusedIndex,
-    );
-    setState(() => _focusedIndex = firstSelectable);
-    _ensureVisible(_focusedIndex);
   }
 
   void _toggleCurrent() {
@@ -323,14 +304,6 @@ class _FilterOverlayState extends State<FilterOverlay>
                         widget.onClose,
                     const SingleActivator(LogicalKeyboardKey.gameButtonX, includeRepeats: false):
                         widget.onClearAll,
-                    const SingleActivator(LogicalKeyboardKey.gameButtonLeft1, includeRepeats: false):
-                        () => _jumpToSection(_FilterCategory.region),
-                    const SingleActivator(LogicalKeyboardKey.gameButtonRight1, includeRepeats: false):
-                        () => _jumpToSection(_FilterCategory.language),
-                    const SingleActivator(LogicalKeyboardKey.pageUp, includeRepeats: false):
-                        () => _jumpToSection(_FilterCategory.region),
-                    const SingleActivator(LogicalKeyboardKey.pageDown, includeRepeats: false):
-                        () => _jumpToSection(_FilterCategory.language),
                   },
                   child: Focus(
                     focusNode: _focusNode,

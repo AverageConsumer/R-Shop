@@ -1,6 +1,5 @@
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/input/input.dart';
@@ -50,15 +49,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
   @override
   String get routeId => 'settings';
 
-  @override
-  Map<ShortcutActivator, Intent>? get additionalShortcuts => {
-        const SingleActivator(LogicalKeyboardKey.gameButtonLeft2,
-                includeRepeats: false):
-            const TabLeftIntent(),
-        const SingleActivator(LogicalKeyboardKey.gameButtonRight2,
-                includeRepeats: false):
-            const TabRightIntent(),
-      };
+  // L2/R2 tab shortcuts are handled by global shortcuts.
 
   @override
   Map<Type, Action<Intent>> get screenActions => {
