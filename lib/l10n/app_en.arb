@@ -68,6 +68,8 @@
   "downloadStatus_cancelled": "Cancelled",
   "downloadStatus_failed": "Failed",
 
+  "storage_free": "{size} free",
+  "@storage_free": { "placeholders": { "size": { "type": "String" } } },
   "storage_veryLow": "Very low storage: {freeSpace}",
   "@storage_veryLow": { "placeholders": { "freeSpace": { "type": "String" } } },
   "storage_gettingLow": "Storage getting low: {freeSpace}",

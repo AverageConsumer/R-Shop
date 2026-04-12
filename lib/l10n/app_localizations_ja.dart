@@ -187,6 +187,11 @@ class LJa extends L {
   String get downloadStatus_failed => '失敗';
 
   @override
+  String storage_free(String size) {
+    return '$size 空き';
+  }
+
+  @override
   String storage_veryLow(String freeSpace) {
     return 'ストレージ残りわずか: $freeSpace';
   }

@@ -31,10 +31,10 @@ class LowSpaceWarning extends ConsumerWidget {
         final String message;
         if (info.isLow) {
           color = Colors.red;
-          message = l.storage_veryLow(info.freeSpaceText);
+          message = l.storage_veryLow(l.storage_free(info.freeSpaceSize));
         } else {
           color = Colors.amber;
-          message = l.storage_gettingLow(info.freeSpaceText);
+          message = l.storage_gettingLow(l.storage_free(info.freeSpaceSize));
         }
 
         return Container(

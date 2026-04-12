@@ -24,13 +24,17 @@ class StorageInfo {
   /// More than 5 GB free.
   bool get isHealthy => freeBytes >= 5 * 1024 * 1024 * 1024;
 
-  String get freeSpaceText {
-    if (freeGB >= 1.0) {
-      return '${freeGB.toStringAsFixed(1)} GB free';
-    }
+  /// Formatted size string without "free" label (e.g. "668.2 GB", "450 MB").
+  /// Use with l10n `storage_free` for the full localized string.
+  String get freeSpaceSize {
+    if (freeGB >= 1.0) return '${freeGB.toStringAsFixed(1)} GB';
     final mb = freeBytes / (1024 * 1024);
-    return '${mb.toStringAsFixed(0)} MB free';
+    return '${mb.toStringAsFixed(0)} MB';
   }
+
+  /// Legacy convenience getter — returns English "X GB free".
+  /// Prefer [freeSpaceSize] + l10n where BuildContext is available.
+  String get freeSpaceText => '$freeSpaceSize free';
 }
 
 class DiskSpaceService {

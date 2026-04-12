@@ -453,6 +453,12 @@ abstract class L {
   /// **'Failed'**
   String get downloadStatus_failed;
 
+  /// No description provided for @storage_free.
+  ///
+  /// In en, this message translates to:
+  /// **'{size} free'**
+  String storage_free(String size);
+
   /// No description provided for @storage_veryLow.
   ///
   /// In en, this message translates to:

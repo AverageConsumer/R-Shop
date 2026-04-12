@@ -188,6 +188,11 @@ class LPt extends L {
   String get downloadStatus_failed => 'Falhou';
 
   @override
+  String storage_free(String size) {
+    return '$size livre';
+  }
+
+  @override
   String storage_veryLow(String freeSpace) {
     return 'Armazenamento muito baixo: $freeSpace';
   }

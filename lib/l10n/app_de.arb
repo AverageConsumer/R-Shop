@@ -66,6 +66,7 @@
   "downloadStatus_cancelled": "Abgebrochen",
   "downloadStatus_failed": "Fehler",
 
+  "storage_free": "{size} frei",
   "storage_veryLow": "Sehr wenig Speicher: {freeSpace}",
   "storage_gettingLow": "Speicher wird knapp: {freeSpace}",
 

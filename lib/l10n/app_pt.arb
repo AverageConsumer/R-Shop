@@ -66,6 +66,7 @@
   "downloadStatus_cancelled": "Cancelado",
   "downloadStatus_failed": "Falhou",
 
+  "storage_free": "{size} livre",
   "storage_veryLow": "Armazenamento muito baixo: {freeSpace}",
   "storage_gettingLow": "Armazenamento ficando baixo: {freeSpace}",
 

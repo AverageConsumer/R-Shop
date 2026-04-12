@@ -312,7 +312,7 @@ class _StorageBadge extends ConsumerWidget {
                 Icon(icon, size: rs.isSmall ? 10 : 12, color: color),
                 SizedBox(width: rs.isSmall ? 3 : 5),
                 Text(
-                  info.freeSpaceText,
+                  L.of(context).storage_free(info.freeSpaceSize),
                   style: TextStyle(
                     fontSize: rs.isSmall ? 9 : 11,
                     fontWeight: FontWeight.w500,

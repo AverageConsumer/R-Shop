@@ -66,6 +66,7 @@
   "downloadStatus_cancelled": "\u30ad\u30e3\u30f3\u30bb\u30eb\u6e08\u307f",
   "downloadStatus_failed": "\u5931\u6557",
 
+  "storage_free": "{size} \u7a7a\u304d",
   "storage_veryLow": "\u30b9\u30c8\u30ec\u30fc\u30b8\u6b8b\u308a\u308f\u305a\u304b: {freeSpace}",
   "storage_gettingLow": "\u30b9\u30c8\u30ec\u30fc\u30b8\u304c\u5c11\u306a\u3044: {freeSpace}",
 

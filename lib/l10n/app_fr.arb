@@ -58,6 +58,7 @@
   "downloadStatus_complete": "Terminé",
   "downloadStatus_cancelled": "Annulé",
   "downloadStatus_failed": "Échoué",
+  "storage_free": "{size} libre",
   "storage_veryLow": "Stockage très bas : {freeSpace}",
   "storage_gettingLow": "Stockage faible : {freeSpace}",
   "sync_progress": "Synchro {completed}/{total}",

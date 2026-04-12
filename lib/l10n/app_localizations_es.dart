@@ -188,6 +188,11 @@ class LEs extends L {
   String get downloadStatus_failed => 'Falló';
 
   @override
+  String storage_free(String size) {
+    return '$size libre';
+  }
+
+  @override
   String storage_veryLow(String freeSpace) {
     return 'Muy poco espacio: $freeSpace';
   }
