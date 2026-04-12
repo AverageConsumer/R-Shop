@@ -44,6 +44,14 @@ class ConfirmDialog extends StatelessWidget {
     };
   }
 
+  IconData get _icon {
+    return switch (type) {
+      ConfirmDialogType.delete => Icons.delete_outline_rounded,
+      ConfirmDialogType.exitApp => Icons.power_settings_new_rounded,
+      ConfirmDialogType.resetApp => Icons.restart_alt_rounded,
+    };
+  }
+
   Color get _primaryColor {
     return switch (type) {
       ConfirmDialogType.delete => Colors.redAccent,
@@ -56,81 +64,94 @@ class ConfirmDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final rs = context.rs;
     final l = L.of(context);
-    final titleFontSize = rs.isSmall ? 18.0 : rs.typography.titleSmall;
-    final messageFontSize = rs.isSmall ? 13.0 : rs.typography.bodySmall;
-    final dialogPadding = rs.isSmall ? rs.spacing.md : rs.spacing.lg;
-    final buttonPadding = rs.isSmall
-        ? const EdgeInsets.symmetric(horizontal: 16, vertical: 10)
-        : const EdgeInsets.symmetric(horizontal: 24, vertical: 12);
 
     return Container(
       color: Colors.black.withValues(alpha: 0.7),
       child: Center(
         child: Container(
-          margin: EdgeInsets.symmetric(horizontal: rs.spacing.xl),
-          padding: EdgeInsets.all(dialogPadding),
+          width: (rs.isSmall ? 300.0 : 400.0).clamp(0, rs.screenWidth * 0.85),
+          padding: EdgeInsets.all(rs.isSmall ? 24 : 32),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E1E1E),
+            color: const Color(0xFF141414),
             borderRadius: BorderRadius.circular(rs.radius.lg),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5),
-                blurRadius: 20,
+                color: Colors.black.withValues(alpha: 0.6),
+                blurRadius: 40,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Icon
+              Container(
+                width: rs.isSmall ? 48 : 56,
+                height: rs.isSmall ? 48 : 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _primaryColor.withValues(alpha: 0.1),
+                  border: Border.all(
+                    color: _primaryColor.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Icon(
+                  _icon,
+                  size: rs.isSmall ? 24 : 28,
+                  color: _primaryColor.withValues(alpha: 0.8),
+                ),
+              ),
+              SizedBox(height: rs.isSmall ? 14 : 18),
+              // Title
               Text(
                 _title(l),
                 style: TextStyle(
+                  fontSize: rs.isSmall ? 16 : 20,
+                  fontWeight: FontWeight.w800,
                   color: Colors.white,
-                  fontSize: titleFontSize,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: rs.spacing.sm),
-              Text(
-                _message(l),
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: messageFontSize,
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: rs.spacing.lg),
+              SizedBox(height: rs.spacing.sm),
+              // Message
+              Text(
+                _message(l),
+                style: TextStyle(
+                  fontSize: rs.isSmall ? 12 : 14,
+                  color: Colors.white.withValues(alpha: 0.5),
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: rs.isSmall ? 18 : 24),
+              // Buttons
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Flexible(
-                    child: _DialogButton(
+                  Expanded(
+                    child: _ConfirmButton(
                       label: l.common_cancelUpper,
-                      color: Colors.grey,
                       isSelected: selection == 1,
+                      isDestructive: false,
+                      isSmall: rs.isSmall,
                       onTap: onSecondary,
-                      padding: buttonPadding,
                     ),
                   ),
-                  SizedBox(width: rs.spacing.md),
-                  Flexible(
-                    child: _DialogButton(
+                  SizedBox(width: rs.isSmall ? 10 : 14),
+                  Expanded(
+                    child: _ConfirmButton(
                       label: _primaryLabel(l),
-                    color: _primaryColor,
-                    isSelected: selection == 0,
+                      isSelected: selection == 0,
+                      isDestructive: true,
+                      destructiveColor: _primaryColor,
+                      isSmall: rs.isSmall,
                       onTap: onPrimary,
-                      padding: buttonPadding,
                     ),
                   ),
                 ],
-              ),
-              SizedBox(height: rs.spacing.sm),
-              Text(
-                l.confirm_gamepadHint,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: rs.typography.caption,
-                ),
               ),
             ],
           ),
@@ -140,45 +161,66 @@ class ConfirmDialog extends StatelessWidget {
   }
 }
 
-class _DialogButton extends StatelessWidget {
+class _ConfirmButton extends StatelessWidget {
   final String label;
-  final Color color;
   final bool isSelected;
+  final bool isDestructive;
+  final Color? destructiveColor;
+  final bool isSmall;
   final VoidCallback onTap;
-  final EdgeInsets padding;
 
-  const _DialogButton({
+  const _ConfirmButton({
     required this.label,
-    required this.color,
     required this.isSelected,
+    required this.isDestructive,
+    this.destructiveColor,
+    required this.isSmall,
     required this.onTap,
-    required this.padding,
   });
 
   @override
   Widget build(BuildContext context) {
-    final rs = context.rs;
-    final fontSize = rs.isSmall ? 12.0 : rs.typography.bodySmall;
+    final color = isDestructive ? (destructiveColor ?? Colors.redAccent) : Colors.white;
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: padding,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.symmetric(vertical: isSmall ? 10 : 12),
         decoration: BoxDecoration(
-          color: isSelected ? color : color.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(rs.radius.md),
+          color: isSelected
+              ? (isDestructive
+                  ? color.withValues(alpha: 0.15)
+                  : Colors.white.withValues(alpha: 0.08))
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? color : color.withValues(alpha: 0.5),
-            width: 2,
+            color: isSelected
+                ? (isDestructive
+                    ? color.withValues(alpha: 0.5)
+                    : Colors.white.withValues(alpha: 0.3))
+                : Colors.white.withValues(alpha: 0.08),
+            width: isSelected ? 1.5 : 1,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: (isDestructive ? color : Colors.white)
+                        .withValues(alpha: 0.15),
+                    blurRadius: 12,
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
+          textAlign: TextAlign.center,
           style: TextStyle(
-            color: isSelected ? Colors.white : color,
-            fontWeight: FontWeight.bold,
-            fontSize: fontSize,
+            color: isSelected ? color : Colors.white.withValues(alpha: 0.4),
+            fontSize: isSmall ? 13 : 15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1,
           ),
         ),
       ),
