@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/input/input.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../providers/app_providers.dart';
 import '../../../utils/game_metadata.dart';
@@ -196,7 +197,7 @@ class _GameListOverlayState extends ConsumerState<GameListOverlay> {
                             Text(
                               l.gameListOverlay_gameCount(widget.gameIds.length),
                               style: TextStyle(
-                                color: accentColor,
+                                color: accentColor.forText,
                                 fontSize: rs.isSmall ? 10 : 12,
                               ),
                             ),
@@ -264,14 +265,14 @@ class _GameListOverlayState extends ConsumerState<GameListOverlay> {
                                             MainAxisAlignment.center,
                                         children: [
                                           Icon(Icons.clear_all_rounded,
-                                              size: 14, color: accentColor),
+                                              size: 14, color: accentColor.forIcon),
                                           const SizedBox(width: 6),
                                           Text(
                                             l.gameListOverlay_clearAll,
                                             style: TextStyle(
                                               fontSize: rs.isSmall ? 11 : 12,
                                               fontWeight: FontWeight.w600,
-                                              color: accentColor,
+                                              color: accentColor.forText,
                                             ),
                                           ),
                                         ],

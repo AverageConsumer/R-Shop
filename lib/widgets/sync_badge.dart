@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/responsive/responsive.dart';
+import '../core/util/color_contrast.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/app_providers.dart';
 import '../providers/library_providers.dart';
@@ -295,7 +296,7 @@ class _SyncPillContent extends StatelessWidget {
               style: TextStyle(
                 fontSize: fontSize,
                 fontWeight: FontWeight.w600,
-                color: accentColor,
+                color: accentColor.forText,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

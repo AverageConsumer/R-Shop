@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../models/system_model.dart';
 
 enum ScanTileState { pending, scanning, complete, failed }
@@ -96,7 +97,7 @@ class ScanConsoleTile extends StatelessWidget {
                       colorFilter: ColorFilter.mode(system.iconColor, BlendMode.srcIn),
                       placeholderBuilder: (_) => Icon(
                         Icons.videogame_asset,
-                        color: system.accentColor,
+                        color: system.accentColor.forIcon,
                         size: iconSize,
                       ),
                     ),

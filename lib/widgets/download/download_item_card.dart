@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/responsive/responsive.dart';
+import '../../core/util/color_contrast.dart';
 import '../../models/download_item.dart';
 import '../../utils/image_helper.dart';
 import 'action_button.dart';
@@ -125,7 +126,7 @@ class DownloadItemCard extends StatelessWidget {
                               child: Text(
                                 item.system.name,
                                 style: TextStyle(
-                                  color: accentColor.withValues(alpha: 0.9),
+                                  color: accentColor.forText,
                                   fontSize: rs.isSmall ? 9 : 10,
                                   fontWeight: FontWeight.w600,
                                 ),

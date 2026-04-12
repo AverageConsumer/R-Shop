@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../core/widgets/console_focusable.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/system_model.dart';
@@ -106,7 +107,7 @@ class _ConsoleConfigPanelState extends ConsumerState<ConsoleConfigPanel> {
               colorFilter: ColorFilter.mode(system.iconColor, BlendMode.srcIn),
               placeholderBuilder: (_) => Icon(
                 Icons.videogame_asset,
-                color: system.accentColor,
+                color: system.accentColor.forIcon,
                 size: iconSize,
               ),
             ),

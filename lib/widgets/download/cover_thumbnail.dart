@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/util/color_contrast.dart';
 import '../smart_cover_image.dart';
 
 /// Game cover art thumbnail with status overlay
@@ -92,7 +93,7 @@ class CoverThumbnail extends StatelessWidget {
       child: Center(
         child: Icon(
           Icons.videogame_asset_rounded,
-          color: accentColor.withValues(alpha: 0.6),
+          color: accentColor.forIcon,
           size: size * 0.45,
         ),
       ),

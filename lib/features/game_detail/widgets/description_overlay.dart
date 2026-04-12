@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../models/game_metadata_info.dart';
 
 class DescriptionOverlay extends StatelessWidget {
@@ -55,7 +56,7 @@ class DescriptionOverlay extends StatelessWidget {
                           Text(
                             metadata.developer!,
                             style: TextStyle(
-                              color: accentColor.withValues(alpha: 0.8),
+                              color: accentColor.forText,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
@@ -105,8 +106,7 @@ class DescriptionOverlay extends StatelessWidget {
                                       child: Text(
                                         genre,
                                         style: TextStyle(
-                                          color: accentColor
-                                              .withValues(alpha: 0.9),
+                                          color: accentColor.forText,
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
                                         ),

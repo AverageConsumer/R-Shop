@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../l10n/app_localizations.dart';
 import 'download_action_button.dart';
 
@@ -185,21 +186,21 @@ class _PrimaryActionButton extends StatelessWidget {
       case DownloadButtonState.download:
         bgColor = accentColor.withValues(alpha: isFocused ? 0.25 : 0.15);
         borderColor = accentColor.withValues(alpha: isFocused ? 0.7 : 0.4);
-        textColor = accentColor;
+        textColor = accentColor.forText;
         icon = Icons.download_rounded;
         label = isMulti ? l.gameDetail_manageFiles : l.gameDetail_download;
         showProgressFill = false;
       case DownloadButtonState.adding:
         bgColor = accentColor.withValues(alpha: 0.1);
         borderColor = accentColor.withValues(alpha: 0.3);
-        textColor = accentColor.withValues(alpha: 0.7);
+        textColor = accentColor.forText;
         icon = Icons.download_rounded;
         label = l.gameDetail_adding;
         showProgressFill = false;
       case DownloadButtonState.queued:
         bgColor = accentColor.withValues(alpha: 0.08);
         borderColor = accentColor.withValues(alpha: 0.4);
-        textColor = accentColor.withValues(alpha: 0.8);
+        textColor = accentColor.forText;
         icon = Icons.schedule_rounded;
         label = l.gameDetail_queued;
         showProgressFill = false;
@@ -227,7 +228,7 @@ class _PrimaryActionButton extends StatelessWidget {
       case DownloadButtonState.installed:
         bgColor = accentColor.withValues(alpha: isFocused ? 0.2 : 0.1);
         borderColor = accentColor.withValues(alpha: isFocused ? 0.6 : 0.3);
-        textColor = accentColor;
+        textColor = accentColor.forText;
         icon = Icons.folder_open_rounded;
         label = l.gameDetail_manageFiles;
         showProgressFill = false;
@@ -351,7 +352,7 @@ class _PrimaryActionButton extends StatelessWidget {
                         child: Text(
                           '$variantCount',
                           style: TextStyle(
-                            color: accentColor,
+                            color: accentColor.forText,
                             fontSize: rs.isSmall ? 9 : 11,
                             fontWeight: FontWeight.w700,
                           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/system_model.dart';
 import '../../../providers/game_providers.dart';
@@ -165,7 +166,7 @@ class HomeGridView extends ConsumerWidget {
                     child: Icon(
                       Icons.library_books_rounded,
                       size: iconSize,
-                      color: accentColor.withValues(alpha: 0.6),
+                      color: accentColor.forIcon.withValues(alpha: 0.6),
                     ),
                   ),
                 ),
@@ -238,7 +239,7 @@ class HomeGridView extends ConsumerWidget {
                           L.of(context).home_library,
                           style: TextStyle(
                             fontSize: subFontSize,
-                            color: accentColor.withValues(alpha: 0.7),
+                            color: accentColor.forText,
                           ),
                         ),
                       ],
@@ -468,14 +469,14 @@ class _GridCountPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: iconSize, color: color),
+          Icon(icon, size: iconSize, color: color.forIcon),
           const SizedBox(width: 2),
           Text(
             '$count',
             style: TextStyle(
               fontSize: fontSize,
               fontWeight: FontWeight.w600,
-              color: color,
+              color: color.forText,
               letterSpacing: 0.3,
             ),
           ),

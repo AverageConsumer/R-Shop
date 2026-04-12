@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/util/color_contrast.dart';
 import '../../models/download_item.dart';
 
 /// Sleek progress bar with glow
@@ -53,7 +54,7 @@ class DownloadProgressBar extends StatelessWidget {
                   child: Text(
                     '${(value * 100).toStringAsFixed(0)}%',
                     style: TextStyle(
-                      color: accentColor.withValues(alpha: 0.8),
+                      color: accentColor.forText,
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
                       fontFeatures: const [FontFeature.tabularFigures()],

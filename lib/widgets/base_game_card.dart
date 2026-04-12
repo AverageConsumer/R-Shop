@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/responsive/responsive.dart';
+import '../core/util/color_contrast.dart';
 import '../l10n/app_localizations.dart';
 import '../models/download_item.dart';
 import '../models/ra_models.dart';
@@ -158,7 +159,7 @@ class BaseGameCard extends StatelessWidget {
                               vertical: rs.isSmall ? 1.5 : 2.0,
                             ),
                             decoration: BoxDecoration(
-                              color: accentColor.withValues(alpha: 0.85),
+                              color: accentColor.forText.withValues(alpha: 0.85),
                               borderRadius: BorderRadius.circular(3),
                             ),
                             child: Text(

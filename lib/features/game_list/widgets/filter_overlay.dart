@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../l10n/app_localizations.dart';
 import '../logic/filter_state.dart';
 
@@ -405,7 +406,7 @@ class _FilterOverlayState extends State<FilterOverlay>
                         style: TextStyle(
                           fontSize: badgeFontSize,
                           fontWeight: FontWeight.w600,
-                          color: widget.accentColor,
+                          color: widget.accentColor.forText,
                         ),
                       ),
                     ),
@@ -521,7 +522,7 @@ class _FilterOverlayState extends State<FilterOverlay>
                   ? Icon(
                       Icons.check_circle,
                       size: 16,
-                      color: widget.accentColor,
+                      color: widget.accentColor.forIcon,
                     )
                   : Icon(
                       Icons.circle_outlined,

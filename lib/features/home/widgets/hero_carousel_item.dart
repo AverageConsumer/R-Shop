@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../models/system_model.dart';
 class HeroCarouselItem extends StatelessWidget {
   final SystemModel system;
@@ -146,7 +147,7 @@ class HeroLibraryCarouselItem extends StatelessWidget {
                         child: Icon(
                           Icons.library_books_rounded,
                           size: iconSize * 0.45,
-                          color: accentColor.withValues(alpha: 0.6),
+                          color: accentColor.forIcon.withValues(alpha: 0.6),
                         ),
                       ),
                     ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../models/game_metadata_info.dart';
 
 class BadgesRow extends StatelessWidget {
@@ -40,7 +41,7 @@ class BadgesRow extends StatelessWidget {
               child: Text(
                 genre,
                 style: TextStyle(
-                  color: accentColor.withValues(alpha: 0.9),
+                  color: accentColor.forText,
                   fontSize: rs.isSmall ? 9 : 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -129,7 +130,7 @@ class _CompactRating extends StatelessWidget {
                 : (i == full && fraction >= 0.5)
                     ? Icons.star_half_rounded
                     : Icons.star_outline_rounded,
-            color: accentColor.withValues(alpha: 0.7),
+            color: accentColor.forIcon,
             size: rs.isSmall ? 12 : 14,
           ),
         SizedBox(width: rs.spacing.xs),

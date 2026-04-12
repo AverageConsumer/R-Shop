@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 
 class SettingsTabs extends StatelessWidget {
   final int selectedTab;
@@ -54,7 +55,7 @@ class SettingsTabs extends StatelessWidget {
                 style: TextStyle(
                   fontSize: fontSize,
                   fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                  color: isActive ? accentColor : Colors.grey[500],
+                  color: isActive ? accentColor.forText : Colors.grey[500],
                   letterSpacing: 1.0,
                 ),
               ),

@@ -15,6 +15,7 @@ import '../../providers/ra_providers.dart';
 import '../../services/config_bootstrap.dart';
 import '../../services/input_debouncer.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
+import '../../core/util/color_contrast.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/download_overlay.dart';
 import '../library/library_screen.dart';
@@ -744,13 +745,13 @@ class _HomeViewState extends ConsumerState<HomeView>
               if (c.remote > 0) _GameCountPill(
                 icon: Icons.cloud_outlined,
                 count: c.remote,
-                color: system.accentColor,
+                color: system.accentColor.forText,
               ),
               if (c.remote > 0 && c.local > 0) const SizedBox(width: 6),
               if (c.local > 0) _GameCountPill(
                 icon: Icons.folder_outlined,
                 count: c.local,
-                color: system.accentColor,
+                color: system.accentColor.forText,
               ),
             ],
           ),

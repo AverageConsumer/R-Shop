@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../models/system_model.dart';
 import '../onboarding_controller.dart';
 
@@ -151,7 +152,7 @@ class _ConsoleTileState extends State<_ConsoleTile> {
                         colorFilter: ColorFilter.mode(widget.system.iconColor, BlendMode.srcIn),
                         placeholderBuilder: (_) => Icon(
                           Icons.videogame_asset,
-                          color: widget.system.accentColor,
+                          color: widget.system.accentColor.forIcon,
                           size: iconSize,
                         ),
                       ),

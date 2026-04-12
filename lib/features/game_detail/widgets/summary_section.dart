@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/responsive/responsive.dart';
+import '../../../core/util/color_contrast.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/game_metadata_info.dart';
 
@@ -37,7 +38,7 @@ class SummarySection extends StatelessWidget {
           Text(
             credits,
             style: TextStyle(
-              color: accentColor.withValues(alpha: 0.8),
+              color: accentColor.forText,
               fontSize: rs.isSmall ? 11 : 13,
               fontWeight: FontWeight.w600,
             ),
@@ -75,7 +76,7 @@ class SummarySection extends StatelessWidget {
                     child: Text(
                       isExpanded ? L.of(context).gameDetail_showLess : L.of(context).gameDetail_readMore,
                       style: TextStyle(
-                        color: accentColor.withValues(alpha: 0.7),
+                        color: accentColor.forText,
                         fontSize: rs.isSmall ? 10 : 12,
                         fontWeight: FontWeight.w600,
                       ),

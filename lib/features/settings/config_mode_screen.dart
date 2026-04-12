@@ -6,6 +6,7 @@ import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/util/color_contrast.dart';
 import '../../core/widgets/console_focusable.dart';
 import '../../core/widgets/screen_layout.dart';
 import '../../models/config/system_config.dart';
@@ -244,7 +245,7 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen>
                 fontSize: rs.isSmall ? 18 : 22,
                 fontWeight: FontWeight.w900,
                 color: system != null
-                    ? (system.accentColor)
+                    ? system.accentColor.forText
                     : Colors.white,
                 letterSpacing: 4,
               ),
@@ -330,7 +331,7 @@ class _SystemList extends ConsumerWidget {
                           isConfigured
                               ? Icons.sports_esports
                               : Icons.sports_esports_outlined,
-                          color: accent,
+                          color: accent.forIcon,
                           size: 22,
                         ),
                       ),
@@ -367,7 +368,7 @@ class _SystemList extends ConsumerWidget {
                       ),
                       if (isConfigured)
                         Icon(Icons.check_circle,
-                            color: accent.withValues(alpha: 0.6),
+                            color: accent.forIcon,
                             size: 18),
                       const SizedBox(width: 8),
                       const Icon(Icons.chevron_right,
