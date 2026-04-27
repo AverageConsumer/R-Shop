@@ -397,8 +397,10 @@ class HomeGridView extends ConsumerWidget {
                         Text(
                           '${system.manufacturer} \u00B7 ${system.releaseYear}',
                           style: TextStyle(
-                            fontSize: rs.isSmall ? 8.0 : 10.0,
-                            color: Colors.grey[400],
+                            fontSize: rs.isSmall ? 9.0 : 11.0,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.55),
+                            letterSpacing: 0.4,
                           ),
                         ),
                       ],

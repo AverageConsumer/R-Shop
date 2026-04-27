@@ -86,7 +86,8 @@ class GameListHeader extends ConsumerWidget {
                         '${system.manufacturer} · ${system.releaseYear}',
                         style: TextStyle(
                           fontSize: subtitleFontSize,
-                          color: Colors.grey[500],
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.55),
                           letterSpacing: 2,
                         ),
                       ),
