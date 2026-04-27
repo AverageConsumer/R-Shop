@@ -112,9 +112,18 @@ class BaseGameCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(borderRadius),
             border: isSelected
-                ? Border.all(color: Colors.white, width: borderSelected)
+                ? Border.all(color: accentColor, width: borderSelected)
                 : Border.all(
                     color: Colors.white.withValues(alpha: 0.08), width: 1),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: accentColor.withValues(alpha: 0.45),
+                      blurRadius: 18,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(innerBorderRadius),
@@ -329,11 +338,11 @@ class BaseGameCard extends StatelessWidget {
                     right: 0,
                     child: Container(
                       height: rs.isSmall ? 2 : 3,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
                             Colors.transparent,
-                            Colors.white,
+                            accentColor,
                             Colors.transparent,
                           ],
                         ),
