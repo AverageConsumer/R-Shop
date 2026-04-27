@@ -69,6 +69,9 @@ class LFr extends L {
   String get common_favorite => 'Favori';
 
   @override
+  String get common_share => 'Partager';
+
+  @override
   String get common_unfavorite => 'Retirer favori';
 
   @override

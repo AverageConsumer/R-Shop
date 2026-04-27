@@ -69,6 +69,9 @@ class LEn extends L {
   String get common_favorite => 'Favorite';
 
   @override
+  String get common_share => 'Share';
+
+  @override
   String get common_unfavorite => 'Unfavorite';
 
   @override

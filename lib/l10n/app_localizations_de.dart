@@ -69,6 +69,9 @@ class LDe extends L {
   String get common_favorite => 'Favorit';
 
   @override
+  String get common_share => 'Teilen';
+
+  @override
   String get common_unfavorite => 'Entfernen';
 
   @override

@@ -69,6 +69,9 @@ class LPt extends L {
   String get common_favorite => 'Favoritar';
 
   @override
+  String get common_share => 'Compartilhar';
+
+  @override
   String get common_unfavorite => 'Desfavoritar';
 
   @override

@@ -69,6 +69,9 @@ class LJa extends L {
   String get common_favorite => 'お気に入り';
 
   @override
+  String get common_share => '共有';
+
+  @override
   String get common_unfavorite => 'お気に入り解除';
 
   @override

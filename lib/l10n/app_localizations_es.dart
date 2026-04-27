@@ -69,6 +69,9 @@ class LEs extends L {
   String get common_favorite => 'Favorito';
 
   @override
+  String get common_share => 'Compartir';
+
+  @override
   String get common_unfavorite => 'Quitar favorito';
 
   @override

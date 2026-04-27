@@ -225,6 +225,12 @@ abstract class L {
   /// **'Favorite'**
   String get common_favorite;
 
+  /// No description provided for @common_share.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get common_share;
+
   /// No description provided for @common_unfavorite.
   ///
   /// In en, this message translates to:

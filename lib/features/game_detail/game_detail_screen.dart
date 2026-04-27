@@ -1200,7 +1200,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               ),
             ],
           ),
-          maxLines: controller.state.showFullFilename ? 3 : 2,
+          maxLines: controller.state.showFullFilename ? 4 : 3,
           overflow: TextOverflow.ellipsis,
         ),
         SizedBox(height: rs.spacing.sm),

@@ -23,6 +23,7 @@
   "common_retry": "Retry",
   "common_remove": "Remove",
   "common_favorite": "Favorite",
+  "common_share": "Share",
   "common_unfavorite": "Unfavorite",
   "common_downloads": "Downloads",
   "common_installed": "INSTALLED",
