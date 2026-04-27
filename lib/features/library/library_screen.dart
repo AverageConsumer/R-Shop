@@ -12,6 +12,7 @@ import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/util/source_color.dart';
 import '../../core/widgets/screen_layout.dart';
+import '../../core/widgets/skeleton.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
@@ -1216,8 +1217,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   Widget _buildContent(Responsive rs) {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.cyanAccent),
+      final spacing = rs.isSmall ? 10.0 : 16.0;
+      return SkeletonGrid(
+        columns: _columns,
+        spacing: spacing,
+        padding: EdgeInsets.only(
+          left: rs.spacing.lg,
+          right: rs.spacing.lg,
+          top: rs.spacing.md,
+          bottom: rs.isPortrait ? 80 : 100,
+        ),
       );
     }
 
