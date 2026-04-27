@@ -365,7 +365,7 @@
   "gameList_errorLoadingGames": "Fehler beim Laden",
   "gameList_gamesAppearShortly": "Spiele erscheinen in Kürze",
   "gameList_syncingLibrary": "Bibliothek wird synchronisiert\u2026",
-  "gameList_localFilesOnly": "Nur lokale Dateien \u00B7 Füge eine Quelle hinzu für Downloads",
+  "gameList_localFilesOnly": "Lokal",
   "gameList_pressMenuHint": "Drücke  +  für Menü",
 
   "filter_activeCount": "{count} aktiv",

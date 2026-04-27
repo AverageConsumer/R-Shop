@@ -365,7 +365,7 @@
   "gameList_errorLoadingGames": "Erro ao carregar jogos",
   "gameList_gamesAppearShortly": "Os jogos v\u00e3o aparecer em breve",
   "gameList_syncingLibrary": "Sincronizando biblioteca\u2026",
-  "gameList_localFilesOnly": "S\u00f3 arquivos locais \u00B7 Adicione um provedor pra baixar mais",
+  "gameList_localFilesOnly": "Local",
   "gameList_pressMenuHint": "Aperte  +  pro menu",
 
   "filter_activeCount": "{count} ativos",

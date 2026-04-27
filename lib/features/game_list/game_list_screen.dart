@@ -551,10 +551,9 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final state = _controller.state;
     final baseTopPadding = rs.safeAreaTop + (rs.isSmall ? 60 : 80);
     final folderExtraPadding = widget.targetFolder.isNotEmpty ? (rs.isSmall ? 14.0 : 16.0) : 0.0;
-    final localOnlyExtraPadding = state.isLocalOnly ? (rs.isSmall ? 24.0 : 28.0) : 0.0;
     final searchExtraPadding = rs.isSmall ? 16.0 : 20.0;
     final topPadding =
-        baseTopPadding + folderExtraPadding + localOnlyExtraPadding + (isSearchActive ? searchExtraPadding : 0.0);
+        baseTopPadding + folderExtraPadding + (isSearchActive ? searchExtraPadding : 0.0);
 
     return buildWithActions(
       PopScope(

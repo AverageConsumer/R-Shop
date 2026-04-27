@@ -2148,7 +2148,7 @@ abstract class L {
   /// No description provided for @gameList_localFilesOnly.
   ///
   /// In en, this message translates to:
-  /// **'Local files only · Add a provider to download more'**
+  /// **'Local'**
   String get gameList_localFilesOnly;
 
   /// No description provided for @gameList_pressMenuHint.

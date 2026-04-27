@@ -1110,8 +1110,7 @@ class LDe extends L {
   String get gameList_syncingLibrary => 'Bibliothek wird synchronisiert…';
 
   @override
-  String get gameList_localFilesOnly =>
-      'Nur lokale Dateien · Füge eine Quelle hinzu für Downloads';
+  String get gameList_localFilesOnly => 'Lokal';
 
   @override
   String get gameList_pressMenuHint => 'Drücke  +  für Menü';

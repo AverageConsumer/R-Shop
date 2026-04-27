@@ -161,6 +161,8 @@ class GameListHeader extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    if (isLocalOnly)
+                      _LocalOnlyBadge(rs: rs),
                     if (isOffline)
                       _OfflineBadge(rs: rs),
                     if (targetFolder.isNotEmpty)
@@ -172,36 +174,12 @@ class GameListHeader extends ConsumerWidget {
                 ),
               ],
             ),
-            if (isLocalOnly) ...[
-              SizedBox(height: rs.spacing.sm),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(
-                  horizontal: rs.isSmall ? 8 : 12,
-                  vertical: rs.isSmall ? 4 : 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(rs.isSmall ? 6 : 8),
-                  border: Border.all(
-                    color: Colors.amber.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Text(
-                  l.gameList_localFilesOnly,
-                  style: TextStyle(
-                    fontSize: rs.isSmall ? 9.0 : 11.0,
-                    color: Colors.amber.shade200,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),
     );
   }
+
 
   static String _shortenPath(String path) {
     const prefixes = [
@@ -214,6 +192,51 @@ class GameListHeader extends ConsumerWidget {
       }
     }
     return path;
+  }
+}
+
+class _LocalOnlyBadge extends StatelessWidget {
+  final Responsive rs;
+
+  const _LocalOnlyBadge({required this.rs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: rs.isSmall ? 8 : 10,
+          vertical: rs.isSmall ? 3 : 5,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(rs.isSmall ? 10 : 14),
+          border: Border.all(
+            color: Colors.amber.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.folder_outlined,
+              size: rs.isSmall ? 10 : 12,
+              color: Colors.amber.shade300,
+            ),
+            SizedBox(width: rs.isSmall ? 3 : 5),
+            Text(
+              L.of(context).gameList_localFilesOnly,
+              style: TextStyle(
+                fontSize: rs.isSmall ? 9 : 11,
+                fontWeight: FontWeight.w500,
+                color: Colors.amber.shade300,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

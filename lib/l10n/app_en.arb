@@ -390,7 +390,7 @@
   "gameList_errorLoadingGames": "Error loading games",
   "gameList_gamesAppearShortly": "Games will appear shortly",
   "gameList_syncingLibrary": "Syncing library\u2026",
-  "gameList_localFilesOnly": "Local files only \u00B7 Add a provider to download more",
+  "gameList_localFilesOnly": "Local",
   "gameList_pressMenuHint": "Press  +  for menu",
 
   "filter_activeCount": "{count} active",

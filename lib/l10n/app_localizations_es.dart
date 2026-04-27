@@ -1109,8 +1109,7 @@ class LEs extends L {
   String get gameList_syncingLibrary => 'Sincronizando biblioteca…';
 
   @override
-  String get gameList_localFilesOnly =>
-      'Solo archivos locales · Añade un proveedor para más';
+  String get gameList_localFilesOnly => 'Local';
 
   @override
   String get gameList_pressMenuHint => 'Pulsa  +  para el menú';

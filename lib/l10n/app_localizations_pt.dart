@@ -1111,8 +1111,7 @@ class LPt extends L {
   String get gameList_syncingLibrary => 'Sincronizando biblioteca…';
 
   @override
-  String get gameList_localFilesOnly =>
-      'Só arquivos locais · Adicione um provedor pra baixar mais';
+  String get gameList_localFilesOnly => 'Local';
 
   @override
   String get gameList_pressMenuHint => 'Aperte  +  pro menu';

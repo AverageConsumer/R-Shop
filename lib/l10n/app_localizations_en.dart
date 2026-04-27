@@ -1102,8 +1102,7 @@ class LEn extends L {
   String get gameList_syncingLibrary => 'Syncing library…';
 
   @override
-  String get gameList_localFilesOnly =>
-      'Local files only · Add a provider to download more';
+  String get gameList_localFilesOnly => 'Local';
 
   @override
   String get gameList_pressMenuHint => 'Press  +  for menu';

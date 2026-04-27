@@ -1087,7 +1087,7 @@ class LJa extends L {
   String get gameList_syncingLibrary => 'ライブラリを同期中…';
 
   @override
-  String get gameList_localFilesOnly => 'ローカルファイルのみ · プロバイダーを追加してダウンロード';
+  String get gameList_localFilesOnly => 'ローカル';
 
   @override
   String get gameList_pressMenuHint => ' + でメニュー';

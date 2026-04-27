@@ -1110,8 +1110,7 @@ class LFr extends L {
   String get gameList_syncingLibrary => 'Synchronisation en cours…';
 
   @override
-  String get gameList_localFilesOnly =>
-      'Fichiers locaux uniquement · Ajoute une source pour plus';
+  String get gameList_localFilesOnly => 'Local';
 
   @override
   String get gameList_pressMenuHint => 'Appuie sur  +  pour le menu';

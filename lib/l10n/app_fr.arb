@@ -340,7 +340,7 @@
   "gameList_errorLoadingGames": "Erreur de chargement",
   "gameList_gamesAppearShortly": "Les jeux vont apparaître bientôt",
   "gameList_syncingLibrary": "Synchronisation en cours\u2026",
-  "gameList_localFilesOnly": "Fichiers locaux uniquement \u00B7 Ajoute une source pour plus",
+  "gameList_localFilesOnly": "Local",
   "gameList_pressMenuHint": "Appuie sur  +  pour le menu",
   "filter_activeCount": "{count} actifs",
   "shelfEdit_addFilter": "+ AJOUTER FILTRE",
