@@ -108,7 +108,6 @@ class _ChatBubbleState extends ConsumerState<ChatBubble> {
           ),
           border: Border.all(
             color: (widget.accentColor ?? Colors.white).withValues(alpha: 0.15),
-            width: 1,
           ),
           boxShadow: [
             BoxShadow(

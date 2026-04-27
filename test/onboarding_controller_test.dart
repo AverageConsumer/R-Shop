@@ -243,7 +243,7 @@ void main() {
     test('startEditProvider out of bounds is no-op', () {
       final c = _createController();
       c.state = c.state.copyWith(
-        consoleSubState: const ConsoleSetupState(providers: []),
+        consoleSubState: const ConsoleSetupState(),
       );
       c.startEditProvider(5);
       expect(c.state.providerForm, isNull);
@@ -277,7 +277,6 @@ void main() {
       final c = _createController();
       c.state = c.state.copyWith(
         providerForm: const ProviderFormState(
-          type: ProviderType.web,
           fields: {'url': 'https://example.com'},
         ),
       );
@@ -342,7 +341,7 @@ void main() {
     test('web needs url', () {
       final c = _createController();
       c.state = c.state.copyWith(
-        providerForm: const ProviderFormState(type: ProviderType.web),
+        providerForm: const ProviderFormState(),
       );
       expect(c.state.canTest, false);
       c.updateProviderField('url', 'https://example.com');
@@ -395,7 +394,7 @@ void main() {
     test('whitespace-only values do not satisfy canTest', () {
       final c = _createController();
       c.state = c.state.copyWith(
-        providerForm: const ProviderFormState(type: ProviderType.web),
+        providerForm: const ProviderFormState(),
       );
       c.updateProviderField('url', '   ');
       expect(c.state.canTest, false);
@@ -409,9 +408,8 @@ void main() {
     test('add mode appends to providers list', () {
       final c = _createController();
       c.state = c.state.copyWith(
-        consoleSubState: const ConsoleSetupState(providers: []),
+        consoleSubState: const ConsoleSetupState(),
         providerForm: const ProviderFormState(
-          type: ProviderType.web,
           fields: {'url': 'https://example.com'},
         ),
       );
@@ -435,7 +433,6 @@ void main() {
           ],
         ),
         providerForm: const ProviderFormState(
-          type: ProviderType.web,
           fields: {'url': 'https://new.com'},
           editingIndex: 0,
         ),
@@ -448,7 +445,7 @@ void main() {
     test('saveProvider with auth fields builds AuthConfig', () {
       final c = _createController();
       c.state = c.state.copyWith(
-        consoleSubState: const ConsoleSetupState(providers: []),
+        consoleSubState: const ConsoleSetupState(),
         providerForm: const ProviderFormState(
           type: ProviderType.ftp,
           fields: {
@@ -471,7 +468,7 @@ void main() {
         () {
       final c = _createController();
       c.state = c.state.copyWith(
-        consoleSubState: const ConsoleSetupState(providers: []),
+        consoleSubState: const ConsoleSetupState(),
         providerForm: const ProviderFormState(
           type: ProviderType.romm,
           fields: {'url': 'https://romm.com'},
@@ -493,9 +490,8 @@ void main() {
     test('saveProvider without auth fields leaves auth null', () {
       final c = _createController();
       c.state = c.state.copyWith(
-        consoleSubState: const ConsoleSetupState(providers: []),
+        consoleSubState: const ConsoleSetupState(),
         providerForm: const ProviderFormState(
-          type: ProviderType.web,
           fields: {'url': 'https://noauth.com'},
         ),
       );
@@ -506,7 +502,7 @@ void main() {
     test('saveProvider with port as string parses to int', () {
       final c = _createController();
       c.state = c.state.copyWith(
-        consoleSubState: const ConsoleSetupState(providers: []),
+        consoleSubState: const ConsoleSetupState(),
         providerForm: const ProviderFormState(
           type: ProviderType.ftp,
           fields: {'host': '1.2.3.4', 'port': '2121', 'path': '/roms'},
@@ -599,13 +595,12 @@ void main() {
     test('add, reorder, remove sequence works correctly', () {
       final c = _createController();
       c.state = c.state.copyWith(
-        consoleSubState: const ConsoleSetupState(providers: []),
+        consoleSubState: const ConsoleSetupState(),
       );
 
       // Add three providers
       c.state = c.state.copyWith(
         providerForm: const ProviderFormState(
-          type: ProviderType.web,
           fields: {'url': 'https://first.com'},
         ),
       );
@@ -806,13 +801,13 @@ void main() {
 
     test('selectedSystem looks up from SystemModel.supportedSystems', () {
       expect(const OnboardingState().selectedSystem, isNull);
-      final state = const OnboardingState(selectedConsoleId: 'nes');
+      const state = OnboardingState(selectedConsoleId: 'nes');
       expect(state.selectedSystem, isNotNull);
       expect(state.selectedSystem!.id, 'nes');
     });
 
     test('selectedSystem returns null for unknown ID', () {
-      final state = const OnboardingState(selectedConsoleId: 'unknown_xyz');
+      const state = OnboardingState(selectedConsoleId: 'unknown_xyz');
       expect(state.selectedSystem, isNull);
     });
 

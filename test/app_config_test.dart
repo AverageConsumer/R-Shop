@@ -67,7 +67,7 @@ void main() {
     test('fromJson sorts providers by priority ascending', () {
       final json = _systemJson(providers: [
         _providerJson(type: 'ftp', priority: 3, host: 'ftp.local'),
-        _providerJson(type: 'web', priority: 1, url: 'https://x.com'),
+        _providerJson(url: 'https://x.com'),
         _providerJson(type: 'smb', priority: 2, host: 'nas', share: 'r'),
       ]);
       final config = SystemConfig.fromJson(json);
@@ -131,7 +131,7 @@ void main() {
       final json = {
         'version': 2,
         'systems': [
-          _systemJson(id: 'gba'),
+          _systemJson(),
           _systemJson(id: 'snes', name: 'SNES', targetFolder: '/roms/snes'),
         ],
       };
@@ -162,7 +162,7 @@ void main() {
       final config = AppConfig.fromJson({
         'version': 2,
         'systems': [
-          _systemJson(id: 'gba'),
+          _systemJson(),
           _systemJson(id: 'snes', name: 'SNES', targetFolder: '/roms/snes'),
         ],
       });

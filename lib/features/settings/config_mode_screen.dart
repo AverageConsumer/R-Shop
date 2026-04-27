@@ -273,7 +273,7 @@ class _SystemList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = L.of(context);
     final rs = context.rs;
-    final allSystems = SystemModel.supportedSystems;
+    const allSystems = SystemModel.supportedSystems;
     // Show configured systems first, then unconfigured ones.
     final configured = allSystems
         .where((s) => systems.containsKey(s.id))

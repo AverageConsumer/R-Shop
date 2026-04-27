@@ -34,7 +34,6 @@ class EmptyStateView extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: rs.spacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(
                 icon,
@@ -107,7 +106,6 @@ class ErrorStateView extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: rs.spacing.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(
                 icon,

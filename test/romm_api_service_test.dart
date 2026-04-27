@@ -659,7 +659,7 @@ void main() {
 
     test('sends auth headers (API key)', () async {
       fakeDio.enqueue([]);
-      final auth = AuthConfig(apiKey: 'my-secret-key');
+      const auth = AuthConfig(apiKey: 'my-secret-key');
 
       await service.fetchPlatforms('https://romm.local', auth: auth);
 
@@ -842,7 +842,7 @@ void main() {
   // ═══════════════════════════════════════════════════════
   group('buildRomDownloadUrl', () {
     test('constructs correct URL with encoded filename', () {
-      final rom = RommRom(
+      const rom = RommRom(
         id: 42,
         name: 'Super Mario World',
         fileName: 'smw.sfc',
@@ -855,7 +855,7 @@ void main() {
     });
 
     test('handles special characters in filename', () {
-      final rom = RommRom(
+      const rom = RommRom(
         id: 7,
         name: 'Game',
         fileName: 'My Game (USA) [!].zip',
@@ -869,7 +869,7 @@ void main() {
     });
 
     test('normalizes trailing slashes in baseUrl', () {
-      final rom = RommRom(
+      const rom = RommRom(
         id: 1,
         name: 'Game',
         fileName: 'game.rom',
@@ -886,7 +886,7 @@ void main() {
   // ═══════════════════════════════════════════════════════
   group('buildCoverUrl', () {
     test('returns external CDN URL as-is', () {
-      final rom = RommRom(
+      const rom = RommRom(
         id: 1,
         name: 'Game',
         fileName: 'game.rom',
@@ -901,7 +901,7 @@ void main() {
     });
 
     test('prepends baseUrl to relative urlCover', () {
-      final rom = RommRom(
+      const rom = RommRom(
         id: 1,
         name: 'Game',
         fileName: 'game.rom',
@@ -916,7 +916,7 @@ void main() {
     });
 
     test('falls back to pathCoverSmall', () {
-      final rom = RommRom(
+      const rom = RommRom(
         id: 1,
         name: 'Game',
         fileName: 'game.rom',
@@ -931,7 +931,7 @@ void main() {
     });
 
     test('falls back to pathCoverLarge', () {
-      final rom = RommRom(
+      const rom = RommRom(
         id: 1,
         name: 'Game',
         fileName: 'game.rom',
@@ -946,7 +946,7 @@ void main() {
     });
 
     test('falls back to first screenshot', () {
-      final rom = RommRom(
+      const rom = RommRom(
         id: 1,
         name: 'Game',
         fileName: 'game.rom',
@@ -961,7 +961,7 @@ void main() {
     });
 
     test('returns null when no cover data available', () {
-      final rom = RommRom(
+      const rom = RommRom(
         id: 1,
         name: 'Game',
         fileName: 'game.rom',
@@ -1033,7 +1033,7 @@ void main() {
   // ═══════════════════════════════════════════════════════
   group('_normalizeBaseUrl (tested via buildRomDownloadUrl)', () {
     test('strips single trailing slash', () {
-      final rom = RommRom(
+      const rom = RommRom(
         id: 1,
         name: 'G',
         fileName: 'g.rom',
@@ -1045,7 +1045,7 @@ void main() {
     });
 
     test('strips multiple trailing slashes', () {
-      final rom = RommRom(
+      const rom = RommRom(
         id: 1,
         name: 'G',
         fileName: 'g.rom',

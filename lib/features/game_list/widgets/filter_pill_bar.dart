@@ -127,7 +127,6 @@ class _FilterPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(rs.isSmall ? 12 : 16),
         border: Border.all(
           color: accent.withValues(alpha: 0.55),
-          width: 1,
         ),
       ),
       child: Row(

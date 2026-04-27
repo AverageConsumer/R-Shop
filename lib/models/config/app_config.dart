@@ -207,7 +207,6 @@ AppConfig _migrateLegacyToV3(List<SystemConfig> legacySystems) {
   }
 
   return AppConfig(
-    version: AppConfig.currentVersion,
     systems: migratedSystems,
     sources: sourcesByKey.values.toList()
       ..sort((a, b) => a.priority.compareTo(b.priority)),

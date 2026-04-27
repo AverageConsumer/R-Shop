@@ -188,7 +188,6 @@ class _GameGridState extends ConsumerState<GameGrid> {
               crossAxisCount: widget.crossAxisCount,
               mainAxisSpacing: rs.isSmall ? 10 : 16,
               crossAxisSpacing: rs.isSmall ? 10 : 16,
-              childAspectRatio: 1.0,
             ),
             itemCount: widget.filteredGroups.length,
             itemBuilder: _buildItem,
@@ -334,7 +333,6 @@ class GameGridLoading extends StatelessWidget {
         crossAxisCount: crossAxisCount,
         mainAxisSpacing: spacing,
         crossAxisSpacing: spacing,
-        childAspectRatio: 1.0,
       ),
       itemCount: crossAxisCount * 3,
       itemBuilder: (context, index) {

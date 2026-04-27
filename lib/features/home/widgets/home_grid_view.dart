@@ -52,7 +52,6 @@ class HomeGridView extends ConsumerWidget {
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
-            childAspectRatio: 1.0,
             crossAxisSpacing: spacing,
             mainAxisSpacing: spacing,
           ),
@@ -119,7 +118,7 @@ class HomeGridView extends ConsumerWidget {
             border: isSelected
                 ? Border.all(color: accentColor, width: borderSelected)
                 : Border.all(
-                    color: Colors.white.withValues(alpha: 0.08), width: 1),
+                    color: Colors.white.withValues(alpha: 0.08)),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
@@ -300,7 +299,7 @@ class HomeGridView extends ConsumerWidget {
             border: isSelected
                 ? Border.all(color: accentColor, width: borderSelected)
                 : Border.all(
-                    color: Colors.white.withValues(alpha: 0.08), width: 1),
+                    color: Colors.white.withValues(alpha: 0.08)),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
@@ -337,7 +336,6 @@ class HomeGridView extends ConsumerWidget {
                   padding: EdgeInsets.all(rs.isSmall ? 20.0 : 28.0),
                   child: SvgPicture.asset(
                     system.iconAssetPath,
-                    fit: BoxFit.contain,
                     colorFilter: ColorFilter.mode(system.iconColor, BlendMode.srcIn),
                     placeholderBuilder: (_) => Icon(
                       Icons.gamepad,

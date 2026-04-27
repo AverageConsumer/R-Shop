@@ -283,7 +283,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                     Color(0xFF1565C0),
                   ],
                   numberOfParticles: 30,
-                  gravity: 0.2,
                 ),
               ),
               if (showQuickMenu)

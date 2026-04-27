@@ -66,7 +66,6 @@ class DownloadItemCard extends StatelessWidget {
                     BoxShadow(
                       color: _getGlowColor().withValues(alpha: 0.2),
                       blurRadius: 20,
-                      spreadRadius: 0,
                     ),
                   ]
                 : null,

@@ -126,9 +126,9 @@ void main() {
       // Games without cover_url so getGamesNeedingThumbnails returns empty
       // (avoids triggering ThumbnailService.generateThumbnail in test env)
       await _insertGame(db,
-          filename: 'a.sfc', coverUrl: null, hasThumbnail: 1);
+          filename: 'a.sfc', hasThumbnail: 1);
       await _insertGame(db,
-          filename: 'b.sfc', coverUrl: null, hasThumbnail: 1);
+          filename: 'b.sfc', hasThumbnail: 1);
 
       await ThumbnailMigrationService.migrateIfNeeded(dbService);
 
@@ -174,7 +174,7 @@ void main() {
     });
 
     test('excludes games without cover_url', () async {
-      await _insertGame(db, filename: 'no_cover.sfc', coverUrl: null);
+      await _insertGame(db, filename: 'no_cover.sfc');
 
       final rows = await dbService.getGamesNeedingThumbnails();
 

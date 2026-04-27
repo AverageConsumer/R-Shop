@@ -81,9 +81,7 @@ void main() {
   // ─── Freshness tracking ────────────────────────────────
 
   group('Freshness tracking', () {
-    setUp(() {
-      LibrarySyncService.clearFreshness();
-    });
+    setUp(LibrarySyncService.clearFreshness);
 
     test('system is not fresh before sync', () {
       expect(LibrarySyncService.isFresh('nes'), isFalse);
@@ -226,7 +224,6 @@ void main() {
       state = const LibrarySyncState(
         isSyncing: true,
         totalSystems: 3,
-        completedSystems: 0,
       );
       expect(state.isSyncing, isTrue);
       expect(state.totalSystems, 3);
@@ -265,7 +262,6 @@ void main() {
       state = const LibrarySyncState(
         isSyncing: true,
         totalSystems: 3,
-        completedSystems: 0,
       );
       expect(state.isUserTriggered, isFalse);
 
@@ -295,7 +291,7 @@ void main() {
       );
 
       // Complete
-      state = state.copyWith(isSyncing: false, currentSystem: null);
+      state = state.copyWith(isSyncing: false);
       expect(state.isSyncing, isFalse);
       expect(state.gamesPerSystem, {'nes': 100, 'n64': 50});
       expect(state.totalGamesFound, 150);
@@ -384,7 +380,7 @@ void main() {
       expect(state.gamesPerSystem, hasLength(2));
 
       // Complete
-      state = state.copyWith(isSyncing: false, currentSystem: null);
+      state = state.copyWith(isSyncing: false);
       expect(state.isSyncing, isFalse);
       expect(state.totalGamesFound, 350);
     });
@@ -496,7 +492,6 @@ void main() {
         name: 'NES',
         targetFolder: '/roms/nes',
         providers: [],
-        autoSync: true,
       );
       final updated = config.copyWith(autoSync: false);
       expect(updated.autoSync, isFalse);

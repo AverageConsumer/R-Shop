@@ -802,7 +802,7 @@ class _SourceCard extends ConsumerWidget {
                           ),
                           child: Text(
                             L.of(context).sources_borrowed,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: Colors.lightBlueAccent,
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
@@ -822,7 +822,7 @@ class _SourceCard extends ConsumerWidget {
                           ),
                           child: Text(
                             L.of(context).sources_off,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: Colors.white54,
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
@@ -1337,7 +1337,7 @@ class _SourceTypePickerOverlayState
                     children: [
                       Text(
                         l.sources_addSource,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -1405,7 +1405,7 @@ class _TypeOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = AppTheme.primaryColor;
+    const color = AppTheme.primaryColor;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),
       width: double.infinity,
@@ -1431,7 +1431,7 @@ class _TypeOptionTile extends StatelessWidget {
               children: [
                 Text(
                   option.label,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: color,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,

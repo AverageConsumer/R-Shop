@@ -84,9 +84,7 @@ void main() {
   });
 
   group('DeviceInfoService', () {
-    setUp(() {
-      DeviceInfoService.resetForTesting();
-    });
+    setUp(DeviceInfoService.resetForTesting);
 
     test('returns cached result on subsequent calls', () async {
       final first = await DeviceInfoService.getDeviceMemory();

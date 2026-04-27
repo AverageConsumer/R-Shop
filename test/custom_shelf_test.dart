@@ -42,7 +42,7 @@ void main() {
   });
 
   group('CustomShelf', () {
-    final now = DateTime(2026, 1, 1);
+    final now = DateTime(2026);
 
     CustomShelf makeShelf({
       List<ShelfFilterRule> filterRules = const [],
@@ -215,7 +215,7 @@ void main() {
         'filterRules': <dynamic>[],
         'manualGameIds': <dynamic>[],
         'sortMode': 'alphabetical',
-        'createdAt': DateTime(2026, 1, 1).toIso8601String(),
+        'createdAt': DateTime(2026).toIso8601String(),
       };
       final shelf = CustomShelf.fromJson(json);
       expect(shelf.excludedGameIds, isEmpty);

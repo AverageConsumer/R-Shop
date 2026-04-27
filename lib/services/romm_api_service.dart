@@ -174,7 +174,7 @@ class RommRom {
       if (siblingsRaw is List && siblingsRaw.isNotEmpty) {
         parsedSiblings = siblingsRaw
             .whereType<Map<String, dynamic>>()
-            .map((e) => RommSibling.fromJson(e))
+            .map(RommSibling.fromJson)
             .toList();
       }
     } catch (e) {
@@ -334,7 +334,7 @@ class RommApiService {
 
     return list
         .whereType<Map<String, dynamic>>()
-        .map((e) => RommPlatform.fromJson(e))
+        .map(RommPlatform.fromJson)
         .toList();
   }
 
@@ -378,7 +378,7 @@ class RommApiService {
       allRoms.addAll(
         list
             .whereType<Map<String, dynamic>>()
-            .map((e) => RommRom.fromJson(e)),
+            .map(RommRom.fromJson),
       );
 
       if (list.length < pageSize) break;

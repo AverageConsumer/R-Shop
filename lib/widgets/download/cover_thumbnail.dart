@@ -32,7 +32,6 @@ class CoverThumbnail extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: _borderColor.withValues(alpha: 0.3),
-          width: 1,
         ),
         boxShadow: [
           BoxShadow(

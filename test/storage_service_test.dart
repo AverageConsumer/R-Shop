@@ -19,7 +19,7 @@ void main() {
   group('StorageService — initialization', () {
     test('uninitialized access throws StateError', () {
       final uninitService = StorageService();
-      expect(() => uninitService.getRomPath(), throwsStateError);
+      expect(uninitService.getRomPath, throwsStateError);
     });
   });
 

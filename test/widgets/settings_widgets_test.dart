@@ -80,7 +80,7 @@ class _FakeStorageService extends StorageService {
   Future<void> setMaxConcurrentDownloads(int value) async {}
   @override
   SoundSettings getSoundSettings() =>
-      const SoundSettings(enabled: true, bgmVolume: 0.5, sfxVolume: 0.5);
+      const SoundSettings(bgmVolume: 0.5, sfxVolume: 0.5);
   @override
   Future<void> setSoundSettings(SoundSettings settings) async {}
   @override
@@ -133,7 +133,6 @@ void main() {
         const SettingsTabs(
           selectedTab: 0,
           tabs: tabs,
-          accentColor: Colors.cyanAccent,
         ),
       ));
 
@@ -401,7 +400,6 @@ void main() {
       await tester.pumpWidget(buildCard(
         totalBytes: 4 * 1024 * 1024 * 1024,
         tier: MemoryTier.standard,
-        version: '1.3.0',
       ));
       expect(find.text('v1.3.0'), findsOneWidget);
     });

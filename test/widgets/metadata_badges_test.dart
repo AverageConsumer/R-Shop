@@ -146,7 +146,7 @@ void main() {
 
     testWidgets('compact=false uses normal fonts', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const TagBadges(tags: [versionTag], compact: false),
+        const TagBadges(tags: [versionTag]),
       ));
 
       final text = tester.widget<Text>(find.text('(Rev A)'));

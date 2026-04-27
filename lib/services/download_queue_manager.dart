@@ -254,7 +254,7 @@ class DownloadQueueManager extends ChangeNotifier {
     _subscriptions[id]?.cancel();
     _subscriptions.remove(id);
 
-    await _downloadServices[id]?.cancelDownload(preserveTempFile: false);
+    await _downloadServices[id]?.cancelDownload();
     _downloadServices.remove(id);
 
     _updateItem(id, status: DownloadStatus.cancelled, clearTempFilePath: true);

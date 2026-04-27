@@ -53,7 +53,7 @@ class _AchievementsScreenState extends ConsumerState<AchievementsScreen>
     _focusManager = FocusSyncManager(
       scrollController: _scrollController,
       getCrossAxisCount: () => 1,
-      getItemCount: () => _getAchievementCount(),
+      getItemCount: _getAchievementCount,
       getGridRatio: () => 1.0,
       onSelectionChanged: (index) => _selectedIndexNotifier.value = index,
     );

@@ -745,7 +745,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
     if (widget.activeDownloads.isNotEmpty) {
       widgets.add(_buildSectionHeader(L.of(context).downloads_sectionDownloading, rs));
       for (final item in widget.activeDownloads) {
-        _itemKeys.putIfAbsent(item.id, () => GlobalKey());
+        _itemKeys.putIfAbsent(item.id, GlobalKey.new);
         seenIds.add(item.id);
         widgets.add(_buildCard(item, itemIndex, rs));
         itemIndex++;
@@ -756,7 +756,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
     if (widget.queuedItems.isNotEmpty) {
       widgets.add(_buildSectionHeader(L.of(context).downloads_sectionQueued, rs));
       for (final item in widget.queuedItems) {
-        _itemKeys.putIfAbsent(item.id, () => GlobalKey());
+        _itemKeys.putIfAbsent(item.id, GlobalKey.new);
         seenIds.add(item.id);
         widgets.add(_buildCard(item, itemIndex, rs));
         itemIndex++;
@@ -768,7 +768,7 @@ class _DownloadModalState extends ConsumerState<_DownloadModal>
     if (finishedItems.isNotEmpty) {
       widgets.add(_buildSectionHeader(L.of(context).downloads_sectionComplete, rs));
       for (final item in finishedItems) {
-        _itemKeys.putIfAbsent(item.id, () => GlobalKey());
+        _itemKeys.putIfAbsent(item.id, GlobalKey.new);
         seenIds.add(item.id);
         widgets.add(_buildCard(item, itemIndex, rs));
         itemIndex++;

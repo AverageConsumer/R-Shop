@@ -111,7 +111,6 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
 
       state = SourcesState(
         sources: List<Source>.unmodifiable(_cachedConfig.sources),
-        loading: false,
       );
     } catch (e) {
       debugPrint('SourcesNotifier: bootstrap failed: $e');
@@ -435,7 +434,6 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       _cachedConfig = updated;
       state = SourcesState(
         sources: List<Source>.unmodifiable(next),
-        loading: false,
       );
     } catch (e) {
       debugPrint('SourcesNotifier: persist failed: $e');

@@ -106,13 +106,13 @@ class CustomShelf {
             (g) => filterRules.any((r) => r.matches(g.displayName, g.systemSlug)))
         .map((g) => g.filename)
         .toSet();
-    final manual = manualGameIds.where((f) => allFilenames.contains(f)).toSet();
+    final manual = manualGameIds.where(allFilenames.contains).toSet();
     final combined = {...manual, ...filterMatches};
     combined.removeAll(excludedGameIds);
 
     if (sortMode == ShelfSortMode.manual) {
       final result = [
-        ...manualGameIds.where((f) => combined.contains(f)),
+        ...manualGameIds.where(combined.contains),
       ];
       final newFilterOnly = filterMatches.difference(manual).toList()..sort();
       result.addAll(newFilterOnly);

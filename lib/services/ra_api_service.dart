@@ -206,7 +206,7 @@ class RetroAchievementsService {
     required String apiKey,
   }) async {
     if (username.isEmpty || apiKey.isEmpty) {
-      return SourceConnectionResult.failed(
+      return const SourceConnectionResult.failed(
         'Username and API Key are required',
       );
     }
@@ -224,9 +224,9 @@ class RetroAchievementsService {
 
         final data = response.data;
         if (data is List && data.isNotEmpty) {
-          return SourceConnectionResult.ok();
+          return const SourceConnectionResult.ok();
         }
-        return SourceConnectionResult.failed('Unexpected response from server');
+        return const SourceConnectionResult.failed('Unexpected response from server');
       } on DioException catch (e) {
         return SourceConnectionResult.failed(_getUserFriendlyError(e));
       }

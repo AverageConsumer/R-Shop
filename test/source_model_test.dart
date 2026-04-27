@@ -7,15 +7,15 @@ import 'package:retro_eshop/models/config/system_config.dart';
 void main() {
   group('Source serialization', () {
     test('round-trips a RomM source with auth and known platforms', () {
-      final source = Source(
+      const source = Source(
         id: 'src-romm-1',
         name: 'My RomM',
         type: SourceType.romm,
         url: 'http://192.168.1.50:8090',
-        auth: const AuthConfig(clientToken: 'tok', clientTokenId: 7),
+        auth: AuthConfig(clientToken: 'tok', clientTokenId: 7),
         autoMap: true,
         priority: 1,
-        knownPlatforms: const {'snes': 4, 'nds': 8, 'gba': 5},
+        knownPlatforms: {'snes': 4, 'nds': 8, 'gba': 5},
       );
 
       final json = source.toJson();
@@ -44,7 +44,7 @@ void main() {
     });
 
     test('borrowed flag and tokenExpiresAt round-trip', () {
-      final exp = DateTime.utc(2026, 5, 9, 12, 0, 0);
+      final exp = DateTime.utc(2026, 5, 9, 12);
       final source = Source(
         id: 'borrowed',
         name: 'Tims RomM',
@@ -134,13 +134,13 @@ void main() {
 
   group('SystemConfig new fields', () {
     test('enabledSourceIds and manualMappings round-trip', () {
-      final s = SystemConfig(
+      const s = SystemConfig(
         id: 'snes',
         name: 'SNES',
         targetFolder: '/roms/snes',
-        providers: const [],
-        enabledSourceIds: const ['src-a', 'src-b'],
-        manualMappings: const [
+        providers: [],
+        enabledSourceIds: ['src-a', 'src-b'],
+        manualMappings: [
           SystemSourceMapping(sourceId: 'src-a', remotePath: '/share/snes'),
         ],
       );
@@ -162,12 +162,12 @@ void main() {
     });
 
     test('copyWith clearEnabledSourceIds resets to null', () {
-      final s = SystemConfig(
+      const s = SystemConfig(
         id: 'snes',
         name: 'SNES',
         targetFolder: '/x',
-        providers: const [],
-        enabledSourceIds: const ['a'],
+        providers: [],
+        enabledSourceIds: ['a'],
       );
       final cleared = s.copyWith(clearEnabledSourceIds: true);
       expect(cleared.enabledSourceIds, isNull);
@@ -322,9 +322,8 @@ void main() {
     });
 
     test('v3 JSON is read back verbatim without re-running migration', () {
-      final original = AppConfig(
-        version: 3,
-        systems: const [
+      const original = AppConfig(
+        systems: [
           SystemConfig(
             id: 'snes',
             name: 'SNES',
@@ -335,7 +334,7 @@ void main() {
             ],
           ),
         ],
-        sources: const [
+        sources: [
           Source(
             id: 'src-a',
             name: 'NAS',

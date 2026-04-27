@@ -4,7 +4,7 @@ import 'package:retro_eshop/models/game_metadata_info.dart';
 void main() {
   group('GameMetadataInfo', () {
     test('hasContent returns true when summary is set', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         summary: 'A fun game',
@@ -14,7 +14,7 @@ void main() {
     });
 
     test('hasContent returns true when genres is set', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         genres: 'Platformer',
@@ -24,7 +24,7 @@ void main() {
     });
 
     test('hasContent returns true when developer is set', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         developer: 'Nintendo',
@@ -34,7 +34,7 @@ void main() {
     });
 
     test('hasContent returns true when releaseYear is set', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         releaseYear: 1988,
@@ -44,7 +44,7 @@ void main() {
     });
 
     test('hasContent returns true when only rating is set', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         rating: 85.0,
@@ -54,7 +54,7 @@ void main() {
     });
 
     test('hasContent returns false when all fields null', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         lastUpdated: 0,
@@ -63,7 +63,7 @@ void main() {
     });
 
     test('genreList splits comma-separated genres', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         genres: 'Platformer, Action, Adventure',
@@ -73,7 +73,7 @@ void main() {
     });
 
     test('genreList returns empty list when null', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         lastUpdated: 0,
@@ -82,7 +82,7 @@ void main() {
     });
 
     test('genreList filters empty entries', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         genres: 'Platformer, , Action',
@@ -92,7 +92,7 @@ void main() {
     });
 
     test('gameModeList splits comma-separated modes', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         gameModes: 'Single Player, Multiplayer',
@@ -102,7 +102,7 @@ void main() {
     });
 
     test('gameModeList returns empty list when null', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         lastUpdated: 0,
@@ -111,7 +111,7 @@ void main() {
     });
 
     test('toDbRow produces correct map', () {
-      final info = GameMetadataInfo(
+      const info = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         summary: 'A fun game',
@@ -135,7 +135,7 @@ void main() {
     });
 
     test('fromDbRow round-trips correctly', () {
-      final original = GameMetadataInfo(
+      const original = GameMetadataInfo(
         filename: 'game.rom',
         systemSlug: 'nes',
         summary: 'A fun game',

@@ -55,12 +55,11 @@ void main() {
     });
 
     test('canStartNewDownload respects maxConcurrent', () {
-      const state = DownloadQueueState(maxConcurrent: 2);
+      const state = DownloadQueueState();
       expect(state.canStartNewDownload(), isTrue);
 
       // With 2 active items, can't start new
       final stateWith2Active = DownloadQueueState(
-        maxConcurrent: 2,
         queue: [
           DownloadItem(
             id: 'a',
@@ -118,7 +117,6 @@ void main() {
             game: makeGame('c'),
             system: testSystem,
             targetFolder: '/roms',
-            status: DownloadStatus.queued,
           ),
           DownloadItem(
             id: 'd',
@@ -160,7 +158,7 @@ void main() {
     });
 
     test('copyWith creates new state with updated fields', () {
-      const state = DownloadQueueState(maxConcurrent: 2);
+      const state = DownloadQueueState();
       final updated = state.copyWith(maxConcurrent: 3);
       expect(updated.maxConcurrent, 3);
       expect(state.maxConcurrent, 2); // original unchanged
@@ -200,7 +198,7 @@ void main() {
         game: makeGame('game'),
         system: testSystem,
         targetFolder: '/roms/nes',
-        addedAt: DateTime(2026, 1, 1),
+        addedAt: DateTime(2026),
       );
 
       final json = item.toJson();
@@ -343,7 +341,7 @@ void main() {
     test('toJson includes isFolder when true', () {
       final item = DownloadItem(
         id: 'ps2_folder',
-        game: GameItem(
+        game: const GameItem(
           filename: 'Final Fantasy X',
           displayName: 'Final Fantasy X',
           url: '/share/ps2/Final Fantasy X',
@@ -405,7 +403,7 @@ void main() {
     test('isFolder round-trip serialization', () {
       final original = DownloadItem(
         id: 'ps2_folder',
-        game: GameItem(
+        game: const GameItem(
           filename: 'Game Folder',
           displayName: 'Game Folder',
           url: '/share/ps2/Game Folder',
@@ -499,7 +497,6 @@ void main() {
         game: makeGame('test'),
         system: testSystem,
         targetFolder: '/roms',
-        status: DownloadStatus.queued,
         retryCount: 2,
       );
       expect(item.displayText, 'Retrying (2/3)...');
@@ -622,7 +619,6 @@ void main() {
           game: makeGame('queued'),
           system: testSystem,
           targetFolder: '/roms',
-          status: DownloadStatus.queued,
         ),
         DownloadItem(
           id: 'downloading',

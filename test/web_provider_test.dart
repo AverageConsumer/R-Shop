@@ -244,7 +244,7 @@ void main() {
         const config = ProviderConfig(type: ProviderType.web, priority: 1, url: 'https://example.com');
         final provider = WebProvider(config, dio: dio);
 
-        adapter.onHead('https://example.com/', statusCode: 200);
+        adapter.onHead('https://example.com/');
 
         final result = await provider.testConnection();
         expect(result.success, true);

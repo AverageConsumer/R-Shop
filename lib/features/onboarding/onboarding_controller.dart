@@ -506,7 +506,6 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       connectionTestSuccess: state.connectionTestSuccess,
       canProceed: state.canProceed,
       rommPlatforms: state.rommPlatforms,
-      rommMatchedPlatform: null,
       rommFetchError: state.rommFetchError,
       isFetchingRommPlatforms: state.isFetchingRommPlatforms,
     );
@@ -670,7 +669,6 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       debugPrint('buildFinalConfig: failed to read existing sources: $e');
     }
     return AppConfig(
-      version: AppConfig.currentVersion,
       systems: state.configuredSystems.values.toList(),
       sources: existingSources,
     );

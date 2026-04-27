@@ -81,7 +81,7 @@ void main() {
 
     test('parses config with multiple systems', () {
       final config = ConfigParser.parse(_buildConfigJson(systems: [
-        _system(id: 'nes', name: 'NES'),
+        _system(),
         _system(id: 'snes', name: 'SNES', targetFolder: 'SNES'),
       ]));
       expect(config.systems.length, 2);
@@ -91,7 +91,7 @@ void main() {
 
     test('parses config with all provider types', () {
       final config = ConfigParser.parse(_buildConfigJson(systems: [
-        _system(id: 'nes', providers: [_webProvider()]),
+        _system(providers: [_webProvider()]),
         _system(id: 'snes', targetFolder: 'SNES', providers: [_smbProvider()]),
         _system(id: 'gba', name: 'GBA', targetFolder: 'GBA', providers: [_ftpProvider()]),
         _system(id: 'ps1', name: 'PS1', targetFolder: 'PS1', providers: [_rommProvider()]),
@@ -177,8 +177,8 @@ void main() {
     test('throws on duplicate system IDs', () {
       expect(
         () => ConfigParser.parse(_buildConfigJson(systems: [
-          _system(id: 'nes', name: 'NES 1'),
-          _system(id: 'nes', name: 'NES 2'),
+          _system(name: 'NES 1'),
+          _system(name: 'NES 2'),
         ])),
         throwsA(isA<ConfigParseException>().having(
           (e) => e.message,

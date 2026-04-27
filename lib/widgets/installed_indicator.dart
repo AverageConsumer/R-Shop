@@ -50,7 +50,6 @@ class InstalledBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(3),
         border: Border.all(
           color: Colors.greenAccent.withValues(alpha: 0.6),
-          width: 1,
         ),
         boxShadow: [
           BoxShadow(

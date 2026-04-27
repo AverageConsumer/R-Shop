@@ -97,7 +97,6 @@ void main() {
       test('passes correct arguments to channel', () async {
         await service.testConnection(
           host: '192.168.1.100',
-          port: 445,
           share: 'roms',
           path: '/snes',
           user: 'admin',

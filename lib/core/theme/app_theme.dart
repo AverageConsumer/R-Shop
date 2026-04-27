@@ -85,7 +85,6 @@ class AppTheme {
       scaffoldBackgroundColor: backgroundColor,
       colorScheme: const ColorScheme.dark(
         primary: primaryColor,
-        surface: surfaceColor,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: backgroundColor,

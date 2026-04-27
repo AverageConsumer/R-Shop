@@ -188,7 +188,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         return _CompleteStep(
           configuredCount: state.configuredCount,
           onComplete: controller.onMessageComplete,
-          onExport: () => _exportConfig(),
+          onExport: _exportConfig,
           onJumpIn: _finishOnboarding,
         );
     }

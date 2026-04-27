@@ -27,7 +27,6 @@ Future<ConfigStorageService> _storageWithSystem({
 }) async {
   final storage = _storageInTempDir();
   final config = AppConfig(
-    version: AppConfig.currentVersion,
     systems: [
       SystemConfig(
         id: systemId,
@@ -36,7 +35,6 @@ Future<ConfigStorageService> _storageWithSystem({
         providers: const [],
       ),
     ],
-    sources: const [],
   );
   await storage.saveConfig(jsonEncode(config.toJson()));
   return storage;
@@ -170,7 +168,7 @@ void main() {
       final storage = _storageInTempDir();
       final notifier = SourcesNotifier(storage);
       await notifier.ready;
-      await notifier.addSource(_romm(id: 'a', platforms: const {'snes': 4}));
+      await notifier.addSource(_romm(id: 'a'));
       await notifier.updateKnownPlatforms('a', const {
         'snes': 4,
         'nds': 8,
@@ -194,7 +192,7 @@ void main() {
       // Initially the system has no providers.
       expect(notifier.debugCachedConfig.systems.single.providers, isEmpty);
 
-      await notifier.addSource(_romm(id: 'a', platforms: const {'snes': 4}));
+      await notifier.addSource(_romm(id: 'a'));
 
       final providers = notifier.debugCachedConfig.systems.single.providers;
       expect(providers, hasLength(1));
@@ -214,9 +212,8 @@ void main() {
       });
       final storage =
           ConfigStorageService(directoryProvider: () async => dir);
-      final initial = AppConfig(
-        version: AppConfig.currentVersion,
-        systems: const [
+      const initial = AppConfig(
+        systems: [
           SystemConfig(
             id: 'snes',
             name: 'SNES',
@@ -232,13 +229,12 @@ void main() {
             ],
           ),
         ],
-        sources: const [],
       );
       await storage.saveConfig(jsonEncode(initial.toJson()));
 
       final notifier = SourcesNotifier(storage);
       await notifier.ready;
-      await notifier.addSource(_romm(id: 'a', platforms: const {'snes': 4}));
+      await notifier.addSource(_romm(id: 'a'));
       // Now: SNES has 2 providers (1 SMB legacy + 1 RomM managed).
       expect(notifier.debugCachedConfig.systems.single.providers, hasLength(2));
 
@@ -260,9 +256,8 @@ void main() {
       });
       final storage =
           ConfigStorageService(directoryProvider: () async => dir);
-      final initial = AppConfig(
-        version: AppConfig.currentVersion,
-        systems: const [
+      const initial = AppConfig(
+        systems: [
           SystemConfig(
             id: 'snes',
             name: 'SNES',
@@ -278,13 +273,12 @@ void main() {
             ],
           ),
         ],
-        sources: const [],
       );
       await storage.saveConfig(jsonEncode(initial.toJson()));
 
       final notifier = SourcesNotifier(storage);
       await notifier.ready;
-      await notifier.addSource(_romm(id: 'a', platforms: const {'snes': 4}));
+      await notifier.addSource(_romm(id: 'a'));
       await notifier.setEnabled('a', false);
       final providers = notifier.debugCachedConfig.systems.single.providers;
       expect(providers, hasLength(1));
@@ -302,9 +296,8 @@ void main() {
       });
       final storage =
           ConfigStorageService(directoryProvider: () async => dir);
-      final config = AppConfig(
-        version: AppConfig.currentVersion,
-        systems: const [
+      const config = AppConfig(
+        systems: [
           SystemConfig(
             id: 'snes',
             name: 'SNES',
@@ -318,13 +311,12 @@ void main() {
             providers: [],
           ),
         ],
-        sources: const [],
       );
       await storage.saveConfig(jsonEncode(config.toJson()));
 
       final notifier = SourcesNotifier(storage);
       await notifier.ready;
-      await notifier.addSource(_romm(id: 'a', platforms: const {'snes': 4}));
+      await notifier.addSource(_romm(id: 'a'));
       var systems = notifier.debugCachedConfig.systems;
       expect(systems.firstWhere((s) => s.id == 'snes').providers, hasLength(1));
       expect(systems.firstWhere((s) => s.id == 'nds').providers, isEmpty);
@@ -357,9 +349,8 @@ void main() {
       // Pre-existing config: two systems, each with a configured legacy
       // provider (e.g. set up by the onboarding flow). The user has NOT
       // paired anything yet — sources is empty.
-      final initial = AppConfig(
-        version: AppConfig.currentVersion,
-        systems: const [
+      const initial = AppConfig(
+        systems: [
           SystemConfig(
             id: 'snes',
             name: 'SNES',
@@ -389,14 +380,13 @@ void main() {
             ],
           ),
         ],
-        sources: const [],
       );
       await storage.saveConfig(jsonEncode(initial.toJson()));
 
       // Now the user pairs a brand-new RomM that only knows SNES.
       final notifier = SourcesNotifier(storage);
       await notifier.ready;
-      await notifier.addSource(_romm(id: 'pair', platforms: const {'snes': 4}));
+      await notifier.addSource(_romm(id: 'pair'));
 
       // Expectation:
       // - SNES has BOTH the legacy SMB AND the new managed RomM (multi-
@@ -438,9 +428,8 @@ void main() {
       expect(notifier.debugCachedConfig.systems, isEmpty);
 
       // Onboarding writes a system to disk *behind the notifier's back*.
-      final externalUpdate = AppConfig(
-        version: AppConfig.currentVersion,
-        systems: const [
+      const externalUpdate = AppConfig(
+        systems: [
           SystemConfig(
             id: 'gba',
             name: 'GBA',
@@ -448,7 +437,6 @@ void main() {
             providers: [],
           ),
         ],
-        sources: const [],
       );
       await storage.saveConfig(jsonEncode(externalUpdate.toJson()));
 
@@ -477,13 +465,12 @@ void main() {
         type: SourceType.romm,
         url: 'http://old.example.com',
         autoMap: true,
-        enabled: true,
         borrowed: true,
         knownPlatforms: const {'snes': 4, 'gba': 5},
-        tokenExpiresAt: DateTime.utc(2026, 1, 1),
+        tokenExpiresAt: DateTime.utc(2026),
       ));
 
-      final newExpiry = DateTime.utc(2026, 6, 1);
+      final newExpiry = DateTime.utc(2026, 6);
       await notifier.refreshTokenFromPair(
         'tims-romm',
         RommPairResult(
@@ -513,18 +500,17 @@ void main() {
       final storage = _storageInTempDir();
       final notifier = SourcesNotifier(storage);
       await notifier.ready;
-      await notifier.addSource(_romm(id: 's1', platforms: const {'snes': 4}));
+      await notifier.addSource(_romm());
 
       await notifier.refreshTokenFromPair(
         's1',
-        RommPairResult(
+        const RommPairResult(
           serverUrl: 'http://romm.local:8090',
           token: 't',
           tokenId: 1,
           name: 'r-shop',
-          scopes: const [],
+          scopes: [],
           userId: 1,
-          expiresAt: null,
         ),
         knownPlatforms: const {'nds': 8, 'gba': 5},
       );
@@ -540,12 +526,12 @@ void main() {
       expect(
         () => notifier.refreshTokenFromPair(
           'nope',
-          RommPairResult(
+          const RommPairResult(
             serverUrl: 'http://x',
             token: 't',
             tokenId: 1,
             name: 'n',
-            scopes: const [],
+            scopes: [],
             userId: 1,
           ),
         ),

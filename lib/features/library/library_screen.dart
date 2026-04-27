@@ -354,7 +354,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       switch (_selectedTab) {
         case 1: // Installed
           games = _deduplicateInstalled(
-            games.where((g) => _isGameInstalled(g)).toList(),
+            games.where(_isGameInstalled).toList(),
           );
         case 2: // Favorites
           games =
@@ -1046,7 +1046,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   int get _installedCount =>
       _deduplicateInstalled(
-        _allGames.where((g) => _isGameInstalled(g)).toList(),
+        _allGames.where(_isGameInstalled).toList(),
       ).length;
 
   int get _favoritesCount =>
@@ -1190,7 +1190,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 LibraryTabs(
                   selectedTab: _selectedTab,
                   tabs: tabs,
-                  accentColor: Colors.cyanAccent,
                   onTap: _selectTab,
                 ),
               ],
@@ -1283,7 +1282,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           crossAxisCount: _columns,
           mainAxisSpacing: rs.isSmall ? 10 : 16,
           crossAxisSpacing: rs.isSmall ? 10 : 16,
-          childAspectRatio: 1.0,
         ),
         itemCount: _filteredGames.length,
         itemBuilder: (context, index) {

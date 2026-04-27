@@ -55,7 +55,7 @@ class _OtherVersionsSectionState extends State<OtherVersionsSection> {
   final Map<int, GlobalKey> _itemKeys = {};
 
   GlobalKey _keyFor(int index) =>
-      _itemKeys.putIfAbsent(index, () => GlobalKey());
+      _itemKeys.putIfAbsent(index, GlobalKey.new);
 
   @override
   void didUpdateWidget(OtherVersionsSection oldWidget) {

@@ -108,8 +108,6 @@ void main() {
         raGameId: 3,
         title: 'Zelda',
         consoleId: 7,
-        numAchievements: 0, // no achievements
-        points: 0,
       ),
       const RaGame(
         raGameId: 4,

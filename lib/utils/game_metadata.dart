@@ -122,7 +122,7 @@ class GameMetadata {
       if (matched.isNotEmpty && matched.length == parts.length) {
         return RegionInfo(
           name: matched.map((r) => r.regionName).join(' / '),
-          flag: matched.map((r) => r.flag).join(''),
+          flag: matched.map((r) => r.flag).join(),
         );
       }
     }

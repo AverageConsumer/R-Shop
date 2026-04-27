@@ -35,7 +35,6 @@ class BadgesRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(rs.isSmall ? 4 : 6),
                 border: Border.all(
                   color: accentColor.withValues(alpha: 0.35),
-                  width: 1,
                 ),
               ),
               child: Text(
@@ -183,7 +182,6 @@ class _AgeRatingBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(isSmall ? 4 : 6),
         border: Border.all(
           color: color.withValues(alpha: 0.35),
-          width: 1,
         ),
       ),
       child: Row(

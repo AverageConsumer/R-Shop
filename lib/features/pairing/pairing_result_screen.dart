@@ -140,7 +140,7 @@ class _PairingResultScreenState extends State<PairingResultScreen> {
                                   children: [
                                     Text(
                                       l.pairing_permissions,
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         color: Colors.grey,
                                         fontSize: 10,
                                         letterSpacing: 1.5,
@@ -298,7 +298,6 @@ Future<bool> showPairingResultScreen(
 ) async {
   final accepted = await Navigator.of(context).push<bool>(
     PageRouteBuilder(
-      opaque: true,
       pageBuilder: (_, __, ___) => PairingResultScreen(result: result),
     ),
   );

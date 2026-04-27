@@ -331,7 +331,7 @@ class _MappingRowWidget extends StatelessWidget {
     return ConsoleFocusable(
       focusNode: row.consoleFocus,
       focusScale: 1.0,
-      onSelect: () => row.textFocus.requestFocus(),
+      onSelect: row.textFocus.requestFocus,
       child: ListenableBuilder(
         listenable: row.textFocus,
         builder: (context, _) {

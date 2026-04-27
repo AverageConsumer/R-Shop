@@ -36,7 +36,6 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
   void initState() {
     super.initState();
     _controller = MobileScannerController(
-      detectionSpeed: DetectionSpeed.normal,
       formats: const [BarcodeFormat.qrCode],
     );
   }
@@ -195,7 +194,7 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
                       const SizedBox(width: 12),
                       Text(
                         L.of(context).pairing_scanQrTitle,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -260,7 +259,7 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
                       ],
                       Text(
                         L.of(context).pairing_scanQrHint,
-                        style: TextStyle(color: Colors.white, fontSize: 14),
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
                       ),
                       const SizedBox(height: 12),
                       ConsoleFocusable(
@@ -278,7 +277,7 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
                           ),
                           child: Text(
                             L.of(context).pairing_enterManually,
-                            style: TextStyle(
+                            style: const TextStyle(
                                 color: Colors.white, fontSize: 13),
                           ),
                         ),

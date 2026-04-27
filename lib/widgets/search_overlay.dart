@@ -95,7 +95,6 @@ class SearchOverlay extends StatelessWidget {
         child: TextField(
           controller: searchController,
           focusNode: searchFocusNode,
-          autofocus: false,
           autocorrect: false,
           maxLength: 100,
           buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,

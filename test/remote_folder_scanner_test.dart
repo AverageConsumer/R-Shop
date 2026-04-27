@@ -52,7 +52,7 @@ void main() {
   });
 
   group('LocalFolderMatcher with remote folder names', () {
-    final systems = SystemModel.supportedSystems;
+    const systems = SystemModel.supportedSystems;
 
     test('matches exact system IDs', () {
       expect(LocalFolderMatcher.matchFolder('snes', systems, const []), 'snes');

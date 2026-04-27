@@ -124,7 +124,6 @@ class _AddToQueueToastState extends ConsumerState<AddToQueueToast>
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: accent.withValues(alpha: 0.4),
-                    width: 1,
                   ),
                   boxShadow: [
                     BoxShadow(

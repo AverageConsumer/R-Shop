@@ -114,7 +114,7 @@ class BaseGameCard extends StatelessWidget {
             border: isSelected
                 ? Border.all(color: accentColor, width: borderSelected)
                 : Border.all(
-                    color: Colors.white.withValues(alpha: 0.08), width: 1),
+                    color: Colors.white.withValues(alpha: 0.08)),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
@@ -135,7 +135,6 @@ class BaseGameCard extends StatelessWidget {
                   child: SmartCoverImage(
                     urls: coverUrls,
                     cachedUrl: cachedUrl,
-                    fit: BoxFit.contain,
                     onUrlFound: onCoverFound,
                     hasThumbnail: hasThumbnail,
                     onThumbnailNeeded: onThumbnailNeeded,
@@ -387,7 +386,6 @@ class _InstalledBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
           color: Colors.greenAccent.withValues(alpha: 0.5),
-          width: 1,
         ),
         boxShadow: [
           BoxShadow(
@@ -464,7 +462,7 @@ class _RaBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: border, width: 1),
+        border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
             color: accent.withValues(alpha: 0.3),
@@ -646,7 +644,6 @@ class _DownloadRevealOverlay extends StatelessWidget {
             // Accent glow line at the reveal edge
             if (isDownloading && value > 0.01 && value < 0.99)
               Positioned(
-                top: null,
                 left: 0,
                 right: 0,
                 bottom: (1.0 - value) *

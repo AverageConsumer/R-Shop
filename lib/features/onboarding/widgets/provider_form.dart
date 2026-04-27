@@ -590,7 +590,7 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
       focusNode: consoleFocusNode,
       focusScale: 1.0,
       borderRadius: rs.radius.sm,
-      onSelect: () => textFocusNode.requestFocus(),
+      onSelect: textFocusNode.requestFocus,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -632,12 +632,9 @@ class _ProviderFormState extends ConsumerState<ProviderForm> {
             },
             child: CallbackShortcuts(
               bindings: {
-                const SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false): () =>
-                    consoleFocusNode.requestFocus(),
-                const SingleActivator(LogicalKeyboardKey.gameButtonB, includeRepeats: false): () =>
-                    consoleFocusNode.requestFocus(),
-                const SingleActivator(LogicalKeyboardKey.goBack, includeRepeats: false): () =>
-                    consoleFocusNode.requestFocus(),
+                const SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false): consoleFocusNode.requestFocus,
+                const SingleActivator(LogicalKeyboardKey.gameButtonB, includeRepeats: false): consoleFocusNode.requestFocus,
+                const SingleActivator(LogicalKeyboardKey.goBack, includeRepeats: false): consoleFocusNode.requestFocus,
               },
               child: TextField(
                 controller: fieldController,

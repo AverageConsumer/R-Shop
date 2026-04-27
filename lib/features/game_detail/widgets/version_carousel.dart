@@ -56,7 +56,7 @@ class _VersionCarouselState extends State<VersionCarousel> {
   void _ensureKeys() {
     if (_cardKeys.length == widget.variants.length) return;
     for (int i = 0; i < widget.variants.length; i++) {
-      _cardKeys.putIfAbsent(i, () => GlobalKey());
+      _cardKeys.putIfAbsent(i, GlobalKey.new);
     }
   }
 

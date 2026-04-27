@@ -165,7 +165,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   }
 
   GlobalKey _keyForSection(DetailSection section) {
-    return _sectionKeys.putIfAbsent(section, () => GlobalKey());
+    return _sectionKeys.putIfAbsent(section, GlobalKey.new);
   }
 
   void _scrollToFocusedSection({bool scrollingUp = false}) {
@@ -512,7 +512,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         QuickMenuItem(
           label: L.of(context).gameDetail_gameInfo,
           icon: Icons.info_outline_rounded,
-          onSelect: () => controller.openGameInfo(),
+          onSelect: controller.openGameInfo,
         ),
       if (raMatch != null && raMatch.hasMatch && raMatch.raGameId != null)
         QuickMenuItem(
@@ -530,7 +530,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         QuickMenuItem(
           label: L.of(context).gameDetail_fromProvider(variant.providerConfig?.detailLabel ?? 'Primary'),
           icon: Icons.cloud_download_outlined,
-          onSelect: () => controller.performAction(),
+          onSelect: controller.performAction,
         ),
         for (final alt in variant.alternativeSources)
           QuickMenuItem(
@@ -1229,7 +1229,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
             borderRadius: BorderRadius.circular(rs.radius.sm),
             border: Border.all(
               color: widget.system.accentColor.withValues(alpha: 0.5),
-              width: 1,
             ),
           ),
           child: Row(

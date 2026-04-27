@@ -21,7 +21,6 @@ void main() {
     test('displayText shows MB when totalBytes unknown', () {
       final p = DownloadProgress(
         status: DownloadStatus.downloading,
-        progress: 0,
         receivedBytes: 5 * 1024 * 1024, // 5 MB
       );
       expect(p.displayText, '5.0 MB');
@@ -30,7 +29,6 @@ void main() {
     test('displayText for extracting with no progress', () {
       final p = DownloadProgress(
         status: DownloadStatus.extracting,
-        progress: 0.0,
       );
       expect(p.displayText, 'Extracting...');
     });
@@ -182,8 +180,6 @@ void main() {
     test('downloading with zero totalBytes shows MB format', () {
       final p = DownloadProgress(
         status: DownloadStatus.downloading,
-        progress: 0,
-        receivedBytes: 0,
         totalBytes: 0,
       );
       expect(p.displayText, '0.0 MB');

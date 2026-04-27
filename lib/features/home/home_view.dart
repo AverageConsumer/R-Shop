@@ -120,7 +120,7 @@ class _HomeViewState extends ConsumerState<HomeView>
         final oldIds = _configuredSystems.map((s) => s.id).toList();
         final newIds = filtered.map((s) => s.id).toList();
         final changed = oldIds.length != newIds.length ||
-            !oldIds.every((id) => newIds.contains(id));
+            !oldIds.every(newIds.contains);
         if (!changed) return;
         if (filtered.isEmpty) {
           setState(() => _configuredSystems = []);
@@ -453,7 +453,6 @@ class _HomeViewState extends ConsumerState<HomeView>
         QuickMenuItem(
           label: l.common_downloads,
           icon: Icons.download_rounded,
-          shortcutHint: null,
           onSelect: () => toggleDownloadOverlay(ref),
           highlight: true,
         ),

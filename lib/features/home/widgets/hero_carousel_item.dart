@@ -47,7 +47,6 @@ class HeroCarouselItem extends StatelessWidget {
                       child: Container(
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
-                            center: Alignment.center,
                             radius: 0.55,
                             colors: [
                               accentColor.withValues(alpha: 0.35),
@@ -64,7 +63,6 @@ class HeroCarouselItem extends StatelessWidget {
                         padding: EdgeInsets.all(padding),
                         child: SvgPicture.asset(
                           system.iconAssetPath,
-                          fit: BoxFit.contain,
                           colorFilter: ColorFilter.mode(system.iconColor, BlendMode.srcIn),
                           placeholderBuilder: (_) => Icon(
                             Icons.gamepad,
@@ -128,7 +126,6 @@ class HeroLibraryCarouselItem extends StatelessWidget {
                       child: Container(
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
-                            center: Alignment.center,
                             radius: 0.55,
                             colors: [
                               accentColor.withValues(alpha: 0.35),

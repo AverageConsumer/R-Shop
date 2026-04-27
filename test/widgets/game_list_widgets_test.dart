@@ -68,7 +68,6 @@ void main() {
           GameListHeader(
             system: _snes,
             gameCount: 10,
-            hasActiveFilters: false,
           ),
         ]),
       ));
@@ -168,7 +167,6 @@ void main() {
         isSelected: false,
         accentColor: Colors.green,
         sourceDotColor: Colors.greenAccent,
-        sourceDotBorrowed: false,
         onTap: () {},
       )));
       // No share icon because not borrowed.

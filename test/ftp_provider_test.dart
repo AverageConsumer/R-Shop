@@ -12,7 +12,7 @@ void main() {
         );
         final provider = FtpProvider(config);
         expect(
-          () => provider.testConnection(),
+          provider.testConnection,
           throwsA(isA<StateError>()),
         );
       });
@@ -25,7 +25,7 @@ void main() {
         );
         final provider = FtpProvider(config);
         expect(
-          () => provider.testConnection(),
+          provider.testConnection,
           throwsA(isA<StateError>()),
         );
       });
@@ -38,7 +38,7 @@ void main() {
         );
         final provider = FtpProvider(config);
         expect(
-          () => provider.testConnection(),
+          provider.testConnection,
           throwsA(isA<StateError>()),
         );
       });
@@ -116,7 +116,7 @@ void main() {
         );
         final provider = FtpProvider(config);
         expect(
-          () => provider.testConnection(),
+          provider.testConnection,
           throwsA(isA<StateError>()),
         );
       });
@@ -219,7 +219,7 @@ void main() {
           type: ProviderType.ftp, priority: 1, host: '[:]',
         ));
         expect(
-          () => provider.testConnection(),
+          provider.testConnection,
           throwsA(isA<StateError>()),
         );
       });
@@ -229,7 +229,7 @@ void main() {
           type: ProviderType.ftp, priority: 1, host: '[ABCD1234]',
         ));
         expect(
-          () => provider.testConnection(),
+          provider.testConnection,
           throwsA(isA<StateError>()),
         );
       });
@@ -239,7 +239,7 @@ void main() {
           type: ProviderType.ftp, priority: 1, host: '[]',
         ));
         expect(
-          () => provider.testConnection(),
+          provider.testConnection,
           throwsA(isA<StateError>()),
         );
       });

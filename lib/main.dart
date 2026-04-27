@@ -151,7 +151,6 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
         messenger?.showSnackBar(
           SnackBar(
             content: Text(L.of(context).toast_configRecovered),
-            duration: const Duration(seconds: 4),
           ),
         );
       }

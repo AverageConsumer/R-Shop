@@ -256,9 +256,6 @@ class DownloadService {
     if (_progressController?.isClosed == false) {
       _progressController?.add(DownloadProgress(
         status: DownloadStatus.downloading,
-        progress: 0,
-        receivedBytes: 0,
-        totalBytes: null,
       ));
     }
 
@@ -633,9 +630,6 @@ class DownloadService {
       if (_progressController?.isClosed == false) {
         _progressController?.add(DownloadProgress(
           status: DownloadStatus.downloading,
-          progress: 0,
-          receivedBytes: 0,
-          totalBytes: null,
         ));
       }
 
