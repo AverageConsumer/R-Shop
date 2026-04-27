@@ -8,6 +8,7 @@ import '../../models/config/system_config.dart';
 
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
+import '../../core/widgets/screen_layout.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
@@ -563,8 +564,11 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
             _handleBack();
           }
         },
-        child: Scaffold(
+        child: ScreenLayout(
         backgroundColor: Colors.black,
+        accentColor: widget.system.accentColor,
+        useSafeArea: false,
+        padding: EdgeInsets.zero,
         body: GestureDetector(
           onScaleStart: (details) {
             _lastPinchScale = 1.0;
