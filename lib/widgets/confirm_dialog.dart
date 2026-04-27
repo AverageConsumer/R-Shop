@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/input/overlay_scope.dart';
 import '../core/responsive/responsive.dart';
 import '../l10n/app_localizations.dart';
 
@@ -65,7 +66,10 @@ class ConfirmDialog extends StatelessWidget {
     final rs = context.rs;
     final l = L.of(context);
 
-    return Container(
+    return DialogFocusScope(
+      isVisible: true,
+      onClose: onSecondary,
+      child: Container(
       color: Colors.black.withValues(alpha: 0.7),
       child: Center(
         child: Container(
@@ -156,6 +160,7 @@ class ConfirmDialog extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
