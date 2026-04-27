@@ -74,8 +74,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
       debugPrint('Failed to get package info: $e');
     });
 
+    // Restore previously-active tab if user re-enters Settings.
+    final restored = savedSelectedIndex;
+    if (restored != null && restored >= 0 && restored < _tabCount) {
+      _selectedTab = restored;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _firstGeneralNode.requestFocus();
+      _focusFirstItemInTab(_selectedTab);
     });
   }
 
@@ -97,6 +103,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final next = (_selectedTab + 1) % _tabCount;
     ref.read(feedbackServiceProvider).tick();
     setState(() => _selectedTab = next);
+    saveFocusState(selectedIndex: next);
     _focusFirstItemInTab(next);
   }
 
@@ -104,11 +111,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
     final next = (_selectedTab - 1 + _tabCount) % _tabCount;
     ref.read(feedbackServiceProvider).tick();
     setState(() => _selectedTab = next);
+    saveFocusState(selectedIndex: next);
     _focusFirstItemInTab(next);
   }
 
   void _selectTab(int index) {
     if (index == _selectedTab) return;
+    saveFocusState(selectedIndex: index);
     ref.read(feedbackServiceProvider).tick();
     setState(() => _selectedTab = index);
     _focusFirstItemInTab(index);
