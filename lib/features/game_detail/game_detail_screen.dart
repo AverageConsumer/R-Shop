@@ -1264,7 +1264,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     // For single-ROM: check the selected variant.
     // For multi-ROM: check all variants, pick the most "active" one.
     if (baseState == DownloadButtonState.download ||
-        baseState == DownloadButtonState.delete) {
+        baseState == DownloadButtonState.installed) {
       final variantsToCheck = isMultiRom
           ? widget.variants
           : [controller.selectedVariant];
@@ -1353,7 +1353,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           ? DownloadButtonState.installed
           : DownloadButtonState.download;
     }
-    if (state.isVariantInstalled) return DownloadButtonState.delete;
+    if (state.isVariantInstalled) return DownloadButtonState.installed;
     return DownloadButtonState.download;
   }
 
