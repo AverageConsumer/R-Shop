@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/util/source_color.dart';
+import '../../core/widgets/screen_layout.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
@@ -1064,8 +1065,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) _handleBack();
         },
-        child: Scaffold(
+        child: ScreenLayout(
           backgroundColor: Colors.black,
+          accentColor: Colors.cyanAccent,
+          useSafeArea: false,
+          padding: EdgeInsets.zero,
           body: Stack(
             children: [
               // Grid content (behind header)
