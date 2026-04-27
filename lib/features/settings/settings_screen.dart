@@ -229,17 +229,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
           accentColor: AppTheme.primaryColor,
           body: Stack(
             children: [
-              Positioned.fill(
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF1A1A1A), Colors.black],
-                    ),
-                  ),
-                ),
-              ),
               Column(
                 children: [
                   SizedBox(height: topPadding),
