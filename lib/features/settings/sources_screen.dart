@@ -14,6 +14,7 @@ import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../providers/library_providers.dart';
+import '../../widgets/state_views.dart';
 import '../../providers/source_health_providers.dart';
 import '../../services/romm_api_service.dart';
 import '../../services/romm_pairing_service.dart';
@@ -476,10 +477,47 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                   child: state.loading
                       ? const Center(child: CircularProgressIndicator())
                       : state.sources.isEmpty
-                          ? _EmptyState(
-                              rs: rs,
-                              focusNode: _addEmptyFocus,
-                              onAdd: _addSource,
+                          ? EmptyStateView(
+                              icon: Icons.cloud_off_outlined,
+                              title: L.of(context).sources_noSourcesYet,
+                              subtitle:
+                                  L.of(context).sources_noSourcesDescription,
+                              action: ConsoleFocusable(
+                                focusNode: _addEmptyFocus,
+                                autofocus: true,
+                                onSelect: _addSource,
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: rs.spacing.lg,
+                                    vertical: rs.spacing.md,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryColor
+                                        .withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: AppTheme.primaryColor,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.add,
+                                          color: AppTheme.primaryColor),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        L.of(context).sources_addSource,
+                                        style: const TextStyle(
+                                          color: AppTheme.primaryColor,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             )
                           : _SourceList(
                               sources: state.sources,
@@ -556,89 +594,6 @@ class _Header extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.rs,
-    required this.focusNode,
-    required this.onAdd,
-  });
-  final Responsive rs;
-  final FocusNode focusNode;
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.cloud_off_outlined,
-              size: rs.isSmall ? 56 : 72,
-              color: Colors.white24,
-            ),
-            SizedBox(height: rs.spacing.lg),
-            Text(
-              L.of(context).sources_noSourcesYet,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: rs.isSmall ? 16 : 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SizedBox(height: rs.spacing.sm),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: rs.spacing.lg),
-              child: Text(
-                L.of(context).sources_noSourcesDescription,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey.shade500,
-                  fontSize: rs.isSmall ? 11 : 13,
-                ),
-              ),
-            ),
-            SizedBox(height: rs.spacing.lg),
-            ConsoleFocusable(
-              focusNode: focusNode,
-              autofocus: true,
-              onSelect: onAdd,
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: rs.spacing.lg,
-                  vertical: rs.spacing.md,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.primaryColor, width: 2),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.add, color: AppTheme.primaryColor),
-                    const SizedBox(width: 8),
-                    Text(
-                      L.of(context).sources_addSource,
-                      style: const TextStyle(
-                        color: AppTheme.primaryColor,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

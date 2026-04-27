@@ -13,6 +13,7 @@ import '../../core/responsive/responsive.dart';
 import '../../core/util/source_color.dart';
 import '../../core/widgets/screen_layout.dart';
 import '../../core/widgets/skeleton.dart';
+import '../../widgets/state_views.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
@@ -1250,26 +1251,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         title = l.library_noGamesInLibrary;
         subtitle = _allGames.isEmpty ? l.library_gamesAfterSync : null;
       }
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.library_books_outlined,
-                size: 64, color: Colors.grey[700]),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: TextStyle(color: Colors.grey[500], fontSize: 16),
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
-              ),
-            ],
-          ],
-        ),
+      return EmptyStateView(
+        icon: Icons.library_books_outlined,
+        title: title,
+        subtitle: subtitle,
       );
     }
 
