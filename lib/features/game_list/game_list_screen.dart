@@ -32,6 +32,7 @@ import '../library/widgets/shelf_picker_dialog.dart';
 import 'widgets/game_grid.dart';
 import 'widgets/game_list_header.dart';
 import 'widgets/filter_overlay.dart';
+import 'widgets/filter_pill_bar.dart';
 
 class GameListScreen extends ConsumerStatefulWidget {
   final SystemModel system;
@@ -643,9 +644,25 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
     return Stack(
       children: [
-        Padding(
-          padding: EdgeInsets.only(top: topPadding),
-          child: _buildGridOrStatus(state, syncActive),
+        Positioned.fill(
+          top: topPadding,
+          child: Column(
+            children: [
+              if (state.activeFilters.isNotEmpty)
+                FilterPillBar(
+                  filters: state.activeFilters,
+                  availableRegions: state.availableRegions,
+                  availableLanguages: state.availableLanguages,
+                  accentColor: widget.system.accentColor,
+                  onToggleRegion: _controller.toggleRegionFilter,
+                  onToggleLanguage: _controller.toggleLanguageFilter,
+                  onToggleFavorites: _controller.toggleFavoritesFilter,
+                  onToggleLocal: _controller.toggleLocalFilter,
+                  onClearAll: _controller.clearFilters,
+                ),
+              Expanded(child: _buildGridOrStatus(state, syncActive)),
+            ],
+          ),
         ),
         GameListHeader(
           system: widget.system,
