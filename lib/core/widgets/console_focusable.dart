@@ -4,6 +4,92 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme/app_theme.dart';
 
+/// Shared focus-state machine for the ConsoleFocusable family. Owns the
+/// FocusNode lifecycle, listens to focus changes, scrolls into view on focus,
+/// and forwards A/Enter/Space to onSelect. Each visual variant only writes its
+/// own build() and (optionally) drives its own AnimationController(s) via the
+/// onFocusStateChanged hook.
+mixin _FocusableSurfaceMixin<T extends StatefulWidget> on State<T> {
+  late FocusNode _focusNode;
+  bool _ownsNode = false;
+  bool _isFocused = false;
+
+  /// Subclass tells us which external FocusNode (if any) to wrap.
+  FocusNode? get externalFocusNode;
+
+  /// Subclass tells us what to invoke on A/Enter/Space.
+  VoidCallback? get onSelect;
+
+  /// Subclass reacts to focus changes — usually to drive its animations.
+  void onFocusStateChanged(bool focused);
+
+  bool get isFocused => _isFocused;
+  FocusNode get focusNode => _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = externalFocusNode ?? FocusNode();
+    _ownsNode = externalFocusNode == null;
+    _focusNode.addListener(_updateFocusState);
+  }
+
+  /// Call this from didUpdateWidget when the external FocusNode swap happens.
+  void didUpdateExternalNode(FocusNode? oldExternal) {
+    if (externalFocusNode == oldExternal) return;
+    _focusNode.removeListener(_updateFocusState);
+    if (_ownsNode) _focusNode.dispose();
+    _focusNode = externalFocusNode ?? FocusNode();
+    _ownsNode = externalFocusNode == null;
+    _focusNode.addListener(_updateFocusState);
+    _updateFocusState();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_updateFocusState);
+    if (_ownsNode) _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _updateFocusState() {
+    final hasFocus = _focusNode.hasFocus;
+    if (hasFocus != _isFocused) {
+      _isFocused = hasFocus;
+      if (hasFocus) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Scrollable.ensureVisible(
+              context,
+              duration: const Duration(milliseconds: 200),
+            );
+          }
+        });
+      }
+      onFocusStateChanged(hasFocus);
+    }
+  }
+
+  /// Subclasses pass this to their Focus widget's onKeyEvent.
+  KeyEventResult handleFocusableKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
+        event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+        event.logicalKey == LogicalKeyboardKey.space) {
+      onSelect?.call();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  /// Subclasses use this for GestureDetector.onTap.
+  void onTapFocusable() {
+    _focusNode.requestFocus();
+    onSelect?.call();
+  }
+}
+
 class ConsoleFocusable extends ConsumerStatefulWidget {
   final Widget child;
   final FocusNode? focusNode;
@@ -37,106 +123,45 @@ class ConsoleFocusable extends ConsumerStatefulWidget {
 }
 
 class _ConsoleFocusableState extends ConsumerState<ConsoleFocusable>
-    with SingleTickerProviderStateMixin {
-  late FocusNode _focusNode;
+    with SingleTickerProviderStateMixin, _FocusableSurfaceMixin {
   late final AnimationController _controller;
   late final Animation<double> _scaleAnimation;
   late final Animation<double> _glowAnimation;
-  bool _isFocused = false;
+
+  @override
+  FocusNode? get externalFocusNode => widget.focusNode;
+
+  @override
+  VoidCallback? get onSelect => widget.onSelect;
+
+  @override
+  void onFocusStateChanged(bool focused) {
+    focused ? _controller.forward() : _controller.reverse();
+  }
 
   @override
   void initState() {
     super.initState();
-    _focusNode = widget.focusNode ?? FocusNode();
-    _focusNode.addListener(_onFocusChange);
-
     _controller = AnimationController(
       duration: widget.animationDuration,
       vsync: this,
     );
-
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: widget.focusScale,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
-
-    _glowAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
-
+    _scaleAnimation = Tween<double>(begin: 1.0, end: widget.focusScale)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _glowAnimation = Tween<double>(begin: 0.0, end: 1.0)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
 
   @override
   void didUpdateWidget(ConsoleFocusable oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.focusNode != oldWidget.focusNode) {
-      _focusNode.removeListener(_onFocusChange);
-      if (oldWidget.focusNode == null) {
-        _focusNode.dispose();
-      }
-      _focusNode = widget.focusNode ?? FocusNode();
-      _focusNode.addListener(_onFocusChange);
-      _updateFocusState();
-    }
+    didUpdateExternalNode(oldWidget.focusNode);
   }
 
   @override
   void dispose() {
-    _focusNode.removeListener(_onFocusChange);
-    if (widget.focusNode == null) {
-      _focusNode.dispose();
-    }
     _controller.dispose();
     super.dispose();
-  }
-
-  void _onFocusChange() {
-    _updateFocusState();
-  }
-
-  void _updateFocusState() {
-    final hasFocus = _focusNode.hasFocus;
-    if (hasFocus != _isFocused) {
-      _isFocused = hasFocus;
-      if (hasFocus) {
-        _controller.forward();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            Scrollable.ensureVisible(context,
-                duration: const Duration(milliseconds: 200));
-          }
-        });
-      } else {
-        _controller.reverse();
-      }
-    }
-  }
-
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is KeyUpEvent) {
-      return KeyEventResult.ignored;
-    }
-
-    if (event is! KeyDownEvent) {
-      return KeyEventResult.ignored;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-        event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter ||
-        event.logicalKey == LogicalKeyboardKey.space) {
-      widget.onSelect?.call();
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
   }
 
   @override
@@ -151,7 +176,7 @@ class _ConsoleFocusableState extends ConsumerState<ConsoleFocusable>
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(widget.borderRadius),
-              border: _isFocused
+              border: isFocused
                   ? Border.all(
                       color: focusBorderColor.withValues(
                         alpha: _glowAnimation.value * 0.95,
@@ -159,7 +184,7 @@ class _ConsoleFocusableState extends ConsumerState<ConsoleFocusable>
                       width: widget.borderWidth,
                     )
                   : null,
-              boxShadow: _isFocused && widget.showGlow
+              boxShadow: isFocused && widget.showGlow
                   ? [
                       BoxShadow(
                         color: focusBorderColor.withValues(
@@ -173,13 +198,10 @@ class _ConsoleFocusableState extends ConsumerState<ConsoleFocusable>
             ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () {
-                _focusNode.requestFocus();
-                widget.onSelect?.call();
-              },
+              onTap: onTapFocusable,
               child: Focus(
-                focusNode: _focusNode,
-                onKeyEvent: _handleKeyEvent,
+                focusNode: focusNode,
+                onKeyEvent: handleFocusableKeyEvent,
                 autofocus: widget.autofocus,
                 child: widget.child,
               ),
@@ -227,105 +249,45 @@ class ConsoleFocusableCard extends ConsumerStatefulWidget {
 }
 
 class _ConsoleFocusableCardState extends ConsumerState<ConsoleFocusableCard>
-    with SingleTickerProviderStateMixin {
-  late FocusNode _focusNode;
+    with SingleTickerProviderStateMixin, _FocusableSurfaceMixin {
   late final AnimationController _controller;
   late final Animation<double> _scaleAnimation;
   late final Animation<double> _glowAnimation;
-  bool _isFocused = false;
+
+  @override
+  FocusNode? get externalFocusNode => widget.focusNode;
+
+  @override
+  VoidCallback? get onSelect => widget.onSelect;
+
+  @override
+  void onFocusStateChanged(bool focused) {
+    focused ? _controller.forward() : _controller.reverse();
+  }
 
   @override
   void initState() {
     super.initState();
-    _focusNode = widget.focusNode ?? FocusNode();
-    _focusNode.addListener(_onFocusChange);
-
     _controller = AnimationController(
       duration: widget.animationDuration,
       vsync: this,
     );
-
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: widget.focusScale,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
-
-    _glowAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
+    _scaleAnimation = Tween<double>(begin: 1.0, end: widget.focusScale)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+    _glowAnimation = Tween<double>(begin: 0.0, end: 1.0)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
 
   @override
   void didUpdateWidget(ConsoleFocusableCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.focusNode != oldWidget.focusNode) {
-      _focusNode.removeListener(_onFocusChange);
-      if (oldWidget.focusNode == null) {
-        _focusNode.dispose();
-      }
-      _focusNode = widget.focusNode ?? FocusNode();
-      _focusNode.addListener(_onFocusChange);
-      _updateFocusState();
-    }
+    didUpdateExternalNode(oldWidget.focusNode);
   }
 
   @override
   void dispose() {
-    _focusNode.removeListener(_onFocusChange);
-    if (widget.focusNode == null) {
-      _focusNode.dispose();
-    }
     _controller.dispose();
     super.dispose();
-  }
-
-  void _onFocusChange() {
-    _updateFocusState();
-  }
-
-  void _updateFocusState() {
-    final hasFocus = _focusNode.hasFocus;
-    if (hasFocus != _isFocused) {
-      _isFocused = hasFocus;
-      if (hasFocus) {
-        _controller.forward();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            Scrollable.ensureVisible(context,
-                duration: const Duration(milliseconds: 200));
-          }
-        });
-      } else {
-        _controller.reverse();
-      }
-    }
-  }
-
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is KeyUpEvent) {
-      return KeyEventResult.ignored;
-    }
-
-    if (event is! KeyDownEvent) {
-      return KeyEventResult.ignored;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-        event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter ||
-        event.logicalKey == LogicalKeyboardKey.space) {
-      widget.onSelect?.call();
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
   }
 
   @override
@@ -345,12 +307,12 @@ class _ConsoleFocusableCardState extends ConsumerState<ConsoleFocusableCard>
               color: bgColor,
               borderRadius: BorderRadius.circular(widget.borderRadius),
               border: Border.all(
-                color: _isFocused
+                color: isFocused
                     ? focusColor.withValues(alpha: _glowAnimation.value * 0.95)
                     : Colors.white.withValues(alpha: 0.1),
-                width: _isFocused ? widget.borderWidth : 1,
+                width: isFocused ? widget.borderWidth : 1,
               ),
-              boxShadow: _isFocused
+              boxShadow: isFocused
                   ? [
                       BoxShadow(
                         color: focusColor.withValues(
@@ -364,13 +326,10 @@ class _ConsoleFocusableCardState extends ConsumerState<ConsoleFocusableCard>
             ),
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () {
-                _focusNode.requestFocus();
-                widget.onSelect?.call();
-              },
+              onTap: onTapFocusable,
               child: Focus(
-                focusNode: _focusNode,
-                onKeyEvent: _handleKeyEvent,
+                focusNode: focusNode,
+                onKeyEvent: handleFocusableKeyEvent,
                 autofocus: widget.autofocus,
                 child: Padding(
                   padding: widget.padding ?? EdgeInsets.zero,
@@ -418,96 +377,42 @@ class ConsoleFocusableListItem extends ConsumerStatefulWidget {
 
 class _ConsoleFocusableListItemState
     extends ConsumerState<ConsoleFocusableListItem>
-    with SingleTickerProviderStateMixin {
-  late FocusNode _focusNode;
+    with SingleTickerProviderStateMixin, _FocusableSurfaceMixin {
   late final AnimationController _controller;
   late final Animation<double> _highlightAnimation;
-  bool _isFocused = false;
+
+  @override
+  FocusNode? get externalFocusNode => widget.focusNode;
+
+  @override
+  VoidCallback? get onSelect => widget.onSelect;
+
+  @override
+  void onFocusStateChanged(bool focused) {
+    focused ? _controller.forward() : _controller.reverse();
+  }
 
   @override
   void initState() {
     super.initState();
-    _focusNode = widget.focusNode ?? FocusNode();
-    _focusNode.addListener(_onFocusChange);
-
     _controller = AnimationController(
       duration: widget.animationDuration,
       vsync: this,
     );
-
-    _highlightAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOut,
-    ));
+    _highlightAnimation = Tween<double>(begin: 0.0, end: 1.0)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
 
   @override
   void didUpdateWidget(ConsoleFocusableListItem oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.focusNode != oldWidget.focusNode) {
-      _focusNode.removeListener(_onFocusChange);
-      if (oldWidget.focusNode == null) {
-        _focusNode.dispose();
-      }
-      _focusNode = widget.focusNode ?? FocusNode();
-      _focusNode.addListener(_onFocusChange);
-      _updateFocusState();
-    }
+    didUpdateExternalNode(oldWidget.focusNode);
   }
 
   @override
   void dispose() {
-    _focusNode.removeListener(_onFocusChange);
-    if (widget.focusNode == null) {
-      _focusNode.dispose();
-    }
     _controller.dispose();
     super.dispose();
-  }
-
-  void _onFocusChange() {
-    _updateFocusState();
-  }
-
-  void _updateFocusState() {
-    final hasFocus = _focusNode.hasFocus;
-    if (hasFocus != _isFocused) {
-      _isFocused = hasFocus;
-      if (hasFocus) {
-        _controller.forward();
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            Scrollable.ensureVisible(context,
-                duration: const Duration(milliseconds: 200));
-          }
-        });
-      } else {
-        _controller.reverse();
-      }
-    }
-  }
-
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is KeyUpEvent) {
-      return KeyEventResult.ignored;
-    }
-
-    if (event is! KeyDownEvent) {
-      return KeyEventResult.ignored;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.gameButtonA ||
-        event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter ||
-        event.logicalKey == LogicalKeyboardKey.space) {
-      widget.onSelect?.call();
-      return KeyEventResult.handled;
-    }
-
-    return KeyEventResult.ignored;
   }
 
   @override
@@ -532,18 +437,15 @@ class _ConsoleFocusableListItemState
                     _highlightAnimation.value,
                   ) ??
                   Colors.white.withValues(alpha: 0.08),
-              width: _isFocused ? 2 : 1,
+              width: isFocused ? 2 : 1,
             ),
           ),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () {
-              _focusNode.requestFocus();
-              widget.onSelect?.call();
-            },
+            onTap: onTapFocusable,
             child: Focus(
-              focusNode: _focusNode,
-              onKeyEvent: _handleKeyEvent,
+              focusNode: focusNode,
+              onKeyEvent: handleFocusableKeyEvent,
               autofocus: widget.autofocus,
               child: Padding(
                 padding: widget.padding ?? EdgeInsets.zero,
