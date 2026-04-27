@@ -617,6 +617,8 @@ class _HomeViewState extends ConsumerState<HomeView>
         child: ScreenLayout(
           backgroundColor: Colors.black,
           accentColor: accentColor,
+          glowIntensity: isGrid ? 1.7 : 1.0,
+          secondaryGlow: isGrid,
           useSafeArea: false,
           padding: EdgeInsets.zero,
           body: Stack(

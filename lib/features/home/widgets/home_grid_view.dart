@@ -333,17 +333,7 @@ class HomeGridView extends ConsumerWidget {
               fit: StackFit.expand,
               children: [
                 Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color.lerp(const Color(0xFF151515), accentColor, 0.08)!
-                            .withValues(alpha: 0.92),
-                        const Color(0xFF0A0A0A).withValues(alpha: 0.88),
-                      ],
-                    ),
-                  ),
+                  color: const Color(0xFF151515).withValues(alpha: 0.62),
                   padding: EdgeInsets.all(rs.isSmall ? 20.0 : 28.0),
                   child: SvgPicture.asset(
                     system.iconAssetPath,
