@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/responsive/responsive.dart';
 import '../../../core/util/source_color.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/config/source.dart';
 import '../../../models/game_item.dart';
@@ -305,7 +306,7 @@ class _GameGridState extends ConsumerState<GameGrid> {
 
 }
 
-class GameGridLoading extends StatefulWidget {
+class GameGridLoading extends StatelessWidget {
   final Color accentColor;
   final int crossAxisCount;
 
@@ -316,33 +317,10 @@ class GameGridLoading extends StatefulWidget {
   });
 
   @override
-  State<GameGridLoading> createState() => _GameGridLoadingState();
-}
-
-class _GameGridLoadingState extends State<GameGridLoading>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _shimmerController;
-
-  @override
-  void initState() {
-    super.initState();
-    _shimmerController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _shimmerController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final rs = context.rs;
     final spacing = rs.isSmall ? 10.0 : 16.0;
-    final borderRadius = rs.isSmall ? 8.0 : 10.0;
+    final borderRadius = BorderRadius.circular(rs.isSmall ? 8.0 : 10.0);
 
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
@@ -353,105 +331,63 @@ class _GameGridLoadingState extends State<GameGridLoading>
         bottom: rs.isPortrait ? 80 : 100,
       ),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: widget.crossAxisCount,
+        crossAxisCount: crossAxisCount,
         mainAxisSpacing: spacing,
         crossAxisSpacing: spacing,
         childAspectRatio: 1.0,
       ),
-      itemCount: widget.crossAxisCount * 3,
+      itemCount: crossAxisCount * 3,
       itemBuilder: (context, index) {
-        return AnimatedBuilder(
-          animation: _shimmerController,
-          builder: (context, child) {
-            final shimmerValue = _shimmerController.value;
-            final begin = Alignment.lerp(
-              const Alignment(-1.5, -0.3),
-              const Alignment(0.5, -0.1),
-              shimmerValue,
-            )!;
-            final end = Alignment.lerp(
-              const Alignment(-0.5, 0.1),
-              const Alignment(1.5, 0.3),
-              shimmerValue,
-            )!;
-
-            return Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A1A),
-                borderRadius: BorderRadius.circular(borderRadius),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.05),
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            SkeletonBox(borderRadius: borderRadius),
+            // Bottom title placeholder — preserves the visual rhythm so the
+            // skeleton hints "title goes here" before real cards arrive.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 40,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black87],
+                  ),
                 ),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(borderRadius - 1),
-                child: Stack(
-                  fit: StackFit.expand,
+                padding: const EdgeInsets.fromLTRB(8, 12, 8, 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    // Shimmer sweep
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: begin,
-                          end: end,
-                          colors: [
-                            Colors.transparent,
-                            Colors.white.withValues(alpha: 0.06),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
+                    FractionallySizedBox(
+                      widthFactor: 0.6,
+                      child: Container(
+                        height: rs.isSmall ? 8 : 10,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(4),
                         ),
                       ),
                     ),
-                    // Bottom title placeholder
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: 40,
+                    const SizedBox(height: 4),
+                    FractionallySizedBox(
+                      widthFactor: 0.35,
                       child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, Colors.black87],
-                          ),
-                        ),
-                        padding: const EdgeInsets.fromLTRB(8, 12, 8, 6),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            FractionallySizedBox(
-                              widthFactor: 0.6,
-                              child: Container(
-                                height: rs.isSmall ? 8 : 10,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            FractionallySizedBox(
-                              widthFactor: 0.35,
-                              child: Container(
-                                height: rs.isSmall ? 6 : 8,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                            ),
-                          ],
+                        height: rs.isSmall ? 6 : 8,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(3),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-            );
-          },
+            ),
+          ],
         );
       },
     );
