@@ -1,113 +1,713 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>R-Shop — Your Handheld's Missing Piece</title>
-    <meta name="description"
-        content="A premium, console-native game manager for Android retro handhelds. Built for AYN, Retroid, and Anbernic.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
-</head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>R-Shop — Console-native game manager for Android handhelds</title>
+<meta name="description" content="A controller-first library for RomM, SMB, FTP, Web and local sources. 66 systems, automatic mapping, RetroAchievements built in." />
+<link rel="icon" href="assets/icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --brand: #FF5252;
+  --brand-glow: rgba(255, 82, 82, 0.35);
+  --brand-dim: rgba(255, 82, 82, 0.12);
+  --bg: #08080A;
+  --bg-2: #0E0E11;
+  --surface: #131318;
+  --card: #1B1B22;
+  --text: #ECECEE;
+  --text-dim: #9A9AA3;
+  --text-muted: #5A5A63;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-soft: rgba(255, 255, 255, 0.04);
+  --font-head: 'Outfit', sans-serif;
+  --font-body: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  font-size: 16px;
+  line-height: 1.55;
+  overflow-x: hidden;
+}
+img { display: block; max-width: 100%; }
+a { color: inherit; text-decoration: none; }
 
+/* ───────── Top Nav ───────── */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 32px;
+  background: rgba(8,8,10,0.7);
+  backdrop-filter: saturate(140%) blur(14px);
+  border-bottom: 1px solid var(--border-soft);
+}
+.nav-brand { display: flex; align-items: center; gap: 12px; }
+.nav-brand img { width: 28px; height: 28px; border-radius: 6px; }
+.nav-brand .word { font-family: var(--font-head); font-weight: 700; letter-spacing: 0.05em; font-size: 16px; }
+.nav-brand .tag { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; }
+.nav-links { display: flex; gap: 28px; }
+.nav-links a { font-size: 14px; color: var(--text-dim); transition: color .15s; }
+.nav-links a:hover { color: var(--text); }
+.nav-cta { display: flex; align-items: center; gap: 12px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 8px; font-family: var(--font-head); font-weight: 600; font-size: 14px; letter-spacing: 0.02em; transition: all .2s; cursor: pointer; border: none; }
+.btn-primary { background: var(--brand); color: #fff; box-shadow: 0 0 0 0 var(--brand-glow), 0 1px 0 rgba(255,255,255,0.15) inset; }
+.btn-primary:hover { box-shadow: 0 0 24px var(--brand-glow), 0 1px 0 rgba(255,255,255,0.15) inset; transform: translateY(-1px); }
+.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.02); }
+
+/* ───────── Hero ───────── */
+.hero {
+  position: relative;
+  padding: 96px 32px 72px;
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 64px;
+  max-width: 1280px;
+  margin: 0 auto;
+  align-items: center;
+}
+.hero::before {
+  content: ''; position: absolute; inset: 0;
+  background:
+    radial-gradient(900px 500px at 80% 50%, rgba(255,82,82,0.10) 0%, transparent 60%),
+    radial-gradient(280px 280px at 8% 30%, rgba(255,82,82,0.16) 0%, transparent 70%);
+  pointer-events: none; z-index: -1;
+}
+.hero-mark {
+  display: flex; align-items: center; gap: 18px;
+  margin-bottom: 28px;
+}
+.hero-mark img {
+  width: 76px; height: 76px;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 1px rgba(255,82,82,0.25),
+    0 0 30px rgba(255,82,82,0.35),
+    0 0 80px rgba(255,82,82,0.18);
+}
+.hero-mark .word {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: 0.18em;
+  color: #fff;
+}
+.hero-mark .ver {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.15em;
+  margin-top: 4px;
+}
+.hero-eyebrow { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 12px; color: var(--brand); margin-bottom: 20px; letter-spacing: 0.05em; }
+.hero-eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 10px var(--brand-glow); }
+.hero h1 { font-family: var(--font-head); font-size: clamp(40px, 5vw, 64px); font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; margin-bottom: 20px; }
+.hero h1 em { font-style: normal; color: var(--brand); }
+.hero p.lede { font-size: 18px; color: var(--text-dim); margin-bottom: 32px; max-width: 520px; line-height: 1.6; }
+.hero-actions { display: flex; gap: 12px; margin-bottom: 36px; flex-wrap: wrap; }
+.hero-meta { display: flex; gap: 28px; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+.hero-meta b { color: var(--text); font-weight: 500; }
+
+.hero-visual {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 40px 90px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,82,82,0.08);
+  background: var(--surface);
+}
+.hero-visual img { width: 100%; height: 100%; object-fit: cover; }
+.hero-visual::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(60% 50% at 30% 20%, transparent, rgba(0,0,0,0.4));
+  pointer-events: none;
+}
+
+/* ───────── Marquee Strip ───────── */
+.marquee {
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  padding: 18px 0;
+  overflow: hidden;
+  background: var(--bg-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+.marquee-track { display: flex; gap: 36px; white-space: nowrap; animation: scroll 90s linear infinite; align-items: center; }
+.marquee-track span { opacity: 0.7; color: var(--text); font-family: var(--font-body); font-weight: 500; letter-spacing: 0.02em; text-transform: none; font-size: 13px; }
+.marquee-track span em { color: var(--text-muted); font-style: normal; font-family: var(--font-mono); font-size: 11px; margin-left: 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+.marquee-track .pulse { color: var(--brand); animation: pulse 1.6s ease-in-out infinite; }
+.marquee-track .now { color: var(--brand); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; opacity: 1; }
+@keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes pulse { 50% { opacity: 0.3; } }
+
+/* ───────── Section ───────── */
+.section { padding: 96px 32px; max-width: 1280px; margin: 0 auto; }
+.section-head { display: flex; align-items: end; justify-content: space-between; margin-bottom: 56px; gap: 32px; flex-wrap: wrap; }
+.section-head .eyebrow { font-family: var(--font-mono); font-size: 12px; color: var(--brand); letter-spacing: 0.08em; margin-bottom: 12px; }
+.section-head h2 { font-family: var(--font-head); font-size: clamp(28px, 3.2vw, 40px); font-weight: 700; letter-spacing: -0.015em; line-height: 1.15; max-width: 640px; }
+.section-head p { color: var(--text-dim); max-width: 420px; font-size: 15px; }
+
+/* ───────── Feature Rows ───────── */
+.features { display: flex; flex-direction: column; gap: 96px; }
+.feature {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 64px;
+  align-items: center;
+}
+.feature.reverse { grid-template-columns: 1.1fr 1fr; }
+.feature.reverse .feature-text { order: 2; }
+.feature-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--brand);
+  letter-spacing: 0.08em; margin-bottom: 16px;
+}
+.feature-eyebrow .num { color: var(--text-muted); }
+.feature h3 {
+  font-family: var(--font-head); font-size: 32px; font-weight: 700;
+  letter-spacing: -0.01em; line-height: 1.2; margin-bottom: 16px;
+}
+.controller-hint {
+  display: inline-flex; flex-wrap: wrap; gap: 18px;
+  padding: 10px 14px;
+  margin-bottom: 24px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.02);
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-dim); letter-spacing: 0.04em;
+  text-transform: uppercase;
+  align-items: center;
+}
+.controller-hint .cbtn { font-size: 9px; }
+.feature p { color: var(--text-dim); font-size: 16px; margin-bottom: 24px; max-width: 460px; }
+.feature ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.feature li { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; color: var(--text-dim); }
+.feature li::before { content: ''; flex: 0 0 6px; height: 6px; border-radius: 50%; background: var(--brand); margin-top: 9px; box-shadow: 0 0 6px var(--brand-glow); }
+.feature li b { color: var(--text); font-weight: 500; }
+.feature-shot {
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+}
+.feature-shot img { width: 100%; height: auto; display: block; }
+
+/* ───────── Systems Grid ───────── */
+.systems-section { background: var(--bg-2); padding: 96px 32px; border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
+.systems-inner { max-width: 1280px; margin: 0 auto; }
+.systems-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+.system-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 14px 12px 14px 14px;
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--chip-accent, rgba(255,255,255,0.1));
+  border-radius: 6px;
+  color: var(--text-dim);
+  text-align: center;
+  transition: all .15s;
+  letter-spacing: 0.02em;
+  position: relative;
+}
+.system-chip:hover {
+  border-color: rgba(255,82,82,0.3);
+  border-left-color: var(--chip-accent, rgba(255,82,82,0.5));
+  color: var(--text);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+}
+.system-chip .vendor { display: block; font-size: 9px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.1em; }
+/* Vendor color accents (left stripe) */
+.system-chip[data-vendor="nintendo"] { --chip-accent: #E60012; }
+.system-chip[data-vendor="sony"]     { --chip-accent: #003791; }
+.system-chip[data-vendor="sega"]     { --chip-accent: #1A6BB0; }
+.system-chip[data-vendor="atari"]    { --chip-accent: #C8102E; }
+.system-chip[data-vendor="nec"]      { --chip-accent: #BD3A2D; }
+.system-chip[data-vendor="snk"]      { --chip-accent: #F0BF06; }
+.system-chip[data-vendor="bandai"]   { --chip-accent: #ED1C24; }
+.system-chip[data-vendor="coleco"]   { --chip-accent: #ED1C24; }
+.system-chip[data-vendor="mattel"]   { --chip-accent: #C40029; }
+.system-chip[data-vendor="gce"]      { --chip-accent: #6B6B6B; }
+.system-chip[data-vendor="ms"]       { --chip-accent: #F25022; }
+.system-chip[data-vendor="amstrad"]  { --chip-accent: #00529B; }
+.system-chip[data-vendor="commodore"]{ --chip-accent: #58508D; }
+.system-chip[data-vendor="sinclair"] { --chip-accent: #DA291C; }
+.system-chip[data-vendor="other"]    { --chip-accent: #5A5A63; }
+
+/* ───────── Source Logos ───────── */
+.sources {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.source-card {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 28px 24px;
+  transition: all .2s;
+}
+.source-card:hover { border-color: var(--border); }
+.source-card .icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: var(--card);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--brand);
+  margin-bottom: 16px;
+  border: 1px solid var(--border-soft);
+}
+.source-card h4 { font-family: var(--font-head); font-size: 17px; font-weight: 600; margin-bottom: 6px; letter-spacing: -0.01em; }
+.source-card p { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+
+/* ───────── CTA Block ───────── */
+.cta {
+  margin: 0 32px 96px;
+  max-width: 1280px;
+  margin: 96px auto;
+  padding: 72px 48px;
+  background:
+    radial-gradient(700px 300px at 50% 100%, rgba(255,82,82,0.18), transparent 60%),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.cta::before {
+  content: ''; position: absolute; inset: -1px;
+  background: linear-gradient(135deg, transparent 60%, rgba(255,82,82,0.4));
+  border-radius: 16px;
+  z-index: -1;
+}
+.cta img { width: 56px; height: 56px; border-radius: 12px; margin: 0 auto 20px; box-shadow: 0 0 40px var(--brand-glow); }
+.cta h2 { font-family: var(--font-head); font-size: clamp(28px, 3.5vw, 42px); font-weight: 700; letter-spacing: -0.02em; margin-bottom: 12px; }
+.cta p { color: var(--text-dim); margin-bottom: 28px; max-width: 480px; margin-left: auto; margin-right: auto; }
+.cta-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.cta .meta { margin-top: 24px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); letter-spacing: 0.06em; }
+
+/* ───────── Footer ───────── */
+.footer {
+  border-top: 1px solid var(--border-soft);
+  padding: 48px 32px 32px;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 48px;
+  font-size: 13px;
+}
+.footer-brand img { width: 32px; height: 32px; border-radius: 7px; margin-bottom: 12px; }
+.footer-brand .name { font-family: var(--font-head); font-weight: 700; letter-spacing: 0.05em; margin-bottom: 6px; }
+.footer-brand p { color: var(--text-muted); max-width: 280px; line-height: 1.5; }
+.footer-col h5 { font-family: var(--font-head); font-size: 12px; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
+.footer-col a { display: block; color: var(--text-dim); padding: 4px 0; transition: color .15s; }
+.footer-col a:hover { color: var(--text); }
+.footer-bottom {
+  grid-column: 1 / -1;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-soft);
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+/* ───────── Controller chip helper ───────── */
+.cbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.1em; height: 1.1em;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-family: var(--font-head); font-size: 0.55em; font-weight: 700;
+  vertical-align: 0.16em;
+  margin: 0 0.08em 0 0.05em;
+  letter-spacing: 0;
+  line-height: 1;
+}
+.cbtn-a { color: var(--brand); border-color: var(--brand); box-shadow: 0 0 10px rgba(255,82,82,0.35); }
+.cbtn-b { color: #FFB05A; border-color: rgba(255,176,90,0.7); }
+.cbtn-x { color: #5AB7FF; border-color: rgba(90,183,255,0.7); }
+.cbtn-y { color: #6FD680; border-color: rgba(111,214,128,0.75); }
+.cbtn-d {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.1em; height: 1.1em; vertical-align: 0.16em;
+  margin: 0 0.08em 0 0.05em; color: var(--text-dim);
+  font-size: 0.7em; line-height: 1;
+}
+
+/* ───────── Mobile ───────── */
+@media (max-width: 880px) {
+  .nav-links { display: none; }
+  .hero { grid-template-columns: 1fr; padding: 64px 20px 48px; gap: 40px; }
+  .section { padding: 64px 20px; }
+  .feature, .feature.reverse { grid-template-columns: 1fr; gap: 32px; }
+  .feature.reverse .feature-text { order: 0; }
+  .sources { grid-template-columns: repeat(2, 1fr); }
+  .footer { grid-template-columns: 1fr 1fr; }
+  .systems-section { padding: 64px 20px; }
+  .cta { margin: 64px 20px; padding: 48px 24px; }
+}
+</style>
+</head>
 <body>
 
-    <!-- Audio -->
-    <audio id="sfx-ambience" src="assets/sounds/ambience.wav" loop preload="auto"></audio>
-    <audio id="sfx-typing" src="assets/sounds/rapid_text.wav" preload="auto"></audio>
-    <audio id="sfx-nav" src="assets/sounds/navigation.wav" preload="auto"></audio>
-    <audio id="sfx-confirm" src="assets/sounds/confirm.wav" preload="auto"></audio>
+<!-- Top Nav -->
+<nav class="nav">
+  <a class="nav-brand" href="#">
+    <img src="assets/icon.png" alt="R-Shop" />
+    <span class="word">R-SHOP</span>
+    <span class="tag">v1.7</span>
+  </a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#sources">Sources</a>
+    <a href="#systems">Systems</a>
+    <a href="#download">Download</a>
+    <a href="https://github.com/AverageConsumer/R-Shop">GitHub</a>
+  </div>
+  <div class="nav-cta">
+    <a class="btn btn-ghost" href="https://github.com/AverageConsumer/R-Shop">Source</a>
+    <a class="btn btn-primary" href="#download">↓ Download APK</a>
+  </div>
+</nav>
 
-    <!-- Ambient Backgrounds -->
-    <div class="bg-gradient"></div>
-    <div class="bg-radial-glow"></div>
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-text">
+    <div class="hero-mark">
+      <img src="assets/icon.png" alt="R-Shop logo" />
+      <div>
+        <span class="word">R-SHOP</span>
+        <span class="ver">v1.7.0 · ANDROID 8.0+</span>
+      </div>
+    </div>
+    <div class="hero-eyebrow"><span class="dot"></span> Controller-first · Android handhelds &amp; TV</div>
+    <h1>Your retro library, finally <em>console-native</em>.</h1>
+    <p class="lede">R-Shop unifies RomM, SMB, FTP, Web, and local folders behind one polished, D-pad-driven UI. No file browsers. No SD-card juggling. Scan, connect, browse, play.</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="#download">↓ Download APK</a>
+      <a class="btn btn-ghost" href="#features">See how it works</a>
+    </div>
+    <div class="hero-meta">
+      <span><b>66</b> systems</span>
+      <span><b>5</b> source types</span>
+      <span><b>MIT</b> licensed</span>
+      <span><b>Free</b> &amp; open source</span>
+    </div>
+  </div>
+  <div class="hero-visual">
+    <img src="assets/rom_list.png" alt="R-Shop library grid with rich box art" />
+  </div>
+</section>
 
-    <!-- Pixel Particle Canvas -->
-    <canvas id="particleCanvas"></canvas>
+<!-- Marquee Strip · live library sample -->
+<div class="marquee">
+  <div class="marquee-track">
+    <span class="pulse">●</span><span class="now">NOW IN LIBRARY</span>
+    <span>Chrono Trigger <em>· SNES</em></span>
+    <span>Metal Gear Solid <em>· PS1</em></span>
+    <span>Pokémon Crystal <em>· GBC</em></span>
+    <span>Castlevania: SOTN <em>· PS1</em></span>
+    <span>Super Mario 64 <em>· N64</em></span>
+    <span>Shenmue <em>· DC</em></span>
+    <span>Streets of Rage 2 <em>· MD</em></span>
+    <span>Final Fantasy IX <em>· PS1</em></span>
+    <span>Advance Wars <em>· GBA</em></span>
+    <span>The Last Story <em>· WII</em></span>
+    <span>Ridge Racer Type 4 <em>· PS1</em></span>
+    <span>Earthbound <em>· SNES</em></span>
+    <span>Mega Man X4 <em>· PS1</em></span>
+    <span>Professor Layton <em>· NDS</em></span>
+    <span>Persona 3 FES <em>· PS2</em></span>
+    <span class="pulse">●</span><span class="now">NOW IN LIBRARY</span>
+    <span>Chrono Trigger <em>· SNES</em></span>
+    <span>Metal Gear Solid <em>· PS1</em></span>
+    <span>Pokémon Crystal <em>· GBC</em></span>
+    <span>Castlevania: SOTN <em>· PS1</em></span>
+    <span>Super Mario 64 <em>· N64</em></span>
+    <span>Shenmue <em>· DC</em></span>
+    <span>Streets of Rage 2 <em>· MD</em></span>
+    <span>Final Fantasy IX <em>· PS1</em></span>
+    <span>Advance Wars <em>· GBA</em></span>
+    <span>The Last Story <em>· WII</em></span>
+    <span>Ridge Racer Type 4 <em>· PS1</em></span>
+    <span>Earthbound <em>· SNES</em></span>
+    <span>Mega Man X4 <em>· PS1</em></span>
+    <span>Professor Layton <em>· NDS</em></span>
+    <span>Persona 3 FES <em>· PS2</em></span>
+  </div>
+</div>
 
-    <!-- ==================== BOOT SCREEN ==================== -->
-    <div id="bootScreen" class="boot-screen">
-        <div class="boot-content">
-            <!-- Pixel Mascot rendered via Canvas -->
-            <canvas id="mascotCanvas" width="96" height="96" class="boot-mascot"></canvas>
-            <h1 class="boot-title">R-SHOP</h1>
-            <p class="boot-sub">Your handheld's missing piece.</p>
-            <button class="boot-btn" id="bootBtn">
-                <span class="boot-btn-icon">▶</span> START
-            </button>
-            <p class="boot-hint">Audio will play</p>
-            <a href="#" class="boot-skip" id="skipBtn">Skip to Downloads →</a>
+<!-- Features -->
+<section class="section" id="features">
+  <div class="section-head">
+    <div>
+      <div class="eyebrow">FEATURES</div>
+      <h2>Designed for the couch, the handheld, the TV — never the file manager.</h2>
+    </div>
+    <p>R-Shop's UI is built around the d-pad first. Every screen, every focus state, every animation accounts for a controller in your hand.</p>
+  </div>
+
+  <div class="features">
+
+    <div class="feature">
+      <div class="feature-text">
+        <div class="feature-eyebrow"><span class="num">01</span> · CONSOLE OVERVIEW</div>
+        <h3>One screen. Sixty-six consoles. Zero menus.</h3>
+        <div class="controller-hint">
+          <span class="cbtn cbtn-d">◆</span> navigate
+          <span class="cbtn cbtn-a">A</span> enter
+          <span class="cbtn cbtn-b">B</span> back
         </div>
+        <p>Scroll through your platforms like flipping through a shelf of cartridges. Each system gets its own colour theme, official logo, and live install count.</p>
+        <ul>
+          <li><b>Tilt-perspective scroll</b> — the side cabinets blur past as you flick the stick</li>
+          <li><b>Per-system theming</b> — SNES is purple, GBA is lavender, Mega Drive is red</li>
+          <li><b>Live counts</b> — installed vs. available, updated in real time</li>
+        </ul>
+      </div>
+      <div class="feature-shot">
+        <img src="assets/console_list.png" alt="Console picker showing Super Nintendo" />
+      </div>
     </div>
 
-    <!-- ==================== MAIN EXPERIENCE ==================== -->
-    <main class="experience" id="experience">
-
-        <!-- Progress -->
-        <div class="step-counter" id="stepCounter">
-            <span class="step-current">1</span>/<span class="step-total">7</span>
+    <div class="feature reverse">
+      <div class="feature-text">
+        <div class="feature-eyebrow"><span class="num">02</span> · LIBRARY GRID</div>
+        <h3>Box art that earns the screen.</h3>
+        <div class="controller-hint">
+          <span class="cbtn cbtn-a">A</span> details
+          <span class="cbtn cbtn-y">Y</span> favorite
+          <span class="cbtn cbtn-x">X</span> install
+          <span class="cbtn cbtn-d">◆</span> jump letter
         </div>
+        <p>The library view treats artwork as a first-class citizen — large, sharp, and uncropped. Filter by Installed, Favorites, or text search; jump letters with the right stick.</p>
+        <ul>
+          <li><b>Adjustable density</b> — squeeze in more cards or zoom for cover focus</li>
+          <li><b>Per-card source dots</b> — see at a glance where each ROM lives</li>
+          <li><b>Background download badges</b> — progress overlays on every card</li>
+        </ul>
+      </div>
+      <div class="feature-shot">
+        <img src="assets/rom_list.png" alt="Library grid" />
+      </div>
+    </div>
 
-        <!-- Screenshot Showcase -->
-        <div class="showcase" id="showcase">
-            <div class="showcase-device">
-                <img id="showcaseImg" src="assets/console_list.png" alt="App Screenshot">
-            </div>
-            <p class="showcase-label" id="showcaseLabel">Console Overview</p>
+    <div class="feature">
+      <div class="feature-text">
+        <div class="feature-eyebrow"><span class="num">03</span> · GAME DETAIL</div>
+        <h3>Metadata, achievements, region — without the spreadsheet vibe.</h3>
+        <div class="controller-hint">
+          <span class="cbtn cbtn-a">A</span> play
+          <span class="cbtn cbtn-x">X</span> screenshots
+          <span class="cbtn cbtn-y">Y</span> achievements
         </div>
+        <p>Each title pulls cover art, screenshots, descriptions, region flags, ESRB rating, file size, and RetroAchievements progress automatically. No accounts. No manual entry.</p>
+        <ul>
+          <li><b>Auto-matched RetroAchievements</b> with badges and progress</li>
+          <li><b>Multi-region detection</b> with primary region picker</li>
+          <li><b>Other Versions</b> aware — Rev 1, NDub, hacks all surface together</li>
+        </ul>
+      </div>
+      <div class="feature-shot">
+        <img src="assets/detail_screen.png" alt="Professor Layton detail screen" />
+      </div>
+    </div>
 
-        <!-- Chat Area (matches app's ChatBubble widget) -->
-        <div class="chat-area" id="chatArea">
-            <!-- Pixel Mascot (small, inline) -->
-            <canvas id="mascotSmall" width="48" height="48" class="chat-mascot"></canvas>
+    <div class="feature reverse">
+      <div class="feature-text">
+        <div class="feature-eyebrow"><span class="num">04</span> · DOWNLOAD ENGINE</div>
+        <h3>Background queue. Foreground service. ZIP unpack on the way down.</h3>
+        <p>A native Android foreground service keeps transfers alive when you minimise the app. ZIPs are extracted as the bytes hit disk. Orphaned temps are cleaned at boot.</p>
+        <ul>
+          <li><b>Resumable downloads</b> per file</li>
+          <li><b>Per-card live progress</b> — no separate "downloads tab" required</li>
+          <li><b>Native SMB</b> via Kotlin (not a JS port) for real throughput</li>
+        </ul>
+      </div>
+      <div class="feature-shot">
+        <img src="assets/download_queue.png" alt="Download queue" />
+      </div>
+    </div>
 
-            <!-- Chat Bubble -->
-            <div class="chat-bubble" id="chatBubble">
-                <p class="chat-text" id="chatText"></p>
-                <span class="chat-cursor" id="chatCursor"></span>
-            </div>
-        </div>
+  </div>
+</section>
 
-        <!-- Console HUD (matches app's ConsoleHud widget) -->
-        <div class="console-hud" id="consoleHud">
-            <div class="hud-btn" id="hudPrev">
-                <span class="hud-key">B</span>
-                <span class="hud-label">Back</span>
-            </div>
-            <div class="hud-btn hud-highlight" id="hudNext">
-                <span class="hud-key">A</span>
-                <span class="hud-label">Continue</span>
-            </div>
-        </div>
+<!-- Sources -->
+<section class="section" id="sources">
+  <div class="section-head">
+    <div>
+      <div class="eyebrow">SOURCES</div>
+      <h2>Five backends. One library. No tradeoffs.</h2>
+    </div>
+    <p>Connect anything you already own — local folders, your home server, your NAS — and R-Shop merges them into a single deduplicated library.</p>
+  </div>
 
-        <!-- Finale CTA -->
-        <div class="finale" id="finale">
-            <h2 class="finale-title">Ready to sync?</h2>
-            <p class="finale-sub">Free & Open Source. Built for the community.</p>
-            <div class="finale-btns">
-                <a href="https://github.com/AverageConsumer/R-Shop/releases" class="btn-primary" id="btnDownload">
-                    ↓ Download APK
-                </a>
-                <a href="https://github.com/AverageConsumer/R-Shop" class="btn-ghost">
-                    ◇ View on GitHub
-                </a>
-                <a href="https://github.com/AverageConsumer/R-Shop/blob/main/docs/USER_GUIDE.md" class="btn-ghost">
-                    📖 User Guide
-                </a>
-            </div>
-            <div class="finale-tags">
-                <span>RomM</span><span>SMB</span><span>FTP</span><span>HTTP</span>
-            </div>
-        </div>
+  <div class="sources">
+    <div class="source-card">
+      <div class="icon">RM</div>
+      <h4>RomM</h4>
+      <p>QR-based pairing, token auth, automatic system mapping. The fastest path from server to handheld.</p>
+    </div>
+    <div class="source-card">
+      <div class="icon">SMB</div>
+      <h4>SMB / CIFS</h4>
+      <p>Native Kotlin client — not a Dart port. Real throughput on big PS2/Wii ISOs over your LAN.</p>
+    </div>
+    <div class="source-card">
+      <div class="icon">FTP</div>
+      <h4>FTP</h4>
+      <p>For older NAS setups and homebrew servers. Anonymous and authenticated, both supported.</p>
+    </div>
+    <div class="source-card">
+      <div class="icon">↓</div>
+      <h4>HTTP / Web</h4>
+      <p>Point at any directory listing or static index. Works with most self-hosted ROM mirrors.</p>
+    </div>
+  </div>
+</section>
 
-    </main>
+<!-- Systems Grid -->
+<section class="systems-section" id="systems">
+  <div class="systems-inner">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow">SUPPORTED SYSTEMS</div>
+        <h2>66 systems. Every console you actually own.</h2>
+      </div>
+      <p>From the NES to the PS Vita, with detours through the Vectrex and the PC-FX. Each system ships with iconography, automatic folder mapping, and RetroAchievements support where available.</p>
+    </div>
+    <div class="systems-grid">
+      <!-- Nintendo -->
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>NES</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>SNES</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>N64</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>GameCube</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>Wii</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>Wii U</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>Switch</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>Game Boy</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>GB Color</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>GBA</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>NDS</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>3DS</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>DSi</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>Virtual Boy</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>FDS</div>
+      <div class="system-chip" data-vendor="nintendo"><span class="vendor">Nintendo</span>Game &amp; Watch</div>
+      <!-- Sony -->
+      <div class="system-chip" data-vendor="sony"><span class="vendor">Sony</span>PlayStation</div>
+      <div class="system-chip" data-vendor="sony"><span class="vendor">Sony</span>PS2</div>
+      <div class="system-chip" data-vendor="sony"><span class="vendor">Sony</span>PS3</div>
+      <div class="system-chip" data-vendor="sony"><span class="vendor">Sony</span>PSP</div>
+      <div class="system-chip" data-vendor="sony"><span class="vendor">Sony</span>PS Vita</div>
+      <!-- Sega -->
+      <div class="system-chip" data-vendor="sega"><span class="vendor">Sega</span>Master System</div>
+      <div class="system-chip" data-vendor="sega"><span class="vendor">Sega</span>Mega Drive</div>
+      <div class="system-chip" data-vendor="sega"><span class="vendor">Sega</span>Game Gear</div>
+      <div class="system-chip" data-vendor="sega"><span class="vendor">Sega</span>Sega CD</div>
+      <div class="system-chip" data-vendor="sega"><span class="vendor">Sega</span>32X</div>
+      <div class="system-chip" data-vendor="sega"><span class="vendor">Sega</span>Saturn</div>
+      <div class="system-chip" data-vendor="sega"><span class="vendor">Sega</span>Dreamcast</div>
+      <div class="system-chip" data-vendor="sega"><span class="vendor">Sega</span>SG-1000</div>
+      <!-- Atari -->
+      <div class="system-chip" data-vendor="atari"><span class="vendor">Atari</span>2600</div>
+      <div class="system-chip" data-vendor="atari"><span class="vendor">Atari</span>5200</div>
+      <div class="system-chip" data-vendor="atari"><span class="vendor">Atari</span>7800</div>
+      <div class="system-chip" data-vendor="atari"><span class="vendor">Atari</span>Lynx</div>
+      <div class="system-chip" data-vendor="atari"><span class="vendor">Atari</span>Jaguar</div>
+      <div class="system-chip" data-vendor="atari"><span class="vendor">Atari</span>Jaguar CD</div>
+      <div class="system-chip" data-vendor="atari"><span class="vendor">Atari</span>ST</div>
+      <!-- NEC -->
+      <div class="system-chip" data-vendor="nec"><span class="vendor">NEC</span>TurboGrafx-16</div>
+      <div class="system-chip" data-vendor="nec"><span class="vendor">NEC</span>TurboGrafx-CD</div>
+      <div class="system-chip" data-vendor="nec"><span class="vendor">NEC</span>PC-FX</div>
+      <!-- SNK -->
+      <div class="system-chip" data-vendor="snk"><span class="vendor">SNK</span>Neo Geo Pocket</div>
+      <div class="system-chip" data-vendor="snk"><span class="vendor">SNK</span>Neo Geo CD</div>
+      <!-- Other -->
+      <div class="system-chip" data-vendor="bandai"><span class="vendor">Bandai</span>WonderSwan</div>
+      <div class="system-chip" data-vendor="coleco"><span class="vendor">Coleco</span>ColecoVision</div>
+      <div class="system-chip" data-vendor="mattel"><span class="vendor">Mattel</span>Intellivision</div>
+      <div class="system-chip" data-vendor="gce"><span class="vendor">GCE</span>Vectrex</div>
+      <div class="system-chip" data-vendor="ms"><span class="vendor">Microsoft</span>MSX</div>
+      <div class="system-chip" data-vendor="amstrad"><span class="vendor">Amstrad</span>CPC</div>
+      <div class="system-chip" data-vendor="commodore"><span class="vendor">Commodore</span>C64</div>
+      <div class="system-chip" data-vendor="commodore"><span class="vendor">Commodore</span>Amiga</div>
+      <div class="system-chip" data-vendor="sinclair"><span class="vendor">Sinclair</span>ZX Spectrum</div>
+      <div class="system-chip" data-vendor="other"><span class="vendor">—</span>Arcade</div>
+      <div class="system-chip" data-vendor="other"><span class="vendor">—</span>DOS</div>
+      <div class="system-chip" data-vendor="other" style="opacity:.5">+15 more</div>
+    </div>
+  </div>
+</section>
 
-    <script src="js/main.js"></script>
+<!-- CTA -->
+<section class="cta" id="download">
+  <img src="assets/icon.png" alt="R-Shop" />
+  <h2>Ready to retire the file browser?</h2>
+  <p>Free, open source, MIT licensed. Built by a retro gamer for retro gamers. Install in under a minute.</p>
+  <div class="cta-actions">
+    <a class="btn btn-primary" href="https://github.com/AverageConsumer/R-Shop/releases">↓ Download APK</a>
+    <a class="btn btn-ghost" href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/averageconsumer/r-shop">Get on Obtainium</a>
+    <a class="btn btn-ghost" href="https://github.com/AverageConsumer/R-Shop">★ Star on GitHub</a>
+  </div>
+  <div class="meta">v1.7.0 · ANDROID 8.0+ · CONTROLLER REQUIRED FOR FULL EXPERIENCE</div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-brand">
+    <img src="assets/icon.png" alt="" />
+    <div class="name">R-SHOP</div>
+    <p>A controller-first retro library for Android handhelds and TV. Open source, MIT licensed, community built.</p>
+  </div>
+  <div class="footer-col">
+    <h5>Product</h5>
+    <a href="#features">Features</a>
+    <a href="#sources">Sources</a>
+    <a href="#systems">Systems</a>
+    <a href="USER_GUIDE.html">User guide</a>
+  </div>
+  <div class="footer-col">
+    <h5>Install</h5>
+    <a href="https://github.com/AverageConsumer/R-Shop/releases">Latest APK</a>
+    <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/averageconsumer/r-shop">Obtainium</a>
+    <a href="#">Changelog</a>
+  </div>
+  <div class="footer-col">
+    <h5>Community</h5>
+    <a href="https://github.com/AverageConsumer/R-Shop">GitHub</a>
+    <a href="https://discord.gg/xVT26BHGqh">Discord</a>
+    <a href="https://github.com/AverageConsumer/R-Shop/issues">Issues</a>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 R-SHOP · MIT LICENSE · NOT AFFILIATED WITH NINTENDO, SONY, SEGA, OR ANY ROM SOURCE</span>
+    <span>BUILT WITH FLUTTER · v1.7.0</span>
+  </div>
+</footer>
+
 </body>
-
 </html>
