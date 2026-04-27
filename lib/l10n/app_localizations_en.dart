@@ -259,7 +259,7 @@ class LEn extends L {
 
   @override
   String get gameDetail_noMetadataHint =>
-      'Sync with RetroAchievements or a metadata source for descriptions, screenshots, and more.';
+      'Descriptions and screenshots load automatically from RomM when available.';
 
   @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';

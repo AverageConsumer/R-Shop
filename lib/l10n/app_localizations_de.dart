@@ -260,7 +260,7 @@ class LDe extends L {
 
   @override
   String get gameDetail_noMetadataHint =>
-      'Synchronisiere mit RetroAchievements oder einer Metadata-Quelle für Beschreibungen, Screenshots und mehr.';
+      'Beschreibungen und Screenshots werden automatisch aus RomM geladen, wenn verfügbar.';
 
   @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';

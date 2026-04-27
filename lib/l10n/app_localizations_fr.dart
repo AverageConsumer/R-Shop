@@ -259,7 +259,7 @@ class LFr extends L {
 
   @override
   String get gameDetail_noMetadataHint =>
-      'Synchronise avec RetroAchievements ou une source de métadonnées pour descriptions, captures, etc.';
+      'Les descriptions et captures sont chargées automatiquement depuis RomM lorsqu\'elles sont disponibles.';
 
   @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';

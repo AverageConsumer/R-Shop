@@ -74,7 +74,7 @@
   "gameDetail_mastered": "MAÎTRISÉ",
   "gameDetail_noAchievementsFound": "Aucun succès trouvé",
   "gameDetail_noMetadata": "Aucune info supplémentaire",
-  "gameDetail_noMetadataHint": "Synchronise avec RetroAchievements ou une source de métadonnées pour descriptions, captures, etc.",
+  "gameDetail_noMetadataHint": "Les descriptions et captures sont chargées automatiquement depuis RomM lorsqu'elles sont disponibles.",
   "gameDetail_retroachievements": "RETROACHIEVEMENTS",
   "gameDetail_romVerified": "ROM vérifiée",
   "gameDetail_incompatibleRom": "ROM incompatible",

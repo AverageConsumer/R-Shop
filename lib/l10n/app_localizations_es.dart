@@ -259,7 +259,7 @@ class LEs extends L {
 
   @override
   String get gameDetail_noMetadataHint =>
-      'Sincroniza con RetroAchievements o una fuente de metadatos para descripciones, capturas y más.';
+      'Las descripciones y capturas se cargan automáticamente desde RomM cuando están disponibles.';
 
   @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';

@@ -259,7 +259,7 @@ class LPt extends L {
 
   @override
   String get gameDetail_noMetadataHint =>
-      'Sincronize com RetroAchievements ou uma fonte de metadados para descrições, capturas e mais.';
+      'Descrições e capturas são carregadas automaticamente do RomM quando disponíveis.';
 
   @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';

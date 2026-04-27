@@ -258,7 +258,7 @@ class LJa extends L {
 
   @override
   String get gameDetail_noMetadataHint =>
-      '説明、スクリーンショットなどを取得するには、RetroAchievementsまたはメタデータソースと同期してください。';
+      '説明とスクリーンショットは、RomMから自動的に読み込まれます（利用可能な場合）。';
 
   @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';

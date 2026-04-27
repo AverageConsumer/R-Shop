@@ -96,7 +96,7 @@
   "gameDetail_mastered": "MASTERED",
   "gameDetail_noAchievementsFound": "No achievements found",
   "gameDetail_noMetadata": "No additional info yet",
-  "gameDetail_noMetadataHint": "Sync with RetroAchievements or a metadata source for descriptions, screenshots, and more.",
+  "gameDetail_noMetadataHint": "Descriptions and screenshots load automatically from RomM when available.",
   "gameDetail_retroachievements": "RETROACHIEVEMENTS",
   "gameDetail_romVerified": "ROM Verified",
   "gameDetail_incompatibleRom": "Incompatible ROM",

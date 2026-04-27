@@ -552,7 +552,7 @@ abstract class L {
   /// No description provided for @gameDetail_noMetadataHint.
   ///
   /// In en, this message translates to:
-  /// **'Sync with RetroAchievements or a metadata source for descriptions, screenshots, and more.'**
+  /// **'Descriptions and screenshots load automatically from RomM when available.'**
   String get gameDetail_noMetadataHint;
 
   /// No description provided for @gameDetail_retroachievements.
