@@ -863,26 +863,19 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                 : (rs.screenWidth * (rs.isSmall ? 0.35 : 0.30)).clamp(180, 340),
             child: Column(
               children: [
-                // Cover takes available space, buttons anchor to bottom
+                // Cover fills remaining vertical space, BoxFit.contain inside
+                // CoverSection scales it without cropping. Action buttons
+                // anchor below.
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        AspectRatio(
-                          aspectRatio: 0.75,
-                          child: CoverSection(
-                            game: widget.game,
-                            system: widget.system,
-                            coverUrls: coverUrls,
-                            cachedUrl: selectedVariant.cachedCoverUrl,
-                            metadata: fileMetadata,
-                            isFavorite: isFavorite,
-                            isInstalled: state.isVariantInstalled,
-                            hasThumbnail: selectedVariant.hasThumbnail,
-                          ),
-                        ),
-                      ],
-                    ),
+                  child: CoverSection(
+                    game: widget.game,
+                    system: widget.system,
+                    coverUrls: coverUrls,
+                    cachedUrl: selectedVariant.cachedCoverUrl,
+                    metadata: fileMetadata,
+                    isFavorite: isFavorite,
+                    isInstalled: state.isVariantInstalled,
+                    hasThumbnail: selectedVariant.hasThumbnail,
                   ),
                 ),
                 SizedBox(height: rs.spacing.sm),
