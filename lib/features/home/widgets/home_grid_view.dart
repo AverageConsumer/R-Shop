@@ -117,20 +117,20 @@ class HomeGridView extends ConsumerWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(borderRadius),
             border: isSelected
-                ? Border.all(color: Colors.white, width: borderSelected)
+                ? Border.all(color: accentColor, width: borderSelected)
                 : Border.all(
                     color: Colors.white.withValues(alpha: 0.08), width: 1),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      spreadRadius: 2,
+                      color: accentColor.withValues(alpha: 0.55),
+                      blurRadius: 24,
+                      spreadRadius: 1,
                     ),
                     BoxShadow(
-                      color: accentColor.withValues(alpha: 0.3),
-                      blurRadius: 30,
-                      spreadRadius: 5,
+                      color: accentColor.withValues(alpha: 0.25),
+                      blurRadius: 40,
+                      spreadRadius: 4,
                     ),
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.7),
@@ -298,20 +298,20 @@ class HomeGridView extends ConsumerWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(borderRadius),
             border: isSelected
-                ? Border.all(color: Colors.white, width: borderSelected)
+                ? Border.all(color: accentColor, width: borderSelected)
                 : Border.all(
                     color: Colors.white.withValues(alpha: 0.08), width: 1),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      spreadRadius: 2,
+                      color: accentColor.withValues(alpha: 0.55),
+                      blurRadius: 24,
+                      spreadRadius: 1,
                     ),
                     BoxShadow(
-                      color: accentColor.withValues(alpha: 0.3),
-                      blurRadius: 30,
-                      spreadRadius: 5,
+                      color: accentColor.withValues(alpha: 0.25),
+                      blurRadius: 40,
+                      spreadRadius: 4,
                     ),
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.7),
