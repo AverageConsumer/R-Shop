@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/animated_background.dart';
 import '../../core/widgets/console_focusable.dart';
+import '../../core/widgets/radial_glow.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/app_providers.dart';
 import '../../utils/friendly_error.dart';
@@ -142,8 +144,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           backgroundColor: Colors.black,
           body: Stack(
             children: [
-              const _AnimatedBackground(),
-              const _RadialGlow(),
+              const AnimatedBackground(),
+              const RadialGlow(center: Alignment(-0.3, -0.3)),
               SafeArea(
                 child: Padding(
                   padding: EdgeInsets.symmetric(
@@ -203,55 +205,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     // Complete step has its own ConsoleFocusable tiles for Jump In / Export.
     return const SizedBox.shrink();
-  }
-}
-
-class _AnimatedBackground extends StatelessWidget {
-  const _AnimatedBackground();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.redAccent.withValues(alpha: 0.25),
-            Colors.redAccent.withValues(alpha: 0.12),
-            const Color(0xFF080808),
-            const Color(0xFF030303),
-            Colors.black,
-          ],
-          stops: const [0.0, 0.15, 0.35, 0.6, 1.0],
-        ),
-      ),
-    );
-  }
-}
-
-class _RadialGlow extends StatelessWidget {
-  const _RadialGlow();
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              center: const Alignment(-0.3, -0.3),
-              radius: 1.2,
-              colors: [
-                Colors.redAccent.withValues(alpha: 0.35),
-                Colors.redAccent.withValues(alpha: 0.15),
-                Colors.redAccent.withValues(alpha: 0.05),
-                Colors.transparent,
-              ],
-              stops: const [0.0, 0.3, 0.6, 1.0],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 
