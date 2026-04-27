@@ -254,6 +254,13 @@ class LJa extends L {
   String get gameDetail_noAchievementsFound => '実績が見つかりません';
 
   @override
+  String get gameDetail_noMetadata => '追加情報なし';
+
+  @override
+  String get gameDetail_noMetadataHint =>
+      '説明、スクリーンショットなどを取得するには、RetroAchievementsまたはメタデータソースと同期してください。';
+
+  @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';
 
   @override

@@ -256,6 +256,13 @@ class LDe extends L {
   String get gameDetail_noAchievementsFound => 'Keine Achievements gefunden';
 
   @override
+  String get gameDetail_noMetadata => 'Keine zusätzlichen Infos';
+
+  @override
+  String get gameDetail_noMetadataHint =>
+      'Synchronisiere mit RetroAchievements oder einer Metadata-Quelle für Beschreibungen, Screenshots und mehr.';
+
+  @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';
 
   @override

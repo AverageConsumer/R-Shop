@@ -85,6 +85,8 @@
   "gameDetail_achievements": "Achievements",
   "gameDetail_mastered": "GEMEISTERT",
   "gameDetail_noAchievementsFound": "Keine Achievements gefunden",
+  "gameDetail_noMetadata": "Keine zusätzlichen Infos",
+  "gameDetail_noMetadataHint": "Synchronisiere mit RetroAchievements oder einer Metadata-Quelle für Beschreibungen, Screenshots und mehr.",
   "gameDetail_retroachievements": "RETROACHIEVEMENTS",
   "gameDetail_romVerified": "ROM verifiziert",
   "gameDetail_incompatibleRom": "Inkompatibles ROM",

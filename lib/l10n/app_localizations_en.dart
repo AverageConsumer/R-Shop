@@ -255,6 +255,13 @@ class LEn extends L {
   String get gameDetail_noAchievementsFound => 'No achievements found';
 
   @override
+  String get gameDetail_noMetadata => 'No additional info yet';
+
+  @override
+  String get gameDetail_noMetadataHint =>
+      'Sync with RetroAchievements or a metadata source for descriptions, screenshots, and more.';
+
+  @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';
 
   @override

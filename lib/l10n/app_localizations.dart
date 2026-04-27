@@ -543,6 +543,18 @@ abstract class L {
   /// **'No achievements found'**
   String get gameDetail_noAchievementsFound;
 
+  /// No description provided for @gameDetail_noMetadata.
+  ///
+  /// In en, this message translates to:
+  /// **'No additional info yet'**
+  String get gameDetail_noMetadata;
+
+  /// No description provided for @gameDetail_noMetadataHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync with RetroAchievements or a metadata source for descriptions, screenshots, and more.'**
+  String get gameDetail_noMetadataHint;
+
   /// No description provided for @gameDetail_retroachievements.
   ///
   /// In en, this message translates to:

@@ -255,6 +255,13 @@ class LPt extends L {
   String get gameDetail_noAchievementsFound => 'Nenhuma conquista encontrada';
 
   @override
+  String get gameDetail_noMetadata => 'Sem informações adicionais';
+
+  @override
+  String get gameDetail_noMetadataHint =>
+      'Sincronize com RetroAchievements ou uma fonte de metadados para descrições, capturas e mais.';
+
+  @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';
 
   @override

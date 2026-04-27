@@ -255,6 +255,13 @@ class LEs extends L {
   String get gameDetail_noAchievementsFound => 'No se encontraron logros';
 
   @override
+  String get gameDetail_noMetadata => 'Sin información adicional';
+
+  @override
+  String get gameDetail_noMetadataHint =>
+      'Sincroniza con RetroAchievements o una fuente de metadatos para descripciones, capturas y más.';
+
+  @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';
 
   @override

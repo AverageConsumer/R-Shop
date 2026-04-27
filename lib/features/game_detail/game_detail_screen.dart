@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/input/input.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/responsive/responsive.dart';
+import '../../widgets/state_views.dart';
 import '../../models/download_item.dart';
 import '../../models/game_item.dart';
 import '../../models/game_metadata_info.dart';
@@ -979,19 +980,40 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final sections = controller.availableSections;
     final focused = controller.focusedSection;
 
+    // In landscape, the right column ends up empty when no rich metadata
+    // has loaded — only title/badges/fileDetails render and the bottom 60%
+    // is dead space. Fill with an EmptyStateView so the screen reads as
+    // intentional, not broken.
+    final rightColumnSections = sections
+        .where((s) => !(excludeActions && leftColumnSections.contains(s)))
+        .toList();
+    final hasRichSections = rightColumnSections.any((s) =>
+        s == DetailSection.summary ||
+        s == DetailSection.screenshots ||
+        s == DetailSection.otherVersions ||
+        s == DetailSection.achievements);
+    final showEmptyState = excludeActions && !hasRichSections;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final section in sections)
-          if (!(excludeActions && leftColumnSections.contains(section)))
-            _buildSection(
-              rs, state, controller, section,
-              fileMetadata: fileMetadata,
-              richMetadata: richMetadata,
-              isMultiRom: isMultiRom,
-              raMatch: raMatch,
-              isFocused: section == focused,
-            ),
+        for (final section in rightColumnSections)
+          _buildSection(
+            rs, state, controller, section,
+            fileMetadata: fileMetadata,
+            richMetadata: richMetadata,
+            isMultiRom: isMultiRom,
+            raMatch: raMatch,
+            isFocused: section == focused,
+          ),
+        if (showEmptyState) ...[
+          SizedBox(height: rs.spacing.xl),
+          EmptyStateView(
+            icon: Icons.info_outline_rounded,
+            title: L.of(context).gameDetail_noMetadata,
+            subtitle: L.of(context).gameDetail_noMetadataHint,
+          ),
+        ],
       ],
     );
   }

@@ -85,6 +85,8 @@
   "gameDetail_achievements": "\u5b9f\u7e3e",
   "gameDetail_mastered": "\u30de\u30b9\u30bf\u30fc",
   "gameDetail_noAchievementsFound": "\u5b9f\u7e3e\u304c\u898b\u3064\u304b\u308a\u307e\u305b\u3093",
+  "gameDetail_noMetadata": "追加情報なし",
+  "gameDetail_noMetadataHint": "説明、スクリーンショットなどを取得するには、RetroAchievementsまたはメタデータソースと同期してください。",
   "gameDetail_retroachievements": "RETROACHIEVEMENTS",
   "gameDetail_romVerified": "ROM\u691c\u8a3c\u6e08\u307f",
   "gameDetail_incompatibleRom": "\u975e\u5bfe\u5fdc ROM",

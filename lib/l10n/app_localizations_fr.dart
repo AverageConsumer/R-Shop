@@ -255,6 +255,13 @@ class LFr extends L {
   String get gameDetail_noAchievementsFound => 'Aucun succès trouvé';
 
   @override
+  String get gameDetail_noMetadata => 'Aucune info supplémentaire';
+
+  @override
+  String get gameDetail_noMetadataHint =>
+      'Synchronise avec RetroAchievements ou une source de métadonnées pour descriptions, captures, etc.';
+
+  @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';
 
   @override

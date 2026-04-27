@@ -85,6 +85,8 @@
   "gameDetail_achievements": "Conquistas",
   "gameDetail_mastered": "DOMINADO",
   "gameDetail_noAchievementsFound": "Nenhuma conquista encontrada",
+  "gameDetail_noMetadata": "Sem informações adicionais",
+  "gameDetail_noMetadataHint": "Sincronize com RetroAchievements ou uma fonte de metadados para descrições, capturas e mais.",
   "gameDetail_retroachievements": "RETROACHIEVEMENTS",
   "gameDetail_romVerified": "ROM Verificada",
   "gameDetail_incompatibleRom": "ROM Incompat\u00edvel",
