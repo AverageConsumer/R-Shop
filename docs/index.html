@@ -120,14 +120,14 @@ a { color: inherit; text-decoration: none; }
 
 .hero-visual {
   position: relative;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--border);
   box-shadow: 0 40px 90px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,82,82,0.08);
-  background: var(--surface);
+  background: var(--bg);
 }
-.hero-visual img { width: 100%; height: 100%; object-fit: cover; }
+.hero-visual img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .hero-visual::after {
   content: ''; position: absolute; inset: 0;
   background: radial-gradient(60% 50% at 30% 20%, transparent, rgba(0,0,0,0.4));
