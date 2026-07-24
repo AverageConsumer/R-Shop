@@ -15,7 +15,7 @@ val keyProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.retro.rshop"
+    namespace = "com.retro.rshop.tw"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -29,7 +29,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.retro.rshop"
+        applicationId = "com.retro.rshop.tw"
 
         // Version values are pulled from pubspec.yaml automatically
         minSdk = flutter.minSdkVersion
@@ -61,6 +61,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+    }
+
+    applicationVariants.all {
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output.outputFileName = "R-Shop-v${defaultConfig.versionName}.apk"
         }
     }
 }

@@ -75,7 +75,7 @@ class DeviceMemoryInfo {
 }
 
 class DeviceInfoService {
-  static const _channel = MethodChannel('com.retro.rshop/storage');
+  static const _channel = MethodChannel('com.retro.rshop.tw/storage');
   static DeviceMemoryInfo? _cached;
 
   /// Test hook: clears cached result so tests can re-query.

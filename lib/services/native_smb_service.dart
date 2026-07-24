@@ -19,8 +19,8 @@ class SmbFileEntry {
 }
 
 class NativeSmbService {
-  static const _channel = MethodChannel('com.retro.rshop/smb');
-  static const _progressChannel = EventChannel('com.retro.rshop/smb_progress');
+  static const _channel = MethodChannel('com.retro.rshop.tw/smb');
+  static const _progressChannel = EventChannel('com.retro.rshop.tw/smb_progress');
 
   Stream<Map<String, dynamic>>? _progressStream;
 

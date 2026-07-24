@@ -11,6 +11,7 @@ import 'app_localizations_es.dart';
 import 'app_localizations_fr.dart';
 import 'app_localizations_ja.dart';
 import 'app_localizations_pt.dart';
+import 'app_localizations_zh.dart';
 
 // ignore_for_file: type=lint
 
@@ -102,7 +103,9 @@ abstract class L {
     Locale('es'),
     Locale('fr'),
     Locale('ja'),
-    Locale('pt')
+    Locale('pt'),
+    Locale('zh'),
+    Locale('zh', 'TW')
   ];
 
   /// No description provided for @appTitle.
@@ -3055,7 +3058,8 @@ class _LDelegate extends LocalizationsDelegate<L> {
         'es',
         'fr',
         'ja',
-        'pt'
+        'pt',
+        'zh'
       ].contains(locale.languageCode);
 
   @override
@@ -3063,6 +3067,18 @@ class _LDelegate extends LocalizationsDelegate<L> {
 }
 
 L lookupL(Locale locale) {
+  // Lookup logic when language+country codes are specified.
+  switch (locale.languageCode) {
+    case 'zh':
+      {
+        switch (locale.countryCode) {
+          case 'TW':
+            return LZhTw();
+        }
+        break;
+      }
+  }
+
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
     case 'de':
@@ -3077,6 +3093,8 @@ L lookupL(Locale locale) {
       return LJa();
     case 'pt':
       return LPt();
+    case 'zh':
+      return LZh();
   }
 
   throw FlutterError(

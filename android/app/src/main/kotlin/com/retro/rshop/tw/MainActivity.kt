@@ -1,4 +1,4 @@
-package com.retro.rshop
+package com.retro.rshop.tw
 
 import android.content.Context
 import android.net.wifi.WifiManager
@@ -17,11 +17,11 @@ import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.retro.rshop/zip"
-    private val STORAGE_CHANNEL = "com.retro.rshop/storage"
-    private val PROGRESS_CHANNEL = "com.retro.rshop/zip_progress"
-    private val SMB_CHANNEL = "com.retro.rshop/smb"
-    private val SMB_PROGRESS_CHANNEL = "com.retro.rshop/smb_progress"
+    private val CHANNEL = "com.retro.rshop.tw/zip"
+    private val STORAGE_CHANNEL = "com.retro.rshop.tw/storage"
+    private val PROGRESS_CHANNEL = "com.retro.rshop.tw/zip_progress"
+    private val SMB_CHANNEL = "com.retro.rshop.tw/smb"
+    private val SMB_PROGRESS_CHANNEL = "com.retro.rshop.tw/smb_progress"
     private val TAG = "MainActivity"
 
     private val extractorPool = Executors.newFixedThreadPool(2)
