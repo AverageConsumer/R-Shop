@@ -302,16 +302,27 @@ class LocaleNotifier extends StateNotifier<Locale?> {
   LocaleNotifier(this._storage) : super(_initLocale(_storage));
 
   static Locale? _initLocale(StorageService s) {
-    final code = s.getLocaleOverride();
-    return code == null ? null : Locale(code);
+    final tag = s.getLocaleOverride();
+    if (tag == null) return null;
+    final parts = tag.split('-');
+    if (parts.length > 1) {
+      return Locale(parts[0], parts[1]);
+    }
+    return Locale(tag);
   }
 
   Future<void> cycle(List<Locale> supported) async {
-    final codes = [null, ...supported.map((l) => l.languageCode)];
-    final current = state?.languageCode;
-    final idx = codes.indexOf(current);
-    final next = codes[(idx + 1) % codes.length];
-    state = next == null ? null : Locale(next);
+    final tags = [null, ...supported.map((l) => l.toLanguageTag())];
+    final current = state?.toLanguageTag();
+    final idx = tags.indexOf(current);
+    final next = tags[(idx + 1) % tags.length];
+
+    if (next == null) {
+      state = null;
+    } else {
+      final parts = next.split('-');
+      state = parts.length > 1 ? Locale(parts[0], parts[1]) : Locale(next);
+    }
     await _storage.setLocaleOverride(next);
   }
 }

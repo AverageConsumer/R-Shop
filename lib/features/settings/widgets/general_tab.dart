@@ -12,10 +12,12 @@ import 'settings_list_view.dart';
 const _localeNames = <String, String>{
   'en': 'English',
   'de': 'Deutsch',
-  'es': 'Espa\u00f1ol',
-  'fr': 'Fran\u00e7ais',
-  'pt': 'Portugu\u00eas',
-  'ja': '\u65e5\u672c\u8a9e',
+  'es': 'Español',
+  'fr': 'Français',
+  'pt': 'Português',
+  'ja': '日本語',
+  'zh': '中文 (简体)',
+  'zh-TW': '繁體中文 (台灣)',
 };
 
 class SettingsGeneralTab extends ConsumerWidget {
@@ -32,7 +34,9 @@ class SettingsGeneralTab extends ConsumerWidget {
     final localeOverride = ref.watch(localeProvider);
     final localeName = localeOverride == null
         ? l.settings_languageSystem
-        : _localeNames[localeOverride.languageCode] ?? localeOverride.languageCode;
+        : _localeNames[localeOverride.toLanguageTag()] ??
+            _localeNames[localeOverride.languageCode] ??
+            localeOverride.languageCode;
     final localeShort = localeOverride == null
         ? 'AUTO'
         : localeOverride.languageCode.toUpperCase();
