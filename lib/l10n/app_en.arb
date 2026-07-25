@@ -452,6 +452,10 @@
   "onboarding_selectFolderPrompt": "Pick the folder where ROMs should be saved",
   "onboarding_serverType": "Server type",
 
+  "onboarding_folderExplanationTitle": "Setup your Library Path",
+  "onboarding_folderExplanationMessage": "R-Shop needs a base folder to store your downloaded games. This helps organize your files and is required for Android folder permissions.\n\nWe recommend creating a folder named 'ROMs' and selecting it.",
+  "onboarding_continueToPicker": "Select Folder",
+
   "onboarding_hangOn": "Hang on, testing the connection...",
   "onboarding_foundConsole": "I found this console on your RomM server! Confirm or pick a different one.",
   "onboarding_pickPlatform": "Pick the matching platform from your RomM server.",

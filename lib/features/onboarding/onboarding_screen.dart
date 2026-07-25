@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/console_focusable.dart';
@@ -131,38 +132,57 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final state = ref.watch(onboardingControllerProvider);
     final rs = context.rs;
 
-    return Focus(
-      focusNode: _focusNode,
-      onKeyEvent: _handleKeyEvent,
-      autofocus: true,
-      child: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {},
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
-            children: [
-              const _AnimatedBackground(),
-              const _RadialGlow(),
-              SafeArea(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: rs.isSmall ? rs.spacing.md : rs.spacing.lg,
-                    vertical: rs.isSmall ? rs.spacing.md : rs.spacing.xxl,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: _buildContent(state)),
-                    ],
+    return buildWithActions(
+      Focus(
+        focusNode: _focusNode,
+        onKeyEvent: _handleKeyEvent,
+        autofocus: true,
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {},
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: Stack(
+              children: [
+                const _AnimatedBackground(),
+                const _RadialGlow(),
+                SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: rs.isSmall ? rs.spacing.md : rs.spacing.lg,
+                      vertical: rs.isSmall ? rs.spacing.md : rs.spacing.xxl,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _buildContent(state)),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              _buildControls(state),
-            ],
+                _buildControls(state),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget buildWithActions(Widget child) {
+    return Actions(
+      actions: {
+        FavoriteIntent: CallbackAction<FavoriteIntent>(
+          onInvoke: (_) {
+            if (ref.read(onboardingControllerProvider).currentStep ==
+                OnboardingStep.welcome) {
+              _importConfig();
+            }
+            return null;
+          },
+        ),
+      },
+      child: child,
     );
   }
 

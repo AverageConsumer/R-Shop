@@ -452,6 +452,10 @@
   "onboarding_selectFolderPrompt": "選擇儲存 ROM 的資料夾",
   "onboarding_serverType": "伺服器類型",
 
+  "onboarding_folderExplanationTitle": "設定您的遊戲庫路徑",
+  "onboarding_folderExplanationMessage": "R-Shop 需要您選擇一個資料夾來存放下載的遊戲。這能幫助 App 整理您的遊戲檔案，並獲得 Android 的存取權限。\n\n建議您可以建立一個名為「ROMs」的資料夾並選擇它。",
+  "onboarding_continueToPicker": "開始選擇",
+
   "onboarding_hangOn": "請稍候，正在測試連線...",
   "onboarding_foundConsole": "我在您的 RomM 伺服器上找到了這個主機！請確認或選擇另一個。",
   "onboarding_pickPlatform": "從您的 RomM 伺服器選擇對應的平台。",

@@ -99,9 +99,45 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
   // ---- path handlers ----
 
   Future<String?> _pickRomBaseFolder() async {
+    final l = L.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1C),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Colors.white12),
+        ),
+        title: Text(l.onboarding_folderExplanationTitle,
+            style: const TextStyle(color: Colors.white)),
+        content: Text(
+          l.onboarding_folderExplanationMessage,
+          style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l.common_cancel,
+                style: const TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(l.onboarding_continueToPicker),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return null;
+
     try {
       return await FilePicker.platform.getDirectoryPath(
-        dialogTitle: L.of(context).onboarding_selectFolderPrompt,
+        dialogTitle: l.onboarding_selectFolderPrompt,
       );
     } catch (e) {
       debugPrint('WelcomeChooser: folder picker failed: $e');
