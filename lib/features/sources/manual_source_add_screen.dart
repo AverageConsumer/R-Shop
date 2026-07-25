@@ -355,126 +355,115 @@ class _ManualSourceAddScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Focus(
-              focusNode: _screenFocus,
-              autofocus: true,
-              onKeyEvent: _handleScreenKey,
-              child: Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            ConsoleFocusable(
-                              focusNode: _backFocus,
-                              onSelect: () => Navigator.of(context).maybePop(),
-                              child: const Padding(
-                                padding: EdgeInsets.all(8),
-                                child: Icon(Icons.arrow_back, color: Colors.white),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Add ${_typeLabel(widget.type)} source',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 48),
-                          child: Text(
-                            'Connection only — map systems to remote folders '
-                            'after saving from the source actions menu.',
-                            style: TextStyle(
-                                color: Colors.grey.shade500, fontSize: 12),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Expanded(
-                          child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (widget.type != SourceType.web)
-                              _buildDiscoverySection(),
-                            for (final f in _fields) ...[
-                              _textBox(f),
-                              const SizedBox(height: 12),
-                            ],
-                            if (_error != null) ...[
-                              const SizedBox(height: 4),
-                              Text(_error!,
-                                  style: const TextStyle(
-                                      color: Colors.redAccent, fontSize: 13)),
-                            ],
-                            const SizedBox(height: 16),
-                            ConsoleFocusable(
-                              focusNode: _saveFocus,
-                              focusScale: 1.0,
-                              onSelect: _busy ? null : _save,
-                              child: Container(
-                                width: double.infinity,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryColor
-                                      .withValues(alpha: 0.18),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                      color: AppTheme.primaryColor, width: 2),
-                                ),
-                                child: _busy
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: AppTheme.primaryColor,
-                                        ),
-                                      )
-                                    : Text(
-                                        L.of(context).manualSource_saveSource,
-                                        style: const TextStyle(
-                                          color: AppTheme.primaryColor,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: 1,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            // Extra bottom padding so content doesn't
-                            // hide behind the HUD.
-                            const SizedBox(height: 56),
-                          ],
-                        ),
+      body: SafeArea(
+        child: Focus(
+          focusNode: _screenFocus,
+          autofocus: true,
+          onKeyEvent: _handleScreenKey,
+          child: Column(
+            children: [
+              // Fixed Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+                child: Row(
+                  children: [
+                    ConsoleFocusable(
+                      focusNode: _backFocus,
+                      onSelect: () => Navigator.of(context).maybePop(),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(Icons.arrow_back,
+                            color: Colors.white, size: 26),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Add ${_typeLabel(widget.type)} source',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
+              // Scrollable Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          Text(
+                            'Connection only — map systems to remote folders '
+                            'after saving from the source actions menu.',
+                            style: TextStyle(
+                                color: Colors.grey.shade500, fontSize: 12),
+                          ),
+                          const SizedBox(height: 20),
+                          if (widget.type != SourceType.web)
+                            _buildDiscoverySection(),
+                          for (final f in _fields) ...[
+                            _textBox(f),
+                            const SizedBox(height: 12),
+                          ],
+                          if (_error != null) ...[
+                            const SizedBox(height: 4),
+                            Text(_error!,
+                                style: const TextStyle(
+                                    color: Colors.redAccent, fontSize: 13)),
+                          ],
+                          const SizedBox(height: 16),
+                          ConsoleFocusable(
+                            focusNode: _saveFocus,
+                            focusScale: 1.0,
+                            onSelect: _busy ? null : _save,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor
+                                    .withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: AppTheme.primaryColor, width: 2),
+                              ),
+                              child: _busy
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    )
+                                  : Text(
+                                      L.of(context).manualSource_saveSource,
+                                      style: const TextStyle(
+                                        color: AppTheme.primaryColor,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 60),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-      ),
-      ConsoleHud(
-        b: HudAction(L.of(context).common_back, onTap: () => Navigator.maybePop(context)),
-      ),
-        ],
       ),
     );
   }

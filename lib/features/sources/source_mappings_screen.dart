@@ -200,42 +200,45 @@ class _SourceMappingsScreenState
           focusNode: _screenFocus,
           autofocus: true,
           onKeyEvent: _handleScreenKey,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            children: [
+              // Fixed Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        ConsoleFocusable(
-                          focusNode: _backFocus,
-                          onSelect: () => Navigator.of(context).maybePop(),
-                          child: const Padding(
-                            padding: EdgeInsets.all(8),
-                            child: Icon(Icons.arrow_back, color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          L.of(context).sourceMappings_title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                    ConsoleFocusable(
+                      focusNode: _backFocus,
+                      onSelect: () => Navigator.of(context).maybePop(),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(Icons.arrow_back,
+                            color: Colors.white, size: 26),
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 48),
+                    const SizedBox(width: 4),
+                    Text(
+                      L.of(context).sourceMappings_title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Scrollable Content
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 640),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const SizedBox(height: 8),
                           Text(
                             '${widget.source.name} · ${widget.source.hostLabel}',
                             style: TextStyle(
@@ -250,75 +253,77 @@ class _SourceMappingsScreenState
                             style: TextStyle(
                                 color: Colors.grey.shade500, fontSize: 12),
                           ),
+                          const SizedBox(height: 16),
+                          Expanded(
+                            child: _rows.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'No systems configured yet — add one '
+                                      'from the home screen first.',
+                                      style: TextStyle(
+                                          color: Colors.white54, fontSize: 13),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  )
+                                : ListView.separated(
+                                    controller: _scroll,
+                                    itemCount: _rows.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: 10),
+                                    itemBuilder: (_, i) => _MappingRowWidget(
+                                      row: _rows[i],
+                                    ),
+                                  ),
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 8),
+                            Text(_error!,
+                                style: const TextStyle(
+                                    color: Colors.redAccent, fontSize: 13)),
+                          ],
+                          const SizedBox(height: 14),
+                          ConsoleFocusable(
+                            focusNode: _saveFocus,
+                            onSelect: _busy ? null : _save,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor
+                                    .withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: AppTheme.primaryColor, width: 2),
+                              ),
+                              child: _busy
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    )
+                                  : Text(
+                                      L.of(context).sourceMappings_save,
+                                      style: const TextStyle(
+                                        color: AppTheme.primaryColor,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 40),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: _rows.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No systems configured yet — add one '
-                                'from the home screen first.',
-                                style: TextStyle(
-                                    color: Colors.white54, fontSize: 13),
-                                textAlign: TextAlign.center,
-                              ),
-                            )
-                          : ListView.separated(
-                              controller: _scroll,
-                              itemCount: _rows.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 10),
-                              itemBuilder: (_, i) => _MappingRowWidget(
-                                row: _rows[i],
-                              ),
-                            ),
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 8),
-                      Text(_error!,
-                          style: const TextStyle(
-                              color: Colors.redAccent, fontSize: 13)),
-                    ],
-                    const SizedBox(height: 14),
-                    ConsoleFocusable(
-                      focusNode: _saveFocus,
-                      onSelect: _busy ? null : _save,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: AppTheme.primaryColor, width: 2),
-                        ),
-                        child: _busy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppTheme.primaryColor,
-                                ),
-                              )
-                            : Text(
-                                L.of(context).sourceMappings_save,
-                                style: const TextStyle(
-                                  color: AppTheme.primaryColor,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),

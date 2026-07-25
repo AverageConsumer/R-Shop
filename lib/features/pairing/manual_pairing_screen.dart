@@ -231,111 +231,125 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
           focusNode: _screenFocus,
           autofocus: true,
           onKeyEvent: _handleScreenKey,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            children: [
+              // Fixed Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        ConsoleFocusable(
-                          focusNode: _backFocus,
-                          onSelect: () => Navigator.of(context).maybePop(),
-                          child: const Padding(
-                            padding: EdgeInsets.all(8),
-                            child: Icon(Icons.arrow_back, color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          L.of(context).pairing_manualTitle,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${L.of(context).pairing_manualInstructions}'
-                      'Profile → API Tokens → Pair Device.',
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                    ),
-                    const SizedBox(height: 24),
-                    _label(L.of(context).pairing_serverUrl),
-                    _textField(
-                      controller: _urlController,
-                      consoleFocus: _urlConsoleFocus,
-                      textFocus: _urlTextFocus,
-                      hint: 'https://romm.example.com',
-                      monospace: true,
-                    ),
-                    const SizedBox(height: 6),
-                    _probeStatus(),
-                    const SizedBox(height: 16),
-                    _label(L.of(context).pairing_pairingCode),
-                    _textField(
-                      controller: _codeController,
-                      consoleFocus: _codeConsoleFocus,
-                      textFocus: _codeTextFocus,
-                      hint: L.of(context).pairing_pairingCodeHint,
-                      monospace: true,
-                      uppercase: true,
-                    ),
-                    if (_submitError != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _submitError!,
-                        style: const TextStyle(
-                            color: Colors.redAccent, fontSize: 13),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
                     ConsoleFocusable(
-                      focusNode: _submitFocus,
-                      onSelect: _busy ? null : _submit,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: AppTheme.primaryColor,
-                            width: 2,
-                          ),
-                        ),
-                        child: _busy
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppTheme.primaryColor,
-                                ),
-                              )
-                            : Text(
-                                L.of(context).common_connect,
-                                style: const TextStyle(
-                                  color: AppTheme.primaryColor,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1,
-                                ),
-                              ),
+                      focusNode: _backFocus,
+                      onSelect: () => Navigator.of(context).maybePop(),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(Icons.arrow_back,
+                            color: Colors.white, size: 26),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      L.of(context).pairing_manualTitle,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
+              // Scrollable Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          Text(
+                            '${L.of(context).pairing_manualInstructions}'
+                            'Profile → API Tokens → Pair Device.',
+                            style: TextStyle(
+                                color: Colors.grey.shade400, fontSize: 13),
+                          ),
+                          const SizedBox(height: 24),
+                          _label(L.of(context).pairing_serverUrl),
+                          _textField(
+                            controller: _urlController,
+                            consoleFocus: _urlConsoleFocus,
+                            textFocus: _urlTextFocus,
+                            hint: 'https://romm.example.com',
+                            monospace: true,
+                          ),
+                          const SizedBox(height: 6),
+                          _probeStatus(),
+                          const SizedBox(height: 16),
+                          _label(L.of(context).pairing_pairingCode),
+                          _textField(
+                            controller: _codeController,
+                            consoleFocus: _codeConsoleFocus,
+                            textFocus: _codeTextFocus,
+                            hint: L.of(context).pairing_pairingCodeHint,
+                            monospace: true,
+                            uppercase: true,
+                          ),
+                          if (_submitError != null) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              _submitError!,
+                              style: const TextStyle(
+                                  color: Colors.redAccent, fontSize: 13),
+                            ),
+                          ],
+                          const SizedBox(height: 24),
+                          ConsoleFocusable(
+                            focusNode: _submitFocus,
+                            onSelect: _busy ? null : _submit,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor
+                                    .withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppTheme.primaryColor,
+                                  width: 2,
+                                ),
+                              ),
+                              child: _busy
+                                  ? const SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    )
+                                  : Text(
+                                      L.of(context).common_connect,
+                                      style: const TextStyle(
+                                        color: AppTheme.primaryColor,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 40),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

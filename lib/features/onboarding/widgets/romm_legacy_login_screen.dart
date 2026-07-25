@@ -265,149 +265,150 @@ class _RommLegacyLoginScreenState
           focusNode: _screenFocus,
           autofocus: true,
           onKeyEvent: _handleScreenKey,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            children: [
+              // Fixed Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        ConsoleFocusable(
-                          focusNode: _backFocus,
-                          onSelect: () => Navigator.of(context).maybePop(),
-                          child: const Padding(
-                            padding: EdgeInsets.all(8),
-                            child: Icon(Icons.arrow_back, color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          L.of(context).rommLogin_title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 48),
-                      child: Text(
-                        'Use this for RomM servers older than 4.8 — the ones '
-                        'without QR pairing.',
-                        style: TextStyle(
-                            color: Colors.grey.shade500, fontSize: 12),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            for (final f in _fields) ...[
-                              _textBox(f),
-                              const SizedBox(height: 12),
-                            ],
-                    if (_probedVersion != null) ...[
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _probeSupportsTokens
-                              ? Colors.amber.withValues(alpha: 0.12)
-                              : Colors.green.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: _probeSupportsTokens
-                                ? Colors.amber.withValues(alpha: 0.5)
-                                : Colors.green.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _probeSupportsTokens
-                                  ? Icons.qr_code_2
-                                  : Icons.check_circle_outline,
-                              color: _probeSupportsTokens
-                                  ? Colors.amber
-                                  : Colors.greenAccent,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _probeSupportsTokens
-                                    ? 'RomM $_probedVersion supports QR — '
-                                        'tap B and use the QR option for an easier setup.'
-                                    : 'RomM $_probedVersion reachable',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (_error != null) ...[
-                      const SizedBox(height: 8),
-                      Text(_error!,
-                          style: const TextStyle(
-                              color: Colors.redAccent, fontSize: 13)),
-                    ],
-                    const SizedBox(height: 16),
                     ConsoleFocusable(
-                      focusNode: _saveFocus,
-                      focusScale: 1.0,
-                      onSelect: _busy ? null : _save,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: AppTheme.primaryColor, width: 2),
-                        ),
-                        child: _busy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppTheme.primaryColor,
-                                ),
-                              )
-                            : Text(
-                                L.of(context).common_connect,
-                                style: const TextStyle(
-                                  color: AppTheme.primaryColor,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1,
-                                ),
-                              ),
+                      focusNode: _backFocus,
+                      onSelect: () => Navigator.of(context).maybePop(),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(Icons.arrow_back,
+                            color: Colors.white, size: 26),
                       ),
                     ),
-                    ],
-                        ),
+                    const SizedBox(width: 4),
+                    Text(
+                      L.of(context).rommLogin_title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
+              // Scrollable Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          Text(
+                            'Use this for RomM servers older than 4.8 — the ones '
+                            'without QR pairing.',
+                            style: TextStyle(
+                                color: Colors.grey.shade500, fontSize: 12),
+                          ),
+                          const SizedBox(height: 20),
+                          for (final f in _fields) ...[
+                            _textBox(f),
+                            const SizedBox(height: 12),
+                          ],
+                          if (_probedVersion != null) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _probeSupportsTokens
+                                    ? Colors.amber.withValues(alpha: 0.12)
+                                    : Colors.green.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: _probeSupportsTokens
+                                      ? Colors.amber.withValues(alpha: 0.5)
+                                      : Colors.green.withValues(alpha: 0.4),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _probeSupportsTokens
+                                        ? Icons.qr_code_2
+                                        : Icons.check_circle_outline,
+                                    color: _probeSupportsTokens
+                                        ? Colors.amber
+                                        : Colors.greenAccent,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _probeSupportsTokens
+                                          ? 'RomM $_probedVersion supports QR — '
+                                              'tap B and use the QR option for an easier setup.'
+                                          : 'RomM $_probedVersion reachable',
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          if (_error != null) ...[
+                            const SizedBox(height: 8),
+                            Text(_error!,
+                                style: const TextStyle(
+                                    color: Colors.redAccent, fontSize: 13)),
+                          ],
+                          const SizedBox(height: 16),
+                          ConsoleFocusable(
+                            focusNode: _saveFocus,
+                            focusScale: 1.0,
+                            onSelect: _busy ? null : _save,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor
+                                    .withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: AppTheme.primaryColor, width: 2),
+                              ),
+                              child: _busy
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    )
+                                  : Text(
+                                      L.of(context).common_connect,
+                                      style: const TextStyle(
+                                        color: AppTheme.primaryColor,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 40),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
