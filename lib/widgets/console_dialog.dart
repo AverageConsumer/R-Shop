@@ -200,7 +200,7 @@ class _DialogButton extends StatelessWidget {
           focusNode: focusNode,
           onSelect: onSelect,
           focusScale: 1.0,
-          focusBorderColor: color,
+          focusBorderColor: Colors.white,
           borderRadius: 10,
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12),
