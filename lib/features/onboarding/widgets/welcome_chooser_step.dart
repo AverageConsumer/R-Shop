@@ -13,6 +13,7 @@ import '../../../services/romm_api_service.dart';
 import '../../../services/romm_pairing_service.dart';
 import '../../../services/romm_platform_matcher.dart';
 import '../../../models/system_model.dart';
+import '../../../widgets/console_dialog.dart';
 import '../../pairing/qr_pairing_screen.dart';
 import '../../sources/manual_source_add_screen.dart';
 import '../../sources/source_mappings_screen.dart';
@@ -100,37 +101,12 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
 
   Future<String?> _pickRomBaseFolder() async {
     final l = L.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1C),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Colors.white12),
-        ),
-        title: Text(l.onboarding_folderExplanationTitle,
-            style: const TextStyle(color: Colors.white)),
-        content: Text(
-          l.onboarding_folderExplanationMessage,
-          style: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l.common_cancel,
-                style: const TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(l.onboarding_continueToPicker),
-          ),
-        ],
-      ),
+    final confirmed = await showConsoleDialog(
+      context,
+      title: l.onboarding_folderExplanationTitle,
+      message: l.onboarding_folderExplanationMessage,
+      primaryLabel: l.onboarding_continueToPicker,
+      secondaryLabel: l.common_cancel,
     );
 
     if (confirmed != true) return null;
