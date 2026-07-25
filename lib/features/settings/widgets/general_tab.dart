@@ -16,8 +16,7 @@ const _localeNames = <String, String>{
   'fr': 'Français',
   'pt': 'Português',
   'ja': '日本語',
-  'zh': '中文 (简体)',
-  'zh-TW': '繁體中文 (台灣)',
+  'zh': '繁體中文',
 };
 
 class SettingsGeneralTab extends ConsumerWidget {
