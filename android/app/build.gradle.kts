@@ -73,7 +73,7 @@ android {
 
             variant.assembleProvider.configure {
                 doLast {
-                    val destDir = File("D:/test apk")
+                    val destDir = File("D:/test-apk")
                     if (!destDir.exists()) {
                         destDir.mkdirs()
                     }
