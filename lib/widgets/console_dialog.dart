@@ -98,68 +98,72 @@ class _ConsoleDialogState extends ConsumerState<ConsoleDialog> {
       child: Container(
         color: Colors.black.withValues(alpha: 0.75),
         child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Container(
-              margin: const EdgeInsets.all(24),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1C1C1C),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+          child: Material(
+            type: MaterialType.transparency,
+            color: Colors.transparent,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Container(
+                margin: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1C),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 30,
+                      offset: const Offset(0, 10),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    widget.message,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 14,
-                      height: 1.5,
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _DialogButton(
-                          focusNode: _secondaryFocus,
-                          label: widget.secondaryLabel ?? l.common_cancel,
-                          onSelect: () => Navigator.of(context).pop(false),
-                        ),
+                    const SizedBox(height: 12),
+                    Text(
+                      widget.message,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        fontSize: 14,
+                        height: 1.5,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _DialogButton(
-                          focusNode: _primaryFocus,
-                          label: widget.primaryLabel ?? l.common_done,
-                          isPrimary: true,
-                          isDestructive: widget.isDestructive,
-                          onSelect: () => Navigator.of(context).pop(true),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _DialogButton(
+                            focusNode: _secondaryFocus,
+                            label: widget.secondaryLabel ?? l.common_cancel,
+                            onSelect: () => Navigator.of(context).pop(false),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _DialogButton(
+                            focusNode: _primaryFocus,
+                            label: widget.primaryLabel ?? l.common_done,
+                            isPrimary: true,
+                            isDestructive: widget.isDestructive,
+                            onSelect: () => Navigator.of(context).pop(true),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
