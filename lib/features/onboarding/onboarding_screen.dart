@@ -12,6 +12,7 @@ import '../../providers/app_providers.dart';
 import '../../utils/friendly_error.dart';
 import '../../providers/game_providers.dart';
 import '../../providers/ra_providers.dart';
+import '../../widgets/console_dialog.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../../widgets/download_overlay.dart';
@@ -85,6 +86,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       // Refresh sources so the notifier picks up any imported sources.
       ref.read(sourcesProvider.notifier).replaceAll(result.config!.sources);
       showSuccessNotification(context, ref, message: L.of(context).onboarding_configImported);
+    }
+  }
+
+  Future<void> _showExitConfirmation() async {
+    final l = L.of(context);
+    final confirmed = await showConsoleDialog(
+      context,
+      title: l.exit_title,
+      message: l.exit_message,
+      primaryLabel: l.exit_confirmButton,
+      secondaryLabel: l.exit_cancelButton,
+      isDestructive: true,
+    );
+    if (confirmed == true) {
+      SystemNavigator.pop();
     }
   }
 
@@ -172,6 +188,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget buildWithActions(Widget child) {
     return Actions(
       actions: {
+        BackIntent: CallbackAction<BackIntent>(
+          onInvoke: (_) {
+            if (ref.read(onboardingControllerProvider).currentStep ==
+                OnboardingStep.welcome) {
+              _showExitConfirmation();
+            }
+            return null;
+          },
+        ),
         FavoriteIntent: CallbackAction<FavoriteIntent>(
           onInvoke: (_) {
             if (ref.read(onboardingControllerProvider).currentStep ==
@@ -217,7 +242,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // drop in a JSON config without going through any setup wizard.
     if (state.currentStep == OnboardingStep.welcome) {
       return ConsoleHud(
-        select: HudAction(L.of(context).onboarding_importConfig, onTap: _importConfig),
+        b: HudAction(L.of(context).common_exit, onTap: _showExitConfirmation),
+        select: HudAction(L.of(context).onboarding_importConfig,
+            onTap: _importConfig),
       );
     }
 
