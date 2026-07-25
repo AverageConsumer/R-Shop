@@ -190,11 +190,12 @@ class _DialogButton extends StatelessWidget {
       listenable: focusNode,
       builder: (context, child) {
         final isFocused = focusNode.hasFocus;
-        final color = isFocused
-            ? (isDestructive
-                ? Colors.redAccent
-                : (isPrimary ? AppTheme.primaryColor : Colors.white))
-            : Colors.white60;
+        final baseColor = isDestructive ? Colors.redAccent : AppTheme.primaryColor;
+
+        final textColor = isFocused ? Colors.white : (isPrimary ? baseColor : Colors.white60);
+        final bgColor = isFocused
+            ? baseColor.withValues(alpha: 0.35)
+            : baseColor.withValues(alpha: 0.08);
 
         return ConsoleFocusable(
           focusNode: focusNode,
@@ -206,15 +207,15 @@ class _DialogButton extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 12),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.08),
+              color: bgColor,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
               label,
               style: TextStyle(
-                color: color,
+                color: textColor,
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontWeight: isFocused ? FontWeight.w700 : FontWeight.w600,
               ),
             ),
           ),

@@ -433,7 +433,7 @@ class _ChoiceTile extends StatelessWidget {
         final isFocused = focusNode.hasFocus;
         final color = isFocused ? Colors.white : AppTheme.primaryColor;
         final bgColor = isFocused
-            ? AppTheme.primaryColor.withValues(alpha: 0.25)
+            ? AppTheme.primaryColor.withValues(alpha: 0.35)
             : const Color(0xFF1C1C1C);
 
         return ConsoleFocusable(
@@ -456,11 +456,11 @@ class _ChoiceTile extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isFocused
                         ? Colors.white.withValues(alpha: 0.2)
-                        : AppTheme.primaryColor.withValues(alpha: 0.18),
+                        : AppTheme.primaryColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon,
-                      color: isFocused ? Colors.white : AppTheme.primaryColor,
+                      color: isFocused ? Colors.white : AppTheme.primaryColor.withValues(alpha: 0.7),
                       size: 22),
                 ),
                 const SizedBox(width: 14),

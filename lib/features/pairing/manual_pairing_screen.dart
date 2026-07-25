@@ -404,7 +404,7 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: hasFocus
-                    ? AppTheme.primaryColor
+                    ? Colors.white
                     : AppTheme.primaryColor.withValues(alpha: 0.4),
                 width: 2,
               ),
