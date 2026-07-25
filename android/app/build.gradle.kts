@@ -65,9 +65,25 @@ android {
     }
 
     applicationVariants.all {
+        val variant = this
         outputs.all {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
-            output.outputFileName = "R-Shop-v${defaultConfig.versionName}.apk"
+            val fileName = "R-Shop-v${defaultConfig.versionName}.apk"
+            output.outputFileName = fileName
+
+            variant.assembleProvider.configure {
+                doLast {
+                    val destDir = File("D:/test apk")
+                    if (!destDir.exists()) {
+                        destDir.mkdirs()
+                    }
+                    val sourceFile = output.outputFile
+                    if (sourceFile.exists()) {
+                        sourceFile.copyTo(File(destDir, fileName), overwrite = true)
+                        println("Successfully copied APK to: ${destDir.absolutePath}/$fileName")
+                    }
+                }
+            }
         }
     }
 }
