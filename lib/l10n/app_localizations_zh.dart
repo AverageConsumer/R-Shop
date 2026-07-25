@@ -119,7 +119,7 @@ class LZh extends L {
   String get confirm_gamepadHint => '← → 選擇   A 確認   B 取消';
 
   @override
-  String get exit_title => '結束應用程式';
+  String get exit_title => '離開 R-Shop';
 
   @override
   String get exit_message => '確定要退出嗎？';

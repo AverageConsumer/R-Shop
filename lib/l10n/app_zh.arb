@@ -42,7 +42,7 @@
   "confirm_resetButton": "重設",
   "confirm_gamepadHint": "\u2190 \u2192 選擇   A 確認   B 取消",
 
-  "exit_title": "結束應用程式",
+  "exit_title": "離開 R-Shop",
   "exit_message": "確定要退出嗎？",
   "exit_confirmButton": "結束",
   "exit_cancelButton": "留在這裡",

@@ -132,7 +132,7 @@ class _ConsoleDialogState extends ConsumerState<ConsoleDialog> {
                   Text(
                     widget.message,
                     style: TextStyle(
-                      color: Colors.grey.shade400,
+                      color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 14,
                       height: 1.5,
                     ),
