@@ -186,34 +186,40 @@ class _DialogButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isDestructive
-        ? Colors.redAccent
-        : isPrimary
-            ? AppTheme.primaryColor
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, child) {
+        final isFocused = focusNode.hasFocus;
+        final color = isFocused
+            ? (isDestructive
+                ? Colors.redAccent
+                : (isPrimary ? AppTheme.primaryColor : Colors.white))
             : Colors.white60;
 
-    return ConsoleFocusable(
-      focusNode: focusNode,
-      onSelect: onSelect,
-      focusScale: 1.0,
-      focusBorderColor: color,
-      borderRadius: 10,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+        return ConsoleFocusable(
+          focusNode: focusNode,
+          onSelect: onSelect,
+          focusScale: 1.0,
+          focusBorderColor: color,
+          borderRadius: 10,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
