@@ -69,6 +69,8 @@ key.properties
 .agent/
 .artifacts/
 CLAUDE.md
+AGENT.md
+GLOBAL_DEV_NOTES.md
 
 # Environment files
 .env
