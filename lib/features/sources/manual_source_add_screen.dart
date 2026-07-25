@@ -47,6 +47,7 @@ class _ManualSourceAddScreenState
 
   // --- Wrapper focus nodes (controller traverses these) ---
   late List<_Field> _fields;
+  final _backFocus = FocusNode(debugLabel: 'manual_add_back');
   final _saveFocus = FocusNode(debugLabel: 'manual_add_save');
   final _screenFocus = FocusNode(debugLabel: 'manual_add_screen');
 
@@ -183,6 +184,7 @@ class _ManualSourceAddScreenState
     for (final n in _discoveredFocusNodes) {
       n.dispose();
     }
+    _backFocus.dispose();
     _saveFocus.dispose();
     _screenFocus.dispose();
     super.dispose();
@@ -232,7 +234,7 @@ class _ManualSourceAddScreenState
   }
 
   List<FocusNode> get _navOrder =>
-      [..._discoveredFocusNodes, ..._fields.map((f) => f.consoleFocus), _saveFocus];
+      [_backFocus, ..._discoveredFocusNodes, ..._fields.map((f) => f.consoleFocus), _saveFocus];
 
   void _moveFocus(int delta) {
     final order = _navOrder;
@@ -248,6 +250,10 @@ class _ManualSourceAddScreenState
   }
 
   void _activateFocused() {
+    if (_backFocus.hasFocus) {
+      Navigator.of(context).maybePop();
+      return;
+    }
     for (int i = 0; i < _discoveredFocusNodes.length; i++) {
       if (_discoveredFocusNodes[i].hasFocus) {
         _applyDiscovered(_discovered[i]);
@@ -356,28 +362,45 @@ class _ManualSourceAddScreenState
               focusNode: _screenFocus,
               autofocus: true,
               onKeyEvent: _handleScreenKey,
-              child: Center(
+              child: Align(
+                alignment: Alignment.topCenter,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 560),
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Add ${_typeLabel(widget.type)} source',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Row(
+                          children: [
+                            ConsoleFocusable(
+                              focusNode: _backFocus,
+                              onSelect: () => Navigator.of(context).maybePop(),
+                              child: const Padding(
+                                padding: EdgeInsets.all(8),
+                                child: Icon(Icons.arrow_back, color: Colors.white),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Add ${_typeLabel(widget.type)} source',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          'Connection only — map systems to remote folders '
-                          'after saving from the source actions menu.',
-                          style: TextStyle(
-                              color: Colors.grey.shade500, fontSize: 12),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 48),
+                          child: Text(
+                            'Connection only — map systems to remote folders '
+                            'after saving from the source actions menu.',
+                            style: TextStyle(
+                                color: Colors.grey.shade500, fontSize: 12),
+                          ),
                         ),
                         const SizedBox(height: 20),
                         Expanded(

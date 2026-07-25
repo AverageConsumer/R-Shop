@@ -34,6 +34,7 @@ class SourceMappingsScreen extends ConsumerStatefulWidget {
 class _SourceMappingsScreenState
     extends ConsumerState<SourceMappingsScreen> {
   final _screenFocus = FocusNode(debugLabel: 'mapping_screen');
+  final _backFocus = FocusNode(debugLabel: 'mapping_back');
   final _saveFocus = FocusNode(debugLabel: 'mapping_save');
   final ScrollController _scroll = ScrollController();
 
@@ -85,6 +86,7 @@ class _SourceMappingsScreenState
     for (final r in _rows) {
       r.dispose();
     }
+    _backFocus.dispose();
     _saveFocus.dispose();
     _screenFocus.dispose();
     _scroll.dispose();
@@ -94,7 +96,7 @@ class _SourceMappingsScreenState
   bool get _isEditing => _rows.any((r) => r.textFocus.hasFocus);
 
   List<FocusNode> get _navOrder =>
-      [..._rows.map((r) => r.consoleFocus), _saveFocus];
+      [_backFocus, ..._rows.map((r) => r.consoleFocus), _saveFocus];
 
   KeyEventResult _handleScreenKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
@@ -151,6 +153,10 @@ class _SourceMappingsScreenState
   }
 
   void _activateFocused() {
+    if (_backFocus.hasFocus) {
+      Navigator.of(context).maybePop();
+      return;
+    }
     for (final r in _rows) {
       if (r.consoleFocus.hasFocus) {
         r.textFocus.requestFocus();
@@ -194,36 +200,58 @@ class _SourceMappingsScreenState
           focusNode: _screenFocus,
           autofocus: true,
           onKeyEvent: _handleScreenKey,
-          child: Center(
+          child: Align(
+            alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640),
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      L.of(context).sourceMappings_title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      children: [
+                        ConsoleFocusable(
+                          focusNode: _backFocus,
+                          onSelect: () => Navigator.of(context).maybePop(),
+                          child: const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(Icons.arrow_back, color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          L.of(context).sourceMappings_title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      '${widget.source.name} · ${widget.source.hostLabel}',
-                      style: TextStyle(
-                        color: Colors.grey.shade500,
-                        fontSize: 12,
-                        fontFamily: 'monospace',
+                    Padding(
+                      padding: const EdgeInsets.only(left: 48),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${widget.source.name} · ${widget.source.hostLabel}',
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            L.of(context).sourceMappings_instruction,
+                            style: TextStyle(
+                                color: Colors.grey.shade500, fontSize: 12),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      L.of(context).sourceMappings_instruction,
-                      style: TextStyle(
-                          color: Colors.grey.shade500, fontSize: 12),
                     ),
                     const SizedBox(height: 16),
                     Expanded(

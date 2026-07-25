@@ -231,11 +231,12 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
           focusNode: _screenFocus,
           autofocus: true,
           onKeyEvent: _handleScreenKey,
-          child: Center(
+          child: Align(
+            alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -457,6 +458,6 @@ class _ManualPairingScreenState extends ConsumerState<ManualPairingScreen> {
         ],
       );
     }
-    return const SizedBox(height: 16);
+    return const SizedBox.shrink();
   }
 }

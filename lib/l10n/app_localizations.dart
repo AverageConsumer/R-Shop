@@ -2417,6 +2417,24 @@ abstract class L {
   /// **'Server type'**
   String get onboarding_serverType;
 
+  /// No description provided for @onboarding_folderExplanationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup your Library Path'**
+  String get onboarding_folderExplanationTitle;
+
+  /// No description provided for @onboarding_folderExplanationMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'R-Shop needs a base folder to store your downloaded games. This helps organize your files and is required for Android folder permissions.\n\nWe recommend creating a folder named \'ROMs\' and selecting it.'**
+  String get onboarding_folderExplanationMessage;
+
+  /// No description provided for @onboarding_continueToPicker.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Folder'**
+  String get onboarding_continueToPicker;
+
   /// No description provided for @onboarding_hangOn.
   ///
   /// In en, this message translates to:

@@ -235,8 +235,8 @@ class LZh extends L {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '$count 個變體',
-      one: '1 個變體',
+      other: '$count 個版本',
+      one: '1 個版本',
     );
     return '$_temp0';
   }
@@ -1252,6 +1252,16 @@ class LZh extends L {
   String get onboarding_serverType => '伺服器類型';
 
   @override
+  String get onboarding_folderExplanationTitle => '設定您的遊戲庫路徑';
+
+  @override
+  String get onboarding_folderExplanationMessage =>
+      'R-Shop 需要您選擇一個資料夾來存放下載的遊戲。這能幫助 App 整理您的遊戲檔案，並獲得 Android 的存取權限。\n\n建議您可以建立一個名為「ROMs」的資料夾並選擇它。';
+
+  @override
+  String get onboarding_continueToPicker => '開始選擇';
+
+  @override
   String get onboarding_hangOn => '請稍候，正在測試連線...';
 
   @override
@@ -1267,7 +1277,7 @@ class LZh extends L {
   String get onboarding_connectionGood => '連線狀況良好！您可以儲存此來源了。';
 
   @override
-  String get onboarding_couldNotConnect => '嗯... 無法連線。請再次確認網址與憑據。';
+  String get onboarding_couldNotConnect => '嗯... 無法連線。請再次確認網址與認證資訊。';
 
   @override
   String get onboarding_whatKindOfSource => '這是哪種類型的來源？請選擇連線類型。';
@@ -1370,7 +1380,7 @@ class LZh extends L {
       '非本地伺服器的 HTTP 已被封鎖。請使用 HTTPS，或稍後在「設定」中啟用。';
 
   @override
-  String get providerForm_httpWarning => '憑據將透過未加密的 HTTP 傳送';
+  String get providerForm_httpWarning => '認證資訊將透過未加密的 HTTP 傳送';
 
   @override
   String get providerForm_testingConnection => '正在測試連線...';
@@ -1508,10 +1518,10 @@ class LZh extends L {
   String get pairing_pairingCodeHint => 'ABCD-1234';
 
   @override
-  String get pairing_probingServer => '正在探測伺服器...';
+  String get pairing_probingServer => '正在測試伺服器...';
 
   @override
-  String get pairing_serverNotReachable => '伺服器無法連線或非 RomM 執行實體';
+  String get pairing_serverNotReachable => '伺服器無法連線或非 RomM 執行個體';
 
   @override
   String get pairing_serverUrlRequired => '伺服器 URL 與代碼均為必填';
@@ -1529,7 +1539,7 @@ class LZh extends L {
   String get pairing_userId => '使用者 ID';
 
   @override
-  String get pairing_expiry => '有效期至';
+  String get pairing_expiry => '有效期限';
 
   @override
   String get pairing_neverExpires => '永久有效';

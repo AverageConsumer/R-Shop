@@ -1277,6 +1277,16 @@ class LEn extends L {
   String get onboarding_serverType => 'Server type';
 
   @override
+  String get onboarding_folderExplanationTitle => 'Setup your Library Path';
+
+  @override
+  String get onboarding_folderExplanationMessage =>
+      'R-Shop needs a base folder to store your downloaded games. This helps organize your files and is required for Android folder permissions.\n\nWe recommend creating a folder named \'ROMs\' and selecting it.';
+
+  @override
+  String get onboarding_continueToPicker => 'Select Folder';
+
+  @override
   String get onboarding_hangOn => 'Hang on, testing the connection...';
 
   @override

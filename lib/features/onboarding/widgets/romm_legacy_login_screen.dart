@@ -42,6 +42,7 @@ class _RommLegacyLoginScreenState
   final _passCtl = TextEditingController();
 
   late List<_Field> _fields;
+  final _backFocus = FocusNode(debugLabel: 'romm_legacy_back');
   final _saveFocus = FocusNode(debugLabel: 'romm_legacy_save');
   final _screenFocus = FocusNode(debugLabel: 'romm_legacy_screen');
 
@@ -91,6 +92,7 @@ class _RommLegacyLoginScreenState
       f.consoleFocus.dispose();
       f.textFocus.dispose();
     }
+    _backFocus.dispose();
     _saveFocus.dispose();
     _screenFocus.dispose();
     super.dispose();
@@ -162,7 +164,7 @@ class _RommLegacyLoginScreenState
   }
 
   List<FocusNode> get _navOrder =>
-      [..._fields.map((f) => f.consoleFocus), _saveFocus];
+      [_backFocus, ..._fields.map((f) => f.consoleFocus), _saveFocus];
 
   void _moveFocus(int delta) {
     final order = _navOrder;
@@ -178,6 +180,10 @@ class _RommLegacyLoginScreenState
   }
 
   void _activateFocused() {
+    if (_backFocus.hasFocus) {
+      Navigator.of(context).maybePop();
+      return;
+    }
     for (final f in _fields) {
       if (f.consoleFocus.hasFocus) {
         f.textFocus.requestFocus();
@@ -254,44 +260,61 @@ class _RommLegacyLoginScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: Stack(
-        children: [
-          SafeArea(
+      body: SafeArea(
         child: Focus(
           focusNode: _screenFocus,
           autofocus: true,
           onKeyEvent: _handleScreenKey,
-          child: Center(
+          child: Align(
+            alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      L.of(context).rommLogin_title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      children: [
+                        ConsoleFocusable(
+                          focusNode: _backFocus,
+                          onSelect: () => Navigator.of(context).maybePop(),
+                          child: const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(Icons.arrow_back, color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          L.of(context).rommLogin_title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Use this for RomM servers older than 4.8 — the ones '
-                      'without QR pairing.',
-                      style: TextStyle(
-                          color: Colors.grey.shade500, fontSize: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 48),
+                      child: Text(
+                        'Use this for RomM servers older than 4.8 — the ones '
+                        'without QR pairing.',
+                        style: TextStyle(
+                            color: Colors.grey.shade500, fontSize: 12),
+                      ),
                     ),
                     const SizedBox(height: 20),
-                    Expanded(child: SingleChildScrollView(child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    for (final f in _fields) ...[
-                      _textBox(f),
-                      const SizedBox(height: 12),
-                    ],
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (final f in _fields) ...[
+                              _textBox(f),
+                              const SizedBox(height: 12),
+                            ],
                     if (_probedVersion != null) ...[
                       const SizedBox(height: 4),
                       Container(
@@ -377,20 +400,16 @@ class _RommLegacyLoginScreenState
                               ),
                       ),
                     ),
-                  ],
-                    ))),
+                    ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
         ),
-      ),
-          ConsoleHud(
-            b: HudAction(L.of(context).common_back,
-                onTap: () => Navigator.maybePop(context)),
-          ),
-        ],
       ),
     );
   }
