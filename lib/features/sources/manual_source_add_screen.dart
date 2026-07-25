@@ -419,40 +419,54 @@ class _ManualSourceAddScreenState
                                     color: Colors.redAccent, fontSize: 13)),
                           ],
                           const SizedBox(height: 16),
-                          ConsoleFocusable(
-                            focusNode: _saveFocus,
-                            focusScale: 1.0,
-                            onSelect: _busy ? null : _save,
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryColor
-                                    .withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: AppTheme.primaryColor, width: 2),
-                              ),
-                              child: _busy
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppTheme.primaryColor,
-                                      ),
-                                    )
-                                  : Text(
-                                      L.of(context).manualSource_saveSource,
-                                      style: const TextStyle(
-                                        color: AppTheme.primaryColor,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                            ),
+                          ListenableBuilder(
+                            listenable: _saveFocus,
+                            builder: (context, _) {
+                              final isFocused = _saveFocus.hasFocus;
+                              final color = isFocused
+                                  ? Colors.white
+                                  : AppTheme.primaryColor;
+                              final bgColor = isFocused
+                                  ? AppTheme.primaryColor.withValues(alpha: 0.3)
+                                  : AppTheme.primaryColor.withValues(alpha: 0.18);
+
+                              return ConsoleFocusable(
+                                focusNode: _saveFocus,
+                                focusScale: 1.02,
+                                onSelect: _busy ? null : _save,
+                                focusBorderColor: Colors.white,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 14),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: bgColor,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: _busy
+                                      ? SizedBox(
+                                          height: 18,
+                                          width: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: color,
+                                          ),
+                                        )
+                                      : Text(
+                                          L.of(context).manualSource_saveSource,
+                                          style: TextStyle(
+                                            color: color,
+                                            fontSize: 15,
+                                            fontWeight: isFocused
+                                                ? FontWeight.w700
+                                                : FontWeight.w600,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(height: 60),
                         ],

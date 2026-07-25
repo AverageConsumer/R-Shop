@@ -427,58 +427,77 @@ class _ChoiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ConsoleFocusable(
-      focusNode: focusNode,
-      onSelect: onSelect,
-      borderRadius: 12,
-      focusScale: 1.0,
-      focusBorderColor: AppTheme.primaryColor,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1C1C1C),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: AppTheme.primaryColor, size: 22),
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, _) {
+        final isFocused = focusNode.hasFocus;
+        final color = isFocused ? Colors.white : AppTheme.primaryColor;
+        final bgColor = isFocused
+            ? AppTheme.primaryColor.withValues(alpha: 0.25)
+            : const Color(0xFF1C1C1C);
+
+        return ConsoleFocusable(
+          focusNode: focusNode,
+          onSelect: onSelect,
+          borderRadius: 12,
+          focusScale: 1.02,
+          focusBorderColor: Colors.white,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isFocused
+                        ? Colors.white.withValues(alpha: 0.2)
+                        : AppTheme.primaryColor.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 12,
-                    ),
+                  child: Icon(icon,
+                      color: isFocused ? Colors.white : AppTheme.primaryColor,
+                      size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: isFocused ? Colors.white : Colors.white,
+                          fontSize: 15,
+                          fontWeight:
+                              isFocused ? FontWeight.w700 : FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: isFocused
+                              ? Colors.white.withValues(alpha: 0.7)
+                              : Colors.grey.shade400,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                Icon(Icons.chevron_right,
+                    color: isFocused ? Colors.white : Colors.white30),
+              ],
             ),
-            const Icon(Icons.chevron_right, color: Colors.white30),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
