@@ -70,22 +70,14 @@ android {
             val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
             val fileName = "R-Shop-v${defaultConfig.versionName}.apk"
             output.outputFileName = fileName
-
-            variant.assembleProvider.configure {
-                doLast {
-                    val destDir = File("D:/test-apk")
-                    if (!destDir.exists()) {
-                        destDir.mkdirs()
-                    }
-                    val sourceFile = output.outputFile
-                    if (sourceFile.exists()) {
-                        sourceFile.copyTo(File(destDir, fileName), overwrite = true)
-                        println("Successfully copied APK to: ${destDir.absolutePath}/$fileName")
-                    }
-                }
-            }
         }
     }
+}
+
+// 引入本地私有任務（若存在），此部分不進入 Git
+val localTasksFile = file("local-tasks.gradle.kts")
+if (localTasksFile.exists()) {
+    apply(from = localTasksFile)
 }
 
 dependencies {

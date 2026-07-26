@@ -84,3 +84,4 @@ ROADMAP_1.0.md
 
 # Local backup of pre-redesign docs site (keep until new site is verified, then delete)
 docs-old/
+android/app/local-tasks.gradle.kts
