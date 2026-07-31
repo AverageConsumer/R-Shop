@@ -3,7 +3,7 @@
 ## 1. 專案名稱與簡述
 
 - **專案名稱**：R-Shop (`retro_eshop` / `com.retro.rshop.tw`)
-- **目前版本**：v1.7.0
+- **目前版本**：`1.7.0-zh+13`（分支 `main-zh`）
 - **專案簡述**：
   R-Shop 是一款專為 Android 掌機（如 Anbernic, Retroid Pocket, AYN Odin 等）與 Android TV 裝置設計的「控制器優先（Controller-First）」復古遊戲庫管理器與下載前端。本專案採用類似 Nintendo eShop 的現代主機風格視覺介面，支援 Local、RomM、SMB、FTP 及 Web 等多源統一遊戲庫管理。系統內建 66 種經典主機分類自動映射、遊戲封面與元資料自動抓取、RetroAchievements 玩家成就整合比對，以及完整的前台與背景下載佇列管理機制。
 
@@ -82,19 +82,19 @@ flowchart TD
 
 | 類別 / 組件名稱 | 所在檔案 / 模組 | 主要職責與說明 |
 | :--- | :--- | :--- |
-| `RShopApp` | [lib/main.dart](file:///c:/Users/Mini-PC/StudioProjects/R-Shop/lib/main.dart) | 應用程式根 Widget，初始化 Theme、Localization、Riverpod 範疇與全域輸入監聽器。 |
+| `RShopApp` | [lib/main.dart](lib/main.dart) | 應用程式根 Widget，初始化 Theme、Localization、Riverpod 範疇與全域輸入監聽器。 |
 | `SystemModel` | `lib/models/system_model.dart` | 定義 66 種復古遊戲主機字典（包含 NES, SNES, PS1, GBA 等），提供 Platform ID、顯示名稱、副檔名與預設目錄映射。 |
-| `DatabaseService` | [lib/services/database_service.dart](file:///c:/Users/Mini-PC/StudioProjects/R-Shop/lib/services/database_service.dart) | 管理本地 SQLite 資料庫，負責遊戲元資料、來源設定、下載歷史與成就資料的高效 CRUD 操作。 |
-| `DownloadQueueManager` | [lib/services/download_queue_manager.dart](file:///c:/Users/Mini-PC/StudioProjects/R-Shop/lib/services/download_queue_manager.dart) | 管理下載作業佇列，控制並行下載數量、任務優先順序、重試機制與自動解壓縮（Unzip）觸發。 |
-| `DownloadService` | [lib/services/download_service.dart](file:///c:/Users/Mini-PC/StudioProjects/R-Shop/lib/services/download_service.dart) | 執行具體的檔案下載邏輯（支援斷點續傳、 HTTP/FTP/SMB 流式讀寫）並與 Android 前台服務同步狀態。 |
-| `SourcesNotifier` | [lib/services/sources_notifier.dart](file:///c:/Users/Mini-PC/StudioProjects/R-Shop/lib/services/sources_notifier.dart) | 負責多來源（Local, RomM, SMB, FTP, Web）配置的狀態監控與狀態變更廣播。 |
-| `SourceResolver` | [lib/services/source_resolver.dart](file:///c:/Users/Mini-PC/StudioProjects/R-Shop/lib/services/source_resolver.dart) | 統一抽象化異構來源的檔案掃描與存取介面，將不同通訊協定轉換為標準化的 `GameItem` 物件。 |
-| `SmbService` | [android/app/src/main/kotlin/com/retro/rshop/tw/SmbService.kt](file:///c:/Users/Mini-PC/StudioProjects/R-Shop/android/app/src/main/kotlin/com/retro/rshop/tw/SmbService.kt) | Kotlin 原生層 SMB 服務，使用 `smbj` 處理網路芳鄰共享目錄的認證、檔案列舉與高效串流傳輸。 |
-| `NativeSmbService` | [lib/services/native_smb_service.dart](file:///c:/Users/Mini-PC/StudioProjects/R-Shop/lib/services/native_smb_service.dart) | Flutter 端呼叫原生 SMB 服務的 MethodChannel 封裝介面。 |
-| `RaApiService` | [lib/services/ra_api_service.dart](file:///c:/Users/Mini-PC/StudioProjects/R-Shop/lib/services/ra_api_service.dart) | RetroAchievements 官方 REST API 的介面服務，查詢玩家成就、遊戲雜湊碼與解鎖進度。 |
-| `RaSyncService` | [lib/services/ra_sync_service.dart](file:///c:/Users/Mini-PC/StudioProjects/R-Shop/lib/services/ra_sync_service.dart) | 計算 ROM 檔案雜湊值（MD5/SHA1）並與 RetroAchievements 進行自動比對與同步。 |
+| `DatabaseService` | [lib/services/database_service.dart](lib/services/database_service.dart) | 管理本地 SQLite 資料庫，負責遊戲元資料、來源設定、下載歷史與成就資料的高效 CRUD 操作。 |
+| `DownloadQueueManager` | [lib/services/download_queue_manager.dart](lib/services/download_queue_manager.dart) | 管理下載作業佇列，控制並行下載數量、任務優先順序、重試機制與自動解壓縮（Unzip）觸發。 |
+| `DownloadService` | [lib/services/download_service.dart](lib/services/download_service.dart) | 執行具體的檔案下載邏輯（支援斷點續傳、 HTTP/FTP/SMB 流式讀寫）並與 Android 前台服務同步狀態。 |
+| `SourcesNotifier` | [lib/services/sources_notifier.dart](lib/services/sources_notifier.dart) | 負責多來源（Local, RomM, SMB, FTP, Web）配置的狀態監控與狀態變更廣播。 |
+| `SourceResolver` | [lib/services/source_resolver.dart](lib/services/source_resolver.dart) | 統一抽象化異構來源的檔案掃描與存取介面，將不同通訊協定轉換為標準化的 `GameItem` 物件。 |
+| `SmbService` | [android/app/src/main/kotlin/com/retro/rshop/tw/SmbService.kt](android/app/src/main/kotlin/com/retro/rshop/tw/SmbService.kt) | Kotlin 原生層 SMB 服務，使用 `smbj` 處理網路芳鄰共享目錄的認證、檔案列舉與高效串流傳輸。 |
+| `NativeSmbService` | [lib/services/native_smb_service.dart](lib/services/native_smb_service.dart) | Flutter 端呼叫原生 SMB 服務的 MethodChannel 封裝介面。 |
+| `RaApiService` | [lib/services/ra_api_service.dart](lib/services/ra_api_service.dart) | RetroAchievements 官方 REST API 的介面服務，查詢玩家成就、遊戲雜湊碼與解鎖進度。 |
+| `RaSyncService` | [lib/services/ra_sync_service.dart](lib/services/ra_sync_service.dart) | 計算 ROM 檔案雜湊值（MD5/SHA1）並與 RetroAchievements 進行自動比對與同步。 |
 | `GlobalInputWrapper` | `lib/core/input/` | 捕獲 D-pad、手把按鈕與鍵盤事件，統一進行焦點導向與頁面動作轉發。 |
-| `FocusSyncManager` | `lib/core/focus/` | 掌機與 Android TV 的手把焦點同步管理器，確保無觸控環境下的流暢選單導覽體驗。 |
+| `FocusSyncManager` | `lib/core/input/` | 掌機與 Android TV 的手把焦點同步管理器，確保無觸控環境下的流暢選單導覽體驗。 |
 
 ---
 

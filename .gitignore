@@ -64,12 +64,14 @@ android/app/.settings/
 key.properties
 
 # AI tool configurations
+# 正式檔名為 AGENTS.md（跨工具慣例）；AGENT.md / CLAUDE.md 保留為防呆
 .claude/
 .gemini/
 .agent/
 .artifacts/
-CLAUDE.md
+AGENTS.md
 AGENT.md
+CLAUDE.md
 GLOBAL_DEV_NOTES.md
 
 # Environment files
