@@ -119,8 +119,32 @@ class EndpointProbeService {
   ///
   /// An endpoint with no usable address is reported unreachable rather than
   /// skipped, so it can never win auto-selection.
+  /// Id reported for a source that carries its address on the source itself
+  /// rather than in an endpoint list.
+  static const String syntheticEndpointId = 'self';
+
+  /// The routes to probe. [Source.fromJson] backfills an endpoint from the
+  /// legacy connection fields, but a Source built directly in code has an
+  /// empty list while still having a perfectly good address — treating that
+  /// as "nothing to probe" would silently report it unreachable.
+  static List<SourceEndpoint> _probeableEndpoints(Source source) {
+    if (source.endpoints.isNotEmpty) return source.endpoints;
+    if (source.url == null && source.host == null) return const [];
+    return [
+      SourceEndpoint(
+        id: syntheticEndpointId,
+        label: source.name,
+        url: source.url,
+        host: source.host,
+        port: source.port,
+        share: source.share,
+      ),
+    ];
+  }
+
   Future<Set<String>> reachableFor(Source source) async {
-    if (source.endpoints.isEmpty) return const {};
+    final endpoints = _probeableEndpoints(source);
+    if (endpoints.isEmpty) return const {};
 
     final cached = _cache[source.id];
     if (cached != null && _now().difference(cached.at) < _cacheTtl) {
@@ -128,7 +152,7 @@ class EndpointProbeService {
     }
 
     final reachable = <String>{};
-    final probes = source.endpoints.map((ep) async {
+    final probes = endpoints.map((ep) async {
       final target = targetFor(ep, source.type);
       if (target == null) return;
       try {
