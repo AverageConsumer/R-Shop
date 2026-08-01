@@ -23,6 +23,7 @@ import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../onboarding/widgets/romm_legacy_login_screen.dart';
 import '../pairing/qr_pairing_screen.dart';
+import '../sources/endpoint_picker_overlay.dart';
 import '../sources/manual_source_add_screen.dart';
 import '../sources/source_mappings_screen.dart';
 
@@ -57,6 +58,12 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
 
   Source? _activeActionsSource;
   bool _showTypePicker = false;
+
+  /// Set while the connection-route picker is open. Held by id rather than by
+  /// value so the overlay always renders the freshest source — switching a
+  /// route rewrites the Source object, and a stale copy would show the old
+  /// route as still live.
+  String? _routePickerSourceId;
 
   /// True once we've successfully moved focus off of the screen-level
   /// Focus stub created by [ConsoleScreenMixin.buildWithActions]. Until
@@ -344,6 +351,20 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _activeActionsSource = source);
   }
 
+  /// Hands off from the actions overlay to the route picker. The actions
+  /// overlay closes first so only one dialog-priority scope is ever live.
+  void _pickRoute(Source source) {
+    setState(() {
+      _activeActionsSource = null;
+      _routePickerSourceId = source.id;
+    });
+  }
+
+  void _closeRoutePicker() {
+    if (_routePickerSourceId == null) return;
+    setState(() => _routePickerSourceId = null);
+  }
+
   void _closeSourceActions() {
     if (_activeActionsSource == null) return;
     final source = _activeActionsSource!;
@@ -505,11 +526,29 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                 onRepair: () => _repairSource(_activeActionsSource!),
                 onEditMappings: () =>
                     _editMappings(_activeActionsSource!),
+                onPickRoute: () => _pickRoute(_activeActionsSource!),
               ),
             if (_showTypePicker)
               _SourceTypePickerOverlay(
                 onClose: _closeTypePicker,
                 onPick: _onTypePicked,
+              ),
+            if (_routePickerSourceId != null)
+              Builder(
+                builder: (context) {
+                  final src = ref
+                      .watch(sourcesProvider)
+                      .sources
+                      .where((s) => s.id == _routePickerSourceId)
+                      .firstOrNull;
+                  // The source can vanish underneath us (removed elsewhere);
+                  // dropping the overlay is better than rendering a ghost.
+                  if (src == null) return const SizedBox.shrink();
+                  return EndpointPickerOverlay(
+                    source: src,
+                    onClose: _closeRoutePicker,
+                  );
+                },
               ),
           ],
         ),
@@ -982,6 +1021,7 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
     required this.onRemove,
     required this.onRepair,
     required this.onEditMappings,
+    required this.onPickRoute,
   });
 
   final Source source;
@@ -990,6 +1030,7 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
   final VoidCallback onRemove;
   final VoidCallback onRepair;
   final VoidCallback onEditMappings;
+  final VoidCallback onPickRoute;
 
   @override
   ConsumerState<_SourceActionsOverlay> createState() =>
@@ -1018,6 +1059,14 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
           icon: Icons.tune,
           label: l.sources_editMappings,
           onActivate: widget.onEditMappings,
+        ),
+      // Offered whenever the source has an address at all — with a single
+      // route the picker still shows which one is live and why.
+      if (src.endpoints.isNotEmpty)
+        _OverlayAction(
+          icon: Icons.alt_route,
+          label: l.sources_connectionRoute,
+          onActivate: widget.onPickRoute,
         ),
       _OverlayAction(
         icon: src.enabled ? Icons.toggle_off : Icons.toggle_on,

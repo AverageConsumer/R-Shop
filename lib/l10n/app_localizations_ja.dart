@@ -1584,4 +1584,43 @@ class LJa extends L {
   String service_queuedCount(int count) {
     return '$count件キュー中';
   }
+
+  @override
+  String get sources_connectionRoute => '接続経路';
+
+  @override
+  String get sources_routeAuto => '自動選択';
+
+  @override
+  String get sources_routeAutoHint => '応答した経路を使用（上にあるものを優先）';
+
+  @override
+  String get sources_routeInUse => '使用中';
+
+  @override
+  String get sources_routePinned => '固定中';
+
+  @override
+  String get sources_routeReachable => '接続可能';
+
+  @override
+  String get sources_routeNoAnswer => '応答なし';
+
+  @override
+  String get sources_routeChecking => '確認中…';
+
+  @override
+  String get sources_routeOnlyOne => 'この提供元の経路は1つだけです';
+
+  @override
+  String get sources_addRoute => '経路を追加';
+
+  @override
+  String get sources_editRoute => '経路を編集';
+
+  @override
+  String get sources_removeRoute => 'この経路を削除';
+
+  @override
+  String get sources_routeDuplicate => 'この提供元には同じアドレスの経路がすでにあります';
 }

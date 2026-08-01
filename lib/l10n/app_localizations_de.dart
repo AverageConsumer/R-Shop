@@ -1632,4 +1632,45 @@ class LDe extends L {
   String service_queuedCount(int count) {
     return '$count in Warteschlange';
   }
+
+  @override
+  String get sources_connectionRoute => 'Verbindungsweg';
+
+  @override
+  String get sources_routeAuto => 'Automatisch';
+
+  @override
+  String get sources_routeAutoHint =>
+      'Den Weg nutzen, der antwortet – oberster zuerst';
+
+  @override
+  String get sources_routeInUse => 'In Verwendung';
+
+  @override
+  String get sources_routePinned => 'Fixiert';
+
+  @override
+  String get sources_routeReachable => 'Erreichbar';
+
+  @override
+  String get sources_routeNoAnswer => 'Keine Antwort';
+
+  @override
+  String get sources_routeChecking => 'Wird geprüft…';
+
+  @override
+  String get sources_routeOnlyOne => 'Diese Quelle hat nur einen Weg';
+
+  @override
+  String get sources_addRoute => 'Weg hinzufügen';
+
+  @override
+  String get sources_editRoute => 'Weg bearbeiten';
+
+  @override
+  String get sources_removeRoute => 'Weg entfernen';
+
+  @override
+  String get sources_routeDuplicate =>
+      'Diese Quelle hat bereits einen Weg zu dieser Adresse';
 }

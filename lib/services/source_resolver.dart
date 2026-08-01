@@ -131,6 +131,7 @@ class SourceResolver {
           platformName: system.id,
           managedBySource: true,
           sourceId: source.id,
+          endpointId: source.liveEndpoint?.id,
         );
       case SourceType.smb:
         return ProviderConfig(
@@ -143,6 +144,7 @@ class SourceResolver {
           auth: source.auth,
           managedBySource: true,
           sourceId: source.id,
+          endpointId: source.liveEndpoint?.id,
         );
       case SourceType.ftp:
         return ProviderConfig(
@@ -154,6 +156,7 @@ class SourceResolver {
           auth: source.auth,
           managedBySource: true,
           sourceId: source.id,
+          endpointId: source.liveEndpoint?.id,
         );
       case SourceType.web:
         final base = source.url ?? '';
@@ -166,6 +169,7 @@ class SourceResolver {
           auth: source.auth,
           managedBySource: true,
           sourceId: source.id,
+          endpointId: source.liveEndpoint?.id,
         );
       case SourceType.local:
         return ProviderConfig(
@@ -173,6 +177,7 @@ class SourceResolver {
           priority: entry.effectivePriority,
           managedBySource: true,
           sourceId: source.id,
+          endpointId: source.liveEndpoint?.id,
         );
     }
   }

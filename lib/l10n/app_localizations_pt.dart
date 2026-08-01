@@ -1631,4 +1631,45 @@ class LPt extends L {
   String service_queuedCount(int count) {
     return '$count na fila';
   }
+
+  @override
+  String get sources_connectionRoute => 'Rota de ligação';
+
+  @override
+  String get sources_routeAuto => 'Automático';
+
+  @override
+  String get sources_routeAutoHint =>
+      'Usar a rota que responder, preferindo a primeira';
+
+  @override
+  String get sources_routeInUse => 'Em uso';
+
+  @override
+  String get sources_routePinned => 'Fixada';
+
+  @override
+  String get sources_routeReachable => 'Acessível';
+
+  @override
+  String get sources_routeNoAnswer => 'Sem resposta';
+
+  @override
+  String get sources_routeChecking => 'A verificar…';
+
+  @override
+  String get sources_routeOnlyOne => 'Esta fonte só tem uma rota';
+
+  @override
+  String get sources_addRoute => 'Adicionar rota';
+
+  @override
+  String get sources_editRoute => 'Editar rota';
+
+  @override
+  String get sources_removeRoute => 'Remover rota';
+
+  @override
+  String get sources_routeDuplicate =>
+      'Esta fonte já tem uma rota para esse endereço';
 }

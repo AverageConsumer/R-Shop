@@ -568,5 +568,18 @@
   "service_activeCount": "{count} active",
   "@service_activeCount": { "placeholders": { "count": { "type": "int" } } },
   "service_queuedCount": "{count} queued",
-  "@service_queuedCount": { "placeholders": { "count": { "type": "int" } } }
+  "@service_queuedCount": { "placeholders": { "count": { "type": "int" } } },
+  "sources_connectionRoute": "Connection route",
+  "sources_routeAuto": "Automatic",
+  "sources_routeAutoHint": "Use whichever route answers, preferring the top one",
+  "sources_routeInUse": "In use",
+  "sources_routePinned": "Locked",
+  "sources_routeReachable": "Reachable",
+  "sources_routeNoAnswer": "No answer",
+  "sources_routeChecking": "Checking…",
+  "sources_routeOnlyOne": "This source has only one route",
+  "sources_addRoute": "Add route",
+  "sources_editRoute": "Edit route",
+  "sources_removeRoute": "Remove route",
+  "sources_routeDuplicate": "This source already has a route to that address"
 }

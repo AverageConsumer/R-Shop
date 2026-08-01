@@ -488,5 +488,18 @@
   "service_downloadComplete": "Descargas completas",
   "service_downloading": "Descargando: {details}",
   "service_activeCount": "{count} activas",
-  "service_queuedCount": "{count} en cola"
+  "service_queuedCount": "{count} en cola",
+  "sources_connectionRoute": "Ruta de conexión",
+  "sources_routeAuto": "Automático",
+  "sources_routeAutoHint": "Usar la ruta que responda, priorizando la primera",
+  "sources_routeInUse": "En uso",
+  "sources_routePinned": "Fijada",
+  "sources_routeReachable": "Accesible",
+  "sources_routeNoAnswer": "Sin respuesta",
+  "sources_routeChecking": "Comprobando…",
+  "sources_routeOnlyOne": "Esta fuente solo tiene una ruta",
+  "sources_addRoute": "Añadir ruta",
+  "sources_editRoute": "Editar ruta",
+  "sources_removeRoute": "Eliminar ruta",
+  "sources_routeDuplicate": "Esta fuente ya tiene una ruta a esa dirección"
 }

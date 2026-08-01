@@ -1631,4 +1631,45 @@ class LEs extends L {
   String service_queuedCount(int count) {
     return '$count en cola';
   }
+
+  @override
+  String get sources_connectionRoute => 'Ruta de conexión';
+
+  @override
+  String get sources_routeAuto => 'Automático';
+
+  @override
+  String get sources_routeAutoHint =>
+      'Usar la ruta que responda, priorizando la primera';
+
+  @override
+  String get sources_routeInUse => 'En uso';
+
+  @override
+  String get sources_routePinned => 'Fijada';
+
+  @override
+  String get sources_routeReachable => 'Accesible';
+
+  @override
+  String get sources_routeNoAnswer => 'Sin respuesta';
+
+  @override
+  String get sources_routeChecking => 'Comprobando…';
+
+  @override
+  String get sources_routeOnlyOne => 'Esta fuente solo tiene una ruta';
+
+  @override
+  String get sources_addRoute => 'Añadir ruta';
+
+  @override
+  String get sources_editRoute => 'Editar ruta';
+
+  @override
+  String get sources_removeRoute => 'Eliminar ruta';
+
+  @override
+  String get sources_routeDuplicate =>
+      'Esta fuente ya tiene una ruta a esa dirección';
 }

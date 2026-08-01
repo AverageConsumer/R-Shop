@@ -3058,6 +3058,84 @@ abstract class L {
   /// In en, this message translates to:
   /// **'{count} queued'**
   String service_queuedCount(int count);
+
+  /// No description provided for @sources_connectionRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection route'**
+  String get sources_connectionRoute;
+
+  /// No description provided for @sources_routeAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get sources_routeAuto;
+
+  /// No description provided for @sources_routeAutoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use whichever route answers, preferring the top one'**
+  String get sources_routeAutoHint;
+
+  /// No description provided for @sources_routeInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'In use'**
+  String get sources_routeInUse;
+
+  /// No description provided for @sources_routePinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get sources_routePinned;
+
+  /// No description provided for @sources_routeReachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Reachable'**
+  String get sources_routeReachable;
+
+  /// No description provided for @sources_routeNoAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'No answer'**
+  String get sources_routeNoAnswer;
+
+  /// No description provided for @sources_routeChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get sources_routeChecking;
+
+  /// No description provided for @sources_routeOnlyOne.
+  ///
+  /// In en, this message translates to:
+  /// **'This source has only one route'**
+  String get sources_routeOnlyOne;
+
+  /// No description provided for @sources_addRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Add route'**
+  String get sources_addRoute;
+
+  /// No description provided for @sources_editRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit route'**
+  String get sources_editRoute;
+
+  /// No description provided for @sources_removeRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove route'**
+  String get sources_removeRoute;
+
+  /// No description provided for @sources_routeDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'This source already has a route to that address'**
+  String get sources_routeDuplicate;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

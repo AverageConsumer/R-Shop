@@ -1621,4 +1621,45 @@ class LEn extends L {
   String service_queuedCount(int count) {
     return '$count queued';
   }
+
+  @override
+  String get sources_connectionRoute => 'Connection route';
+
+  @override
+  String get sources_routeAuto => 'Automatic';
+
+  @override
+  String get sources_routeAutoHint =>
+      'Use whichever route answers, preferring the top one';
+
+  @override
+  String get sources_routeInUse => 'In use';
+
+  @override
+  String get sources_routePinned => 'Locked';
+
+  @override
+  String get sources_routeReachable => 'Reachable';
+
+  @override
+  String get sources_routeNoAnswer => 'No answer';
+
+  @override
+  String get sources_routeChecking => 'Checking…';
+
+  @override
+  String get sources_routeOnlyOne => 'This source has only one route';
+
+  @override
+  String get sources_addRoute => 'Add route';
+
+  @override
+  String get sources_editRoute => 'Edit route';
+
+  @override
+  String get sources_removeRoute => 'Remove route';
+
+  @override
+  String get sources_routeDuplicate =>
+      'This source already has a route to that address';
 }

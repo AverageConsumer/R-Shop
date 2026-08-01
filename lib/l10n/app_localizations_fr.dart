@@ -1633,4 +1633,45 @@ class LFr extends L {
   String service_queuedCount(int count) {
     return '$count en attente';
   }
+
+  @override
+  String get sources_connectionRoute => 'Voie de connexion';
+
+  @override
+  String get sources_routeAuto => 'Automatique';
+
+  @override
+  String get sources_routeAutoHint =>
+      'Utiliser la voie qui répond, la première en priorité';
+
+  @override
+  String get sources_routeInUse => 'Utilisée';
+
+  @override
+  String get sources_routePinned => 'Verrouillée';
+
+  @override
+  String get sources_routeReachable => 'Joignable';
+
+  @override
+  String get sources_routeNoAnswer => 'Sans réponse';
+
+  @override
+  String get sources_routeChecking => 'Vérification…';
+
+  @override
+  String get sources_routeOnlyOne => 'Cette source n\'a qu\'une seule voie';
+
+  @override
+  String get sources_addRoute => 'Ajouter une voie';
+
+  @override
+  String get sources_editRoute => 'Modifier la voie';
+
+  @override
+  String get sources_removeRoute => 'Supprimer la voie';
+
+  @override
+  String get sources_routeDuplicate =>
+      'Cette source a déjà une voie vers cette adresse';
 }

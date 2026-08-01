@@ -33,13 +33,20 @@ void main() {
               thumb_hash TEXT,
               has_thumbnail INTEGER NOT NULL DEFAULT 0,
               is_folder INTEGER NOT NULL DEFAULT 0,
-              alternative_sources TEXT
+              alternative_sources TEXT,
+              source_id TEXT NOT NULL DEFAULT '',
+              endpoint_id TEXT NOT NULL DEFAULT ''
             )
           ''');
           await db.execute('CREATE INDEX idx_systemSlug ON games (systemSlug)');
           await db.execute('CREATE INDEX idx_displayName ON games (displayName)');
           await db.execute('CREATE INDEX idx_filename ON games (filename)');
-          await db.execute('CREATE UNIQUE INDEX idx_games_system_filename ON games (systemSlug, filename)');
+          // Mirrors production v14: uniqueness is per route, so the same
+          // server reached two ways keeps two independent lists.
+          await db.execute(
+              'CREATE UNIQUE INDEX idx_games_system_filename_route ON games (systemSlug, filename, source_id, endpoint_id)');
+          await db.execute(
+              'CREATE INDEX idx_games_route ON games (source_id, endpoint_id)');
           await db.execute('''
             CREATE TABLE game_metadata (
               filename TEXT NOT NULL,
@@ -92,7 +99,15 @@ void main() {
     test('indices exist', () async {
       final indices = await db.rawQuery('PRAGMA index_list(games)');
       final names = indices.map((r) => r['name'] as String).toSet();
-      expect(names, containsAll(['idx_systemSlug', 'idx_displayName', 'idx_filename', 'idx_games_system_filename']));
+      expect(
+          names,
+          containsAll([
+            'idx_systemSlug',
+            'idx_displayName',
+            'idx_filename',
+            'idx_games_system_filename_route',
+            'idx_games_route',
+          ]));
     });
   });
 

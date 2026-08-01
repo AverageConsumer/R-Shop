@@ -14,7 +14,7 @@ import '../utils/ra_name_matcher.dart';
 class DatabaseService {
   static Future<Database>? _initFuture;
   static const String _tableName = 'games';
-  static const int _dbVersion = 13;
+  static const int _dbVersion = 14;
 
   @visibleForTesting
   static Database? testDatabase;
@@ -56,7 +56,9 @@ class DatabaseService {
         thumb_hash TEXT,
         has_thumbnail INTEGER NOT NULL DEFAULT 0,
         is_folder INTEGER NOT NULL DEFAULT 0,
-        alternative_sources TEXT
+        alternative_sources TEXT,
+        source_id TEXT NOT NULL DEFAULT '',
+        endpoint_id TEXT NOT NULL DEFAULT ''
       )
     ''');
 
@@ -72,8 +74,20 @@ class DatabaseService {
       CREATE INDEX idx_filename ON $_tableName (filename)
     ''');
 
+    // Uniqueness is per *route*, not per system: the same server reached over
+    // the LAN and over the internet keeps two independent lists, so switching
+    // routes swaps which list you see instead of re-syncing.
+    //
+    // source_id / endpoint_id are NOT NULL DEFAULT '' on purpose — SQLite
+    // treats NULLs as distinct inside a UNIQUE index, so a nullable column
+    // here would silently stop deduplicating local scans (which have no route).
     await db.execute('''
-      CREATE UNIQUE INDEX idx_games_system_filename ON $_tableName (systemSlug, filename)
+      CREATE UNIQUE INDEX idx_games_system_filename_route
+        ON $_tableName (systemSlug, filename, source_id, endpoint_id)
+    ''');
+
+    await db.execute('''
+      CREATE INDEX idx_games_route ON $_tableName (source_id, endpoint_id)
     ''');
 
     // RetroAchievements tables
@@ -291,13 +305,70 @@ class DatabaseService {
             'ALTER TABLE $_tableName ADD COLUMN alternative_sources TEXT');
       });
     }
+    if (oldVersion < 14) {
+      // Per-route game lists. Until now a game was unique per (system,
+      // filename), so the same server reached two ways overwrote itself and
+      // switching routes meant a full re-sync. Promoting source_id out of the
+      // provider_config JSON blob and adding endpoint_id lets each route keep
+      // its own list — and makes "by source" queries an indexed lookup instead
+      // of a LIKE scan over serialised JSON.
+      await db.transaction((txn) async {
+        await txn.execute(
+          "ALTER TABLE $_tableName ADD COLUMN source_id TEXT NOT NULL DEFAULT ''",
+        );
+        await txn.execute(
+          "ALTER TABLE $_tableName ADD COLUMN endpoint_id TEXT NOT NULL DEFAULT ''",
+        );
+
+        // Backfill from the JSON blob that has carried source_id all along.
+        // json_extract is available in the SQLite bundled with sqflite; fall
+        // back to leaving '' rather than failing the whole migration, because
+        // an empty route still works — it just starts a fresh list.
+        try {
+          await txn.rawUpdate(
+            "UPDATE $_tableName SET source_id = "
+            "COALESCE(json_extract(provider_config, '\$.source_id'), '') "
+            'WHERE provider_config IS NOT NULL',
+          );
+        } catch (e) {
+          debugPrint('migration v14: json_extract backfill skipped: $e');
+        }
+
+        // Everything that pre-dates routes belongs to the endpoint that
+        // Source.fromJson synthesises from the legacy connection fields.
+        await txn.rawUpdate(
+          "UPDATE $_tableName SET endpoint_id = 'primary' WHERE source_id != ''",
+        );
+
+        await txn.execute('DROP INDEX IF EXISTS idx_games_system_filename');
+        await txn.execute(
+          'CREATE UNIQUE INDEX idx_games_system_filename_route '
+          'ON $_tableName (systemSlug, filename, source_id, endpoint_id)',
+        );
+        await txn.execute(
+          'CREATE INDEX IF NOT EXISTS idx_games_route '
+          'ON $_tableName (source_id, endpoint_id)',
+        );
+      });
+    }
   }
 
+  /// Persists [games] for one system **within one route**.
+  ///
+  /// [sourceId] / [endpointId] identify which route produced this list. They
+  /// default to `''`, the bucket local filesystem scans live in — local files
+  /// belong to no route.
+  ///
+  /// Orphan deletion is scoped to the same route. That scoping is the whole
+  /// point: without it, syncing over the LAN would see the internet route's
+  /// rows as orphans and delete the lot.
   Future<void> saveGames(
     String systemSlug,
     List<GameItem> games, {
     bool deleteOrphans = false,
     bool forceDeleteOrphans = false,
+    String sourceId = '',
+    String endpointId = '',
   }) async {
     final db = await database;
     await db.transaction((txn) async {
@@ -308,8 +379,8 @@ class DatabaseService {
         final existing = await txn.query(
           _tableName,
           columns: ['filename'],
-          where: 'systemSlug = ?',
-          whereArgs: [systemSlug],
+          where: 'systemSlug = ? AND source_id = ? AND endpoint_id = ?',
+          whereArgs: [systemSlug, sourceId, endpointId],
         );
         final existingFiles =
             existing.map((r) => r['filename'] as String).toSet();
@@ -334,18 +405,38 @@ class DatabaseService {
               final chunk = orphanList.skip(i).take(100).toList();
               final placeholders = List.filled(chunk.length, '?').join(',');
               await txn.rawDelete(
-                'DELETE FROM $_tableName WHERE systemSlug = ? AND filename IN ($placeholders)',
-                [systemSlug, ...chunk],
+                'DELETE FROM $_tableName WHERE systemSlug = ? '
+                'AND source_id = ? AND endpoint_id = ? '
+                'AND filename IN ($placeholders)',
+                [systemSlug, sourceId, endpointId, ...chunk],
               );
-              // Cascade: remove orphaned metadata and RA matches
-              await txn.rawDelete(
-                'DELETE FROM game_metadata WHERE system_slug = ? AND filename IN ($placeholders)',
+              // Cascade: remove orphaned metadata and RA matches — but only
+              // once no route still lists the file. Metadata and achievement
+              // matches are keyed by (system, filename) with no route
+              // dimension, so deleting them while another route still shows
+              // the game would strip its cover and RA progress.
+              final stillReferenced = <String>{};
+              for (final row in await txn.rawQuery(
+                'SELECT DISTINCT filename FROM $_tableName '
+                'WHERE systemSlug = ? AND filename IN ($placeholders)',
                 [systemSlug, ...chunk],
-              );
-              await txn.rawDelete(
-                'DELETE FROM ra_matches WHERE system_slug = ? AND game_filename IN ($placeholders)',
-                [systemSlug, ...chunk],
-              );
+              )) {
+                stillReferenced.add(row['filename'] as String);
+              }
+              final droppable =
+                  chunk.where((f) => !stillReferenced.contains(f)).toList();
+              if (droppable.isNotEmpty) {
+                final dropPlaceholders =
+                    List.filled(droppable.length, '?').join(',');
+                await txn.rawDelete(
+                  'DELETE FROM game_metadata WHERE system_slug = ? AND filename IN ($dropPlaceholders)',
+                  [systemSlug, ...droppable],
+                );
+                await txn.rawDelete(
+                  'DELETE FROM ra_matches WHERE system_slug = ? AND game_filename IN ($dropPlaceholders)',
+                  [systemSlug, ...droppable],
+                );
+              }
             }
           }
         }
@@ -355,9 +446,9 @@ class DatabaseService {
       final batch = txn.batch();
       for (final game in games) {
         batch.rawInsert('''
-          INSERT INTO $_tableName (systemSlug, filename, displayName, url, region, cover_url, provider_config, has_thumbnail, is_folder, alternative_sources)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(systemSlug, filename) DO UPDATE SET
+          INSERT INTO $_tableName (systemSlug, filename, displayName, url, region, cover_url, provider_config, has_thumbnail, is_folder, alternative_sources, source_id, endpoint_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(systemSlug, filename, source_id, endpoint_id) DO UPDATE SET
             displayName = excluded.displayName,
             url = excluded.url,
             region = excluded.region,
@@ -382,6 +473,8 @@ class DatabaseService {
               ? null
               : jsonEncode(
                   game.alternativeSources.map((a) => a.toJson()).toList()),
+          sourceId,
+          endpointId,
         ]);
       }
       await batch.commit(noResult: true);
@@ -507,29 +600,173 @@ class DatabaseService {
     );
   }
 
-  Future<List<GameItem>> getGames(String systemSlug) async {
+  /// Games for one system.
+  ///
+  /// Pass [sourceId] / [endpointId] to see just one route's list — that is
+  /// what makes switching routes swap the list instead of re-syncing. Passing
+  /// neither returns every route's rows, which is what the global library and
+  /// the thumbnail jobs want.
+  ///
+  /// Local filesystem entries live under the empty route (`''`/`''`); pass
+  /// [includeLocal] to fold them in alongside a specific route.
+  Future<List<GameItem>> getGames(
+    String systemSlug, {
+    String? sourceId,
+    String? endpointId,
+    bool includeLocal = false,
+  }) async {
     final db = await database;
+    var where = 'systemSlug = ?';
+    final args = <Object?>[systemSlug];
+    if (sourceId != null || endpointId != null) {
+      final routeClause = '(source_id = ? AND endpoint_id = ?)';
+      args.addAll([sourceId ?? '', endpointId ?? '']);
+      where += includeLocal
+          ? " AND ($routeClause OR (source_id = '' AND endpoint_id = ''))"
+          : ' AND $routeClause';
+    }
     final maps = await db.query(
       _tableName,
-      where: 'systemSlug = ?',
-      whereArgs: [systemSlug],
+      where: where,
+      whereArgs: args,
       orderBy: 'displayName ASC',
     );
 
-    return maps
-        .map((map) => GameItem(
-              filename: map['filename'] as String,
-              displayName: map['displayName'] as String,
-              url: map['url'] as String,
-              cachedCoverUrl: map['cover_url'] as String?,
-              providerConfig: _decodeProviderConfig(
-                  map['provider_config'] as String?),
-              hasThumbnail: (map['has_thumbnail'] as int?) == 1,
-              isFolder: (map['is_folder'] as int?) == 1,
-              alternativeSources: _decodeAlternativeSources(
-                  map['alternative_sources'] as String?),
-            ))
-        .toList();
+    return maps.map(_gameFromRow).toList();
+  }
+
+  static GameItem _gameFromRow(Map<String, Object?> map) => GameItem(
+        filename: map['filename'] as String,
+        displayName: map['displayName'] as String,
+        url: map['url'] as String,
+        cachedCoverUrl: map['cover_url'] as String?,
+        providerConfig:
+            _decodeProviderConfig(map['provider_config'] as String?),
+        hasThumbnail: (map['has_thumbnail'] as int?) == 1,
+        isFolder: (map['is_folder'] as int?) == 1,
+        alternativeSources:
+            _decodeAlternativeSources(map['alternative_sources'] as String?),
+      );
+
+  /// Games belonging to any of [routes], optionally plus the local bucket.
+  ///
+  /// The game list passes the routes its system's providers currently resolve
+  /// to, which is how switching a source's route swaps the visible list
+  /// without a re-sync: the other route's rows are still there, just not
+  /// selected. An empty [routes] with [includeLocal] gives just local files.
+  Future<List<GameItem>> getGamesForRoutes(
+    String systemSlug,
+    Iterable<({String source, String endpoint})> routes, {
+    bool includeLocal = true,
+  }) async {
+    final db = await database;
+    final clauses = <String>[];
+    final args = <Object?>[systemSlug];
+    for (final r in routes) {
+      clauses.add('(source_id = ? AND endpoint_id = ?)');
+      args.addAll([r.source, r.endpoint]);
+    }
+    if (includeLocal) {
+      clauses.add("(source_id = '' AND endpoint_id = '')");
+    }
+    if (clauses.isEmpty) return const [];
+
+    final maps = await db.query(
+      _tableName,
+      where: 'systemSlug = ? AND (${clauses.join(' OR ')})',
+      whereArgs: args,
+      orderBy: 'displayName ASC',
+    );
+    return maps.map(_gameFromRow).toList();
+  }
+
+  /// Saves [games] splitting them into one batch per route.
+  ///
+  /// Each [GameItem] already knows where it came from via its
+  /// `providerConfig`, so the grouping needs no extra plumbing from callers.
+  /// Items with no provider (local filesystem scans) land in the empty route.
+  ///
+  /// Use this rather than [saveGames] for anything that mixes sources: it is
+  /// what stops a sync writing every route's results into one shared bucket,
+  /// and it keeps orphan pruning inside the route that produced the list.
+  Future<void> saveGamesByRoute(
+    String systemSlug,
+    List<GameItem> games, {
+    bool deleteOrphans = false,
+    bool forceDeleteOrphans = false,
+  }) async {
+    final byRoute = <({String source, String endpoint}), List<GameItem>>{};
+    for (final game in games) {
+      final key = (
+        source: game.providerConfig?.sourceId ?? '',
+        endpoint: game.providerConfig?.endpointId ?? '',
+      );
+      (byRoute[key] ??= <GameItem>[]).add(game);
+    }
+
+    // An empty incoming list still has to reach saveGames, otherwise
+    // "the server now returns nothing" could never prune anything.
+    if (byRoute.isEmpty) {
+      await saveGames(
+        systemSlug,
+        const [],
+        deleteOrphans: deleteOrphans,
+        forceDeleteOrphans: forceDeleteOrphans,
+      );
+      return;
+    }
+
+    for (final entry in byRoute.entries) {
+      await saveGames(
+        systemSlug,
+        entry.value,
+        deleteOrphans: deleteOrphans,
+        forceDeleteOrphans: forceDeleteOrphans,
+        sourceId: entry.key.source,
+        endpointId: entry.key.endpoint,
+      );
+    }
+  }
+
+  /// How many games each route has cached, keyed `"<sourceId>|<endpointId>"`.
+  ///
+  /// This is the number the route switcher shows: it answers "what did *this*
+  /// route actually find", which a shared list could never distinguish. The
+  /// empty-route bucket (local filesystem scans) is excluded — it belongs to
+  /// no route and would otherwise be attributed to whichever one you opened.
+  Future<Map<String, int>> getGameCountsPerRoute() async {
+    final db = await database;
+    final rows = await db.rawQuery(
+      'SELECT source_id, endpoint_id, COUNT(*) AS c FROM $_tableName '
+      "WHERE source_id != '' GROUP BY source_id, endpoint_id",
+    );
+    return {
+      for (final r in rows)
+        '${r['source_id']}|${r['endpoint_id']}': (r['c'] as int?) ?? 0,
+    };
+  }
+
+  /// Games cached for one specific route.
+  Future<int> getGameCountForRoute(String sourceId, String endpointId) async {
+    final db = await database;
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS c FROM $_tableName '
+      'WHERE source_id = ? AND endpoint_id = ?',
+      [sourceId, endpointId],
+    );
+    return (rows.first['c'] as int?) ?? 0;
+  }
+
+  /// Drops every cached row for one route, leaving other routes of the same
+  /// source untouched. Used when a route is deleted.
+  Future<int> deleteRoute(String sourceId, String endpointId) async {
+    if (sourceId.isEmpty) return 0;
+    final db = await database;
+    return db.delete(
+      _tableName,
+      where: 'source_id = ? AND endpoint_id = ?',
+      whereArgs: [sourceId, endpointId],
+    );
   }
 
   static List<AlternativeSource> _decodeAlternativeSources(String? raw) {

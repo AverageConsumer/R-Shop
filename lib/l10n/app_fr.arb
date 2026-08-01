@@ -488,5 +488,18 @@
   "service_downloadComplete": "Téléchargements terminés",
   "service_downloading": "Téléchargement : {details}",
   "service_activeCount": "{count} actifs",
-  "service_queuedCount": "{count} en attente"
+  "service_queuedCount": "{count} en attente",
+  "sources_connectionRoute": "Voie de connexion",
+  "sources_routeAuto": "Automatique",
+  "sources_routeAutoHint": "Utiliser la voie qui répond, la première en priorité",
+  "sources_routeInUse": "Utilisée",
+  "sources_routePinned": "Verrouillée",
+  "sources_routeReachable": "Joignable",
+  "sources_routeNoAnswer": "Sans réponse",
+  "sources_routeChecking": "Vérification…",
+  "sources_routeOnlyOne": "Cette source n'a qu'une seule voie",
+  "sources_addRoute": "Ajouter une voie",
+  "sources_editRoute": "Modifier la voie",
+  "sources_removeRoute": "Supprimer la voie",
+  "sources_routeDuplicate": "Cette source a déjà une voie vers cette adresse"
 }

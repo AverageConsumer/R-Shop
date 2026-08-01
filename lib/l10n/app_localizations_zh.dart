@@ -1579,4 +1579,43 @@ class LZh extends L {
   String service_queuedCount(int count) {
     return '$count 個等待中';
   }
+
+  @override
+  String get sources_connectionRoute => '連線方式';
+
+  @override
+  String get sources_routeAuto => '自動選擇';
+
+  @override
+  String get sources_routeAutoHint => '用連得上的那條，優先用最上面的';
+
+  @override
+  String get sources_routeInUse => '使用中';
+
+  @override
+  String get sources_routePinned => '已鎖定';
+
+  @override
+  String get sources_routeReachable => '連得上';
+
+  @override
+  String get sources_routeNoAnswer => '沒有回應';
+
+  @override
+  String get sources_routeChecking => '檢查中…';
+
+  @override
+  String get sources_routeOnlyOne => '這個來源只有一條連線方式';
+
+  @override
+  String get sources_addRoute => '新增連線方式';
+
+  @override
+  String get sources_editRoute => '編輯連線方式';
+
+  @override
+  String get sources_removeRoute => '刪除這條連線方式';
+
+  @override
+  String get sources_routeDuplicate => '這個來源已經有一條指向同一個位址的連線方式';
 }

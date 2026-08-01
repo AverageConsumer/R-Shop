@@ -153,14 +153,22 @@ class GameListController extends ChangeNotifier {
         _groupGames();
         _restoreFilters();
         _resolveInstalledStatus();
-        await _databaseService.saveGames(system.id, _state.allGames, forceDeleteOrphans: true);
+        await _databaseService.saveGamesByRoute(system.id, _state.allGames, forceDeleteOrphans: true);
         onGamesSaved?.call();
         return;
       }
 
       // Cache-first: show cached games immediately if available
       if (!forceRefresh && await _databaseService.hasCache(system.id)) {
-        var cached = await _databaseService.getGames(system.id);
+        // Only this system's *currently live* routes. The other route's rows
+        // stay in the DB untouched, so switching back shows them again
+        // without a re-sync.
+        var cached = await _databaseService.getGamesForRoutes(
+          system.id,
+          systemConfig.providers.map(
+            (p) => (source: p.sourceId ?? '', endpoint: p.endpointId ?? ''),
+          ),
+        );
         if (cached.isNotEmpty) {
           // DB strips auth for security — rehydrate from config
           cached = GameItem.rehydrateAuth(cached, systemConfig.providers);
@@ -190,7 +198,7 @@ class GameListController extends ChangeNotifier {
     _groupGames();
     _restoreFilters();
     _resolveInstalledStatus();
-    _databaseService.saveGames(system.id, _state.allGames, deleteOrphans: true);
+    _databaseService.saveGamesByRoute(system.id, _state.allGames, deleteOrphans: true);
     onGamesSaved?.call();
   }
 
@@ -223,7 +231,7 @@ class GameListController extends ChangeNotifier {
         _restoreFilters();
         _resolveInstalledStatus();
       }
-      _databaseService.saveGames(system.id, games, deleteOrphans: true);
+      _databaseService.saveGamesByRoute(system.id, games, deleteOrphans: true);
       _storage?.setLastSyncTime(system.id, DateTime.now());
       onGamesSaved?.call();
       if (_state.isOffline) {

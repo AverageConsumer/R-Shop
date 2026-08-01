@@ -568,5 +568,18 @@
   "service_activeCount": "{count} 個下載中",
   "@service_activeCount": { "placeholders": { "count": { "type": "int" } } },
   "service_queuedCount": "{count} 個等待中",
-  "@service_queuedCount": { "placeholders": { "count": { "type": "int" } } }
+  "@service_queuedCount": { "placeholders": { "count": { "type": "int" } } },
+  "sources_connectionRoute": "連線方式",
+  "sources_routeAuto": "自動選擇",
+  "sources_routeAutoHint": "用連得上的那條，優先用最上面的",
+  "sources_routeInUse": "使用中",
+  "sources_routePinned": "已鎖定",
+  "sources_routeReachable": "連得上",
+  "sources_routeNoAnswer": "沒有回應",
+  "sources_routeChecking": "檢查中…",
+  "sources_routeOnlyOne": "這個來源只有一條連線方式",
+  "sources_addRoute": "新增連線方式",
+  "sources_editRoute": "編輯連線方式",
+  "sources_removeRoute": "刪除這條連線方式",
+  "sources_routeDuplicate": "這個來源已經有一條指向同一個位址的連線方式"
 }
