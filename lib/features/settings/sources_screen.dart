@@ -1556,6 +1556,13 @@ class _SourceTypePickerOverlayState
     super.dispose();
   }
 
+  /// Single path for choosing an option, so [A] and a tap cannot drift apart
+  /// as one of them later gains a step the other does not.
+  void _pickSelected() {
+    ref.read(feedbackServiceProvider).confirm();
+    widget.onPick(_options[_selectedIndex]);
+  }
+
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
@@ -1576,8 +1583,7 @@ class _SourceTypePickerOverlayState
     if (key == LogicalKeyboardKey.gameButtonA ||
         key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.select) {
-      ref.read(feedbackServiceProvider).confirm();
-      widget.onPick(_options[_selectedIndex]);
+      _pickSelected();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.gameButtonB ||
@@ -1643,6 +1649,10 @@ class _SourceTypePickerOverlayState
                         _TypeOptionTile(
                           option: _options[i],
                           selected: _selectedIndex == i,
+                          onTap: () {
+                            setState(() => _selectedIndex = i);
+                            _pickSelected();
+                          },
                         ),
                       ],
                       const SizedBox(height: 14),
@@ -1685,13 +1695,30 @@ class _TypeOption {
 }
 
 class _TypeOptionTile extends StatelessWidget {
-  const _TypeOptionTile({required this.option, required this.selected});
+  const _TypeOptionTile({
+    required this.option,
+    required this.selected,
+    this.onTap,
+  });
   final _TypeOption option;
   final bool selected;
+
+  /// This overlay is reached with [Y] and driven by the gamepad, but the
+  /// device has a touchscreen and the list behind it answers to taps — a row
+  /// that ignores a finger reads as frozen.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = AppTheme.primaryColor;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: _body(color),
+    );
+  }
+
+  Widget _body(Color color) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),
       width: double.infinity,
