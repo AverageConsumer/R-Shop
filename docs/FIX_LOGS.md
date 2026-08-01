@@ -181,3 +181,16 @@
 - **待辦**：接進同步流程（同步前探測 → 不通改用備援 → 標題列標示備援中）。
 - **Commit**：未提交
 
+
+## [連線方式共用憑證] R-Shop: 路由沒有自己的 auth，指向別台伺服器會 401
+
+- **檔案**：`lib/models/config/source.dart`（`endpoints` 欄位註解說明假設；`SourceEndpoint` 刻意**沒有** auth 欄位）
+             `lib/features/sources/endpoint_picker_overlay.dart`（切換器加同伺服器提示）
+             `lib/l10n/app_*.arb`（七語系新增 `sources_routeSameServerHint`）
+- **現象**：使用者問「我 romm 一個外網一個內網，他好像要做認證的耶，這樣切換的了嗎？」
+- **查證**：`auth` 掛在 `Source` 上（`source.dart:226`），`SourceEndpoint` **只有 id/label/url/host/port/share，沒有憑證欄位**。`withLiveEndpoint` 原樣保留 `auth`，`SourceResolver` 四處都餵 `source.auth` 給 provider。
+- **結論：「連線方式」只適用於同一台伺服器的多個位址。** RomM 的 token 由伺服器發、不綁位址，所以同一台的兩個位址共用一個 token 沒問題；**但指向另一台伺服器就會送錯 token，回 401，而那個錯誤看起來像伺服器掛了**，極難聯想到是設定用錯機制。
+- **使用者的情境不適用路由**：他明確說過「其實是不同的兩台伺服器」。正確做法是**兩個獨立來源各自登入，再用 `fallbackSourceId` 配成備援**——切換來源時 auth 跟著換（見 `[R-Shop 來源備援]`）。他現有的設定本來就是對的。
+- **解**：不改架構（per-endpoint 憑證會讓「同一台伺服器」這個前提失去意義，也讓 token 續期變成 N 份）。改為**把假設講出來**：切換器加一行提示指向正確做法，並在 `Source.endpoints` 的註解寫明為什麼沒有 per-route auth，免得後人以為是漏做。
+- **教訓**：**設計時的隱含假設要寫在使用者看得到的地方，不是只寫在程式註解裡。** 我在程式碼裡註明了「both routes reach the same server with the same account」，但 UI 上一個字都沒有——使用者當然會拿它來接兩台不同的伺服器。會問這題的人不只一個。
+- **Commit**：未提交
