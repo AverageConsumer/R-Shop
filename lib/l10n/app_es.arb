@@ -501,5 +501,16 @@
   "sources_addRoute": "Añadir ruta",
   "sources_editRoute": "Editar ruta",
   "sources_removeRoute": "Eliminar ruta",
-  "sources_routeDuplicate": "Esta fuente ya tiene una ruta a esa dirección"
+  "sources_routeDuplicate": "Esta fuente ya tiene una ruta a esa dirección",
+  "sources_activeSource": "Mostrando",
+  "sources_useThisSource": "Mostrar solo esta fuente",
+  "sources_showAllSources": "Mostrar todas las fuentes",
+  "sources_allSources": "Todas las fuentes",
+  "sources_switchSource": "Cambiar fuente",
+  "sources_prevSource": "Fuente anterior",
+  "sources_nextSource": "Fuente siguiente",
+  "sources_setFallback": "Fuente de respaldo",
+  "sources_fallbackNone": "Ninguna",
+  "sources_fallbackShort": "Respaldo",
+  "sources_routeSameServerHint": "Otras direcciones del mismo servidor; para otro servidor añade una fuente"
 }

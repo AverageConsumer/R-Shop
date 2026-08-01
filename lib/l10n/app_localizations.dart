@@ -3136,6 +3136,72 @@ abstract class L {
   /// In en, this message translates to:
   /// **'This source already has a route to that address'**
   String get sources_routeDuplicate;
+
+  /// No description provided for @sources_activeSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Now showing'**
+  String get sources_activeSource;
+
+  /// No description provided for @sources_useThisSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Show this source only'**
+  String get sources_useThisSource;
+
+  /// No description provided for @sources_showAllSources.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all sources'**
+  String get sources_showAllSources;
+
+  /// No description provided for @sources_allSources.
+  ///
+  /// In en, this message translates to:
+  /// **'All sources'**
+  String get sources_allSources;
+
+  /// No description provided for @sources_switchSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch source'**
+  String get sources_switchSource;
+
+  /// No description provided for @sources_prevSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Prev source'**
+  String get sources_prevSource;
+
+  /// No description provided for @sources_nextSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Next source'**
+  String get sources_nextSource;
+
+  /// No description provided for @sources_setFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup source'**
+  String get sources_setFallback;
+
+  /// No description provided for @sources_fallbackNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get sources_fallbackNone;
+
+  /// No description provided for @sources_fallbackShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get sources_fallbackShort;
+
+  /// No description provided for @sources_routeSameServerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Same server, same login — for a different server add a source instead'**
+  String get sources_routeSameServerHint;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

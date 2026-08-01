@@ -1672,4 +1672,38 @@ class LEs extends L {
   @override
   String get sources_routeDuplicate =>
       'Esta fuente ya tiene una ruta a esa dirección';
+
+  @override
+  String get sources_activeSource => 'Mostrando';
+
+  @override
+  String get sources_useThisSource => 'Mostrar solo esta fuente';
+
+  @override
+  String get sources_showAllSources => 'Mostrar todas las fuentes';
+
+  @override
+  String get sources_allSources => 'Todas las fuentes';
+
+  @override
+  String get sources_switchSource => 'Cambiar fuente';
+
+  @override
+  String get sources_prevSource => 'Fuente anterior';
+
+  @override
+  String get sources_nextSource => 'Fuente siguiente';
+
+  @override
+  String get sources_setFallback => 'Fuente de respaldo';
+
+  @override
+  String get sources_fallbackNone => 'Ninguna';
+
+  @override
+  String get sources_fallbackShort => 'Respaldo';
+
+  @override
+  String get sources_routeSameServerHint =>
+      'Otras direcciones del mismo servidor; para otro servidor añade una fuente';
 }

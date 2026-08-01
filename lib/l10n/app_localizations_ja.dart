@@ -1623,4 +1623,37 @@ class LJa extends L {
 
   @override
   String get sources_routeDuplicate => 'この提供元には同じアドレスの経路がすでにあります';
+
+  @override
+  String get sources_activeSource => '表示中';
+
+  @override
+  String get sources_useThisSource => 'この提供元のみ表示';
+
+  @override
+  String get sources_showAllSources => 'すべての提供元を表示';
+
+  @override
+  String get sources_allSources => 'すべての提供元';
+
+  @override
+  String get sources_switchSource => '提供元切替';
+
+  @override
+  String get sources_prevSource => '前の提供元';
+
+  @override
+  String get sources_nextSource => '次の提供元';
+
+  @override
+  String get sources_setFallback => 'バックアップ提供元';
+
+  @override
+  String get sources_fallbackNone => 'なし';
+
+  @override
+  String get sources_fallbackShort => 'バックアップ';
+
+  @override
+  String get sources_routeSameServerHint => '同一サーバーの別アドレス用。別サーバーなら提供元を追加してください';
 }

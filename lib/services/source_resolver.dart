@@ -25,19 +25,32 @@ class SourceResolver {
   const SourceResolver._();
 
   /// Returns the effective providers for [system].
+  /// [activeSourceId] narrows the result to a single source — the library is
+  /// showing and syncing that one alone. Null keeps every enabled source, which
+  /// is what a one-source setup gets and what the app did before switching
+  /// existed.
+  ///
+  /// An unknown id is ignored rather than yielding nothing: a source deleted
+  /// while selected should leave the user with a full library, not an empty one.
   static List<ProviderConfig> providersFor(
     SystemConfig system,
-    List<Source> allSources,
-  ) {
+    List<Source> allSources, {
+    String? activeSourceId,
+  }) {
     final allow = system.enabledSourceIds?.toSet();
     final mappingBySourceId = {
       for (final m in system.manualMappings) m.sourceId: m,
     };
+    final active = activeSourceId != null &&
+            allSources.any((s) => s.id == activeSourceId)
+        ? activeSourceId
+        : null;
 
     final entries = <_ResolvedEntry>[];
 
     for (final source in allSources) {
       if (!source.enabled) continue;
+      if (active != null && source.id != active) continue;
       if (allow != null && !allow.contains(source.id)) continue;
 
       final mapping = mappingBySourceId[source.id];

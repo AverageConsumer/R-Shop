@@ -24,6 +24,7 @@ import '../../widgets/console_notification.dart';
 import '../onboarding/widgets/romm_legacy_login_screen.dart';
 import '../pairing/qr_pairing_screen.dart';
 import '../sources/endpoint_picker_overlay.dart';
+import '../sources/fallback_picker_overlay.dart';
 import '../sources/manual_source_add_screen.dart';
 import '../sources/source_mappings_screen.dart';
 
@@ -64,6 +65,14 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// route rewrites the Source object, and a stale copy would show the old
   /// route as still live.
   String? _routePickerSourceId;
+
+  /// Mirror of AppConfig.activeSourceId so the list can mark which source is
+  /// in view. Read from the bootstrapped config; written via the notifier.
+  String? _activeSourceId;
+
+  /// Set while the fallback picker is open, held by id so the overlay always
+  /// renders the freshest source.
+  String? _fallbackPickerSourceId;
 
   /// True once we've successfully moved focus off of the screen-level
   /// Focus stub created by [ConsoleScreenMixin.buildWithActions]. Until
@@ -365,6 +374,40 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _routePickerSourceId = null);
   }
 
+  /// Hands off from the actions overlay to the fallback picker, closing the
+  /// former first so only one dialog-priority scope is ever live.
+  void _pickFallback(Source source) {
+    setState(() {
+      _activeActionsSource = null;
+      _fallbackPickerSourceId = source.id;
+    });
+  }
+
+  void _closeFallbackPicker() {
+    if (_fallbackPickerSourceId == null) return;
+    setState(() => _fallbackPickerSourceId = null);
+  }
+
+  /// One source at a time is how this app is used, so the action is a plain
+  /// toggle: pick this one, or go back to showing everything.
+  ///
+  /// Switching **never discards cached games** — the other source's library
+  /// stays in the database so coming back is instant. That is what separates
+  /// this from disabling a source.
+  Future<void> _toggleActiveSource(Source source) async {
+    final next = _activeSourceId == source.id ? null : source.id;
+    setState(() {
+      _activeSourceId = next;
+      _activeActionsSource = null;
+    });
+    try {
+      await ref.read(sourcesProvider.notifier).setActiveSource(next);
+      ref.invalidate(bootstrappedConfigProvider);
+    } catch (e) {
+      debugPrint('SourcesScreen: setActiveSource failed: $e');
+    }
+  }
+
   void _closeSourceActions() {
     if (_activeActionsSource == null) return;
     final source = _activeActionsSource!;
@@ -483,6 +526,13 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   Widget build(BuildContext context) {
     final rs = context.rs;
     final state = ref.watch(sourcesProvider);
+    // Seed from the persisted config on first build so the actions overlay
+    // offers "show all" rather than "show only this" for the source that is
+    // already active. Only adopts the stored value while we hold none of our
+    // own, so an in-flight toggle is never overwritten by a stale read.
+    final storedActive =
+        ref.watch(bootstrappedConfigProvider).valueOrNull?.activeSourceId;
+    _activeSourceId ??= storedActive;
     _gcFocusNodes(state.sources);
     _ensureInteractiveFocus(state);
 
@@ -527,6 +577,12 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                 onEditMappings: () =>
                     _editMappings(_activeActionsSource!),
                 onPickRoute: () => _pickRoute(_activeActionsSource!),
+                isActive: _activeSourceId == _activeActionsSource!.id,
+                onToggleActive: () =>
+                    _toggleActiveSource(_activeActionsSource!),
+                hasOtherSources: state.sources.length > 1,
+                onPickFallback: () =>
+                    _pickFallback(_activeActionsSource!),
               ),
             if (_showTypePicker)
               _SourceTypePickerOverlay(
@@ -547,6 +603,21 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                   return EndpointPickerOverlay(
                     source: src,
                     onClose: _closeRoutePicker,
+                  );
+                },
+              ),
+            if (_fallbackPickerSourceId != null)
+              Builder(
+                builder: (context) {
+                  final src = ref
+                      .watch(sourcesProvider)
+                      .sources
+                      .where((s) => s.id == _fallbackPickerSourceId)
+                      .firstOrNull;
+                  if (src == null) return const SizedBox.shrink();
+                  return FallbackPickerOverlay(
+                    source: src,
+                    onClose: _closeFallbackPicker,
                   );
                 },
               ),
@@ -734,6 +805,7 @@ class _SourceList extends ConsumerWidget {
                 onTap: () => onTap(source),
                 rs: rs,
                 mappingCount: mappingCounts[source.id] ?? 0,
+                isActive: cfg?.activeSourceId == source.id,
               );
             },
           ),
@@ -752,6 +824,7 @@ class _SourceCard extends ConsumerWidget {
     required this.onTap,
     required this.rs,
     this.mappingCount = 0,
+    this.isActive = false,
   });
 
   final Source source;
@@ -760,6 +833,10 @@ class _SourceCard extends ConsumerWidget {
   final VoidCallback onTap;
   final Responsive rs;
   final int mappingCount;
+
+  /// True when the library is currently showing only this source. Marked on
+  /// the card because "which source am I looking at" is otherwise invisible.
+  final bool isActive;
 
   Color get _accent {
     if (source.borrowed) return Colors.lightBlueAccent;
@@ -870,6 +947,65 @@ class _SourceCard extends ConsumerWidget {
                           ),
                         ),
                       ),
+                      // Which source the library is actually showing is
+                      // otherwise invisible, and with two sources configured
+                      // that is the first thing you need to know.
+                      if (isActive) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF7BC67B)
+                                .withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: const Color(0xFF7BC67B)
+                                  .withValues(alpha: 0.6),
+                            ),
+                          ),
+                          child: Text(
+                            L.of(context).sources_activeSource,
+                            style: const TextStyle(
+                              color: Color(0xFF7BC67B),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ],
+                      // Naming the stand-in on the card is the only way to
+                      // tell a configured pairing from an unconfigured one.
+                      if (source.fallbackSourceId != null) ...[
+                        const SizedBox(width: 6),
+                        Builder(
+                          builder: (context) {
+                            final target = ref
+                                .watch(sourcesProvider)
+                                .sources
+                                .where((s) => s.id == source.fallbackSourceId)
+                                .firstOrNull;
+                            if (target == null) return const SizedBox.shrink();
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white10,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${L.of(context).sources_fallbackShort} → ${target.name}',
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                       if (source.borrowed) ...[
                         const SizedBox(width: 6),
                         Container(
@@ -1022,6 +1158,10 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
     required this.onRepair,
     required this.onEditMappings,
     required this.onPickRoute,
+    required this.onToggleActive,
+    required this.isActive,
+    required this.onPickFallback,
+    required this.hasOtherSources,
   });
 
   final Source source;
@@ -1031,6 +1171,10 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
   final VoidCallback onRepair;
   final VoidCallback onEditMappings;
   final VoidCallback onPickRoute;
+  final VoidCallback onToggleActive;
+  final bool isActive;
+  final VoidCallback onPickFallback;
+  final bool hasOtherSources;
 
   @override
   ConsumerState<_SourceActionsOverlay> createState() =>
@@ -1059,6 +1203,18 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
           icon: Icons.tune,
           label: l.sources_editMappings,
           onActivate: widget.onEditMappings,
+        ),
+      // No "show only this / show all" here on purpose: switching which
+      // source is in view belongs on the home screen where the console list
+      // actually is (L2/R2). This screen configures sources; the badge on the
+      // card is read-only, just so you can see which one is current.
+      //
+      // Only meaningful once there is another source to stand in.
+      if (widget.hasOtherSources)
+        _OverlayAction(
+          icon: Icons.swap_horiz,
+          label: l.sources_setFallback,
+          onActivate: widget.onPickFallback,
         ),
       // Offered whenever the source has an address at all — with a single
       // route the picker still shows which one is live and why.

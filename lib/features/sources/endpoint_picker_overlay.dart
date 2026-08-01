@@ -211,7 +211,32 @@ class _EndpointPickerOverlayState
                           fontSize: 12,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
+                      // Routes share the source's credentials, so they only
+                      // work for addresses of the *same* server. Pointing one
+                      // at a different server sends the wrong token and fails
+                      // with a 401 that looks like an outage. Say so here —
+                      // the alternative (a second source with its own login,
+                      // paired as a fallback) is not obvious otherwise.
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.info_outline,
+                              size: 12, color: Colors.white38),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              l.sources_routeSameServerHint,
+                              style: const TextStyle(
+                                color: Colors.white38,
+                                fontSize: 10,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
                       _RouteRow(
                         icon: Icons.auto_mode,
                         title: l.sources_routeAuto,

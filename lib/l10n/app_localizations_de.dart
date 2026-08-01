@@ -1673,4 +1673,38 @@ class LDe extends L {
   @override
   String get sources_routeDuplicate =>
       'Diese Quelle hat bereits einen Weg zu dieser Adresse';
+
+  @override
+  String get sources_activeSource => 'Aktuell angezeigt';
+
+  @override
+  String get sources_useThisSource => 'Nur diese Quelle anzeigen';
+
+  @override
+  String get sources_showAllSources => 'Alle Quellen anzeigen';
+
+  @override
+  String get sources_allSources => 'Alle Quellen';
+
+  @override
+  String get sources_switchSource => 'Quelle wechseln';
+
+  @override
+  String get sources_prevSource => 'Vorherige Quelle';
+
+  @override
+  String get sources_nextSource => 'Nächste Quelle';
+
+  @override
+  String get sources_setFallback => 'Ersatzquelle';
+
+  @override
+  String get sources_fallbackNone => 'Keine';
+
+  @override
+  String get sources_fallbackShort => 'Ersatz';
+
+  @override
+  String get sources_routeSameServerHint =>
+      'Nur andere Adressen desselben Servers — für einen anderen Server eine Quelle anlegen';
 }

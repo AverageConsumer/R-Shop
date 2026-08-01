@@ -22,10 +22,21 @@ class AppConfig {
   final List<SystemConfig> systems;
   final List<Source> sources;
 
+  /// The one source the library is currently showing and syncing, or null to
+  /// use every enabled source at once (the historical behaviour, and what a
+  /// single-source setup gets).
+  ///
+  /// Sources are always treated as independent libraries — **even when two of
+  /// them happen to point at the same server**. Switching only changes which
+  /// one is in view; it never touches cached games, so switching back is
+  /// instant rather than a re-sync.
+  final String? activeSourceId;
+
   const AppConfig({
     this.version = currentVersion,
     required this.systems,
     this.sources = const [],
+    this.activeSourceId,
   });
 
   static const empty = AppConfig(systems: []);
@@ -60,6 +71,7 @@ class AppConfig {
         version: rawVersion,
         systems: systems,
         sources: sources,
+        activeSourceId: json['active_source_id'] as String?,
       );
     }
 
@@ -73,6 +85,7 @@ class AppConfig {
       'version': version,
       'systems': systems.map((s) => s.toJson()).toList(),
       'sources': sources.map((s) => s.toJson()).toList(),
+      if (activeSourceId != null) 'active_source_id': activeSourceId,
     };
   }
 
@@ -83,6 +96,7 @@ class AppConfig {
       'version': version,
       'systems': systems.map((s) => s.toJsonWithoutAuth()).toList(),
       'sources': sources.map((s) => s.toJsonWithoutAuth()).toList(),
+      if (activeSourceId != null) 'active_source_id': activeSourceId,
     };
   }
 
@@ -90,12 +104,30 @@ class AppConfig {
     int? version,
     List<SystemConfig>? systems,
     List<Source>? sources,
+    String? activeSourceId,
+    bool clearActiveSource = false,
   }) {
     return AppConfig(
       version: version ?? this.version,
       systems: systems ?? this.systems,
       sources: sources ?? this.sources,
+      activeSourceId:
+          clearActiveSource ? null : (activeSourceId ?? this.activeSourceId),
     );
+  }
+
+  /// The source currently in view, or null when every enabled source is used.
+  ///
+  /// Returns null when [activeSourceId] names a source that no longer exists
+  /// (deleted while selected), which degrades to "show everything" rather than
+  /// to an empty library.
+  Source? get activeSource {
+    final id = activeSourceId;
+    if (id == null) return null;
+    for (final s in sources) {
+      if (s.id == id) return s;
+    }
+    return null;
   }
 }
 

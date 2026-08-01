@@ -581,5 +581,16 @@
   "sources_addRoute": "Add route",
   "sources_editRoute": "Edit route",
   "sources_removeRoute": "Remove route",
-  "sources_routeDuplicate": "This source already has a route to that address"
+  "sources_routeDuplicate": "This source already has a route to that address",
+  "sources_activeSource": "Now showing",
+  "sources_useThisSource": "Show this source only",
+  "sources_showAllSources": "Show all sources",
+  "sources_allSources": "All sources",
+  "sources_switchSource": "Switch source",
+  "sources_prevSource": "Prev source",
+  "sources_nextSource": "Next source",
+  "sources_setFallback": "Backup source",
+  "sources_fallbackNone": "None",
+  "sources_fallbackShort": "Backup",
+  "sources_routeSameServerHint": "Same server, same login — for a different server add a source instead"
 }

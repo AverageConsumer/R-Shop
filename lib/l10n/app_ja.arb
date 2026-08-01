@@ -539,5 +539,16 @@
   "sources_addRoute": "経路を追加",
   "sources_editRoute": "経路を編集",
   "sources_removeRoute": "この経路を削除",
-  "sources_routeDuplicate": "この提供元には同じアドレスの経路がすでにあります"
+  "sources_routeDuplicate": "この提供元には同じアドレスの経路がすでにあります",
+  "sources_activeSource": "表示中",
+  "sources_useThisSource": "この提供元のみ表示",
+  "sources_showAllSources": "すべての提供元を表示",
+  "sources_allSources": "すべての提供元",
+  "sources_switchSource": "提供元切替",
+  "sources_prevSource": "前の提供元",
+  "sources_nextSource": "次の提供元",
+  "sources_setFallback": "バックアップ提供元",
+  "sources_fallbackNone": "なし",
+  "sources_fallbackShort": "バックアップ",
+  "sources_routeSameServerHint": "同一サーバーの別アドレス用。別サーバーなら提供元を追加してください"
 }

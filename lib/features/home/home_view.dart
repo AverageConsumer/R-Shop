@@ -12,8 +12,10 @@ import '../../providers/game_providers.dart';
 import '../../widgets/quick_menu.dart';
 import '../../providers/library_providers.dart';
 import '../../providers/ra_providers.dart';
+import '../../models/config/source.dart';
 import '../../services/config_bootstrap.dart';
 import '../../services/input_debouncer.dart';
+import '../../services/source_failover.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
 import '../../core/util/color_contrast.dart';
 import '../../widgets/console_hud.dart';
@@ -91,6 +93,12 @@ class _HomeViewState extends ConsumerState<HomeView>
           },
         ),
         ToggleOverlayIntent: ToggleOverlayAction(ref, onToggle: toggleQuickMenu),
+        // L2/R2 step between sources here. Elsewhere they switch tabs, so
+        // "move between views" stays their consistent meaning; home simply
+        // had no tabs to give them.
+        TabLeftIntent: TabLeftAction(ref, onTabLeft: () => _cycleActiveSource(-1)),
+        TabRightIntent:
+            TabRightAction(ref, onTabRight: () => _cycleActiveSource(1)),
       };
 
   @override
@@ -486,8 +494,19 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   void _syncAll() async {
-    final config = await ref.read(bootstrappedConfigProvider.future);
-    if (config.systems.isEmpty) return;
+    final loaded = await ref.read(bootstrappedConfigProvider.future);
+    if (loaded.systems.isEmpty) return;
+    // Check the selected source is up before committing to a sync that could
+    // otherwise sit on a dead address for the full RomM timeout, and stand its
+    // partner in when it is not. Only the config passed to the sync changes —
+    // the stored preference is untouched, so the usual source comes back on
+    // its own once it answers.
+    final resolved = await resolveForSync(config: loaded);
+    if (!mounted) return;
+    final config = resolved.config;
+    _fallbackInUse = resolved.choice.isFallback ? resolved.choice.source : null;
+    if (mounted) setState(() {});
+
     final syncService = ref.read(librarySyncServiceProvider.notifier);
     if (ref.read(librarySyncServiceProvider).isSyncing) {
       syncService.cancel();
@@ -522,11 +541,118 @@ class _HomeViewState extends ConsumerState<HomeView>
     SystemNavigator.pop();
   }
 
+  /// Set when the selected source did not answer and its partner covered the
+  /// last sync. Display-only — the stored preference never changes, so this
+  /// clears itself the next time the usual source answers.
+  Source? _fallbackInUse;
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent) {
       _debouncer.stopHold();
     }
     return KeyEventResult.ignored;
+  }
+
+  /// Steps the active source by [delta] over the ring
+  /// `all → first → … → last → all`.
+  ///
+  /// Bound to L2/R2 rather than a face button so the right thumb never has to
+  /// leave A, and made bidirectional so overshooting costs one press instead
+  /// of a full lap. "All" stays in the ring as the way out that does not
+  /// require remembering where you started.
+  ///
+  /// Cheap to press: switching never discards cached games, so the other
+  /// source's library is already in the database and appears immediately.
+  Future<void> _cycleActiveSource(int delta) async {
+    final sources =
+        ref.read(sourcesProvider).sources.where((s) => s.enabled).toList();
+    if (sources.isEmpty) return;
+
+    final current =
+        ref.read(bootstrappedConfigProvider).valueOrNull?.activeSourceId;
+    // Ring positions: 0 = all, 1..n = the sources.
+    final currentPos = current == null
+        ? 0
+        : sources.indexWhere((s) => s.id == current) + 1;
+    final ringSize = sources.length + 1;
+    // A dangling id lands on 0, which is also where we want it.
+    final nextPos = ((currentPos + delta) % ringSize + ringSize) % ringSize;
+    final next = nextPos == 0 ? null : sources[nextPos - 1].id;
+
+    ref.read(feedbackServiceProvider).confirm();
+    try {
+      await ref.read(sourcesProvider.notifier).setActiveSource(next);
+      ref.invalidate(bootstrappedConfigProvider);
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('HomeView: setActiveSource failed: $e');
+    }
+  }
+
+  /// Strip across the top naming the source the console list is showing.
+  ///
+  /// Without it the answer to "which server am I looking at" lives two screens
+  /// away in Settings, which is no use at the moment you are about to sync.
+  Widget _buildSourceBanner() {
+    final l = L.of(context);
+    final cfg = ref.watch(bootstrappedConfigProvider).valueOrNull;
+    final active = cfg?.activeSource;
+    final sources = ref.watch(sourcesProvider).sources;
+    // Hidden with a single source: there is nothing to choose between, and a
+    // header naming the only server there is would just cost a row of screen
+    // on a 3.92" display. The user confirmed this is what they want.
+    if (sources.length < 2) return const SizedBox.shrink();
+
+    // When the selected source was unreachable and its partner stood in, say
+    // so. Quietly showing a different server's library would look like games
+    // had gone missing.
+    final standIn = _fallbackInUse;
+    final name = standIn != null
+        ? '${standIn.name}（${l.sources_fallbackShort}）'
+        : (active?.name ?? l.sources_allSources);
+    final accent = standIn != null
+        ? const Color(0xFFE0A24E)
+        : (active == null ? Colors.white54 : const Color(0xFF7BC67B));
+
+    // A real row in the layout, not an overlay: it must push the console list
+    // down rather than cover whatever scrolls beneath it.
+    return SafeArea(
+      bottom: false,
+      child: IgnorePointer(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 5, 14, 5),
+          // Transparent on purpose: the home screen paints its own background
+          // (black, tinted by the selected console's accent), so any fill here
+          // shows up as a seam across the top.
+          color: Colors.transparent,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.dns_outlined, size: 13, color: accent),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  name,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+              // No button hint here on purpose. The HUD already shows both
+              // triggers as icons drawn from the user's ControllerLayout
+              // (ZL/ZR, LT/RT or L2/R2); spelling one of them out here would
+              // both duplicate that and go stale the moment the layout is
+              // changed in Settings.
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -621,25 +747,40 @@ class _HomeViewState extends ConsumerState<HomeView>
           padding: EdgeInsets.zero,
           body: Stack(
             children: [
-              if (isGrid)
-                HomeGridView(
-                  systems: _configuredSystems,
-                  selectedIndex: _currentIndex,
-                  columns: _columns,
-                  scrollController: _gridScrollController,
-                  itemKeys: _gridItemKeys,
-                  onSelect: (idx) {
-                    setState(() => _currentIndex = idx);
-                    ref.read(feedbackServiceProvider).tick();
-                  },
-                  onConfirm: _navigateToCurrentSystem,
-                  rs: rs,
-                )
-              else if (rs.isPortrait)
-                _buildPortraitLayout(rs, currentSystem, isLibrary)
-              else
-                _buildLandscapeLayout(rs, currentSystem, isLibrary),
-              if (isGrid) _buildControls(rs),
+              // The source banner takes a row of its own rather than floating
+              // over the content: as an overlay it swallowed whatever scrolled
+              // underneath it once the cursor moved down.
+              Column(
+                children: [
+                  _buildSourceBanner(),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        if (isGrid)
+                          HomeGridView(
+                            systems: _configuredSystems,
+                            selectedIndex: _currentIndex,
+                            columns: _columns,
+                            scrollController: _gridScrollController,
+                            itemKeys: _gridItemKeys,
+                            onSelect: (idx) {
+                              setState(() => _currentIndex = idx);
+                              ref.read(feedbackServiceProvider).tick();
+                            },
+                            onConfirm: _navigateToCurrentSystem,
+                            rs: rs,
+                          )
+                        else if (rs.isPortrait)
+                          _buildPortraitLayout(rs, currentSystem, isLibrary)
+                        else
+                          _buildLandscapeLayout(rs, currentSystem, isLibrary),
+                        if (isGrid) _buildControls(rs),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              // Modal overlays stay above everything, banner included.
               if (showQuickMenu)
                 QuickMenuOverlay(
                   items: _buildQuickMenuItems(),
@@ -994,6 +1135,11 @@ class _HomeViewState extends ConsumerState<HomeView>
     return ConsoleHud(
       a: HudAction(l.common_select, onTap: _navigateToCurrentSystem),
       b: HudAction(l.common_exit, onTap: _showExitDialogOverlay),
+      // Both triggers are hinted because both do something. ConsoleHud draws
+      // them from the configured ControllerLayout, so they read as ZL/ZR,
+      // LT/RT or L2/R2 to match the user's controller.
+      lt: HudAction(l.sources_prevSource, onTap: () => _cycleActiveSource(-1)),
+      rt: HudAction(l.sources_nextSource, onTap: () => _cycleActiveSource(1)),
       start: HudAction(l.common_menu, onTap: toggleQuickMenu),
     );
   }

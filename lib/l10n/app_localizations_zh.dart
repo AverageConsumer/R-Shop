@@ -1618,4 +1618,37 @@ class LZh extends L {
 
   @override
   String get sources_routeDuplicate => '這個來源已經有一條指向同一個位址的連線方式';
+
+  @override
+  String get sources_activeSource => '目前顯示';
+
+  @override
+  String get sources_useThisSource => '只看這個來源';
+
+  @override
+  String get sources_showAllSources => '顯示全部來源';
+
+  @override
+  String get sources_allSources => '全部來源';
+
+  @override
+  String get sources_switchSource => '切換來源';
+
+  @override
+  String get sources_prevSource => '上一個來源';
+
+  @override
+  String get sources_nextSource => '下一個來源';
+
+  @override
+  String get sources_setFallback => '備援來源';
+
+  @override
+  String get sources_fallbackNone => '不設定';
+
+  @override
+  String get sources_fallbackShort => '備援';
+
+  @override
+  String get sources_routeSameServerHint => '同一台伺服器的不同位址；不同伺服器請改用「新增來源」＋備援';
 }

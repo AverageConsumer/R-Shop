@@ -1662,4 +1662,38 @@ class LEn extends L {
   @override
   String get sources_routeDuplicate =>
       'This source already has a route to that address';
+
+  @override
+  String get sources_activeSource => 'Now showing';
+
+  @override
+  String get sources_useThisSource => 'Show this source only';
+
+  @override
+  String get sources_showAllSources => 'Show all sources';
+
+  @override
+  String get sources_allSources => 'All sources';
+
+  @override
+  String get sources_switchSource => 'Switch source';
+
+  @override
+  String get sources_prevSource => 'Prev source';
+
+  @override
+  String get sources_nextSource => 'Next source';
+
+  @override
+  String get sources_setFallback => 'Backup source';
+
+  @override
+  String get sources_fallbackNone => 'None';
+
+  @override
+  String get sources_fallbackShort => 'Backup';
+
+  @override
+  String get sources_routeSameServerHint =>
+      'Same server, same login — for a different server add a source instead';
 }

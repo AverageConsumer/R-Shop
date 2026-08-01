@@ -100,7 +100,8 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
               .where((p) => !p.managedBySource)
               .toList(growable: false);
           final managed =
-              SourceResolver.providersFor(s, _cachedConfig.sources);
+              SourceResolver.providersFor(s, _cachedConfig.sources,
+                  activeSourceId: _cachedConfig.activeSourceId);
           if (unmanaged.isEmpty && managed.isEmpty) return s;
           final combined = [...unmanaged, ...managed]
             ..sort((a, b) => a.priority.compareTo(b.priority));
@@ -262,6 +263,50 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     if (!enabled) {
       await _purgeCachedGamesFor(id);
     }
+  }
+
+  /// Designates [fallbackId] as the stand-in to use when [sourceId] does not
+  /// answer — typically an external address paired with an internal one.
+  ///
+  /// Pass null to clear. Refuses to point a source at itself, which would
+  /// make failover a no-op that looks configured.
+  ///
+  /// Does not purge: naming a fallback changes nothing about what is cached.
+  Future<void> setFallbackSource(String sourceId, String? fallbackId) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == sourceId,
+      orElse: () => throw StateError('Unknown source: $sourceId'),
+    );
+    if (fallbackId == sourceId) {
+      throw ArgumentError('A source cannot fall back on itself: $sourceId');
+    }
+    if (fallbackId != null && !state.sources.any((s) => s.id == fallbackId)) {
+      throw StateError('Unknown fallback source: $fallbackId');
+    }
+    if (src.fallbackSourceId == fallbackId) return;
+    await updateSource(src.copyWith(
+      fallbackSourceId: fallbackId,
+      clearFallback: fallbackId == null,
+    ));
+  }
+
+  /// Puts the library on one source, or on all of them when [id] is null.
+  ///
+  /// Sources are independent libraries **even when two of them point at the
+  /// same server** — that is the user's model, not an inference from the URLs.
+  /// So this only changes which source is in view and which one a sync talks
+  /// to; it deliberately **does not purge cached games**, which is what makes
+  /// switching back instant instead of a re-sync. `setEnabled(false)` and
+  /// `removeSource` remain the operations that discard a cache.
+  Future<void> setActiveSource(String? id) async {
+    if (id != null && !state.sources.any((s) => s.id == id)) {
+      throw StateError('Unknown source: $id');
+    }
+    if (_cachedConfig.activeSourceId == id) return;
+    // Republish with the same source list: _writeAndPublish rebuilds every
+    // system's providers through the resolver, which now filters on the
+    // active id, so sync and the game list follow in one step.
+    await _writeAndPublish(state.sources, activeSourceId: id, setActive: true);
   }
 
   // --- Routes (endpoints) ---
@@ -471,6 +516,8 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     Map<String, Map<String, String>> addMappings = const {},
     String? replaceMappingsForSource,
     List<SystemConfig> addSystems = const [],
+    String? activeSourceId,
+    bool setActive = false,
   }) async {
     // Re-read the config from disk so any writes that happened outside
     // this notifier (e.g. the onboarding flow adding new systems) are
@@ -550,7 +597,10 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     final rebuiltSystems = latest.systems.map((s) {
       final unmanaged =
           s.providers.where((p) => !p.managedBySource).toList(growable: false);
-      final managed = SourceResolver.providersFor(s, next);
+      final effectiveActive =
+          setActive ? activeSourceId : latest.activeSourceId;
+      final managed = SourceResolver.providersFor(s, next,
+          activeSourceId: effectiveActive);
       // NB: do NOT early-return when both lists are empty — that would
       // leave the system's old providers in place after a disable, which
       // is exactly the bug where syncAll keeps hitting a turned-off
@@ -563,6 +613,8 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     final updated = latest.copyWith(
       version: AppConfig.currentVersion,
       sources: next,
+      activeSourceId: setActive ? activeSourceId : null,
+      clearActiveSource: setActive && activeSourceId == null,
       systems: rebuiltSystems,
     );
     try {

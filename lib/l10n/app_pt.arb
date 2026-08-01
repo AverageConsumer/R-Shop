@@ -539,5 +539,16 @@
   "sources_addRoute": "Adicionar rota",
   "sources_editRoute": "Editar rota",
   "sources_removeRoute": "Remover rota",
-  "sources_routeDuplicate": "Esta fonte já tem uma rota para esse endereço"
+  "sources_routeDuplicate": "Esta fonte já tem uma rota para esse endereço",
+  "sources_activeSource": "A mostrar",
+  "sources_useThisSource": "Mostrar apenas esta fonte",
+  "sources_showAllSources": "Mostrar todas as fontes",
+  "sources_allSources": "Todas as fontes",
+  "sources_switchSource": "Mudar fonte",
+  "sources_prevSource": "Fonte anterior",
+  "sources_nextSource": "Fonte seguinte",
+  "sources_setFallback": "Fonte de reserva",
+  "sources_fallbackNone": "Nenhuma",
+  "sources_fallbackShort": "Reserva",
+  "sources_routeSameServerHint": "Outros endereços do mesmo servidor; para outro servidor adicione uma fonte"
 }

@@ -1672,4 +1672,38 @@ class LPt extends L {
   @override
   String get sources_routeDuplicate =>
       'Esta fonte já tem uma rota para esse endereço';
+
+  @override
+  String get sources_activeSource => 'A mostrar';
+
+  @override
+  String get sources_useThisSource => 'Mostrar apenas esta fonte';
+
+  @override
+  String get sources_showAllSources => 'Mostrar todas as fontes';
+
+  @override
+  String get sources_allSources => 'Todas as fontes';
+
+  @override
+  String get sources_switchSource => 'Mudar fonte';
+
+  @override
+  String get sources_prevSource => 'Fonte anterior';
+
+  @override
+  String get sources_nextSource => 'Fonte seguinte';
+
+  @override
+  String get sources_setFallback => 'Fonte de reserva';
+
+  @override
+  String get sources_fallbackNone => 'Nenhuma';
+
+  @override
+  String get sources_fallbackShort => 'Reserva';
+
+  @override
+  String get sources_routeSameServerHint =>
+      'Outros endereços do mesmo servidor; para outro servidor adicione uma fonte';
 }

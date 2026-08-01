@@ -1674,4 +1674,38 @@ class LFr extends L {
   @override
   String get sources_routeDuplicate =>
       'Cette source a déjà une voie vers cette adresse';
+
+  @override
+  String get sources_activeSource => 'Affichage';
+
+  @override
+  String get sources_useThisSource => 'Afficher uniquement cette source';
+
+  @override
+  String get sources_showAllSources => 'Afficher toutes les sources';
+
+  @override
+  String get sources_allSources => 'Toutes les sources';
+
+  @override
+  String get sources_switchSource => 'Changer de source';
+
+  @override
+  String get sources_prevSource => 'Source préc.';
+
+  @override
+  String get sources_nextSource => 'Source suiv.';
+
+  @override
+  String get sources_setFallback => 'Source de secours';
+
+  @override
+  String get sources_fallbackNone => 'Aucune';
+
+  @override
+  String get sources_fallbackShort => 'Secours';
+
+  @override
+  String get sources_routeSameServerHint =>
+      'Autres adresses du même serveur ; pour un autre serveur, ajoutez une source';
 }

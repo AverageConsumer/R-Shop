@@ -229,6 +229,15 @@ class Source {
 
   /// Alternative ways to reach this same source, e.g. LAN vs internet.
   ///
+  /// **Every route shares this source's [auth].** A RomM token is issued by a
+  /// server, not by an address, so two addresses of one server work with one
+  /// token — but pointing a route at a *different* server sends it the wrong
+  /// token and fails with a 401 that reads like the server is down.
+  ///
+  /// Two genuinely different servers are two [Source]s, each with its own
+  /// login, optionally paired through [fallbackSourceId]. That path switches
+  /// the whole source, credentials included.
+  ///
   /// Empty for sources created before routes existed and for sources that
   /// only ever had one address; in that case the connection fields above
   /// stand alone. [Source.fromJson] backfills a single endpoint from the
@@ -257,6 +266,14 @@ class Source {
   /// Off-switch that suppresses the source from sync without deleting it
   /// or losing its credentials.
   final bool enabled;
+
+  /// Another source to fall back on when this one does not answer — the
+  /// typical pair being an internal-network server and its external address.
+  ///
+  /// Falling back is a temporary substitution, not a change of preference:
+  /// whichever source the user selected stays selected, so once this one is
+  /// reachable again it is used without anyone having to switch back.
+  final String? fallbackSourceId;
 
   // --- Borrow / sharing ---
 
@@ -293,6 +310,7 @@ class Source {
     this.autoMap = false,
     this.priority = 100,
     this.enabled = true,
+    this.fallbackSourceId,
     this.borrowed = false,
     this.tokenExpiresAt,
     this.knownPlatforms = const {},
@@ -353,6 +371,7 @@ class Source {
       autoMap: json['auto_map'] as bool? ?? false,
       priority: json['priority'] as int? ?? 100,
       enabled: json['enabled'] as bool? ?? true,
+      fallbackSourceId: json['fallback_source_id'] as String?,
       borrowed: json['borrowed'] as bool? ?? false,
       tokenExpiresAt: exp,
       knownPlatforms: (json['known_platforms'] as Map<String, dynamic>?)
@@ -379,6 +398,7 @@ class Source {
       'auto_map': autoMap,
       'priority': priority,
       'enabled': enabled,
+      if (fallbackSourceId != null) 'fallback_source_id': fallbackSourceId,
       'borrowed': borrowed,
       if (tokenExpiresAt != null)
         'token_expires_at': tokenExpiresAt!.toIso8601String(),
@@ -559,6 +579,8 @@ class Source {
     bool? autoMap,
     int? priority,
     bool? enabled,
+    String? fallbackSourceId,
+    bool clearFallback = false,
     bool? borrowed,
     DateTime? tokenExpiresAt,
     Map<String, int>? knownPlatforms,
@@ -581,6 +603,8 @@ class Source {
       autoMap: autoMap ?? this.autoMap,
       priority: priority ?? this.priority,
       enabled: enabled ?? this.enabled,
+      fallbackSourceId:
+          clearFallback ? null : (fallbackSourceId ?? this.fallbackSourceId),
       borrowed: borrowed ?? this.borrowed,
       tokenExpiresAt: tokenExpiresAt ?? this.tokenExpiresAt,
       knownPlatforms: knownPlatforms ?? this.knownPlatforms,

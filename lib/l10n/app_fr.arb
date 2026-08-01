@@ -501,5 +501,16 @@
   "sources_addRoute": "Ajouter une voie",
   "sources_editRoute": "Modifier la voie",
   "sources_removeRoute": "Supprimer la voie",
-  "sources_routeDuplicate": "Cette source a déjà une voie vers cette adresse"
+  "sources_routeDuplicate": "Cette source a déjà une voie vers cette adresse",
+  "sources_activeSource": "Affichage",
+  "sources_useThisSource": "Afficher uniquement cette source",
+  "sources_showAllSources": "Afficher toutes les sources",
+  "sources_allSources": "Toutes les sources",
+  "sources_switchSource": "Changer de source",
+  "sources_prevSource": "Source préc.",
+  "sources_nextSource": "Source suiv.",
+  "sources_setFallback": "Source de secours",
+  "sources_fallbackNone": "Aucune",
+  "sources_fallbackShort": "Secours",
+  "sources_routeSameServerHint": "Autres adresses du même serveur ; pour un autre serveur, ajoutez une source"
 }
