@@ -1,3 +1,5 @@
+> **English** | [繁體中文](USER_GUIDE.zh-TW.md)
+
 # R-Shop User Guide
 
 R-Shop is a retro game manager with a console-style UI. It organizes, downloads, and manages ROM files from your own servers and network shares, with full gamepad and keyboard support.
