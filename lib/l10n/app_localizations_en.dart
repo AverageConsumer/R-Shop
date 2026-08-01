@@ -1695,5 +1695,9 @@ class LEn extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      'Same server, same login — for a different server add a source instead';
+      'Only for addresses that need no separate login. If it asks you to sign in again, add it as its own source and pair the two as backups.';
+
+  @override
+  String get sources_routeCannotRemoveLast =>
+      'The last route cannot be removed';
 }

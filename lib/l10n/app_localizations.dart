@@ -3200,8 +3200,14 @@ abstract class L {
   /// No description provided for @sources_routeSameServerHint.
   ///
   /// In en, this message translates to:
-  /// **'Same server, same login — for a different server add a source instead'**
+  /// **'Only for addresses that need no separate login. If it asks you to sign in again, add it as its own source and pair the two as backups.'**
   String get sources_routeSameServerHint;
+
+  /// No description provided for @sources_routeCannotRemoveLast.
+  ///
+  /// In en, this message translates to:
+  /// **'The last route cannot be removed'**
+  String get sources_routeCannotRemoveLast;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {

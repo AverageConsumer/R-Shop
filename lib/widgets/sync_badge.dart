@@ -52,6 +52,22 @@ class _LibrarySyncPill extends ConsumerStatefulWidget {
 class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
   Map<String, String> _failedSystems = const {};
 
+  /// Appends the source being synced to [systemName].
+  ///
+  /// Returns [systemName] unchanged when every source is in view — there is no
+  /// single server to name then, and inventing one would be worse than saying
+  /// nothing.
+  String? _withSource(BuildContext context, String? systemName) {
+    final src = ref.watch(syncingSourceProvider);
+    if (src == null) return systemName;
+    final label = src.isFallback
+        ? '${src.name}（${L.of(context).sources_fallbackShort}）'
+        : src.name;
+    return systemName == null || systemName.isEmpty
+        ? label
+        : '$systemName · $label';
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(librarySyncServiceProvider);
@@ -90,7 +106,10 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
           color: Colors.cyanAccent,
         ),
         label: L.of(context).sync_progress(state.completedSystems, state.totalSystems),
-        systemName: state.currentSystem,
+        // Name the server alongside the console. With two sources configured,
+        // "3/8 · SNES" does not say whose library is being fetched — and when
+        // a stand-in is covering, that is exactly what you need to know.
+        systemName: _withSource(context, state.currentSystem),
       );
     }
 

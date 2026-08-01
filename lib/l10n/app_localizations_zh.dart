@@ -1650,5 +1650,9 @@ class LZh extends L {
   String get sources_fallbackShort => '備援';
 
   @override
-  String get sources_routeSameServerHint => '同一台伺服器的不同位址；不同伺服器請改用「新增來源」＋備援';
+  String get sources_routeSameServerHint =>
+      '只適用不需要另外登入的位址。如果那個位址要你重新登入，請改成「新增來源」，再把兩個互設備援。';
+
+  @override
+  String get sources_routeCannotRemoveLast => '最後一條連線方式不能移除';
 }

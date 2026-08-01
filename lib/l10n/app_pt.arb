@@ -550,5 +550,6 @@
   "sources_setFallback": "Fonte de reserva",
   "sources_fallbackNone": "Nenhuma",
   "sources_fallbackShort": "Reserva",
-  "sources_routeSameServerHint": "Outros endereços do mesmo servidor; para outro servidor adicione uma fonte"
+  "sources_routeSameServerHint": "Apenas para endereços que não exigem início de sessão separado. Se pedir para entrar de novo, adicione como fonte própria e emparelhe as duas como reserva.",
+  "sources_routeCannotRemoveLast": "Não é possível remover a última rota"
 }

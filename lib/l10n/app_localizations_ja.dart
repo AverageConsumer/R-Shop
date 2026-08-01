@@ -1655,5 +1655,9 @@ class LJa extends L {
   String get sources_fallbackShort => 'バックアップ';
 
   @override
-  String get sources_routeSameServerHint => '同一サーバーの別アドレス用。別サーバーなら提供元を追加してください';
+  String get sources_routeSameServerHint =>
+      '別途ログインが不要なアドレス専用です。再ログインを求められる場合は提供元として追加し、2つをバックアップとして紐付けてください。';
+
+  @override
+  String get sources_routeCannotRemoveLast => '最後の経路は削除できません';
 }

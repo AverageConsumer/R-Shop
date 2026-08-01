@@ -550,5 +550,6 @@
   "sources_setFallback": "バックアップ提供元",
   "sources_fallbackNone": "なし",
   "sources_fallbackShort": "バックアップ",
-  "sources_routeSameServerHint": "同一サーバーの別アドレス用。別サーバーなら提供元を追加してください"
+  "sources_routeSameServerHint": "別途ログインが不要なアドレス専用です。再ログインを求められる場合は提供元として追加し、2つをバックアップとして紐付けてください。",
+  "sources_routeCannotRemoveLast": "最後の経路は削除できません"
 }

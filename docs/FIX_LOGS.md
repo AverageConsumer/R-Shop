@@ -208,3 +208,22 @@
 - **順手修掉一個真實破綻**：`EndpointProbeService.reachableFor` 原本遇到 `endpoints` 為空就直接回傳空集合。而**位址回填只發生在 `Source.fromJson`**，程式碼裡直接建構的 `Source`（有 `url` 但 `endpoints` 空）會被**靜默判定為不可達**——而「不可達」正是觸發備援的條件，等於可能在沒真的連過的情況下就把某台停用掉。改為 endpoints 為空時用來源本身的連線欄位探測。**這是測試抓到的，不是我想到的**：測試直接建構 Source，剛好是正式路徑從沒遇過的形狀。
 - **測試**：`source_failover_sync_test.dart` 9 個（含「偏好未被更動」「偏好通就不探備援」「兩台都不通停在偏好」）。完整套件 1740 通過 / 7 個既有環境失敗，零回歸。
 - **Commit**：`d5d7522`（功能）、`e79007e`（探測修復）
+
+## [同步不知道是哪一台] R-Shop: 徽章只寫進度沒寫來源；連線方式也只能新增不能刪
+
+- **檔案**：`lib/providers/app_providers.dart`（新增 `syncingSourceProvider`）
+             `lib/features/home/home_view.dart`（`_resolveSyncTarget` 抽出，自動同步也走它；標題列改讀 provider）
+             `lib/widgets/sync_badge.dart`（`_withSource` 把來源名接在主機名後）
+             `lib/features/sources/endpoint_picker_overlay.dart`（`[X]` 移除、`[Y]` 編輯、錯誤訊息、提示列）
+             `lib/l10n/app_*.arb`（`sources_routeCannotRemoveLast` 新增；`sources_routeSameServerHint` 改寫）
+- **使用者回報三件事**：
+  1. 「連線方式新增後沒有可以移除的方法」
+  2. 「是不是要說明 不需要驗證的話 / 要驗證要走備援方式」
+  3. 「同步中 指的是哪一台?? 好像沒有標示出來」
+- **解 1**：`[X]` 移除、`[Y]` 編輯目前反白的那條，**刻意不放在 `[A]`**——切換是最常做的動作，要保持一鍵。刪最後一條時 notifier 會拒絕，UI 要**顯示原因**而不是默默沒反應（沒有位址的來源無法使用）。
+- **解 2**：提示原本寫「同一台伺服器的不同位址」——那是**我的技術判準**，使用者未必知道兩個位址背後是不是同一台。改成他實際遇到的現象：「**如果那個位址要你重新登入**，請改成新增來源再互設備援」。判準要用使用者觀察得到的東西表達。
+- **解 3**：新增 `syncingSourceProvider`，標題列與徽章讀同一份，不會各說各話。徽章從 `3/8 · SNES` 變成 `3/8 · SNES · Thor localhost`，用備援時標「（備援）」。
+- **順手修掉的漏洞**：**自動背景同步（`syncSmart`）原本沒走備援解析**，只有手動同步會。所以背景同步可能一直打連不上的那台，而徽章顯示的是另一台。抽出 `_resolveSyncTarget` 讓兩條路徑共用。
+- **教訓**：這三項都是**只有實機操作才會發現**的（同類第六、七、八次，見記憶 `ui-problems-only-surface-on-device`）。特別是第 2 點——**寫給使用者看的說明，判準要用他觀察得到的現象，不是我的內部模型**。
+- **驗證**：1740 通過 / 7 個既有環境失敗，零回歸。
+- **Commit**：未提交

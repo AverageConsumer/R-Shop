@@ -1705,5 +1705,9 @@ class LEs extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      'Otras direcciones del mismo servidor; para otro servidor añade una fuente';
+      'Solo para direcciones que no requieren iniciar sesión aparte. Si te pide iniciar sesión de nuevo, añádela como fuente propia y empareja ambas como respaldo.';
+
+  @override
+  String get sources_routeCannotRemoveLast =>
+      'No se puede eliminar la última ruta';
 }

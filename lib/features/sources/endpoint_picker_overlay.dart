@@ -48,6 +48,9 @@ class _EndpointPickerOverlayState
   /// than claiming every route is dead.
   Set<String>? _reachable;
 
+  /// Shown when an action was refused, e.g. removing the only route.
+  String? _error;
+
   @override
   void initState() {
     super.initState();
@@ -112,7 +115,66 @@ class _EndpointPickerOverlayState
       widget.onClose();
       return KeyEventResult.handled;
     }
+    // [X] removes and [Y] edits the highlighted route. Kept off [A] so that
+    // switching — the thing you do constantly — stays a single press.
+    if (key == LogicalKeyboardKey.gameButtonX) {
+      _removeHighlighted();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.gameButtonY) {
+      _editHighlighted();
+      return KeyEventResult.handled;
+    }
     return KeyEventResult.ignored;
+  }
+
+  /// The route under the cursor, or null when the cursor is on a non-route row.
+  SourceEndpoint? get _highlightedEndpoint {
+    final i = _selectedIndex - 1;
+    if (i < 0 || i >= widget.source.endpoints.length) return null;
+    return widget.source.endpoints[i];
+  }
+
+  Future<void> _removeHighlighted() async {
+    final ep = _highlightedEndpoint;
+    if (ep == null) return;
+    final removed = await ref
+        .read(sourcesProvider.notifier)
+        .removeEndpoint(widget.source.id, ep.id);
+    if (!mounted) return;
+    if (!removed) {
+      // Refused: this is the last route, and a source with no address is
+      // unusable. Say so rather than appearing to ignore the press.
+      ref.read(feedbackServiceProvider).cancel();
+      setState(() => _error = L.of(context).sources_routeCannotRemoveLast);
+      return;
+    }
+    ref.read(feedbackServiceProvider).confirm();
+    setState(() {
+      _error = null;
+      if (_selectedIndex >= _rowCount - 1) _selectedIndex = 0;
+    });
+  }
+
+  Future<void> _editHighlighted() async {
+    final ep = _highlightedEndpoint;
+    if (ep == null) return;
+    ref.read(feedbackServiceProvider).confirm();
+    widget.onClose();
+    final edited = await Navigator.of(context).push<SourceEndpoint?>(
+      MaterialPageRoute(
+        builder: (_) => EndpointEditScreen(
+          sourceType: widget.source.type,
+          existingEndpoints: widget.source.endpoints,
+          initial: ep,
+        ),
+      ),
+    );
+    if (edited != null) {
+      await ref
+          .read(sourcesProvider.notifier)
+          .updateEndpoint(widget.source.id, edited);
+    }
   }
 
   Future<void> _activate() async {
@@ -286,10 +348,20 @@ class _EndpointPickerOverlayState
                         selected: _selectedIndex == _cancelIndex,
                         subdued: true,
                       ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          _error!,
+                          style: const TextStyle(
+                            color: Color(0xFFE57373),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       const Center(
                         child: Text(
-                          '↑↓ navigate · [A] select · [B] back',
+                          '↑↓ navigate · [A] select · [Y] edit · [X] remove · [B] back',
                           style: TextStyle(
                             color: Colors.white30,
                             fontSize: 10,

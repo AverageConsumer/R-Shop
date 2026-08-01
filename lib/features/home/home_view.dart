@@ -12,7 +12,7 @@ import '../../providers/game_providers.dart';
 import '../../widgets/quick_menu.dart';
 import '../../providers/library_providers.dart';
 import '../../providers/ra_providers.dart';
-import '../../models/config/source.dart';
+import '../../models/config/app_config.dart';
 import '../../services/config_bootstrap.dart';
 import '../../services/input_debouncer.dart';
 import '../../services/source_failover.dart';
@@ -161,7 +161,12 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   Future<void> _triggerLibrarySync({Set<String> forceSystemIds = const {}}) async {
-    final config = await ref.read(bootstrappedConfigProvider.future);
+    final loaded = await ref.read(bootstrappedConfigProvider.future);
+    if (!mounted) return;
+    // The automatic sync resolves its source the same way the manual one
+    // does. Without this, a background sync would quietly keep hammering an
+    // unreachable source while the badge named the wrong server.
+    final config = await _resolveSyncTarget(loaded);
     if (!mounted) return;
     if (config.systems.isNotEmpty) {
       final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
@@ -501,11 +506,8 @@ class _HomeViewState extends ConsumerState<HomeView>
     // partner in when it is not. Only the config passed to the sync changes —
     // the stored preference is untouched, so the usual source comes back on
     // its own once it answers.
-    final resolved = await resolveForSync(config: loaded);
+    final config = await _resolveSyncTarget(loaded);
     if (!mounted) return;
-    final config = resolved.config;
-    _fallbackInUse = resolved.choice.isFallback ? resolved.choice.source : null;
-    if (mounted) setState(() {});
 
     final syncService = ref.read(librarySyncServiceProvider.notifier);
     if (ref.read(librarySyncServiceProvider).isSyncing) {
@@ -541,10 +543,20 @@ class _HomeViewState extends ConsumerState<HomeView>
     SystemNavigator.pop();
   }
 
-  /// Set when the selected source did not answer and its partner covered the
-  /// last sync. Display-only — the stored preference never changes, so this
-  /// clears itself the next time the usual source answers.
-  Source? _fallbackInUse;
+  /// Probes the selected source, stands its partner in if it is silent, and
+  /// publishes which one won so the header and the sync badge can name it.
+  ///
+  /// Returns the config to sync with. Only that in-memory copy changes — the
+  /// stored preference is left alone, which is what lets the usual source
+  /// resume on its own once it answers again.
+  Future<AppConfig> _resolveSyncTarget(AppConfig loaded) async {
+    final resolved = await resolveForSync(config: loaded);
+    final chosen = resolved.choice.source;
+    ref.read(syncingSourceProvider.notifier).state = chosen == null
+        ? null
+        : (name: chosen.name, isFallback: resolved.choice.isFallback);
+    return resolved.config;
+  }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent) {
@@ -580,6 +592,9 @@ class _HomeViewState extends ConsumerState<HomeView>
     final next = nextPos == 0 ? null : sources[nextPos - 1].id;
 
     ref.read(feedbackServiceProvider).confirm();
+    // A deliberate switch supersedes whatever stand-in was showing; the next
+    // sync re-resolves and republishes.
+    ref.read(syncingSourceProvider.notifier).state = null;
     try {
       await ref.read(sourcesProvider.notifier).setActiveSource(next);
       ref.invalidate(bootstrappedConfigProvider);
@@ -606,7 +621,8 @@ class _HomeViewState extends ConsumerState<HomeView>
     // When the selected source was unreachable and its partner stood in, say
     // so. Quietly showing a different server's library would look like games
     // had gone missing.
-    final standIn = _fallbackInUse;
+    final syncing = ref.watch(syncingSourceProvider);
+    final standIn = syncing != null && syncing.isFallback ? syncing : null;
     final name = standIn != null
         ? '${standIn.name}（${l.sources_fallbackShort}）'
         : (active?.name ?? l.sources_allSources);

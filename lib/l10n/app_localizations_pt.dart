@@ -1705,5 +1705,9 @@ class LPt extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      'Outros endereços do mesmo servidor; para outro servidor adicione uma fonte';
+      'Apenas para endereços que não exigem início de sessão separado. Se pedir para entrar de novo, adicione como fonte própria e emparelhe as duas como reserva.';
+
+  @override
+  String get sources_routeCannotRemoveLast =>
+      'Não é possível remover a última rota';
 }

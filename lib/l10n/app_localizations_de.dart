@@ -1706,5 +1706,9 @@ class LDe extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      'Nur andere Adressen desselben Servers — für einen anderen Server eine Quelle anlegen';
+      'Nur für Adressen ohne separate Anmeldung. Verlangt sie eine neue Anmeldung, als eigene Quelle anlegen und beide als Ersatz verknüpfen.';
+
+  @override
+  String get sources_routeCannotRemoveLast =>
+      'Der letzte Weg kann nicht entfernt werden';
 }

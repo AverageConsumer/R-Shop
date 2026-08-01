@@ -458,3 +458,15 @@ final storageInfoProvider =
   (ref, path) => DiskSpaceService.getFreeSpace(path),
 );
 
+
+/// Which source the running (or most recent) sync is actually talking to.
+///
+/// Set when a sync resolves its source, so both the home header and the sync
+/// badge can name the server — with two sources configured, "syncing 3/8" on
+/// its own does not say *whose* library is being fetched.
+///
+/// [isFallback] is true when the selected source was unreachable and its
+/// partner stood in. Null means no single answer applies: every source is in
+/// view, or nothing has resolved yet.
+final syncingSourceProvider =
+    StateProvider<({String name, bool isFallback})?>((ref) => null);

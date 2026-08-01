@@ -550,5 +550,6 @@
   "sources_setFallback": "Ersatzquelle",
   "sources_fallbackNone": "Keine",
   "sources_fallbackShort": "Ersatz",
-  "sources_routeSameServerHint": "Nur andere Adressen desselben Servers — für einen anderen Server eine Quelle anlegen"
+  "sources_routeSameServerHint": "Nur für Adressen ohne separate Anmeldung. Verlangt sie eine neue Anmeldung, als eigene Quelle anlegen und beide als Ersatz verknüpfen.",
+  "sources_routeCannotRemoveLast": "Der letzte Weg kann nicht entfernt werden"
 }

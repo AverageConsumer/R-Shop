@@ -592,5 +592,6 @@
   "sources_setFallback": "Backup source",
   "sources_fallbackNone": "None",
   "sources_fallbackShort": "Backup",
-  "sources_routeSameServerHint": "Same server, same login — for a different server add a source instead"
+  "sources_routeSameServerHint": "Only for addresses that need no separate login. If it asks you to sign in again, add it as its own source and pair the two as backups.",
+  "sources_routeCannotRemoveLast": "The last route cannot be removed"
 }

@@ -1707,5 +1707,9 @@ class LFr extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      'Autres adresses du même serveur ; pour un autre serveur, ajoutez une source';
+      'Uniquement pour les adresses ne demandant pas de connexion distincte. Si elle redemande une connexion, ajoutez-la comme source et associez les deux en secours.';
+
+  @override
+  String get sources_routeCannotRemoveLast =>
+      'La dernière voie ne peut pas être supprimée';
 }
