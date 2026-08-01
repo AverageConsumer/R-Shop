@@ -18,6 +18,12 @@
 | **R-Shop Channel 名稱硬編** | 5 個 channel 名稱含 `applicationId`，Kotlin＋Dart 各自硬編共 20 處。**危險在靜默半合併** | `lib/services/platform_channels.dart`（新增，單一前綴） · `android/app/src/main/kotlin/.../MainActivity.kt`（`BuildConfig.APPLICATION_ID`） · `android/app/build.gradle.kts`（`buildFeatures.buildConfig = true`） · `native_smb_service` / `download_service` / `disk_space_service` / `device_info_service` |
 | **R-Shop ProviderFactory 隱式初始化** | 文件稱「未 init 就崩」，查證後**生產不可達**，是契約缺陷 | `lib/services/provider_factory.dart`（具名 `StateError` + `@visibleForTesting reset()`） |
 
+## 🎮 輸入與焦點
+
+| 關鍵字 | 症狀 / 根因 | 主要動到的檔案 |
+| :--- | :--- | :--- |
+| **浮層只做了手把** ⚠️ | ① 刪掉最後一筆來源後**手把完全失效只剩觸控**——`_initialFocusClaimed` 一旦為 true 永不重置，持有焦點的卡片被回收後螢幕上沒有任何節點有焦點。② 三個浮層的列是純 `Container`，**零觸控處理**；而 `ConsoleFocusable` 本身有 `GestureDetector`，所以卡片點得動、浮層點不動，**外觀完全看不出差別** | `lib/features/settings/sources_screen.dart`（`_ensureInteractiveFocus` 放棄宣告、`_OverlayButton.onTap`） · `lib/features/sources/endpoint_picker_overlay.dart` · `lib/features/sources/fallback_picker_overlay.dart` |
+
 ## 🛠️ 建置與環境
 
 | 關鍵字 | 症狀 / 根因 | 主要動到的檔案 |

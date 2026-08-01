@@ -304,6 +304,7 @@ class _EndpointPickerOverlayState
                         title: l.sources_routeAuto,
                         subtitle: l.sources_routeAutoHint,
                         selected: _selectedIndex == 0,
+                        onTap: () { setState(() => _selectedIndex = 0); _activate(); },
                         active: isAuto,
                       ),
                       for (int i = 0; i < src.endpoints.length; i++) ...[
@@ -317,6 +318,7 @@ class _EndpointPickerOverlayState
                           status: _statusFor(src.endpoints[i], l),
                           statusOk: _reachable?.contains(src.endpoints[i].id),
                           selected: _selectedIndex == i + 1,
+                          onTap: () { setState(() => _selectedIndex = i + 1); _activate(); },
                           active: src.endpoints[i].id == liveId,
                           badge: !isAuto && src.pinnedEndpointId == src.endpoints[i].id
                               ? l.sources_routePinned
@@ -340,12 +342,14 @@ class _EndpointPickerOverlayState
                         icon: Icons.add,
                         title: l.sources_addRoute,
                         selected: _selectedIndex == _addIndex,
+                        onTap: () { setState(() => _selectedIndex = _addIndex); _activate(); },
                       ),
                       const SizedBox(height: 8),
                       _RouteRow(
                         icon: Icons.close,
                         title: l.common_cancel,
                         selected: _selectedIndex == _cancelIndex,
+                        onTap: () { setState(() => _selectedIndex = _cancelIndex); _activate(); },
                         subdued: true,
                       ),
                       if (_error != null) ...[
@@ -392,7 +396,13 @@ class _RouteRow extends StatelessWidget {
     this.active = false,
     this.subdued = false,
     this.badge,
+    this.onTap,
   });
+
+  /// The overlay is gamepad-driven, but the device has a touchscreen and the
+  /// list behind it answers to taps — an overlay that ignores them reads as
+  /// frozen rather than as "use the buttons".
+  final VoidCallback? onTap;
 
   final IconData icon;
   final String title;
@@ -407,6 +417,14 @@ class _RouteRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = subdued ? Colors.white54 : Colors.white;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: _body(fg),
+    );
+  }
+
+  Widget _body(Color fg) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(

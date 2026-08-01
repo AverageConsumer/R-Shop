@@ -168,6 +168,7 @@ class _FallbackPickerOverlayState
                         icon: Icons.block,
                         title: l.sources_fallbackNone,
                         selected: _selectedIndex == 0,
+                        onTap: () { setState(() => _selectedIndex = 0); _activate(); },
                         active: current == null,
                       ),
                       for (int i = 0; i < candidates.length; i++) ...[
@@ -177,6 +178,7 @@ class _FallbackPickerOverlayState
                           title: candidates[i].name,
                           subtitle: candidates[i].hostLabel,
                           selected: _selectedIndex == i + 1,
+                          onTap: () { setState(() => _selectedIndex = i + 1); _activate(); },
                           active: candidates[i].id == current,
                         ),
                       ],
@@ -185,6 +187,7 @@ class _FallbackPickerOverlayState
                         icon: Icons.close,
                         title: l.common_cancel,
                         selected: _selectedIndex == _cancelIndex,
+                        onTap: () { setState(() => _selectedIndex = _cancelIndex); _activate(); },
                         subdued: true,
                       ),
                       const SizedBox(height: 12),
@@ -218,7 +221,12 @@ class _Row extends StatelessWidget {
     this.subtitle,
     this.active = false,
     this.subdued = false,
+    this.onTap,
   });
+
+  /// Gamepad-driven, but the device has a touchscreen and the list behind this
+  /// overlay answers to taps — ignoring them reads as frozen.
+  final VoidCallback? onTap;
 
   final IconData icon;
   final String title;
@@ -230,6 +238,14 @@ class _Row extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = subdued ? Colors.white54 : Colors.white;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: _body(fg),
+    );
+  }
+
+  Widget _body(Color fg) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(

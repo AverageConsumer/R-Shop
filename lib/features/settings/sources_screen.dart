@@ -115,6 +115,15 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// once focus has landed on a real interactive widget the flag stays
   /// flipped and subsequent state changes won't yank focus around.
   void _ensureInteractiveFocus(SourcesState state) {
+    // Deleting the last source disposes the card that had focus, leaving the
+    // screen with nothing focusable — the gamepad then does nothing at all and
+    // only touch still works. The claim has to be given up whenever the list
+    // the focus was living in disappears, so the empty state can take it.
+    if (_initialFocusClaimed &&
+        !_cardFocusNodes.values.any((n) => n.hasFocus) &&
+        !_addEmptyFocus.hasFocus) {
+      _initialFocusClaimed = false;
+    }
     if (_initialFocusClaimed || _activeActionsSource != null) return;
     if (state.loading) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1204,11 +1213,17 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
           label: l.sources_editMappings,
           onActivate: widget.onEditMappings,
         ),
-      // No "show only this / show all" here on purpose: switching which
-      // source is in view belongs on the home screen where the console list
-      // actually is (L2/R2). This screen configures sources; the badge on the
-      // card is read-only, just so you can see which one is current.
-      //
+      // Selectable here as well as on the home screen. The triggers there are
+      // the fast path, but you are already looking at the source list when you
+      // decide which one you want — walking back to the home screen to act on
+      // that decision is a detour.
+      _OverlayAction(
+        icon: widget.isActive ? Icons.visibility : Icons.visibility_outlined,
+        label: widget.isActive
+            ? l.sources_showAllSources
+            : l.sources_useThisSource,
+        onActivate: widget.onToggleActive,
+      ),
       // Only meaningful once there is another source to stand in.
       if (widget.hasOtherSources)
         _OverlayAction(
@@ -1353,6 +1368,13 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                           selected: _selectedIndex == i,
                           destructive: actions[i].destructive,
                           subdued: actions[i].cancelStyle,
+                          // Tapping runs the action outright rather than just
+                          // moving the cursor to it — a second tap to confirm
+                          // what you already touched is pure friction.
+                          onTap: () {
+                            setState(() => _selectedIndex = i);
+                            _activate();
+                          },
                         ),
                       ],
                       const SizedBox(height: 12),
@@ -1401,11 +1423,17 @@ class _OverlayButton extends StatelessWidget {
     required this.selected,
     this.destructive = false,
     this.subdued = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
+
+  /// The overlay is driven by the gamepad, but the device has a touchscreen
+  /// and the cards behind it are tappable — so an overlay that only answers to
+  /// buttons reads as frozen.
+  final VoidCallback? onTap;
   final bool destructive;
   final bool subdued;
 
@@ -1416,6 +1444,14 @@ class _OverlayButton extends StatelessWidget {
         : subdued
             ? Colors.white70
             : AppTheme.primaryColor;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: _body(color),
+    );
+  }
+
+  Widget _body(Color color) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),
       width: double.infinity,
