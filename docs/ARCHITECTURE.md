@@ -1,5 +1,13 @@
 # R-Shop 架構圖集（深度）
 
+> **導覽**：先讀共用的 [GLOBAL_DEV_NOTES.md](../../GLOBAL_DEV_NOTES.md)（建置工具鏈、分支政策、紀錄格式），
+> 再依需要讀本專案 `docs/` 的其餘各份：
+> - [FIX_INDEX.md](FIX_INDEX.md) — 症狀 → 過去解過的條目
+> - [FIX_LOGS.md](FIX_LOGS.md) — 修復與功能紀錄（細節、取捨、教訓）
+> - [SPEC.md](SPEC.md) — 規格；**§12 定位指引回答「我要改 X，該動哪些檔」**
+> - [USER_GUIDE.md](USER_GUIDE.md) — 使用手冊
+
+
 > **基準分支：`main-zh`** ｜ `1.7.0-zh+13` ｜ `com.retro.rshop.tw`
 > 搭配 [SPEC.md](SPEC.md) 閱讀。
 

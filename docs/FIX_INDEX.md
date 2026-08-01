@@ -1,5 +1,13 @@
 # R-Shop 解決方案索引
 
+> **導覽**：先讀共用的 [GLOBAL_DEV_NOTES.md](../../GLOBAL_DEV_NOTES.md)（建置工具鏈、分支政策、紀錄格式），
+> 再依需要讀本專案 `docs/` 的其餘各份：
+> - [ARCHITECTURE.md](ARCHITECTURE.md) — 模組分層與依賴方向
+> - [FIX_LOGS.md](FIX_LOGS.md) — 修復與功能紀錄（細節、取捨、教訓）
+> - [SPEC.md](SPEC.md) — 規格；**§12 定位指引回答「我要改 X，該動哪些檔」**
+> - [USER_GUIDE.md](USER_GUIDE.md) — 使用手冊
+
+
 > 關鍵字對應 [FIX_LOGS.md](FIX_LOGS.md) 的 `## [關鍵字]` 標題，**必須逐字一致**。
 > **不要在這裡寫死條目總數**——多個工作階段會同時追加，寫死的數字必定過時。
 > 要對帳就跑 `grep -c '^## \[' docs/FIX_LOGS.md`。

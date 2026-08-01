@@ -1,5 +1,13 @@
 # R-Shop 規格書（`main-zh`）
 
+> **導覽**：先讀共用的 [GLOBAL_DEV_NOTES.md](../../GLOBAL_DEV_NOTES.md)（建置工具鏈、分支政策、紀錄格式），
+> 再依需要讀本專案 `docs/` 的其餘各份：
+> - [ARCHITECTURE.md](ARCHITECTURE.md) — 模組分層與依賴方向
+> - [FIX_INDEX.md](FIX_INDEX.md) — 症狀 → 過去解過的條目
+> - [FIX_LOGS.md](FIX_LOGS.md) — 修復與功能紀錄（細節、取捨、教訓）
+> - [USER_GUIDE.md](USER_GUIDE.md) — 使用手冊
+
+
 > **基準分支：`main-zh`**（領先 upstream `main` 26 個 commit）
 > Flutter 專案名：`retro_eshop` ｜ Android 套件名：`com.retro.rshop.tw`
 > 版本：`1.7.0-zh+13` ｜ Dart SDK `>=3.0.0 <4.0.0` ｜ Material 3
