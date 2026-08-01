@@ -194,3 +194,17 @@
 - **解**：不改架構（per-endpoint 憑證會讓「同一台伺服器」這個前提失去意義，也讓 token 續期變成 N 份）。改為**把假設講出來**：切換器加一行提示指向正確做法，並在 `Source.endpoints` 的註解寫明為什麼沒有 per-route auth，免得後人以為是漏做。
 - **教訓**：**設計時的隱含假設要寫在使用者看得到的地方，不是只寫在程式註解裡。** 我在程式碼裡註明了「both routes reach the same server with the same account」，但 UI 上一個字都沒有——使用者當然會拿它來接兩台不同的伺服器。會問這題的人不只一個。
 - **Commit**：未提交
+
+## [備援接進同步] R-Shop: 同步前先探測，連不上就換備援那台
+
+- **檔案**：`lib/services/source_failover.dart`（`withEffectiveSource`／`resolveForSync`）
+             `lib/features/home/home_view.dart`（`_syncAll` 注入、`_fallbackInUse` 狀態、標題列橘色標示）
+             `lib/services/endpoint_probe_service.dart`（`_probeableEndpoints` 修復）
+- **需求**：使用者要「綁定多台，可以依序或自動，幫我選連線正常的那台」。他決定**兩台各自獨立設定**，理由是「連線位置不同，兩次都會需要認證，就相當於兩台不同的伺服器了」。
+- **注入點**：`_syncAll` 拿到 config 之後、傳給 `LibrarySyncService` 之前，用 `resolveForSync` 重建一份**記憶體中的** config。**磁碟上什麼都沒改**，所以偏好的來源會自己回來——這是整個設計的核心，不是實作細節。
+- **只探測最多兩台**：偏好的通就完全不探備援（探了也改變不了結果，在掌機上省一次連線）。有測試釘住 `net.asked` 只有一筆。
+- **短逾時**：TCP 連得上即可，**不能等 RomM 的同步逾時**（至少 10 分鐘）。
+- **手動切換來源會清掉備援標示**——使用者主動選了就是他說了算。
+- **順手修掉一個真實破綻**：`EndpointProbeService.reachableFor` 原本遇到 `endpoints` 為空就直接回傳空集合。而**位址回填只發生在 `Source.fromJson`**，程式碼裡直接建構的 `Source`（有 `url` 但 `endpoints` 空）會被**靜默判定為不可達**——而「不可達」正是觸發備援的條件，等於可能在沒真的連過的情況下就把某台停用掉。改為 endpoints 為空時用來源本身的連線欄位探測。**這是測試抓到的，不是我想到的**：測試直接建構 Source，剛好是正式路徑從沒遇過的形狀。
+- **測試**：`source_failover_sync_test.dart` 9 個（含「偏好未被更動」「偏好通就不探備援」「兩台都不通停在偏好」）。完整套件 1740 通過 / 7 個既有環境失敗，零回歸。
+- **Commit**：`d5d7522`（功能）、`e79007e`（探測修復）
