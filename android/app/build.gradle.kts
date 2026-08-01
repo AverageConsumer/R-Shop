@@ -28,6 +28,12 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    buildFeatures {
+        // MainActivity derives the platform-channel prefix from
+        // BuildConfig.APPLICATION_ID; AGP 8 disables BuildConfig by default.
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "com.retro.rshop.tw"
 

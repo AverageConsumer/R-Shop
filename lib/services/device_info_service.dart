@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'platform_channels.dart';
+
 enum MemoryTier { low, standard, high }
 
 class DeviceMemoryInfo {
@@ -75,7 +77,7 @@ class DeviceMemoryInfo {
 }
 
 class DeviceInfoService {
-  static const _channel = MethodChannel('com.retro.rshop.tw/storage');
+  static const _channel = MethodChannel(kStorageChannel);
   static DeviceMemoryInfo? _cached;
 
   /// Test hook: clears cached result so tests can re-query.

@@ -17,11 +17,18 @@ import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.retro.rshop.tw/zip"
-    private val STORAGE_CHANNEL = "com.retro.rshop.tw/storage"
-    private val PROGRESS_CHANNEL = "com.retro.rshop.tw/zip_progress"
-    private val SMB_CHANNEL = "com.retro.rshop.tw/smb"
-    private val SMB_PROGRESS_CHANNEL = "com.retro.rshop.tw/smb_progress"
+    // Single source of truth for the channel namespace. Derived from the
+    // applicationId in android/app/build.gradle.kts so it follows the branch
+    // automatically (upstream main = com.retro.rshop, main-zh = com.retro.rshop.tw).
+    // The Dart side mirrors this in lib/services/platform_channels.dart —
+    // both must resolve to the same strings or every native call fails with
+    // MissingPluginException at runtime.
+    private val CHANNEL_PREFIX = BuildConfig.APPLICATION_ID
+    private val CHANNEL = "$CHANNEL_PREFIX/zip"
+    private val STORAGE_CHANNEL = "$CHANNEL_PREFIX/storage"
+    private val PROGRESS_CHANNEL = "$CHANNEL_PREFIX/zip_progress"
+    private val SMB_CHANNEL = "$CHANNEL_PREFIX/smb"
+    private val SMB_PROGRESS_CHANNEL = "$CHANNEL_PREFIX/smb_progress"
     private val TAG = "MainActivity"
 
     private val extractorPool = Executors.newFixedThreadPool(2)

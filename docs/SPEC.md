@@ -46,7 +46,7 @@
 | 檔案連結為 `file:///c:/Users/Mini-PC/StudioProjects/...` | 實際路徑為 `D:\ThorAPK\StudioProjects\` | ✅ **已改為相對路徑** |
 | 版本 v1.7.0 | `main-zh` 為 `1.7.0-zh+13` | ✅ **已更新** |
 | `GlobalInputWrapper` 位於 `lib/core/input/` | 正確（`lib/core/input/global_input_wrapper.dart`） | — 無誤 |
-| 「66 種主機字典」 | `system_model.dart` 實際有 **67 個 `SystemModel(` 建構** | ⚠️ **待核實**：可能含 1 個非主機項目，或已新增 1 種未更新描述 |
+| 「66 種主機字典」 | `system_model.dart` 的 `supportedSystems` 實際為 **66 個 `SystemModel(...)` 條目**（:56 起、:883 收尾）；`grep -c "SystemModel("` 數到 67 是把 `:16` 的建構式宣告 `const SystemModel({` 也算進去了 | ✅ **已核實**：文件寫 66 種正確，無須修改程式碼 |
 
 ---
 
@@ -147,7 +147,7 @@ abstract class SourceProvider {
 | `RommProvider` | 167 | RomM REST API（委派 `RommApiService` 442 行） |
 
 `ProviderFactory.getProvider(config)` 依 `ProviderType` 建立實例。
-**注意**：`SmbProvider` 需要 `ProviderFactory.init(smbService:)` 先注入 `NativeSmbService`，否則 `_smbService!` 會拋 null assertion。
+**注意**：`SmbProvider` 需要 `ProviderFactory.init(smbService:)` 先注入 `NativeSmbService`（正式流程於 `main.dart:87` 的 `runApp()` 之前完成），否則會拋出具名 `StateError` 說明尚未初始化。測試可用 `ProviderFactory.reset()`（`@visibleForTesting`）清除 static 狀態。
 
 ### 3.3 `SourceResolver`（全靜態工具類）
 
@@ -255,7 +255,7 @@ enum DownloadStatus {
 | `com.retro.rshop.tw/smb` | MethodChannel | SMB 操作 |
 | `com.retro.rshop.tw/smb_progress` | EventChannel | SMB 傳輸進度串流 |
 
-> ⚠️ **Channel 名稱含 applicationId 前綴 `com.retro.rshop.tw`** —— 這代表 `main` 與 `main-zh` 的 channel 名稱**不同**。若要合併分支，channel 字串必須同步修改 Kotlin 與 Dart 兩側（`native_smb_service.dart` 141 行）。
+> ⚠️ **Channel 名稱含 applicationId 前綴 `com.retro.rshop.tw`** —— 這代表 `main` 與 `main-zh` 的 channel 名稱**不同**。若要合併分支，channel 字串必須同步修改 Kotlin 與 Dart 兩側（`native_smb_service.dart:22-23` 的 `_channel` / `_progressChannel` 宣告）。
 
 `SmbService.kt` 使用 `smbj` 0.13.0 處理 SMB2/SMB3 認證、檔案列舉與串流傳輸。
 
@@ -275,7 +275,7 @@ enum DownloadStatus {
 
 ### 7.2 主機字典（`system_model.dart`，906 行）
 
-約 66–67 種經典主機（NES / SNES / N64 / Game Boy / PS1 / PSP…），每筆含 platform ID、顯示名稱、副檔名清單、預設目錄映射。
+66 種經典主機（NES / SNES / N64 / Game Boy / PS1 / PSP…），每筆含 platform ID、顯示名稱、副檔名清單、預設目錄映射。
 
 配套：`romm_platform_matcher.dart`（128 行）把 RomM 的平台名稱對映到本地 `SystemModel`。
 
@@ -373,11 +373,10 @@ enum DownloadStatus {
 |------|------|------|
 | Channel 名稱含 applicationId | `main` 與 `main-zh` channel 名稱不同，合併時易漏 | `MainActivity.kt` + `native_smb_service.dart` |
 | `local` 型別不對稱 | `SourceType.local` 無對應 `ProviderType`，不走抽象層 | `source.dart` / `provider_config.dart` |
-| `ProviderFactory` null assertion | `SmbProvider` 依賴 `_smbService!`，未 `init()` 就會崩 | `provider_factory.dart:20` |
+| `ProviderFactory` 隱式初始化依賴 | static 狀態且無自動初始化；未 `init()` 就取 SMB provider 會拋 `StateError`（訊息已明確，不再是裸的 null assertion）。正式流程由 `main.dart:87` 在 `runApp()` 前 init | `provider_factory.dart` |
 | 兩種狀態管理模式並存 | Riverpod + `ChangeNotifier`（`DownloadQueueManager`、`SourcesNotifier`） | `services/` |
 | 大型單檔 | `download_service` 1245、`database_service` 1066、`system_model` 906、`download_queue_manager` 694 | `services/` `models/` |
-| 測試覆蓋 | `test/` 僅 `native_smb_service_test.dart` 一檔 | `test/` |
-| 主機數量表述 | 文件稱 66 種，程式碼有 67 個建構 | `system_model.dart` |
+| 測試覆蓋 | `test/` 已有 64 個單元測試檔 + `test/widgets/` 13 個 Widget 測試檔（涵蓋 `source_model` / `source_resolver` / `sources_notifier` / `source_failover` / `app_config` / `provider_config` / `provider_factory` / `library_sync_service` / `database_service` / `download_*` / `romm_*` / `ra_*` / `thumbnail_*` 等）；缺口在 `features/` 畫面層與 `download_service` 的整合情境 | `test/` |
 | 多平台目錄未維護 | ios / linux / macos / windows / web 目錄存在但未實際支援 | 專案根 |
 
 ---

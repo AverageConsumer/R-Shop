@@ -78,6 +78,120 @@ class SystemSourceMapping {
   }
 }
 
+/// How R-Shop decides which [SourceEndpoint] of a source to talk to.
+enum EndpointSelection {
+  /// Probe the endpoints in list order and use the first one that answers.
+  /// Falls back to the first endpoint when nothing is reachable, so a sync
+  /// still produces a real error instead of silently doing nothing.
+  auto,
+
+  /// Always use [Source.pinnedEndpointId]. The user asked for this exact
+  /// route, so we do not silently switch away from it even if it is down —
+  /// a failed sync is more honest than a route that moves behind their back.
+  pinned,
+}
+
+/// One way to reach a [Source].
+///
+/// The same RomM server is typically reachable both over the LAN
+/// (`http://192.168.1.50:8090`, fast, only at home) and over the internet
+/// (`https://roms.example.org`, slower, works anywhere). Those are not two
+/// sources — same server, same library, same credentials — they are two
+/// routes to one source.
+///
+/// **Exactly one endpoint is live at a time.** The live endpoint's connection
+/// fields are mirrored onto the parent [Source] (`url` / `host` / `port` /
+/// `share`), which is what every downstream consumer — [SourceResolver],
+/// [Source.connectionKey], the providers — actually reads. Switching routes
+/// is therefore a config-only change: no re-sync is required and no cached
+/// game is touched.
+class SourceEndpoint {
+  /// Stable identifier, unique within the parent source.
+  final String id;
+
+  /// User-facing label, e.g. "區網" or "遠端". Never empty in practice; the
+  /// editor falls back to the host when the user leaves it blank.
+  final String label;
+
+  // --- Connection (same shape as the parent Source) ---
+  final String? url; // romm/web
+  final String? host; // smb/ftp
+  final int? port; // smb/ftp
+  final String? share; // smb
+
+  const SourceEndpoint({
+    required this.id,
+    required this.label,
+    this.url,
+    this.host,
+    this.port,
+    this.share,
+  });
+
+  factory SourceEndpoint.fromJson(Map<String, dynamic> json) {
+    return SourceEndpoint(
+      id: json['id'] as String,
+      label: json['label'] as String? ?? '',
+      url: json['url'] as String?,
+      host: json['host'] as String?,
+      port: json['port'] as int?,
+      share: json['share'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'label': label,
+      if (url != null) 'url': url,
+      if (host != null) 'host': host,
+      if (port != null) 'port': port,
+      if (share != null) 'share': share,
+    };
+  }
+
+  SourceEndpoint copyWith({
+    String? id,
+    String? label,
+    String? url,
+    String? host,
+    int? port,
+    String? share,
+  }) {
+    return SourceEndpoint(
+      id: id ?? this.id,
+      label: label ?? this.label,
+      url: url ?? this.url,
+      host: host ?? this.host,
+      port: port ?? this.port,
+      share: share ?? this.share,
+    );
+  }
+
+  /// True when [other] points at the same place as this endpoint, ignoring
+  /// the label. Used to avoid creating a duplicate route for an address the
+  /// source already knows.
+  bool sameAddressAs(SourceEndpoint other) =>
+      Source._normalizeUrl(url) == Source._normalizeUrl(other.url) &&
+      host?.toLowerCase() == other.host?.toLowerCase() &&
+      port == other.port &&
+      share?.toLowerCase() == other.share?.toLowerCase();
+
+  /// Short address label for the switcher, e.g. "192.168.1.50:8090".
+  /// Falls back to [label] when there is no address to show.
+  String get addressLabel {
+    if (url != null && url!.isNotEmpty) {
+      final uri = Uri.tryParse(url!);
+      if (uri == null || uri.host.isEmpty) return url!;
+      return uri.hasPort ? '${uri.host}:${uri.port}' : uri.host;
+    }
+    if (host != null && host!.isNotEmpty) {
+      return port != null ? '$host:$port' : host!;
+    }
+    return label;
+  }
+}
+
 /// A top-level content source — a server (RomM/SMB/FTP/Web) or the local
 /// filesystem.
 ///
@@ -97,13 +211,36 @@ class Source {
 
   final SourceType type;
 
-  // --- Connection ---
+  // --- Connection (the live route) ---
+  //
+  // These fields are the single source of truth for "where do we connect
+  // right now". When [endpoints] is non-empty they mirror whichever endpoint
+  // is currently live — see [withLiveEndpoint]. Everything downstream
+  // (SourceResolver, connectionKey, hostLabel, the providers) reads only
+  // these, which is why switching routes needs no changes outside this file.
   final String? url; // romm/web
   final String? host; // smb/ftp
   final int? port; // smb/ftp
   final String? share; // smb
   final String? path; // local
   final AuthConfig? auth;
+
+  // --- Routes ---
+
+  /// Alternative ways to reach this same source, e.g. LAN vs internet.
+  ///
+  /// Empty for sources created before routes existed and for sources that
+  /// only ever had one address; in that case the connection fields above
+  /// stand alone. [Source.fromJson] backfills a single endpoint from the
+  /// legacy fields so the rest of the app can assume a list.
+  final List<SourceEndpoint> endpoints;
+
+  /// Whether to probe for a working route or stick to [pinnedEndpointId].
+  final EndpointSelection endpointSelection;
+
+  /// The route the user explicitly chose. Only meaningful when
+  /// [endpointSelection] is [EndpointSelection.pinned].
+  final String? pinnedEndpointId;
 
   // --- Behaviour ---
 
@@ -150,6 +287,9 @@ class Source {
     this.share,
     this.path,
     this.auth,
+    this.endpoints = const [],
+    this.endpointSelection = EndpointSelection.auto,
+    this.pinnedEndpointId,
     this.autoMap = false,
     this.priority = 100,
     this.enabled = true,
@@ -164,20 +304,52 @@ class Source {
     if (raw is String && raw.isNotEmpty) {
       exp = DateTime.tryParse(raw);
     }
+    final type = SourceType.values
+            .asNameMap()[json['type'] as String? ?? 'romm'] ??
+        SourceType.romm;
+    final url = json['url'] as String?;
+    final host = json['host'] as String?;
+    final port = json['port'] as int?;
+    final share = json['share'] as String?;
+
+    // Routes are additive: a config written before they existed has no
+    // `endpoints` key, so synthesize one from the connection fields. That
+    // keeps "every source has at least one route" true everywhere else and
+    // means no config migration step is needed.
+    var endpoints = (json['endpoints'] as List<dynamic>?)
+            ?.map((e) => SourceEndpoint.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        const <SourceEndpoint>[];
+    if (endpoints.isEmpty && type != SourceType.local) {
+      endpoints = [
+        SourceEndpoint(
+          id: _primaryEndpointId,
+          label: json['name'] as String,
+          url: url,
+          host: host,
+          port: port,
+          share: share,
+        ),
+      ];
+    }
+
     return Source(
       id: json['id'] as String,
       name: json['name'] as String,
-      type: SourceType.values
-              .asNameMap()[json['type'] as String? ?? 'romm'] ??
-          SourceType.romm,
-      url: json['url'] as String?,
-      host: json['host'] as String?,
-      port: json['port'] as int?,
-      share: json['share'] as String?,
+      type: type,
+      url: url,
+      host: host,
+      port: port,
+      share: share,
       path: json['path'] as String?,
       auth: json['auth'] != null
           ? AuthConfig.fromJson(json['auth'] as Map<String, dynamic>)
           : null,
+      endpoints: endpoints,
+      endpointSelection: EndpointSelection.values
+              .asNameMap()[json['endpoint_selection'] as String? ?? 'auto'] ??
+          EndpointSelection.auto,
+      pinnedEndpointId: json['pinned_endpoint_id'] as String?,
       autoMap: json['auto_map'] as bool? ?? false,
       priority: json['priority'] as int? ?? 100,
       enabled: json['enabled'] as bool? ?? true,
@@ -200,6 +372,10 @@ class Source {
       if (share != null) 'share': share,
       if (path != null) 'path': path,
       if (auth != null) 'auth': auth!.toJson(),
+      if (endpoints.isNotEmpty)
+        'endpoints': endpoints.map((e) => e.toJson()).toList(),
+      'endpoint_selection': endpointSelection.name,
+      if (pinnedEndpointId != null) 'pinned_endpoint_id': pinnedEndpointId,
       'auto_map': autoMap,
       'priority': priority,
       'enabled': enabled,
@@ -208,6 +384,97 @@ class Source {
         'token_expires_at': tokenExpiresAt!.toIso8601String(),
       if (knownPlatforms.isNotEmpty) 'known_platforms': knownPlatforms,
     };
+  }
+
+  /// Id given to the endpoint backfilled from a pre-routes config.
+  static const String _primaryEndpointId = 'primary';
+
+  /// The route whose address is currently mirrored onto the connection
+  /// fields, or null when this source has no routes (local sources).
+  ///
+  /// This is derived by matching addresses rather than stored, so it stays
+  /// correct even if something edits the connection fields directly.
+  SourceEndpoint? get liveEndpoint {
+    if (endpoints.isEmpty) return null;
+    final probe = SourceEndpoint(
+      id: '',
+      label: '',
+      url: url,
+      host: host,
+      port: port,
+      share: share,
+    );
+    for (final ep in endpoints) {
+      if (ep.sameAddressAs(probe)) return ep;
+    }
+    return null;
+  }
+
+  SourceEndpoint? endpointById(String endpointId) {
+    for (final ep in endpoints) {
+      if (ep.id == endpointId) return ep;
+    }
+    return null;
+  }
+
+  /// Which route *should* be live, given what is reachable right now.
+  ///
+  /// - `pinned`: the user's choice wins outright. If it is unreachable they
+  ///   get a failed sync, not a silent reroute — a route that moves on its
+  ///   own is exactly what pinning exists to prevent.
+  /// - `auto`: first endpoint in list order that is in [reachable]. List
+  ///   order is the user's preference order, so putting the LAN address
+  ///   first is what makes "fast at home, works away" fall out.
+  /// - `auto` with nothing reachable: the first endpoint, so the sync runs
+  ///   and surfaces a real connection error instead of doing nothing.
+  ///
+  /// Pure — [reachable] comes from the caller's probe, never from I/O here.
+  SourceEndpoint? resolveEndpoint({Set<String> reachable = const {}}) {
+    if (endpoints.isEmpty) return null;
+    if (endpointSelection == EndpointSelection.pinned &&
+        pinnedEndpointId != null) {
+      final pinned = endpointById(pinnedEndpointId!);
+      if (pinned != null) return pinned;
+      // Pinned route was deleted — fall through to auto rather than stall.
+    }
+    for (final ep in endpoints) {
+      if (reachable.contains(ep.id)) return ep;
+    }
+    return endpoints.first;
+  }
+
+  /// Returns a copy with [endpoint]'s address mirrored onto the connection
+  /// fields, making it the live route.
+  ///
+  /// [pin] records it as the user's explicit choice; leave it false when the
+  /// switch came from auto-selection, so a later probe can still move.
+  ///
+  /// Credentials are deliberately untouched: two routes to one server share
+  /// one account, and re-authenticating on every switch would defeat the
+  /// point. Cached games are untouched too — the source id does not change,
+  /// so nothing in the database is orphaned by a switch.
+  Source withLiveEndpoint(SourceEndpoint endpoint, {bool pin = false}) {
+    return Source(
+      id: id,
+      name: name,
+      type: type,
+      url: endpoint.url,
+      host: endpoint.host,
+      port: endpoint.port,
+      share: endpoint.share,
+      path: path,
+      auth: auth,
+      endpoints: endpoints,
+      endpointSelection:
+          pin ? EndpointSelection.pinned : endpointSelection,
+      pinnedEndpointId: pin ? endpoint.id : pinnedEndpointId,
+      autoMap: autoMap,
+      priority: priority,
+      enabled: enabled,
+      borrowed: borrowed,
+      tokenExpiresAt: tokenExpiresAt,
+      knownPlatforms: knownPlatforms,
+    );
   }
 
   /// Convenience: returns true if this source advertises [systemId].
@@ -285,6 +552,10 @@ class Source {
     String? share,
     String? path,
     AuthConfig? auth,
+    List<SourceEndpoint>? endpoints,
+    EndpointSelection? endpointSelection,
+    String? pinnedEndpointId,
+    bool clearPinnedEndpoint = false,
     bool? autoMap,
     int? priority,
     bool? enabled,
@@ -302,6 +573,11 @@ class Source {
       share: share ?? this.share,
       path: path ?? this.path,
       auth: auth ?? this.auth,
+      endpoints: endpoints ?? this.endpoints,
+      endpointSelection: endpointSelection ?? this.endpointSelection,
+      pinnedEndpointId: clearPinnedEndpoint
+          ? null
+          : (pinnedEndpointId ?? this.pinnedEndpointId),
       autoMap: autoMap ?? this.autoMap,
       priority: priority ?? this.priority,
       enabled: enabled ?? this.enabled,

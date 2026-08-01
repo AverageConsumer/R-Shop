@@ -59,7 +59,7 @@ graph TB
     end
 
     subgraph MODEL["models/ — 資料模型（11 檔）"]
-        SM["system_model 906<br/>★ 約 66–67 種主機字典"]
+        SM["system_model 906<br/>★ 66 種主機字典"]
         GI["game_item 121<br/>download_item 199<br/>game_metadata_info 179"]
         CFG["config/<br/>app_config 255 · provider_config 335<br/>source 313 · system_config 122"]
         RAM["ra_models 233<br/>custom_shelf 174"]
@@ -141,7 +141,7 @@ graph TB
     AUTO["SourceTypeX.supportsAutoMap<br/>僅 romm == true<br/>→ RomM 自報平台清單<br/>其他需 SystemSourceMapping"]
     ST -.- AUTO
 
-    NULLW["⚠️ SmbProvider 依賴 _smbService!<br/>必須先 ProviderFactory.init(smbService:)<br/>否則 null assertion 崩潰"]
+    NULLW["⚠️ SmbProvider 依賴注入的 _smbService<br/>必須先 ProviderFactory.init(smbService:)<br/>否則拋 StateError（訊息已具名）"]
     SM2 -.- NULLW
 
     style LF fill:#ffe0b2,color:#000
@@ -411,7 +411,7 @@ graph TB
     end
 
     subgraph MODELS["模型"]
-        SM["system_model 906<br/>約 66–67 種主機<br/>platform ID · 副檔名 · 預設目錄"]
+        SM["system_model 906<br/>66 種主機<br/>platform ID · 副檔名 · 預設目錄"]
         RPM["romm_platform_matcher 128<br/>RomM 平台名 → SystemModel"]
     end
 

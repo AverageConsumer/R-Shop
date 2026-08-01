@@ -13,6 +13,7 @@ import '../utils/friendly_error.dart';
 import '../utils/network_constants.dart';
 import 'download_handle.dart';
 import 'native_smb_service.dart';
+import 'platform_channels.dart';
 import 'provider_factory.dart';
 import 'rom_manager.dart';
 
@@ -66,8 +67,8 @@ class DownloadProgress {
 }
 
 class DownloadService {
-  static const _zipChannel = MethodChannel('com.retro.rshop.tw/zip');
-  static const _zipProgressChannel = EventChannel('com.retro.rshop.tw/zip_progress');
+  static const _zipChannel = MethodChannel(kZipChannel);
+  static const _zipProgressChannel = EventChannel(kZipProgressChannel);
 
   final NativeSmbService _smbService;
 
