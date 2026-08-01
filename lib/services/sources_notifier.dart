@@ -264,6 +264,141 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     }
   }
 
+  // --- Routes (endpoints) ---
+  //
+  // A route change is *not* a source change: same server, same library, same
+  // credentials, only a different way to reach it. Every method below goes
+  // through [updateSource] and therefore **never calls
+  // [_purgeCachedGamesFor]** — dropping the cached games on a route switch
+  // would make switching cost a full re-sync, which defeats the point.
+  // [setEnabled] and [removeSource] purge; routes must not.
+
+  /// Makes [endpointId] the live route for [sourceId].
+  ///
+  /// [pin] records it as the user's explicit choice so auto-selection stops
+  /// moving it. Pass false when the switch came from a probe.
+  Future<void> switchEndpoint(
+    String sourceId,
+    String endpointId, {
+    bool pin = true,
+  }) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == sourceId,
+      orElse: () => throw StateError('Unknown source: $sourceId'),
+    );
+    final ep = src.endpointById(endpointId);
+    if (ep == null) {
+      throw StateError('Unknown endpoint $endpointId on source $sourceId');
+    }
+    if (src.liveEndpoint?.id == endpointId &&
+        (!pin || src.pinnedEndpointId == endpointId)) {
+      return;
+    }
+    await updateSource(src.withLiveEndpoint(ep, pin: pin));
+  }
+
+  /// Switches between probing for a working route and staying on the pinned
+  /// one. Selecting [EndpointSelection.auto] clears the pin.
+  Future<void> setEndpointSelection(
+    String sourceId,
+    EndpointSelection selection,
+  ) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == sourceId,
+      orElse: () => throw StateError('Unknown source: $sourceId'),
+    );
+    if (src.endpointSelection == selection) return;
+    if (selection == EndpointSelection.auto) {
+      await updateSource(
+        src.copyWith(
+          endpointSelection: selection,
+          clearPinnedEndpoint: true,
+        ),
+      );
+    } else {
+      // Pinning with nothing chosen yet pins whatever is live right now,
+      // which is what the user sees and therefore what they mean.
+      await updateSource(
+        src.copyWith(
+          endpointSelection: selection,
+          pinnedEndpointId: src.pinnedEndpointId ?? src.liveEndpoint?.id,
+        ),
+      );
+    }
+  }
+
+  /// Adds another way to reach [sourceId].
+  ///
+  /// Returns false without changing anything if the source already has a
+  /// route to that address — two entries for one address would make the
+  /// switcher ambiguous and [Source.liveEndpoint] arbitrary.
+  Future<bool> addEndpoint(String sourceId, SourceEndpoint endpoint) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == sourceId,
+      orElse: () => throw StateError('Unknown source: $sourceId'),
+    );
+    if (src.endpoints.any((e) => e.sameAddressAs(endpoint))) return false;
+    if (src.endpoints.any((e) => e.id == endpoint.id)) return false;
+    await updateSource(
+      src.copyWith(endpoints: [...src.endpoints, endpoint]),
+    );
+    return true;
+  }
+
+  /// Edits an existing route in place. If it is the live one, the source's
+  /// connection fields follow it, so editing the address you are currently
+  /// using takes effect immediately.
+  Future<void> updateEndpoint(
+    String sourceId,
+    SourceEndpoint endpoint,
+  ) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == sourceId,
+      orElse: () => throw StateError('Unknown source: $sourceId'),
+    );
+    final idx = src.endpoints.indexWhere((e) => e.id == endpoint.id);
+    if (idx < 0) {
+      throw StateError('Unknown endpoint ${endpoint.id} on source $sourceId');
+    }
+    final wasLive = src.liveEndpoint?.id == endpoint.id;
+    final next = [...src.endpoints]..[idx] = endpoint;
+    final updated = src.copyWith(endpoints: next);
+    await updateSource(
+      wasLive ? updated.withLiveEndpoint(endpoint) : updated,
+    );
+  }
+
+  /// Removes a route.
+  ///
+  /// Refuses to remove the last one — a source with no route has no address
+  /// at all. If the removed route was live, the first remaining one takes
+  /// over; if it was pinned, the pin is cleared rather than left dangling.
+  /// Cached games are untouched: the source still exists.
+  Future<bool> removeEndpoint(String sourceId, String endpointId) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == sourceId,
+      orElse: () => throw StateError('Unknown source: $sourceId'),
+    );
+    if (src.endpoints.length <= 1) return false;
+    final remaining =
+        src.endpoints.where((e) => e.id != endpointId).toList();
+    if (remaining.length == src.endpoints.length) return false;
+
+    final wasLive = src.liveEndpoint?.id == endpointId;
+    final wasPinned = src.pinnedEndpointId == endpointId;
+    var updated = src.copyWith(
+      endpoints: remaining,
+      clearPinnedEndpoint: wasPinned,
+      endpointSelection:
+          wasPinned ? EndpointSelection.auto : src.endpointSelection,
+    );
+    if (wasLive) {
+      updated = updated.withLiveEndpoint(remaining.first);
+    }
+    await updateSource(updated);
+    return true;
+  }
+
   Future<void> _purgeCachedGamesFor(String sourceId) async {
     try {
       final folders = <String, String>{
