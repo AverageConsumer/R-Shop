@@ -1,0 +1,114 @@
+---
+name: rshop-source-routing
+description: "Touch anything about sources, connection routes, the active source, or failover. Use when: editing source.dart, sources_notifier.dart, source_failover.dart, source_resolver.dart, or the games table. Holds the four invariants that make switching cheap and self-healing — breaking any one of them loses the user's cached library or strands them on the wrong server."
+---
+
+# Skill: `rshop-source-routing`
+
+## Role
+
+這一塊的設計繞了四圈才對，因為需求很容易被讀成別的意思。
+底下四條不變式是**整個功能之所以能用的原因**，改任何相關的檔之前先讀。
+
+---
+
+## 使用者要的到底是什麼
+
+> 「我並不是要同時顯示兩個來源，而是**一次顯示一個來源，可以切換**」
+> 「**就算是同一台，我也要當不同台**」
+> 「至少要能指派一個備援就好」「timeout 後切換另一個來源」
+
+翻成規格：**多個來源，一次看／同步一個，可以指派備援；連不上時備援自動代打。**
+
+**不要**把兩個來源的清單合併起來當同一份看 —— 這是被明確否決過的。
+即使兩個位址其實是同一台伺服器，**也一律當作獨立的來源**。
+
+---
+
+## 不變式 1：切換來源不能碰快取
+
+`switchEndpoint`、`setEndpointSelection`、`addEndpoint`、`updateEndpoint`、
+`removeEndpoint`、`setFallbackSource`、`setActiveSource` —— **全部走 `updateSource`，
+而且一個都不准呼叫 `_purgeCachedGamesFor`。**
+
+這就是切換之所以是免費的原因：每條路線的清單各自存著，切回去馬上就在。
+一旦有人在這些路徑上加了清快取，使用者每切一次就要重掃一次整個圖書館。
+
+---
+
+## 不變式 2：備援是暫時代打，不改變偏好
+
+`chooseSource()` 選到備援時，**`activeSourceId` 不會被改寫**。
+`withEffectiveSource()` 重建的是**記憶體中的 config，磁碟完全不動**。
+
+所以偏好的那台一旦醒過來，下一次自己就回去了 —— 不需要使用者再設定一次。
+**如果哪天有人為了「讓它記住」而把 `activeSourceId` 寫回磁碟，這個自癒就死了。**
+
+---
+
+## 不變式 3：`url`/`host`/`port`/`share` 就是「現行路線」
+
+`Source` 的頂層欄位**不是預設值，是當下生效的那條路**。
+`withLiveEndpoint()` 會把選中的 endpoint 的值寫上去。
+
+這樣設計的代價是省掉了一整輪改動：`SourceResolver`、`connectionKey`、
+各個 provider **完全不必知道 endpoint 的存在**。要維持這個好處，
+新程式碼一律讀頂層欄位，**不要自己去 `endpoints` 裡挑**。
+
+`fromJson` 會從舊欄位補一個 id 為 `'primary'` 的 endpoint，**所以沒有設定檔遷移**。
+
+---
+
+## 不變式 4：路線共用來源的憑證 ⚠️
+
+`auth` 掛在 `Source` 上，**endpoint 沒有自己的憑證**。
+
+同一台伺服器的多個位址共用一個 token 沒問題。
+**指向另一台伺服器就會送錯 token 換回 401 —— 而 401 看起來像伺服器掛了**，
+使用者無從判斷。兩台不同的伺服器要用「**兩個來源 + 備援**」，不是兩條路線。
+
+UI 上的提示字串是 `sources_routeSameServerHint`。
+
+---
+
+## 資料庫：每條路線各存一份
+
+schema **v14**。`games` 表加了
+
+```sql
+source_id  TEXT NOT NULL DEFAULT '',
+endpoint_id TEXT NOT NULL DEFAULT ''
+```
+
+**`NOT NULL DEFAULT ''` 不是隨便寫的** —— SQLite 的 UNIQUE 索引把 NULL 視為互不相同，
+用得到 NULL 的話唯一鍵形同虛設，同一筆遊戲會無限重複。
+
+唯一索引：`(systemSlug, filename, source_id, endpoint_id)`。
+孤兒清除也要**帶上這三個欄位**，否則會刪掉別條路線的資料。
+串連刪 `game_metadata` / `ra_matches` 前要先檢查 `stillReferenced`。
+
+相關 API：`saveGamesByRoute()`（依每筆遊戲**自己的** `providerConfig` 分組）、
+`getGamesForRoutes()`、`getGameCountsPerRoute()`、`deleteRoute()`。
+
+---
+
+## 探測
+
+`EndpointProbeService` 用 TCP connect，單點 1 秒／整體 3 秒，有 TTL 快取。
+
+**已修過的坑**：`_probeableEndpoints()` 在 `endpoints` 為空時，
+原本會靜默回報「不可達」—— 而不可達正是觸發備援的條件，
+所以在程式碼裡直接建出來的 `Source` 會莫名其妙一直走備援。
+現在會從 `Source` 自己的欄位合成一個 endpoint。
+
+---
+
+## 檔案
+
+見 `docs/FIX_INDEX.md` 的 **R-Shop 連線路由**、**R-Shop 目前來源**、
+**R-Shop 來源備援**、**備援接進同步**、**連線方式共用憑證** 五條 —— 檔案清單在那裡，
+不要重新搜尋。
+
+UI 那一面另見 `rshop-touch-and-gamepad`：這個功能的四個浮層
+（endpoint picker、fallback picker、actions overlay、type picker）
+**每一個都曾經是觸控死的**。

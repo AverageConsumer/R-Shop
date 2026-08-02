@@ -4,7 +4,12 @@
 > 再依需要讀本專案 `docs/` 的其餘各份：
 > - [ARCHITECTURE.md](ARCHITECTURE.md) — 模組分層與依賴方向
 > - [FIX_LOGS.md](FIX_LOGS.md) — 修復與功能紀錄（細節、取捨、教訓）
+> - [FIX_BY_FILE.md](FIX_BY_FILE.md) — **反查表：我要改這個檔，它身上以前發生過什麼**（自動產生）
 > - [SPEC.md](SPEC.md) — 規格；**§12 定位指引回答「我要改 X，該動哪些檔」**
+>
+> 會重複的作法收在 [`.agents/skills/`](../.agents/skills/)：
+> `rshop-build-deploy`（建置的三個陷阱）· `rshop-touch-and-gamepad`（**動 UI 之前一定先讀**）·
+> `rshop-source-routing`（來源／路由／備援的四條不變式）· `rshop-l10n`。
 > - [USER_GUIDE.md](USER_GUIDE.md) — 使用手冊
 
 
@@ -30,6 +35,8 @@
 
 | 關鍵字 | 症狀 / 根因 | 主要動到的檔案 |
 | :--- | :--- | :--- |
+| **黃色條與雙入口** ⚠️ | 那條黃黑斜紋是 `RenderFlex` **版面溢位警示**不是功能；把功能從選單列搬到圖示上會**弄丟手把入口**（圖示預設只有觸控） | `lib/features/settings/sources_screen.dart`（選單改 `SingleChildScrollView`、卡片列與標頭各加一個眼睛） |
+| **標頭高度與誤讀的按鍵字** | 圖示旁的裸字母 `X` 被讀成關閉鈕；沉浸模式在 `initState` 才切，**第一幀還有狀態列 inset**，包了 `SafeArea` 的標題列會進場高一列再縮回去 | `lib/features/settings/sources_screen.dart` · `lib/features/home/home_view.dart`（`_buildSourceBanner` 拿掉 `SafeArea`） |
 | **浮層只做了手把** ⚠️ | ① 刪掉最後一筆來源後**手把完全失效只剩觸控**——`_initialFocusClaimed` 一旦為 true 永不重置，持有焦點的卡片被回收後螢幕上沒有任何節點有焦點。② 三個浮層的列是純 `Container`，**零觸控處理**；而 `ConsoleFocusable` 本身有 `GestureDetector`，所以卡片點得動、浮層點不動，**外觀完全看不出差別** | `lib/features/settings/sources_screen.dart`（`_ensureInteractiveFocus` 放棄宣告、`_OverlayButton.onTap`） · `lib/features/sources/endpoint_picker_overlay.dart` · `lib/features/sources/fallback_picker_overlay.dart` |
 
 ## 🛠️ 建置與環境

@@ -30,6 +30,7 @@
 ## [AppID 衝突] R-Shop: 無法與原版共存
 - **原因**：`applicationId` 與原廠主線一致。
 - **解法**：修改 ID 為 `com.retro.rshop.tw` 並執行 Kotlin Package 重構。
+- **檔案**：`android/app/build.gradle.kts` · `android/app/src/main/kotlin/com/retro/rshop/tw/MainActivity.kt`（package 重構）
 
 ---
 
@@ -44,6 +45,7 @@
   - `flutter pub get` 相依解析成功（142 個套件）但最後失敗於 `Building with plugins requires symlink support` —— Windows 需啟用**開發人員模式**。只擋 Android 建置，**不擋 `analyze` 與 `test`**（`.dart_tool\package_config.json` 已產生）。
   - PowerShell 5.1 的 `Invoke-WebRequest` 預設用 IE 解析引擎，在 NonInteractive 下會直接拋「無法提示」而不是網路錯誤。加 `-UseBasicParsing`。
 - **教訓**：**環境路徑屬於「每台機器不同」的事實，不該只寫在跟著 repo 走的文件裡。** 已在 R-Shop `AGENTS.md §5` 加註警告，並明令「不要回報你沒真的拿到的 `flutter analyze` / `flutter test` 結果，就說被擋住了」。
+- **檔案**：無程式碼變更。`AGENTS.md` §5（加註路徑警告）· `.agents/skills/rshop-build-deploy/SKILL.md`（現行工具鏈）
 - **Commit**：未提交（環境設定，非程式碼變更）
 
 
@@ -60,6 +62,7 @@
   | `romm_pairing_live_smoke` ×2 | 標了 `live` tag，需要真的有 RomM 跑在 `localhost:8090` |
 - **第 8 個每次不一樣**：基準跑出 `config_storage: AsyncLock save during load does not deadlock`，含改動那次跑出 `game_list_controller: Filter persistence restoreFilters`。**兩者單獨執行都通過**（隔離跑 234 個測試全綠），都是時序敏感型 → 平行負載下的既有不穩定測試。
 - **教訓**：**比對基準時，執行條件必須一致**。測試數量、平行度、機器負載任一不同，得到的差異就沒有意義。另外「失敗總數相同」還不夠——要逐項比對名稱，否則會漏掉「一個修好、一個弄壞」互相抵銷的情況。
+- **檔案**：無程式碼變更（診斷方法紀錄）
 - **Commit**：未提交（診斷紀錄）
 
 
@@ -73,6 +76,7 @@
 - **成果**：全 repo 的 `'com.retro.rshop...'` 字面值從 **20 處降到 1 處**。
 - **實機驗證** ✅：`flutter build apk --debug` 成功（202.4 MB，exit 0），安裝到 AYN Thor 啟動正常，logcat **無 `MissingPluginException`**——這正是本條最該驗的一項，代表 Kotlin 與 Dart 兩側名稱仍然對得上。
 - **教訓**：`analyze` 與 `test` **碰不到 Kotlin 與 Gradle**。這類改動只有 `flutter build apk` 會驗到——單元測試全綠不代表這條改動是對的。**而這次差點驗不成**：建置一開始因 JDK 版本問題失敗，見 `[R-Shop 建置 JDK 不相容]`。
+- **檔案**：`lib/services/platform_channels.dart`（新增）· `android/app/src/main/kotlin/com/retro/rshop/tw/MainActivity.kt` · `android/app/build.gradle.kts`（`buildFeatures.buildConfig`）· `lib/services/native_smb_service.dart` · `lib/services/download_service.dart` · `lib/services/disk_space_service.dart` · `lib/services/device_info_service.dart`
 - **Commit**：未提交
 
 
@@ -82,6 +86,7 @@
 - **查證後的定性修正**：**生產流程實務上不可達**。全 App 只有一個進入點，`main.dart:87` 的 `ProviderFactory.init()` 在 `runApp()` **之前**，所以任何 UI 觸發的 `getProvider` 必定在其後；唯一另一個 `@pragma('vm:entry-point')`（下載前景服務）的 handler 三個回呼全是空實作，不碰 ProviderFactory。所以這是**契約缺陷**（隱式初始化順序依賴 + static 狀態無法重設），不是現行 crash。**測試層面才真的可達**。
 - **解**：`_smbService == null` 時丟具名 `StateError`，訊息點名 `ProviderFactory.init(smbService:)` 且說明正常應在 `main()` 的 `runApp()` 之前。新增 `@visibleForTesting reset()` 讓測試能重設 static 狀態，並補測試驗證訊息可辨識、以及未初始化時 `web` provider 仍正常。**未改建構式簽章**——改成注入式會牽動 4 個呼叫端。
 - **教訓**：文件把一個缺陷寫成「會崩」，實際查證後是「不可達但脆弱」。**定性錯誤會影響修法選擇**：若真的會崩，該做的是改建構式注入；既然只是契約問題，加一個好訊息的 `StateError` 就夠，改動面小得多。
+- **檔案**：`lib/services/provider_factory.dart`
 - **Commit**：未提交
 
 
@@ -118,6 +123,7 @@
 - **UI**：`EndpointPickerOverlay`（動作選單 → 連線方式）顯示自動／各路由／可達狀態／新增；`EndpointEditScreen` 輸入標籤與位址。七語系各補 13 個字串。切換器**開啟時停在目前生效的那條**（誤按 A 是無操作）、**每次開啟重新探測不吃快取**（會打開它就是想知道現在哪條通）。
 - **測試**：`source_endpoint_test` 21 ＋ `sources_notifier_endpoints_test` 21（注入 `_SpyDb` 斷言 **switch/add/remove 皆不 purge、`setEnabled(false)` 仍 purge**）＋ `endpoint_probe_service_test` 19 ＋ `database_service_routes_test` 14（含 **「區網同步絕不刪掉遠端那條路」** 與 cascade 保護）。合計 75 個，全通過；完整套件 1693→ 僅剩 7 個既有環境失敗，**零回歸**。
 - **教訓**：**需求裡的「切換來源」有歧義，而不同解讀導致的架構完全不同**（一個要動資料庫 schema，一個完全不用）。連錯兩次的共同原因是我拿使用者的詞去對映系統既有的概念（Source），而不是先問「你要切的到底是什麼」。
+- **檔案**：`lib/models/config/source.dart` · `lib/services/sources_notifier.dart` · `lib/services/endpoint_probe_service.dart` · `lib/services/database_service.dart`（v14 migration）· `lib/services/source_resolver.dart` · `lib/models/config/provider_config.dart` · `lib/features/sources/endpoint_picker_overlay.dart` · `lib/features/sources/endpoint_edit_screen.dart`
 - **Commit**：未提交
 
 
@@ -136,6 +142,7 @@
 - **解**：`flutter config --jdk-dir="C:\Program Files\Java\jdk-21"` ＋ `gradlew --stop`。之後建置一路通過（936 秒，途中 Gradle **自動補裝** NDK 28.2.13676358 與 23.1.7779620、SDK Platform 36、CMake 3.22.1——**不需要 cmdline-tools／sdkmanager**，Gradle 有自己的下載器）。
 - **不影響 megingiard**：它是 Gradle 9.3.1 且 `gradle/gradle-daemon-jvm.properties` 釘了 `toolchainVersion=21`，由 Gradle 自行挑 JVM，**`JAVA_HOME` 對它根本無效**。所以同一條「JAVA_HOME 設 jbr」的舊指令對 megingiard 無害、對 R-Shop 致命。**兩套機制不要互相照抄。**
 - **教訓**：Gradle 把例外訊息當成 `What went wrong` 的全部內容時（只有一個裸值、沒有句子），**先加 `--stacktrace`**，不要照那個值的「長相」去猜它是什麼。
+- **檔案**：無程式碼變更。`.agents/skills/rshop-build-deploy/SKILL.md`（Step 0 的檢查步驟）
 - **Commit**：未提交（環境設定）
 
 
@@ -149,6 +156,7 @@
   - ✅ 倖存：`/storage/emulated/0/ROMs` **19 GB / 253 檔 / 22 個主機資料夾**——移除 app 不影響外部儲存
   - ✅ 保留：移除前已把舊的 release APK 拉下來存到 `D:	est-apk\R-Shop-v1.7.0-zh-RELEASE-舊機簽章.apk`（99.7 MB），要回舊版可用
 - **教訓**：**動裝置上的 app 之前先確認它是哪種簽章**。`run-as` 能不能用就是最快的判斷——不能用代表是 release 版，那麼資料多半也備不出來（release 通常關掉 `allowBackup`）。這個判斷要在**移除之前**做，不是之後。
+- **檔案**：無程式碼變更（`run-as` 判斷法）
 - **Commit**：未提交（部署作業）
 
 
@@ -165,6 +173,7 @@
 - **UI**：來源卡片加綠色「目前顯示」徽章（否則這件事完全不可見）；`[A]` 動作加「只看這個來源／顯示全部來源」。七語系各補 4 個字串。
 - **測試**：`test/active_source_test.dart` 13 個，含 `NEVER purges — switching back must be instant, not a re-sync`、`but disabling a source still purges it`、未知 id、停用勝過選中、重載後保留。完整套件 1720 通過 / 7 個既有環境失敗，**零回歸**。
 - **教訓**：**使用者說「切換」時，先確認他實際在 UI 上建了什麼**。這次直接讀實機 `config.json` 一眼就看出我做的功能在錯的層級——比再問一輪快，也比猜可靠。debug 建置的 `run-as` 就是這個能力的來源。
+- **檔案**：`lib/models/config/app_config.dart` · `lib/services/source_resolver.dart` · `lib/services/sources_notifier.dart` · `lib/features/home/home_view.dart` · `lib/features/settings/sources_screen.dart`
 - **Commit**：未提交
 
 ---
@@ -187,6 +196,7 @@
 - **UI**：Sources → `[A]` → 「備援來源」開 `FallbackPickerOverlay`（列出其他來源＋「不設定」，已選的打勾）；卡片顯示 `備援 → <名稱>`，否則設完看不出來。只有兩個以上來源才出現此選項。七語系各補 3 個字串。
 - **測試**：`test/source_failover_choice_test.dart` 11 個，全數通過。
 - **待辦**：接進同步流程（同步前探測 → 不通改用備援 → 標題列標示備援中）。
+- **檔案**：`lib/models/config/source.dart` · `lib/services/source_failover.dart` · `lib/services/sources_notifier.dart` · `lib/features/sources/fallback_picker_overlay.dart`
 - **Commit**：未提交
 
 
@@ -268,3 +278,11 @@
 - **教訓**：**把功能從 A 處搬到 B 處時，要確認 B 處兩套輸入都有**。搬移看起來只是移動，實際上會連帶改變可達性——選單列本來按鍵與觸控都通，圖示按鈕預設只有觸控。
 - **驗證**：實機無溢位、無崩潰。
 - **Commit**：見下
+
+## [標頭高度與誤讀的按鍵字] R-Shop: 圖示旁的裸字母被當成關閉鈕；標題列進場高一列再縮回去
+
+- **檔案**：`lib/features/settings/sources_screen.dart`（動作選單標頭）· `lib/features/home/home_view.dart`（`_buildSourceBanner`）
+- **裸字母**：使用者問「來源那邊你右上圖示也寫一個 X 是幹嘛用？」。眼睛圖示旁邊那個 `X` 是想標示綁定的按鍵，但**擺在圖示旁就讀成了關閉按鈕**。而且它還違反我自己記下的規則——裝置支援 `nintendo/xbox/playstation` 三種配置，**同一個實體鍵在三種配置下名字不同，字母不能寫死**。**解**：刪掉標頭那個字，按鍵提示只留在底部提示列。
+- **高度會跳**：使用者說「主頁面的標題在初始時跟下面圖示隔了兩行，但是向下移動後又變成隔一行」。根因是 `SystemChrome.setEnabledSystemUIMode(immersiveSticky)` 在 `initState` 才執行，所以**第一幀還帶著狀態列 inset，後面的幀沒有**——標題列包了 `SafeArea`，就會進場高一列然後縮回去。**解**：全螢幕沉浸的畫面不要包 `SafeArea`，改用純 `IgnorePointer`。
+- **教訓**：**`SafeArea` 的 inset 在沉浸模式下是會變的量，不是常數。** 只要 `initState` 之後才切沉浸，第一幀跟穩態就不一致。這種「只在進場時出現一次」的差異，靜態分析與截圖都抓不到，只有真的進出畫面才看得見。
+- **Commit**：`dac11d6`
