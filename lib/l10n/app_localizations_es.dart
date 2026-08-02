@@ -1674,7 +1674,7 @@ class LEs extends L {
       'Esta fuente ya tiene una ruta a esa dirección';
 
   @override
-  String get sources_activeSource => 'Mostrando';
+  String get sources_activeSource => 'En uso';
 
   @override
   String get sources_useThisSource => 'Mostrar solo esta fuente';
@@ -1723,10 +1723,10 @@ class LEs extends L {
   }
 
   @override
-  String get sources_viewOnlyShort => 'Solo esta';
+  String get sources_useThisShort => 'Usar esta';
 
   @override
-  String get sources_viewAllShort => 'Ver todas';
+  String get sources_stopUsingShort => 'Dejar de usar';
 
   @override
   String get sources_removeConfirmTitle => '¿Eliminar la fuente?';

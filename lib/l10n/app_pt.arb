@@ -540,7 +540,7 @@
   "sources_editRoute": "Editar rota",
   "sources_removeRoute": "Remover rota",
   "sources_routeDuplicate": "Esta fonte já tem uma rota para esse endereço",
-  "sources_activeSource": "A mostrar",
+  "sources_activeSource": "Em uso",
   "sources_useThisSource": "Mostrar apenas esta fonte",
   "sources_showAllSources": "Mostrar todas as fontes",
   "sources_allSources": "Todas as fontes",
@@ -553,8 +553,8 @@
   "sources_routeSameServerHint": "Apenas para endereços que não exigem início de sessão separado. Se pedir para entrar de novo, adicione como fonte própria e emparelhe as duas como reserva.",
   "sources_routeCannotRemoveLast": "Não é possível remover a última rota",
   "sources_countLabel": "{count, plural, =1{1 fonte} other{{count} fontes}}",
-  "sources_viewOnlyShort": "Só esta",
-  "sources_viewAllShort": "Ver todas",
+  "sources_useThisShort": "Usar esta",
+  "sources_stopUsingShort": "Parar de usar",
   "sources_removeConfirmTitle": "Remover a fonte?",
   "sources_removeConfirmMessage": "Remover \"{name}\"? A lista dela desaparece da biblioteca, mas os jogos já baixados neste aparelho são mantidos."
 }

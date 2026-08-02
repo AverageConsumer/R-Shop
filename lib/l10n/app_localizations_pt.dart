@@ -1674,7 +1674,7 @@ class LPt extends L {
       'Esta fonte já tem uma rota para esse endereço';
 
   @override
-  String get sources_activeSource => 'A mostrar';
+  String get sources_activeSource => 'Em uso';
 
   @override
   String get sources_useThisSource => 'Mostrar apenas esta fonte';
@@ -1723,10 +1723,10 @@ class LPt extends L {
   }
 
   @override
-  String get sources_viewOnlyShort => 'Só esta';
+  String get sources_useThisShort => 'Usar esta';
 
   @override
-  String get sources_viewAllShort => 'Ver todas';
+  String get sources_stopUsingShort => 'Parar de usar';
 
   @override
   String get sources_removeConfirmTitle => 'Remover a fonte?';

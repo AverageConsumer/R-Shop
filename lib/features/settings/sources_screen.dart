@@ -620,8 +620,8 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   }
 
   /// The per-source hints only appear once a card is focused, because their
-  /// labels depend on that card: "disable" or "enable", "only this" or
-  /// "show all". With nothing focused they would have to guess.
+  /// labels depend on that card: "disable" or "enable", "use this" or "stop
+  /// using". With nothing focused they would have to guess.
   Widget _buildHud(BuildContext context, SourcesState state) {
     final l = L.of(context);
     final source = state.loading ? null : _focusedSource(state.sources);
@@ -632,8 +632,8 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
           ? null
           : HudAction(
               _activeSourceId == source.id
-                  ? l.sources_viewAllShort
-                  : l.sources_viewOnlyShort,
+                  ? l.sources_stopUsingShort
+                  : l.sources_useThisShort,
               onTap: () => _toggleActiveSource(source),
             ),
       lb: source == null

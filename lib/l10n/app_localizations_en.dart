@@ -1664,7 +1664,7 @@ class LEn extends L {
       'This source already has a route to that address';
 
   @override
-  String get sources_activeSource => 'Now showing';
+  String get sources_activeSource => 'In use';
 
   @override
   String get sources_useThisSource => 'Show this source only';
@@ -1713,10 +1713,10 @@ class LEn extends L {
   }
 
   @override
-  String get sources_viewOnlyShort => 'Only this';
+  String get sources_useThisShort => 'Use this';
 
   @override
-  String get sources_viewAllShort => 'Show all';
+  String get sources_stopUsingShort => 'Stop using';
 
   @override
   String get sources_removeConfirmTitle => 'Remove source?';

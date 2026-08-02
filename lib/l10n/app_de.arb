@@ -540,7 +540,7 @@
   "sources_editRoute": "Weg bearbeiten",
   "sources_removeRoute": "Weg entfernen",
   "sources_routeDuplicate": "Diese Quelle hat bereits einen Weg zu dieser Adresse",
-  "sources_activeSource": "Aktuell angezeigt",
+  "sources_activeSource": "In Verwendung",
   "sources_useThisSource": "Nur diese Quelle anzeigen",
   "sources_showAllSources": "Alle Quellen anzeigen",
   "sources_allSources": "Alle Quellen",
@@ -553,8 +553,8 @@
   "sources_routeSameServerHint": "Nur für Adressen ohne separate Anmeldung. Verlangt sie eine neue Anmeldung, als eigene Quelle anlegen und beide als Ersatz verknüpfen.",
   "sources_routeCannotRemoveLast": "Der letzte Weg kann nicht entfernt werden",
   "sources_countLabel": "{count, plural, =1{1 Quelle} other{{count} Quellen}}",
-  "sources_viewOnlyShort": "Nur diese",
-  "sources_viewAllShort": "Alle zeigen",
+  "sources_useThisShort": "Diese nutzen",
+  "sources_stopUsingShort": "Nicht mehr nutzen",
   "sources_removeConfirmTitle": "Quelle entfernen?",
   "sources_removeConfirmMessage": "\"{name}\" entfernen? Ihre Liste verschwindet aus der Bibliothek, bereits heruntergeladene Spiele bleiben erhalten."
 }

@@ -3140,7 +3140,7 @@ abstract class L {
   /// No description provided for @sources_activeSource.
   ///
   /// In en, this message translates to:
-  /// **'Now showing'**
+  /// **'In use'**
   String get sources_activeSource;
 
   /// No description provided for @sources_useThisSource.
@@ -3215,17 +3215,17 @@ abstract class L {
   /// **'{count, plural, =1{1 source} other{{count} sources}}'**
   String sources_countLabel(num count);
 
-  /// No description provided for @sources_viewOnlyShort.
+  /// No description provided for @sources_useThisShort.
   ///
   /// In en, this message translates to:
-  /// **'Only this'**
-  String get sources_viewOnlyShort;
+  /// **'Use this'**
+  String get sources_useThisShort;
 
-  /// No description provided for @sources_viewAllShort.
+  /// No description provided for @sources_stopUsingShort.
   ///
   /// In en, this message translates to:
-  /// **'Show all'**
-  String get sources_viewAllShort;
+  /// **'Stop using'**
+  String get sources_stopUsingShort;
 
   /// No description provided for @sources_removeConfirmTitle.
   ///

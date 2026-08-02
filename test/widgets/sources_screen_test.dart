@@ -210,7 +210,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Only this'), findsOneWidget);
+      expect(find.text('Use this'), findsOneWidget);
       expect(find.text('Disable'), findsOneWidget);
       expect(find.text('Remove'), findsOneWidget);
     });
@@ -243,7 +243,7 @@ void main() {
       await tester.pumpWidget(_wrap(storage, const SourcesScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.text('Only this'), findsNothing);
+      expect(find.text('Use this'), findsNothing);
       expect(find.text('Disable'), findsNothing);
       expect(find.text('Remove'), findsNothing);
     });

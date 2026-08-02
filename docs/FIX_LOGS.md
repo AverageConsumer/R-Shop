@@ -297,5 +297,6 @@
 - **移除要先問**：`_removeSource` 原本**完全沒有確認**。在選單裡要三次刻意的按壓才點得到，勉強可以；掛到 `R1` 之後變成一鍵，所以補了 `showConsoleDialog`。訊息據實寫：清單會消失，但**已下載到裝置上的遊戲會保留**——`purgeOrDetachSource` 對檔案還在的那些是 `detach`（把 `provider_config` 設 NULL）而不是 delete。
 - **焦點要自己記**：HUD 的字要跟著焦點那張卡變（停用／啟用、只看這個／看全部），但**焦點變動不會觸發 rebuild**。所以在 `_focusFor` 建節點時掛 listener 記進 `_focusedSourceId`。**只在取得焦點時寫，失焦不清**——卡片之間移動會經過一個誰都沒有焦點的瞬間，清掉的話每按一次方向鍵 HUD 就閃一次。
 - **順手修掉的中文化漏洞**：標題副標原本是 `'$count source${count == 1 ? "" : "s"} · [Y] add new'` ——**寫死英文，又把 `[Y]` 寫死在字串裡**（裝置支援三種手把配置，按鍵名不能寫死）。改成 `sources_countLabel`，按鍵名交給 HUD 依 `ControllerLayout` 繪製。標題本身依使用者要求改成「來源清單」。
+- **後續改名**：使用者說「只看這個／看全部 這功能應該叫做 **目前使用這個** 而不是看全部」。他從頭到尾用的詞是「使用」不是「顯示」——他一次只用一個來源，所以「看全部」根本不在他的模型裡。改成 `sources_useThisShort`（目前使用這個）／`sources_stopUsingShort`（取消使用），卡片徽章 `sources_activeSource` 從「目前顯示」改成「**使用中**」（這是他自己在需求裡用的字）。**ARB 的 key 也一起改**，因為 `viewOnly`／`viewAll` 已經描述錯了。順帶查到 `sources_useThisSource`／`sources_showAllSources` 兩個 key **在 Dart 裡已經沒有任何使用**——眼睛搬到列上時選單那兩列就拿掉了，字串留著沒清。
 - **驗證**：`analyze` 無新增問題；`sources_screen_test.dart` 9 項全過（新增 3 項：三個提示都在、停用的來源顯示「啟用」、沒有焦點時不顯示）。HUD 從 2 顆變 5 顆，1080×1920@369dpi 橫向邏輯寬約 832，估算約 460 不會溢位，且 `ControlButton` 的文字有 `maxWidth` + ellipsis 保底。
 - **Commit**：見下

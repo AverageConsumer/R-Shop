@@ -1620,7 +1620,7 @@ class LZh extends L {
   String get sources_routeDuplicate => '這個來源已經有一條指向同一個位址的連線方式';
 
   @override
-  String get sources_activeSource => '目前顯示';
+  String get sources_activeSource => '使用中';
 
   @override
   String get sources_useThisSource => '只看這個來源';
@@ -1662,10 +1662,10 @@ class LZh extends L {
   }
 
   @override
-  String get sources_viewOnlyShort => '只看這個';
+  String get sources_useThisShort => '目前使用這個';
 
   @override
-  String get sources_viewAllShort => '看全部';
+  String get sources_stopUsingShort => '取消使用';
 
   @override
   String get sources_removeConfirmTitle => '移除來源？';

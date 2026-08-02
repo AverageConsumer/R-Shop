@@ -1625,7 +1625,7 @@ class LJa extends L {
   String get sources_routeDuplicate => 'この提供元には同じアドレスの経路がすでにあります';
 
   @override
-  String get sources_activeSource => '表示中';
+  String get sources_activeSource => '使用中';
 
   @override
   String get sources_useThisSource => 'この提供元のみ表示';
@@ -1667,10 +1667,10 @@ class LJa extends L {
   }
 
   @override
-  String get sources_viewOnlyShort => 'これだけ';
+  String get sources_useThisShort => 'この提供元を使用';
 
   @override
-  String get sources_viewAllShort => 'すべて';
+  String get sources_stopUsingShort => '使用をやめる';
 
   @override
   String get sources_removeConfirmTitle => 'ソースを削除しますか？';

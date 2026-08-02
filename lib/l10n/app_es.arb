@@ -502,7 +502,7 @@
   "sources_editRoute": "Editar ruta",
   "sources_removeRoute": "Eliminar ruta",
   "sources_routeDuplicate": "Esta fuente ya tiene una ruta a esa dirección",
-  "sources_activeSource": "Mostrando",
+  "sources_activeSource": "En uso",
   "sources_useThisSource": "Mostrar solo esta fuente",
   "sources_showAllSources": "Mostrar todas las fuentes",
   "sources_allSources": "Todas las fuentes",
@@ -515,8 +515,8 @@
   "sources_routeSameServerHint": "Solo para direcciones que no requieren iniciar sesión aparte. Si te pide iniciar sesión de nuevo, añádela como fuente propia y empareja ambas como respaldo.",
   "sources_routeCannotRemoveLast": "No se puede eliminar la última ruta",
   "sources_countLabel": "{count, plural, =1{1 fuente} other{{count} fuentes}}",
-  "sources_viewOnlyShort": "Solo esta",
-  "sources_viewAllShort": "Ver todas",
+  "sources_useThisShort": "Usar esta",
+  "sources_stopUsingShort": "Dejar de usar",
   "sources_removeConfirmTitle": "¿Eliminar la fuente?",
   "sources_removeConfirmMessage": "¿Eliminar \"{name}\"? Su lista desaparece de la biblioteca, pero los juegos ya descargados en este dispositivo se conservan."
 }

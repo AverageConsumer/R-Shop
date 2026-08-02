@@ -1676,7 +1676,7 @@ class LFr extends L {
       'Cette source a déjà une voie vers cette adresse';
 
   @override
-  String get sources_activeSource => 'Affichage';
+  String get sources_activeSource => 'En cours d\'utilisation';
 
   @override
   String get sources_useThisSource => 'Afficher uniquement cette source';
@@ -1725,10 +1725,10 @@ class LFr extends L {
   }
 
   @override
-  String get sources_viewOnlyShort => 'Celle-ci';
+  String get sources_useThisShort => 'Utiliser celle-ci';
 
   @override
-  String get sources_viewAllShort => 'Tout voir';
+  String get sources_stopUsingShort => 'Ne plus utiliser';
 
   @override
   String get sources_removeConfirmTitle => 'Supprimer la source ?';

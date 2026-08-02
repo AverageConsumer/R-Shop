@@ -540,7 +540,7 @@
   "sources_editRoute": "経路を編集",
   "sources_removeRoute": "この経路を削除",
   "sources_routeDuplicate": "この提供元には同じアドレスの経路がすでにあります",
-  "sources_activeSource": "表示中",
+  "sources_activeSource": "使用中",
   "sources_useThisSource": "この提供元のみ表示",
   "sources_showAllSources": "すべての提供元を表示",
   "sources_allSources": "すべての提供元",
@@ -553,8 +553,8 @@
   "sources_routeSameServerHint": "別途ログインが不要なアドレス専用です。再ログインを求められる場合は提供元として追加し、2つをバックアップとして紐付けてください。",
   "sources_routeCannotRemoveLast": "最後の経路は削除できません",
   "sources_countLabel": "{count} 件のソース",
-  "sources_viewOnlyShort": "これだけ",
-  "sources_viewAllShort": "すべて",
+  "sources_useThisShort": "この提供元を使用",
+  "sources_stopUsingShort": "使用をやめる",
   "sources_removeConfirmTitle": "ソースを削除しますか？",
   "sources_removeConfirmMessage": "「{name}」を削除しますか？このソースの一覧はライブラリから消えますが、すでに端末にダウンロードしたゲームは残ります。"
 }

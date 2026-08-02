@@ -1675,7 +1675,7 @@ class LDe extends L {
       'Diese Quelle hat bereits einen Weg zu dieser Adresse';
 
   @override
-  String get sources_activeSource => 'Aktuell angezeigt';
+  String get sources_activeSource => 'In Verwendung';
 
   @override
   String get sources_useThisSource => 'Nur diese Quelle anzeigen';
@@ -1724,10 +1724,10 @@ class LDe extends L {
   }
 
   @override
-  String get sources_viewOnlyShort => 'Nur diese';
+  String get sources_useThisShort => 'Diese nutzen';
 
   @override
-  String get sources_viewAllShort => 'Alle zeigen';
+  String get sources_stopUsingShort => 'Nicht mehr nutzen';
 
   @override
   String get sources_removeConfirmTitle => 'Quelle entfernen?';
