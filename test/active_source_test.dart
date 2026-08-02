@@ -335,6 +335,36 @@ void main() {
       expect(cfg.sources.single.enabled, isTrue);
     });
 
+    test('two switched-on sources and none picked lands on one', () async {
+      // Otherwise the home screen shows both merged — a third library that is
+      // not on the sources list, which the triggers then step through as if
+      // it were one.
+      final storage = await _storageWithSystem();
+      final notifier = SourcesNotifier(storage, db: _SpyDb());
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+      await notifier.addSource(_romm('b', 'http://home.example.org:9080'));
+      await notifier.setPrimarySource('b');
+      await notifier.setActiveSource(null);
+
+      final reopened = SourcesNotifier(storage, db: _SpyDb());
+      await reopened.ready;
+
+      expect(reopened.state.activeSourceId, 'b', reason: 'the one in use');
+    });
+
+    test('a single source is left alone — nothing to merge with', () async {
+      final storage = await _storageWithSystem();
+      final notifier = SourcesNotifier(storage, db: _SpyDb());
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+
+      final reopened = SourcesNotifier(storage, db: _SpyDb());
+      await reopened.ready;
+
+      expect(reopened.state.activeSourceId, isNull);
+    });
+
     test('the notifier publishes both ids without a config re-read', () async {
       // The screen renders from these. Going back through the config future
       // means invalidating it and waiting on a disk read, and until that

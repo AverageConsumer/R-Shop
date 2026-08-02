@@ -574,15 +574,19 @@ class _HomeViewState extends ConsumerState<HomeView>
   ///
   /// Bound to L2/R2 rather than a face button so the right thumb never has to
   /// leave A, and made bidirectional so overshooting costs one press instead
-  /// of a full lap. "All" stays in the ring as the way out that does not
-  /// require remembering where you started.
+  /// of a full lap.
+  ///
+  /// The ring is the sources and nothing else. It used to carry an extra "all
+  /// of them at once" position, which with two sources configured meant the
+  /// triggers walked A, B, A+B — a third library that is not one of the two on
+  /// the list, and that nobody had asked to see.
   ///
   /// Cheap to press: switching never discards cached games, so the other
   /// source's library is already in the database and appears immediately.
   Future<void> _cycleActiveSource(int delta) async {
-    // Hidden sources are not in the ring. The eye in the sources list is what
-    // decides whether a library reaches this screen at all; stepping onto one
-    // that was hidden would undo that with a trigger press.
+    // Switched-off sources are not in the ring. The eye in the sources list is
+    // what decides whether a library reaches this screen at all; stepping onto
+    // one that was turned off would undo that with a trigger press.
     final sources = ref
         .read(sourcesProvider)
         .sources
@@ -590,16 +594,16 @@ class _HomeViewState extends ConsumerState<HomeView>
         .toList();
     if (sources.isEmpty) return;
 
-    final current =
-        ref.read(bootstrappedConfigProvider).valueOrNull?.activeSourceId;
-    // Ring positions: 0 = all, 1..n = the sources.
-    final currentPos = current == null
-        ? 0
-        : sources.indexWhere((s) => s.id == current) + 1;
-    final ringSize = sources.length + 1;
-    // A dangling id lands on 0, which is also where we want it.
-    final nextPos = ((currentPos + delta) % ringSize + ringSize) % ringSize;
-    final next = nextPos == 0 ? null : sources[nextPos - 1].id;
+    final current = ref.read(sourcesProvider).activeSourceId;
+    final currentPos = sources.indexWhere((s) => s.id == current);
+    // Nothing selected, or a dangling id: the first press lands on a source
+    // rather than stepping off nowhere.
+    final nextPos = currentPos < 0
+        ? (delta > 0 ? 0 : sources.length - 1)
+        : (currentPos + delta) % sources.length;
+    final next =
+        sources[(nextPos % sources.length + sources.length) % sources.length]
+            .id;
 
     ref.read(feedbackServiceProvider).confirm();
     // A deliberate switch supersedes whatever stand-in was showing; the next
@@ -642,13 +646,15 @@ class _HomeViewState extends ConsumerState<HomeView>
         sources.where((s) => s.enabled).toList(growable: false);
     if (standIn == null && visible.isEmpty) return const SizedBox.shrink();
 
-    // Singled out with the triggers, or the only one visible — either way one
-    // server to name. With several on screen it lists them, because that is
-    // what is actually there.
+    // Singled out with the triggers, or the only one switched on — either way
+    // one server to name. The merged case is gone: the notifier lands on a
+    // source at startup when more than one is on, so there is nothing left to
+    // join with a separator.
     final named = active ?? (visible.length == 1 ? visible.single : null);
+    if (standIn == null && named == null) return const SizedBox.shrink();
     final name = standIn != null
         ? '${standIn.name}（${l.sources_fallbackShort}）'
-        : (named?.name ?? visible.map((s) => s.name).join(' · '));
+        : named!.name;
     // Green means "this is also the source in use" — what a sync would talk
     // to. Browsing off it with the triggers greys the strip, so it is visible
     // at a glance that the library on screen is not the one being kept up to

@@ -30,6 +30,19 @@ cause.
 
 ---
 
+## 先看這個：整串已經寫成腳本了
+
+```bash
+scripts/deploy.ps1
+```
+
+驗 JDK 指向 → `analyze` → `build` → `install` → 啟動 → 抓 logcat 的溢位與例外。
+參數：`-SkipAnalyze`、`-NoLaunch`、`-Release`、`-Serial <serial>`。
+
+**底下每一節是那支腳本在做什麼，以及為什麼**。手打之前先想想為什麼不用腳本。
+
+---
+
 ## Step 0 — 先驗 JDK 指向（30 秒，省掉一小時）
 
 ```bash

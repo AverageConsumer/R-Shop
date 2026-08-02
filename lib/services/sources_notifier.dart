@@ -106,6 +106,23 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
         }
       }
 
+      // With more than one source switched on and none of them singled out,
+      // the home screen shows all of them merged — a third library that is
+      // not on the sources list and that nobody asked for. Land on one.
+      // Single-source setups keep the null, which is what they have always
+      // had and what "show everything" correctly means there.
+      final onCount = _cachedConfig.sources.where((s) => s.enabled).length;
+      if (_cachedConfig.activeSourceId == null && onCount > 1) {
+        final landOn = _cachedConfig.primarySourceId ??
+            _cachedConfig.sources.firstWhere((s) => s.enabled).id;
+        _cachedConfig = _cachedConfig.copyWith(activeSourceId: landOn);
+        try {
+          await _storage.saveConfig(jsonEncode(_cachedConfig.toJson()));
+        } catch (e) {
+          debugPrint('SourcesNotifier: initial source pick persist failed: $e');
+        }
+      }
+
       // Sync the in-memory snapshot's legacy providers lists with the
       // current sources list using the same managed/unmanaged split as
       // _writeAndPublish. Read-only — never writes back to disk.
