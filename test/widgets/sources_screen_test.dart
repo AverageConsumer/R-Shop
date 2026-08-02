@@ -212,11 +212,13 @@ void main() {
 
       // Showing a source and using one are separate decisions, so they are
       // separate hints — and separate marks on the row.
-      expect(find.text('Show this'), findsOneWidget);
+      expect(find.text('Show on home'), findsOneWidget);
       expect(find.text('Use this'), findsOneWidget);
       expect(find.text('Disable'), findsOneWidget);
       expect(find.text('Remove'), findsOneWidget);
-      expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+      // Visible by default, so the eye is filled; not in use, so the tick is
+      // an empty ring.
+      expect(find.byIcon(Icons.visibility), findsOneWidget);
       expect(find.byIcon(Icons.radio_button_unchecked), findsOneWidget);
     });
 
@@ -248,7 +250,7 @@ void main() {
       await tester.pumpWidget(_wrap(storage, const SourcesScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.text('Show this'), findsNothing);
+      expect(find.text('Show on home'), findsNothing);
       expect(find.text('Use this'), findsNothing);
       expect(find.text('Disable'), findsNothing);
       expect(find.text('Remove'), findsNothing);

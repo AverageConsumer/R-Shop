@@ -1724,10 +1724,7 @@ class LDe extends L {
   }
 
   @override
-  String get sources_showThisShort => 'Diese zeigen';
-
-  @override
-  String get sources_showAllShort => 'Alle zeigen';
+  String get sources_showOnHome => 'Auf Startseite';
 
   @override
   String get sources_useThisShort => 'Diese nutzen';

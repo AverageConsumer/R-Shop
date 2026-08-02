@@ -519,21 +519,22 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     }
   }
 
-  /// Puts this source on the home screen, or goes back to showing all of them.
+  /// Shows or hides this source's library on the home screen.
   ///
-  /// The same thing the home triggers do, offered here so choosing what to
-  /// look at does not mean leaving this screen first. Changes nothing about
-  /// what syncs — that is the tick, not the eye.
+  /// A tick-box, not a choice between sources — every source with an eye is
+  /// visible, all at once. Changes nothing about what syncs (that is the
+  /// tick) and **discards nothing** (that is disabling).
   Future<void> _toggleShownSource(Source source) async {
-    final shown =
-        ref.read(bootstrappedConfigProvider).valueOrNull?.activeSourceId;
-    final next = shown == source.id ? null : source.id;
     setState(() => _activeActionsSource = null);
     try {
-      await ref.read(sourcesProvider.notifier).setActiveSource(next);
+      await ref
+          .read(sourcesProvider.notifier)
+          .setShowOnHome(source.id, !source.showOnHome);
       ref.invalidate(bootstrappedConfigProvider);
+      ref.invalidate(gamesProvider);
+      ref.read(gameDbChangedProvider.notifier).state++;
     } catch (e) {
-      debugPrint('SourcesScreen: setActiveSource failed: $e');
+      debugPrint('SourcesScreen: setShowOnHome failed: $e');
     }
   }
 
@@ -658,19 +659,19 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     BuildContext context,
     SourcesState state,
     String? primary,
-    String? shown,
   ) {
     final l = L.of(context);
     final source = state.loading ? null : _focusedSource(state.sources);
     return ConsoleHud(
       b: HudAction(l.common_back, onTap: _goBack),
       y: HudAction(l.sources_addSource, onTap: _addSource),
+      // One label, both ways. A tick-box does not need the hint to spell out
+      // which direction the press goes — the eye on the row already says
+      // whether it is on.
       lt: source == null
           ? null
           : HudAction(
-              shown == source.id
-                  ? l.sources_showAllShort
-                  : l.sources_showThisShort,
+              l.sources_showOnHome,
               onTap: () => _toggleShownSource(source),
             ),
       x: source == null
@@ -702,9 +703,8 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final state = ref.watch(sourcesProvider);
     // Watched, not mirrored: the config is the only thing that knows which
     // source is in use, and every label on this screen reads from it.
-    final cfg = ref.watch(bootstrappedConfigProvider).valueOrNull;
-    final primary = cfg?.primarySourceId;
-    final shown = cfg?.activeSourceId;
+    final primary =
+        ref.watch(bootstrappedConfigProvider).valueOrNull?.primarySourceId;
     _gcFocusNodes(state.sources);
     _ensureInteractiveFocus(state);
 
@@ -738,7 +738,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
             ),
             // Every hint here is also a button: the HUD is the finger half of
             // the same three shortcuts, so neither input is a dead end.
-            _buildHud(context, state, primary, shown),
+            _buildHud(context, state, primary),
             if (_activeActionsSource != null)
               _SourceActionsOverlay(
                 source: _activeActionsSource!,
@@ -1017,7 +1017,7 @@ class _SourceList extends ConsumerWidget {
                 mappingCount: mappingCounts[source.id] ?? 0,
                 isActive: cfg?.primarySourceId == source.id,
                 onToggleActive: () => onToggleActive(source),
-                isShown: cfg?.activeSourceId == source.id,
+                isShown: source.showOnHome,
                 onToggleShown: () => onToggleShown(source),
               );
             },
@@ -1057,11 +1057,11 @@ class _SourceCard extends ConsumerWidget {
   /// Designates this source as the one in use, from the tick on the row.
   final VoidCallback? onToggleActive;
 
-  /// True when the home screen is currently showing this source. Marked with
-  /// an eye, because "which library am I looking at" is otherwise invisible.
+  /// True when this source's library appears on the home screen. A tick-box,
+  /// so any number of rows can carry the eye at once.
   final bool isShown;
 
-  /// Puts this source on screen, or goes back to showing every source.
+  /// Shows or hides this source's library, from the eye on the row.
   final VoidCallback? onToggleShown;
 
   Color get _accent {
@@ -1147,9 +1147,10 @@ class _SourceCard extends ConsumerWidget {
             // the row, with no menu to open first — they are what this screen
             // is for, so they do not belong three presses deep.
             //
-            // The eye is what is on screen; the tick is what the app works
-            // against. Same shape for both would put the user back where the
-            // one conflated setting had them.
+            // The eye is a tick-box — every source wearing one is on the home
+            // screen, all together. The tick is single: it names the one the
+            // app works against. Same shape for both would put the user back
+            // where the one conflated setting had them.
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onToggleShown,

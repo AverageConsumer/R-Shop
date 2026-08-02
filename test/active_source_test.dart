@@ -342,4 +342,98 @@ void main() {
       expect(cfg.primarySource, isNull);
     });
   });
+
+  // The eye is a tick-box: every source wearing one is on the home screen,
+  // all together. Not a choice between them.
+  group('showOnHome', () {
+    const system = SystemConfig(
+      id: 'snes',
+      name: 'SNES',
+      targetFolder: '/roms/snes',
+      providers: [],
+    );
+
+    test('two visible sources both reach the home screen', () {
+      final all = [
+        _romm('a', 'http://a'),
+        _romm('b', 'http://b'),
+      ];
+
+      final out = SourceResolver.providersFor(system, all);
+
+      expect(out.map((p) => p.sourceId), ['a', 'b']);
+    });
+
+    test('a hidden one drops out, the rest stay', () {
+      final all = [
+        _romm('a', 'http://a'),
+        _romm('b', 'http://b').copyWith(showOnHome: false),
+        _romm('c', 'http://c'),
+      ];
+
+      final out = SourceResolver.providersFor(system, all);
+
+      expect(out.map((p) => p.sourceId), ['a', 'c']);
+    });
+
+    test('but a named source still resolves while hidden', () {
+      // Hiding is a view filter. A sync against the source in use has to run
+      // whether or not its library is on screen.
+      final all = [_romm('a', 'http://a').copyWith(showOnHome: false)];
+
+      final out =
+          SourceResolver.providersFor(system, all, activeSourceId: 'a');
+
+      expect(out.map((p) => p.sourceId), ['a']);
+    });
+
+    test('hiding never purges — the games are still there to come back to',
+        () async {
+      final storage = await _storageWithSystem();
+      final db = _SpyDb();
+      final notifier = SourcesNotifier(storage, db: db);
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+
+      await notifier.setShowOnHome('a', false);
+
+      expect(db.purged, isEmpty);
+      final cfg = await storage.loadConfig();
+      expect(cfg!.sources.single.showOnHome, isFalse);
+    });
+
+    test('hiding the source being viewed alone widens the view', () async {
+      // Otherwise the home screen is narrowed to a library it must not show,
+      // and comes up empty.
+      final storage = await _storageWithSystem();
+      final notifier = SourcesNotifier(storage, db: _SpyDb());
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+      await notifier.addSource(_romm('b', 'http://home.example.org:9080'));
+      await notifier.setActiveSource('a');
+
+      await notifier.setShowOnHome('a', false);
+
+      final cfg = await storage.loadConfig();
+      expect(cfg!.activeSourceId, isNull);
+      expect(cfg.systems.single.providers.map((p) => p.sourceId), ['b']);
+    });
+
+    test('sources configured before the tick-box existed are visible', () {
+      final src = Source.fromJson({
+        'id': 'a',
+        'name': 'a',
+        'type': 'romm',
+        'url': 'http://a',
+      });
+
+      expect(src.showOnHome, isTrue);
+    });
+
+    test('round-trips through JSON', () {
+      final src = _romm('a', 'http://a').copyWith(showOnHome: false);
+
+      expect(Source.fromJson(src.toJson()).showOnHome, isFalse);
+    });
+  });
 }

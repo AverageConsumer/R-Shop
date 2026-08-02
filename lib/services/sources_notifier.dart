@@ -309,6 +309,33 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     await _writeAndPublish(state.sources, activeSourceId: id, setActive: true);
   }
 
+  /// Shows or hides this source's library on the home screen.
+  ///
+  /// A tick-box: any number of sources can be visible at once. Off hides the
+  /// library and nothing else — **no purge**, because the games are still
+  /// there and the eye is expected to be flipped back. `setEnabled(false)` is
+  /// the one that discards a cache.
+  ///
+  /// Clears the single-source view when it was pointed at this source: the
+  /// home screen would otherwise be narrowed to a library it must not show.
+  Future<void> setShowOnHome(String id, bool visible) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == id,
+      orElse: () => throw StateError('Unknown source: $id'),
+    );
+    if (src.showOnHome == visible) return;
+    final next = [
+      for (final s in state.sources)
+        if (s.id == id) s.copyWith(showOnHome: visible) else s,
+    ];
+    final clearView = !visible && _cachedConfig.activeSourceId == id;
+    await _writeAndPublish(
+      next,
+      activeSourceId: clearView ? null : _cachedConfig.activeSourceId,
+      setActive: clearView,
+    );
+  }
+
   /// Designates the source in use: the one that syncs, and the one the home
   /// screen shows by default.
   ///

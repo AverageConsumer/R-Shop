@@ -1725,10 +1725,7 @@ class LFr extends L {
   }
 
   @override
-  String get sources_showThisShort => 'Afficher celle-ci';
-
-  @override
-  String get sources_showAllShort => 'Tout afficher';
+  String get sources_showOnHome => 'Sur l\'accueil';
 
   @override
   String get sources_useThisShort => 'Utiliser celle-ci';

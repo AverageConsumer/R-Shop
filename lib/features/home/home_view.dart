@@ -580,8 +580,14 @@ class _HomeViewState extends ConsumerState<HomeView>
   /// Cheap to press: switching never discards cached games, so the other
   /// source's library is already in the database and appears immediately.
   Future<void> _cycleActiveSource(int delta) async {
-    final sources =
-        ref.read(sourcesProvider).sources.where((s) => s.enabled).toList();
+    // Hidden sources are not in the ring. The eye in the sources list is what
+    // decides whether a library reaches this screen at all; stepping onto one
+    // that was hidden would undo that with a trigger press.
+    final sources = ref
+        .read(sourcesProvider)
+        .sources
+        .where((s) => s.enabled && s.showOnHome)
+        .toList();
     if (sources.isEmpty) return;
 
     final current =

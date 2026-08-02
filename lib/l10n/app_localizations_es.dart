@@ -1723,10 +1723,7 @@ class LEs extends L {
   }
 
   @override
-  String get sources_showThisShort => 'Mostrar esta';
-
-  @override
-  String get sources_showAllShort => 'Mostrar todas';
+  String get sources_showOnHome => 'Ver en inicio';
 
   @override
   String get sources_useThisShort => 'Usar esta';

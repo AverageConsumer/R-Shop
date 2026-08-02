@@ -40,11 +40,20 @@ description: "Touch anything about sources, connection routes, which source is i
 
 | 欄位 | 意思 | 誰在改 |
 | --- | --- | --- |
-| `primarySourceId` | **使用中**：同步的目標，以及主畫面預設顯示 | 來源清單的 `[X]`／**打勾**圖示（`setPrimarySource`） |
-| `activeSourceId` | **顯示**：主畫面現在在看哪一個 | 主畫面的 L2/R2、來源清單的 `L2`／**眼睛**圖示（`setActiveSource`） |
+| 欄位 | 意思 | 單／複選 | 誰在改 |
+| --- | --- | --- | --- |
+| `primarySourceId` | **使用中**：同步的目標，以及主畫面預設顯示 | 單選 | 來源清單的 `[X]`／**打勾**圖示 |
+| `Source.showOnHome` | **主畫面顯示**：這個來源的清單會不會出現在主畫面 | **複選** | 來源清單的 `L2`／**眼睛**圖示 |
+| `activeSourceId` | 主畫面現在單獨在看哪一個（可以是 null＝看全部可見的） | 單選 | 主畫面的 L2/R2 |
 
-**兩個功能不能共用同一個圖示。** 眼睛只代表「在看哪一個」，打勾只代表「用哪一個」——
+**兩個功能不能共用同一個圖示。** 眼睛只代表「會不會出現」，打勾只代表「用哪一個」——
 它們一度是同一個設定，使用者分不清正是當初要拆開的原因。
+
+**`providersFor` 只在沒指定來源時才套 `showOnHome` 過濾。**
+指定了就是刻意指定的——**使用中的來源被隱藏時同步還是要跑**，
+不然「隱藏」會變成偷偷停掉同步。
+
+**隱藏不清快取**（`setEnabled(false)` 才清）。這是隱藏與停用唯一的差別。
 
 **`resolveForSync` 讀的是 `primarySourceId ?? activeSourceId`。**
 `?? activeSourceId` 是分家之前的設定檔的相容路徑，`fromJson` 也做同樣的回填 ——

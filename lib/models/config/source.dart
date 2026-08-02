@@ -267,6 +267,15 @@ class Source {
   /// or losing its credentials.
   final bool enabled;
 
+  /// Whether this source's library appears on the home screen.
+  ///
+  /// A tick-box, not a choice between sources: any number of them can be on
+  /// at once, and the home screen shows all of them together. Off hides the
+  /// library from view and nothing more — the source still syncs when it is
+  /// the one in use, and **its cached games are kept**, which is what
+  /// separates hiding from [enabled] = false.
+  final bool showOnHome;
+
   /// Another source to fall back on when this one does not answer — the
   /// typical pair being an internal-network server and its external address.
   ///
@@ -310,6 +319,7 @@ class Source {
     this.autoMap = false,
     this.priority = 100,
     this.enabled = true,
+    this.showOnHome = true,
     this.fallbackSourceId,
     this.borrowed = false,
     this.tokenExpiresAt,
@@ -371,6 +381,9 @@ class Source {
       autoMap: json['auto_map'] as bool? ?? false,
       priority: json['priority'] as int? ?? 100,
       enabled: json['enabled'] as bool? ?? true,
+      // Absent for every source configured before the tick-box existed —
+      // they were all visible, so that is what absent has to mean.
+      showOnHome: json['show_on_home'] as bool? ?? true,
       fallbackSourceId: json['fallback_source_id'] as String?,
       borrowed: json['borrowed'] as bool? ?? false,
       tokenExpiresAt: exp,
@@ -398,6 +411,7 @@ class Source {
       'auto_map': autoMap,
       'priority': priority,
       'enabled': enabled,
+      'show_on_home': showOnHome,
       if (fallbackSourceId != null) 'fallback_source_id': fallbackSourceId,
       'borrowed': borrowed,
       if (tokenExpiresAt != null)
@@ -491,6 +505,7 @@ class Source {
       autoMap: autoMap,
       priority: priority,
       enabled: enabled,
+      showOnHome: showOnHome,
       borrowed: borrowed,
       tokenExpiresAt: tokenExpiresAt,
       knownPlatforms: knownPlatforms,
@@ -579,6 +594,7 @@ class Source {
     bool? autoMap,
     int? priority,
     bool? enabled,
+    bool? showOnHome,
     String? fallbackSourceId,
     bool clearFallback = false,
     bool? borrowed,
@@ -603,6 +619,7 @@ class Source {
       autoMap: autoMap ?? this.autoMap,
       priority: priority ?? this.priority,
       enabled: enabled ?? this.enabled,
+      showOnHome: showOnHome ?? this.showOnHome,
       fallbackSourceId:
           clearFallback ? null : (fallbackSourceId ?? this.fallbackSourceId),
       borrowed: borrowed ?? this.borrowed,
