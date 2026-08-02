@@ -3143,24 +3143,6 @@ abstract class L {
   /// **'In use'**
   String get sources_activeSource;
 
-  /// No description provided for @sources_useThisSource.
-  ///
-  /// In en, this message translates to:
-  /// **'Show this source only'**
-  String get sources_useThisSource;
-
-  /// No description provided for @sources_showAllSources.
-  ///
-  /// In en, this message translates to:
-  /// **'Show all sources'**
-  String get sources_showAllSources;
-
-  /// No description provided for @sources_allSources.
-  ///
-  /// In en, this message translates to:
-  /// **'All sources'**
-  String get sources_allSources;
-
   /// No description provided for @sources_switchSource.
   ///
   /// In en, this message translates to:

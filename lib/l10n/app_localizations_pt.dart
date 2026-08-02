@@ -1677,15 +1677,6 @@ class LPt extends L {
   String get sources_activeSource => 'Em uso';
 
   @override
-  String get sources_useThisSource => 'Mostrar apenas esta fonte';
-
-  @override
-  String get sources_showAllSources => 'Mostrar todas as fontes';
-
-  @override
-  String get sources_allSources => 'Todas as fontes';
-
-  @override
   String get sources_switchSource => 'Mudar fonte';
 
   @override

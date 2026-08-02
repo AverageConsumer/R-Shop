@@ -1679,15 +1679,6 @@ class LFr extends L {
   String get sources_activeSource => 'En cours d\'utilisation';
 
   @override
-  String get sources_useThisSource => 'Afficher uniquement cette source';
-
-  @override
-  String get sources_showAllSources => 'Afficher toutes les sources';
-
-  @override
-  String get sources_allSources => 'Toutes les sources';
-
-  @override
   String get sources_switchSource => 'Changer de source';
 
   @override

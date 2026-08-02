@@ -1623,15 +1623,6 @@ class LZh extends L {
   String get sources_activeSource => '使用中';
 
   @override
-  String get sources_useThisSource => '只看這個來源';
-
-  @override
-  String get sources_showAllSources => '顯示全部來源';
-
-  @override
-  String get sources_allSources => '全部來源';
-
-  @override
   String get sources_switchSource => '切換來源';
 
   @override

@@ -1628,15 +1628,6 @@ class LJa extends L {
   String get sources_activeSource => '使用中';
 
   @override
-  String get sources_useThisSource => 'この提供元のみ表示';
-
-  @override
-  String get sources_showAllSources => 'すべての提供元を表示';
-
-  @override
-  String get sources_allSources => 'すべての提供元';
-
-  @override
   String get sources_switchSource => '提供元切替';
 
   @override

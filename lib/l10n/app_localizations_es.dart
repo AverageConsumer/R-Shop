@@ -1677,15 +1677,6 @@ class LEs extends L {
   String get sources_activeSource => 'En uso';
 
   @override
-  String get sources_useThisSource => 'Mostrar solo esta fuente';
-
-  @override
-  String get sources_showAllSources => 'Mostrar todas las fuentes';
-
-  @override
-  String get sources_allSources => 'Todas las fuentes';
-
-  @override
   String get sources_switchSource => 'Cambiar fuente';
 
   @override

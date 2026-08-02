@@ -1667,15 +1667,6 @@ class LEn extends L {
   String get sources_activeSource => 'In use';
 
   @override
-  String get sources_useThisSource => 'Show this source only';
-
-  @override
-  String get sources_showAllSources => 'Show all sources';
-
-  @override
-  String get sources_allSources => 'All sources';
-
-  @override
   String get sources_switchSource => 'Switch source';
 
   @override

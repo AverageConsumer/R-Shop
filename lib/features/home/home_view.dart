@@ -623,38 +623,49 @@ class _HomeViewState extends ConsumerState<HomeView>
     final cfg = ref.watch(bootstrappedConfigProvider).valueOrNull;
     final active = cfg?.activeSource;
     final sources = ref.watch(sourcesProvider).sources;
-    // Hidden with a single source: there is nothing to choose between, and a
-    // header naming the only server there is would just cost a row of screen
-    // on a 3.92" display. The user confirmed this is what they want.
-    if (sources.length < 2) return const SizedBox.shrink();
-
-    // Same reasoning once the eyes have narrowed it down to one: with a
-    // single library on screen and it being the one in use, there is nothing
-    // left for this row to answer. "All sources" would be a wrong answer too —
-    // it is one source, it just happens to be all of the visible ones.
-    final visible =
-        sources.where((s) => s.enabled && s.showOnHome).toList(growable: false);
-    if (visible.length == 1 && visible.single.id == cfg?.primarySourceId) {
-      return const SizedBox.shrink();
-    }
 
     // When the selected source was unreachable and its partner stood in, say
     // so. Quietly showing a different server's library would look like games
     // had gone missing.
     final syncing = ref.watch(syncingSourceProvider);
     final standIn = syncing != null && syncing.isFallback ? syncing : null;
+
+    // This row names one server. It never says "all sources" — that is not
+    // the name of anything, and a row that sometimes carries a real name and
+    // sometimes a placeholder is a row the reader has to parse twice.
+    //
+    // So it is dropped entirely whenever there is no single server to name:
+    //
+    // - one source configured, or one library visible and it is the one in
+    //   use — nothing to choose between, and naming it costs a row of screen
+    //   on a 3.92" display. The user confirmed this is what they want.
+    // - several libraries on screen at once with none singled out — the
+    //   honest answer is a list, which does not fit and nobody asked for.
+    //
+    // Dropping it means SizedBox.shrink, a genuine zero-height row rather
+    // than an empty one: a blank strip would shift everything below it by a
+    // line depending on state, which is the height inconsistency the user
+    // already caught once.
+    final visible =
+        sources.where((s) => s.enabled && s.showOnHome).toList(growable: false);
+    final named =
+        active ?? (visible.length == 1 ? visible.single : null);
+    if (standIn == null) {
+      if (named == null) return const SizedBox.shrink();
+      if (sources.length < 2) return const SizedBox.shrink();
+      if (visible.length == 1 && named.id == cfg?.primarySourceId) {
+        return const SizedBox.shrink();
+      }
+    }
+
     final name = standIn != null
         ? '${standIn.name}（${l.sources_fallbackShort}）'
-        // With one library visible, name it. Nothing is being collapsed, so
-        // calling it "all sources" would describe a choice that isn't there.
-        : (active?.name ??
-            (visible.length == 1 ? visible.single.name : l.sources_allSources));
+        : named!.name;
     // Green means "this is also the source in use" — what a sync would talk
     // to. Browsing off it with the triggers greys the strip, so it is visible
     // at a glance that the library on screen is not the one being kept up to
     // date.
-    final onPrimary =
-        active != null && cfg?.primarySourceId == active.id;
+    final onPrimary = named != null && cfg?.primarySourceId == named.id;
     final accent = standIn != null
         ? const Color(0xFFE0A24E)
         : (onPrimary ? const Color(0xFF7BC67B) : Colors.white54);

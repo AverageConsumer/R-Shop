@@ -1678,15 +1678,6 @@ class LDe extends L {
   String get sources_activeSource => 'In Verwendung';
 
   @override
-  String get sources_useThisSource => 'Nur diese Quelle anzeigen';
-
-  @override
-  String get sources_showAllSources => 'Alle Quellen anzeigen';
-
-  @override
-  String get sources_allSources => 'Alle Quellen';
-
-  @override
   String get sources_switchSource => 'Quelle wechseln';
 
   @override
