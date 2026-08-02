@@ -291,6 +291,35 @@ void main() {
       expect(cfg.primarySourceId, 'a');
     });
 
+    test('designating a hidden source turns its eye back on', () async {
+      // Working against a library you cannot see is not a state worth having.
+      final storage = await _storageWithSystem();
+      final notifier = SourcesNotifier(storage, db: _SpyDb());
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+      await notifier.setShowOnHome('a', false);
+
+      await notifier.setPrimarySource('a');
+
+      final cfg = await storage.loadConfig();
+      expect(cfg!.sources.single.showOnHome, isTrue);
+    });
+
+    test('but clearing it leaves the eye alone', () async {
+      // Giving up the designation says nothing about wanting to stop looking.
+      final storage = await _storageWithSystem();
+      final notifier = SourcesNotifier(storage, db: _SpyDb());
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+      await notifier.setPrimarySource('a');
+
+      await notifier.setPrimarySource(null);
+
+      final cfg = await storage.loadConfig();
+      expect(cfg!.primarySourceId, isNull);
+      expect(cfg.sources.single.showOnHome, isTrue);
+    });
+
     test('designating never purges either library', () async {
       final storage = await _storageWithSystem();
       final db = _SpyDb();

@@ -630,37 +630,25 @@ class _HomeViewState extends ConsumerState<HomeView>
     final syncing = ref.watch(syncingSourceProvider);
     final standIn = syncing != null && syncing.isFallback ? syncing : null;
 
-    // This row names one server. It never says "all sources" — that is not
-    // the name of anything, and a row that sometimes carries a real name and
-    // sometimes a placeholder is a row the reader has to parse twice.
+    // This row names the servers on screen, and never says "all sources" —
+    // that is not the name of anything.
     //
-    // So it is dropped entirely whenever there is no single server to name:
-    //
-    // - one source configured, or one library visible and it is the one in
-    //   use — nothing to choose between, and naming it costs a row of screen
-    //   on a 3.92" display. The user confirmed this is what they want.
-    // - several libraries on screen at once with none singled out — the
-    //   honest answer is a list, which does not fit and nobody asked for.
-    //
-    // Dropping it means SizedBox.shrink, a genuine zero-height row rather
-    // than an empty one: a blank strip would shift everything below it by a
-    // line depending on state, which is the height inconsistency the user
-    // already caught once.
+    // It is present whenever at least one library is: ticking an eye is the
+    // user saying "this is on my home screen", so the row that answers "which
+    // ones" has to be there to answer it. Only an empty screen drops it, and
+    // then as SizedBox.shrink — a genuine zero-height row rather than a blank
+    // one, so nothing below shifts by a line depending on state.
     final visible =
         sources.where((s) => s.enabled && s.showOnHome).toList(growable: false);
-    final named =
-        active ?? (visible.length == 1 ? visible.single : null);
-    if (standIn == null) {
-      if (named == null) return const SizedBox.shrink();
-      if (sources.length < 2) return const SizedBox.shrink();
-      if (visible.length == 1 && named.id == cfg?.primarySourceId) {
-        return const SizedBox.shrink();
-      }
-    }
+    if (standIn == null && visible.isEmpty) return const SizedBox.shrink();
 
+    // Singled out with the triggers, or the only one visible — either way one
+    // server to name. With several on screen it lists them, because that is
+    // what is actually there.
+    final named = active ?? (visible.length == 1 ? visible.single : null);
     final name = standIn != null
         ? '${standIn.name}（${l.sources_fallbackShort}）'
-        : named!.name;
+        : (named?.name ?? visible.map((s) => s.name).join(' · '));
     // Green means "this is also the source in use" — what a sync would talk
     // to. Browsing off it with the triggers greys the strip, so it is visible
     // at a glance that the library on screen is not the one being kept up to

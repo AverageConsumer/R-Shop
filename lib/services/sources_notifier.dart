@@ -339,21 +339,31 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
   /// Designates the source in use: the one that syncs, and the one the home
   /// screen shows by default.
   ///
-  /// Also puts it in view, because "use this" without showing it would leave
-  /// the two disagreeing the moment it is set. The home triggers can move the
-  /// view off it afterwards; that is the point of keeping them separate.
+  /// Also puts it in view and turns its eye on, because "use this" while it is
+  /// hidden would sync a library the user cannot see.
+  ///
+  /// **Clearing does not turn the eye back off.** Giving up the designation
+  /// says nothing about whether you still want to look at it, and silently
+  /// hiding a library nobody asked to hide is the worse of the two guesses.
   ///
   /// Purges nothing, for the same reason [setActiveSource] does not.
   Future<void> setPrimarySource(String? id) async {
     if (id != null && !state.sources.any((s) => s.id == id)) {
       throw StateError('Unknown source: $id');
     }
-    if (_cachedConfig.primarySourceId == id &&
-        _cachedConfig.activeSourceId == id) {
-      return;
-    }
+    final wasHidden = id != null &&
+        state.sources.any((s) => s.id == id && !s.showOnHome);
+    final next = wasHidden
+        ? [
+            for (final s in state.sources)
+              if (s.id == id) s.copyWith(showOnHome: true) else s,
+          ]
+        : state.sources;
+    final alreadySet = _cachedConfig.primarySourceId == id &&
+        _cachedConfig.activeSourceId == id;
+    if (alreadySet && !wasHidden) return;
     await _writeAndPublish(
-      state.sources,
+      next,
       activeSourceId: id,
       setActive: true,
       primarySourceId: id,
