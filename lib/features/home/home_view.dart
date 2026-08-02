@@ -565,8 +565,12 @@ class _HomeViewState extends ConsumerState<HomeView>
     return KeyEventResult.ignored;
   }
 
-  /// Steps the active source by [delta] over the ring
+  /// Steps the **shown** source by [delta] over the ring
   /// `all → first → … → last → all`.
+  ///
+  /// Changes what is on screen and nothing else. The source in use — what
+  /// syncs — is set in the sources list and is not touched here, so browsing
+  /// another library never redirects the next sync at it.
   ///
   /// Bound to L2/R2 rather than a face button so the right thumb never has to
   /// leave A, and made bidirectional so overshooting costs one press instead
@@ -626,9 +630,15 @@ class _HomeViewState extends ConsumerState<HomeView>
     final name = standIn != null
         ? '${standIn.name}（${l.sources_fallbackShort}）'
         : (active?.name ?? l.sources_allSources);
+    // Green means "this is also the source in use" — what a sync would talk
+    // to. Browsing off it with the triggers greys the strip, so it is visible
+    // at a glance that the library on screen is not the one being kept up to
+    // date.
+    final onPrimary =
+        active != null && cfg?.primarySourceId == active.id;
     final accent = standIn != null
         ? const Color(0xFFE0A24E)
-        : (active == null ? Colors.white54 : const Color(0xFF7BC67B));
+        : (onPrimary ? const Color(0xFF7BC67B) : Colors.white54);
 
     // A real row in the layout, not an overlay: it must push the console list
     // down rather than cover whatever scrolls beneath it.

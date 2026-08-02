@@ -119,9 +119,15 @@ Future<({AppConfig config, SourceChoice choice})> resolveForSync({
   required AppConfig config,
   EndpointProbeService? probe,
 }) async {
-  final activeId = config.activeSourceId;
+  // Syncs follow the source **in use**, not the one on screen. Browsing over
+  // to another library with the triggers is a look, not a decision to start
+  // working against that server — and a borrowed library is exactly the kind
+  // of thing you look at without wanting the next sync redirected at it.
+  // Falls back to the shown source when nothing has been designated, which is
+  // both the pre-split behaviour and what a single-source setup wants.
+  final activeId = config.primarySourceId ?? config.activeSourceId;
   if (activeId == null) {
-    // Showing everything — nothing to fail over between.
+    // Nothing designated and showing everything — nothing to fail over between.
     return (config: config, choice: SourceChoice.none);
   }
 

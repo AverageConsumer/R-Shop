@@ -221,4 +221,106 @@ void main() {
       expect(AppConfig.fromJson(cfg.toJson()).activeSourceId, 'a');
     });
   });
+
+  // Two different decisions: what you are looking at, and what the app
+  // actually works against. Browsing a borrowed library with the home
+  // triggers must not redirect the next sync at it.
+  group('the source in use vs the source on screen', () {
+    test('designating one puts it in use and on screen', () async {
+      final storage = await _storageWithSystem();
+      final notifier = SourcesNotifier(storage, db: _SpyDb());
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+      await notifier.addSource(_romm('b', 'http://home.example.org:9080'));
+
+      await notifier.setPrimarySource('b');
+
+      final cfg = await storage.loadConfig();
+      expect(cfg!.primarySourceId, 'b');
+      expect(cfg.activeSourceId, 'b');
+    });
+
+    test('browsing to another source leaves the one in use alone', () async {
+      final storage = await _storageWithSystem();
+      final notifier = SourcesNotifier(storage, db: _SpyDb());
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+      await notifier.addSource(_romm('b', 'http://home.example.org:9080'));
+      await notifier.setPrimarySource('b');
+
+      await notifier.setActiveSource('a');
+
+      final cfg = await storage.loadConfig();
+      expect(cfg!.activeSourceId, 'a', reason: 'the view moved');
+      expect(cfg.primarySourceId, 'b', reason: 'the one in use did not');
+    });
+
+    test('one press clears it — there is no second cancel', () async {
+      // The bug this guards: the screen used to mirror the id into a field
+      // seeded with `??=`, which cannot hold "deliberately none", so the next
+      // build re-seeded it and the toggle took two presses to let go.
+      final storage = await _storageWithSystem();
+      final notifier = SourcesNotifier(storage, db: _SpyDb());
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+      await notifier.setPrimarySource('a');
+
+      await notifier.setPrimarySource(null);
+
+      final cfg = await storage.loadConfig();
+      expect(cfg!.primarySourceId, isNull);
+      expect(cfg.activeSourceId, isNull);
+    });
+
+    test('designating never purges either library', () async {
+      final storage = await _storageWithSystem();
+      final db = _SpyDb();
+      final notifier = SourcesNotifier(storage, db: db);
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+      await notifier.addSource(_romm('b', 'http://home.example.org:9080'));
+
+      await notifier.setPrimarySource('b');
+      await notifier.setPrimarySource('a');
+
+      expect(db.purged, isEmpty);
+    });
+
+    test('a config written before the split keeps syncing what it synced', () {
+      // No primary_source_id on disk — read it as "the shown source is also
+      // the one in use", which is what those installs meant.
+      final cfg = AppConfig.fromJson({
+        'version': AppConfig.currentVersion,
+        'systems': <dynamic>[],
+        'sources': <dynamic>[],
+        'active_source_id': 'b',
+      });
+
+      expect(cfg.primarySourceId, 'b');
+    });
+
+    test('round-trips through JSON independently of the shown source', () {
+      final cfg = AppConfig(
+        systems: const [],
+        sources: [_romm('a', 'http://a'), _romm('b', 'http://b')],
+        activeSourceId: 'a',
+        primarySourceId: 'b',
+      );
+
+      final back = AppConfig.fromJson(cfg.toJson());
+      expect(back.activeSourceId, 'a');
+      expect(back.primarySourceId, 'b');
+      expect(back.primarySource?.id, 'b');
+    });
+
+    test('a deleted source in use resolves to null, not a crash', () {
+      final cfg = AppConfig(
+        systems: const [],
+        sources: [_romm('a', 'http://a')],
+        primarySourceId: 'deleted',
+      );
+
+      expect(cfg.primarySource, isNull);
+    });
+  });
 }

@@ -309,6 +309,31 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     await _writeAndPublish(state.sources, activeSourceId: id, setActive: true);
   }
 
+  /// Designates the source in use: the one that syncs, and the one the home
+  /// screen shows by default.
+  ///
+  /// Also puts it in view, because "use this" without showing it would leave
+  /// the two disagreeing the moment it is set. The home triggers can move the
+  /// view off it afterwards; that is the point of keeping them separate.
+  ///
+  /// Purges nothing, for the same reason [setActiveSource] does not.
+  Future<void> setPrimarySource(String? id) async {
+    if (id != null && !state.sources.any((s) => s.id == id)) {
+      throw StateError('Unknown source: $id');
+    }
+    if (_cachedConfig.primarySourceId == id &&
+        _cachedConfig.activeSourceId == id) {
+      return;
+    }
+    await _writeAndPublish(
+      state.sources,
+      activeSourceId: id,
+      setActive: true,
+      primarySourceId: id,
+      setPrimary: true,
+    );
+  }
+
   // --- Routes (endpoints) ---
   //
   // A route change is *not* a source change: same server, same library, same
@@ -518,6 +543,8 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     List<SystemConfig> addSystems = const [],
     String? activeSourceId,
     bool setActive = false,
+    String? primarySourceId,
+    bool setPrimary = false,
   }) async {
     // Re-read the config from disk so any writes that happened outside
     // this notifier (e.g. the onboarding flow adding new systems) are
@@ -615,6 +642,8 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       sources: next,
       activeSourceId: setActive ? activeSourceId : null,
       clearActiveSource: setActive && activeSourceId == null,
+      primarySourceId: setPrimary ? primarySourceId : null,
+      clearPrimarySource: setPrimary && primarySourceId == null,
       systems: rebuiltSystems,
     );
     try {

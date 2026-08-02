@@ -22,9 +22,13 @@ class AppConfig {
   final List<SystemConfig> systems;
   final List<Source> sources;
 
-  /// The one source the library is currently showing and syncing, or null to
-  /// use every enabled source at once (the historical behaviour, and what a
+  /// The one source the library is currently **showing**, or null to show
+  /// every enabled source at once (the historical behaviour, and what a
   /// single-source setup gets).
+  ///
+  /// This is the cheap, reversible one: the home screen flips it with the
+  /// triggers to look at another library. It is not what syncs — see
+  /// [primarySourceId].
   ///
   /// Sources are always treated as independent libraries — **even when two of
   /// them happen to point at the same server**. Switching only changes which
@@ -32,11 +36,21 @@ class AppConfig {
   /// instant rather than a re-sync.
   final String? activeSourceId;
 
+  /// The source in use: what syncs, and what the home screen shows by default.
+  ///
+  /// Separate from [activeSourceId] because looking at another library and
+  /// changing which server you actually work with are different decisions.
+  /// Browsing over to a borrowed library should not silently redirect the next
+  /// sync at it. Set from the sources list; null means no source has been
+  /// designated and sync falls back to whatever is in view.
+  final String? primarySourceId;
+
   const AppConfig({
     this.version = currentVersion,
     required this.systems,
     this.sources = const [],
     this.activeSourceId,
+    this.primarySourceId,
   });
 
   static const empty = AppConfig(systems: []);
@@ -72,6 +86,11 @@ class AppConfig {
         systems: systems,
         sources: sources,
         activeSourceId: json['active_source_id'] as String?,
+        // Absent in configs written before the two were separated. Falling
+        // back to the shown source keeps those installs syncing exactly what
+        // they synced before, with no migration step.
+        primarySourceId: json['primary_source_id'] as String? ??
+            json['active_source_id'] as String?,
       );
     }
 
@@ -86,6 +105,7 @@ class AppConfig {
       'systems': systems.map((s) => s.toJson()).toList(),
       'sources': sources.map((s) => s.toJson()).toList(),
       if (activeSourceId != null) 'active_source_id': activeSourceId,
+      if (primarySourceId != null) 'primary_source_id': primarySourceId,
     };
   }
 
@@ -97,6 +117,7 @@ class AppConfig {
       'systems': systems.map((s) => s.toJsonWithoutAuth()).toList(),
       'sources': sources.map((s) => s.toJsonWithoutAuth()).toList(),
       if (activeSourceId != null) 'active_source_id': activeSourceId,
+      if (primarySourceId != null) 'primary_source_id': primarySourceId,
     };
   }
 
@@ -106,6 +127,8 @@ class AppConfig {
     List<Source>? sources,
     String? activeSourceId,
     bool clearActiveSource = false,
+    String? primarySourceId,
+    bool clearPrimarySource = false,
   }) {
     return AppConfig(
       version: version ?? this.version,
@@ -113,6 +136,8 @@ class AppConfig {
       sources: sources ?? this.sources,
       activeSourceId:
           clearActiveSource ? null : (activeSourceId ?? this.activeSourceId),
+      primarySourceId:
+          clearPrimarySource ? null : (primarySourceId ?? this.primarySourceId),
     );
   }
 
@@ -123,6 +148,17 @@ class AppConfig {
   /// to an empty library.
   Source? get activeSource {
     final id = activeSourceId;
+    if (id == null) return null;
+    for (final s in sources) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+
+  /// The source in use, or null when none is designated or the designated one
+  /// has been deleted. Same degrade-to-everything rule as [activeSource].
+  Source? get primarySource {
+    final id = primarySourceId;
     if (id == null) return null;
     for (final s in sources) {
       if (s.id == id) return s;

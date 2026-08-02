@@ -300,3 +300,18 @@
 - **後續改名**：使用者說「只看這個／看全部 這功能應該叫做 **目前使用這個** 而不是看全部」。他從頭到尾用的詞是「使用」不是「顯示」——他一次只用一個來源，所以「看全部」根本不在他的模型裡。改成 `sources_useThisShort`（目前使用這個）／`sources_stopUsingShort`（取消使用），卡片徽章 `sources_activeSource` 從「目前顯示」改成「**使用中**」（這是他自己在需求裡用的字）。**ARB 的 key 也一起改**，因為 `viewOnly`／`viewAll` 已經描述錯了。順帶查到 `sources_useThisSource`／`sources_showAllSources` 兩個 key **在 Dart 裡已經沒有任何使用**——眼睛搬到列上時選單那兩列就拿掉了，字串留著沒清。
 - **驗證**：`analyze` 無新增問題；`sources_screen_test.dart` 9 項全過（新增 3 項：三個提示都在、停用的來源顯示「啟用」、沒有焦點時不顯示）。HUD 從 2 顆變 5 顆，1080×1920@369dpi 橫向邏輯寬約 832，估算約 460 不會溢位，且 `ControlButton` 的文字有 `maxWidth` + ellipsis 保底。
 - **Commit**：見下
+
+## [使用中與顯示分家] R-Shop: X 要按兩次才取消；而且「在看哪一個」跟「用哪一個」本來就不該是同一件事
+
+- **檔案**：`lib/models/config/app_config.dart`（新增 `primarySourceId`／`primarySource`／`clearPrimarySource`） · `lib/services/sources_notifier.dart`（`setPrimarySource`、`_writeAndPublish` 的 `setPrimary`） · `lib/services/source_failover.dart`（`resolveForSync` 改讀 primary） · `lib/features/settings/sources_screen.dart`（拿掉 `_activeSourceId` 鏡像） · `lib/features/home/home_view.dart`（橫幅顏色、`_cycleActiveSource` 註解） · `test/active_source_test.dart` · `test/source_failover_sync_test.dart`
+- **現象**：使用者說「為啥我會按了 目前→取消→取消 變兩次取消的流程」。
+- **根因**：`sources_screen` 用 `_activeSourceId ??= storedActive` 從設定檔種值。**`??=` 表達不了「刻意是 null」**——按下取消之後欄位變成 null，下一次 build 又從設定檔種回原本的 id（而且此時 `invalidate` 還沒回來，讀到的是舊值），所以標籤又變回「取消使用」，得再按一次。**解：整個鏡像欄位拿掉**，畫面上每個標籤都直接讀設定檔。卡片上的徽章本來就是直接讀的——所以 HUD 跟徽章其實一直可能不一致，只是先前沒被注意到。
+- **使用者接著提出的分家**：「一個是**使用中**（主畫面預設顯示 以及 同步的），一個是**顯示**（顯示在主畫面 可以切換選擇的），是兩種功能」。
+- **做法**：`AppConfig` 加 `primarySourceId`。
+  - `activeSourceId` 維持原意＝**顯示**（主畫面 L2/R2 切的那個）。這樣**不必動顯示路徑**——顯示是靠 `_writeAndPublish` 依 active 重寫 `system.providers` 生效的，改成執行期覆寫要動到整條讀取鏈。
+  - `primarySourceId` ＝ **使用中**：同步的目標；設定它時順帶把顯示也指過去（「主畫面預設顯示」）。
+  - `resolveForSync` 改讀 `primarySourceId ?? activeSourceId`。**`?? activeSourceId` 是舊設定檔的相容路徑**，`fromJson` 也做同樣的回填，所以沒有遷移步驟。
+  - 來源清單的 `[X]`／眼睛／徽章一律指 **使用中**；主畫面的 L2/R2 只動 **顯示**。
+- **橫幅多了一個訊號**：顯示的來源就是使用中的那個才是綠色，切走了變灰。不然「我在看 A，但同步跑去 B」完全看不出來——這正是分家之後才可能出現的困惑。
+- **驗證**：`analyze` 無新增問題。完整 `flutter test` 1753 passed / 7 failed，**7 個與既有基準完全相同**（見 `[R-Shop 測試基準]`）。新增 10 項測試，其中「一次按壓就清掉，沒有第二次取消」直接釘住這次的 bug。
+- **Commit**：見下

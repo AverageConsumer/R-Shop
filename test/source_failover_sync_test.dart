@@ -34,7 +34,7 @@ Source _romm(String id, String host, {String? fallback}) => Source(
       knownPlatforms: const {'snes': 4},
     );
 
-AppConfig _config({String? active}) => AppConfig(
+AppConfig _config({String? active, String? primary}) => AppConfig(
       systems: const [
         SystemConfig(
           id: 'snes',
@@ -48,6 +48,7 @@ AppConfig _config({String? active}) => AppConfig(
         _romm('wan', 'wan.example.org'),
       ],
       activeSourceId: active,
+      primarySourceId: primary,
     );
 
 void main() {
@@ -69,6 +70,46 @@ void main() {
       final out = withEffectiveSource(_config(active: 'lan'), null);
 
       expect(out.systems.single.providers, hasLength(2));
+    });
+  });
+
+  group('resolveForSync — which source a sync is for', () {
+    test('the one in use, not the one on screen', () async {
+      // Browsing the WAN library with the home triggers must not send the
+      // next sync there. The LAN is what is in use, so the LAN is what syncs.
+      final net = _FakeNet({'lan.local', 'wan.example.org'});
+      final r = await resolveForSync(
+        config: _config(active: 'wan', primary: 'lan'),
+        probe: EndpointProbeService(connect: net.connect),
+      );
+
+      expect(r.choice.source?.id, 'lan');
+      expect(r.config.systems.single.providers.map((p) => p.sourceId), ['lan']);
+    });
+
+    test('falls back to the shown source when none is designated', () async {
+      // Configs written before the two were separated, and single-source
+      // setups that never designate anything.
+      final net = _FakeNet({'lan.local'});
+      final r = await resolveForSync(
+        config: _config(active: 'lan'),
+        probe: EndpointProbeService(connect: net.connect),
+      );
+
+      expect(r.choice.source?.id, 'lan');
+    });
+
+    test('the stand-in covers for the one in use, not the one shown',
+        () async {
+      final net = _FakeNet({'wan.example.org'});
+      final r = await resolveForSync(
+        config: _config(active: 'wan', primary: 'lan'),
+        probe: EndpointProbeService(connect: net.connect),
+      );
+
+      expect(r.choice.isFallback, isTrue);
+      expect(r.choice.preferred?.id, 'lan');
+      expect(r.config.primarySourceId, 'lan', reason: 'preference survives');
     });
   });
 

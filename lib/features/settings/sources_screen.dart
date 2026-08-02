@@ -67,9 +67,14 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// route as still live.
   String? _routePickerSourceId;
 
-  /// Mirror of AppConfig.activeSourceId so the list can mark which source is
-  /// in view. Read from the bootstrapped config; written via the notifier.
-  String? _activeSourceId;
+  /// Which source is designated as in use, read straight from the config.
+  ///
+  /// Deliberately not mirrored in a field. It used to be, seeded with
+  /// `_activeSourceId ??= stored` — and `??=` cannot represent "deliberately
+  /// none", so the next build re-seeded it from the stored value and the
+  /// toggle needed a second press to take. One source of truth instead.
+  String? get _primarySourceId =>
+      ref.read(bootstrappedConfigProvider).valueOrNull?.primarySourceId;
 
   /// Set while the fallback picker is open, held by id so the overlay always
   /// renders the freshest source.
@@ -485,23 +490,24 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _fallbackPickerSourceId = null);
   }
 
-  /// One source at a time is how this app is used, so the action is a plain
-  /// toggle: pick this one, or go back to showing everything.
+  /// Designates the source in use — what syncs, and what the home screen
+  /// opens on. A plain two-state toggle: this one, or none.
   ///
-  /// Switching **never discards cached games** — the other source's library
-  /// stays in the database so coming back is instant. That is what separates
-  /// this from disabling a source.
+  /// Not the same button as the home screen's triggers. Those change what is
+  /// **shown**, which is a look you can take back; this one changes what the
+  /// app actually works against.
+  ///
+  /// **Never discards cached games** — the other source's library stays in the
+  /// database so coming back is instant. That is what separates this from
+  /// disabling a source.
   Future<void> _toggleActiveSource(Source source) async {
-    final next = _activeSourceId == source.id ? null : source.id;
-    setState(() {
-      _activeSourceId = next;
-      _activeActionsSource = null;
-    });
+    final next = _primarySourceId == source.id ? null : source.id;
+    setState(() => _activeActionsSource = null);
     try {
-      await ref.read(sourcesProvider.notifier).setActiveSource(next);
+      await ref.read(sourcesProvider.notifier).setPrimarySource(next);
       ref.invalidate(bootstrappedConfigProvider);
     } catch (e) {
-      debugPrint('SourcesScreen: setActiveSource failed: $e');
+      debugPrint('SourcesScreen: setPrimarySource failed: $e');
     }
   }
 
@@ -622,7 +628,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// The per-source hints only appear once a card is focused, because their
   /// labels depend on that card: "disable" or "enable", "use this" or "stop
   /// using". With nothing focused they would have to guess.
-  Widget _buildHud(BuildContext context, SourcesState state) {
+  Widget _buildHud(BuildContext context, SourcesState state, String? primary) {
     final l = L.of(context);
     final source = state.loading ? null : _focusedSource(state.sources);
     return ConsoleHud(
@@ -631,7 +637,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
       x: source == null
           ? null
           : HudAction(
-              _activeSourceId == source.id
+              primary == source.id
                   ? l.sources_stopUsingShort
                   : l.sources_useThisShort,
               onTap: () => _toggleActiveSource(source),
@@ -655,13 +661,10 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   Widget build(BuildContext context) {
     final rs = context.rs;
     final state = ref.watch(sourcesProvider);
-    // Seed from the persisted config on first build so the actions overlay
-    // offers "show all" rather than "show only this" for the source that is
-    // already active. Only adopts the stored value while we hold none of our
-    // own, so an in-flight toggle is never overwritten by a stale read.
-    final storedActive =
-        ref.watch(bootstrappedConfigProvider).valueOrNull?.activeSourceId;
-    _activeSourceId ??= storedActive;
+    // Watched, not mirrored: the config is the only thing that knows which
+    // source is in use, and every label on this screen reads from it.
+    final primary =
+        ref.watch(bootstrappedConfigProvider).valueOrNull?.primarySourceId;
     _gcFocusNodes(state.sources);
     _ensureInteractiveFocus(state);
 
@@ -694,7 +697,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
             ),
             // Every hint here is also a button: the HUD is the finger half of
             // the same three shortcuts, so neither input is a dead end.
-            _buildHud(context, state),
+            _buildHud(context, state, primary),
             if (_activeActionsSource != null)
               _SourceActionsOverlay(
                 source: _activeActionsSource!,
@@ -706,7 +709,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                 onEditMappings: () =>
                     _editMappings(_activeActionsSource!),
                 onPickRoute: () => _pickRoute(_activeActionsSource!),
-                isActive: _activeSourceId == _activeActionsSource!.id,
+                isActive: primary == _activeActionsSource!.id,
                 onToggleActive: () =>
                     _toggleActiveSource(_activeActionsSource!),
                 hasOtherSources: state.sources.length > 1,
@@ -969,7 +972,10 @@ class _SourceList extends ConsumerWidget {
                 onTap: () => onTap(source),
                 rs: rs,
                 mappingCount: mappingCounts[source.id] ?? 0,
-                isActive: cfg?.activeSourceId == source.id,
+                // The eye and the badge mark the source **in use**, not the one
+                // the home screen happens to be showing — this list is where
+                // that decision is made.
+                isActive: cfg?.primarySourceId == source.id,
                 onToggleActive: () => onToggleActive(source),
               );
             },

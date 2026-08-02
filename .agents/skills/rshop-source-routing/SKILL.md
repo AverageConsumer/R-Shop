@@ -1,6 +1,6 @@
 ---
 name: rshop-source-routing
-description: "Touch anything about sources, connection routes, the active source, or failover. Use when: editing source.dart, sources_notifier.dart, source_failover.dart, source_resolver.dart, or the games table. Holds the four invariants that make switching cheap and self-healing — breaking any one of them loses the user's cached library or strands them on the wrong server."
+description: "Touch anything about sources, connection routes, which source is in use or shown, or failover. Use when: editing source.dart, app_config.dart, sources_notifier.dart, source_failover.dart, source_resolver.dart, or the games table. Holds the five invariants that make switching cheap and self-healing — breaking any one of them loses the user's cached library, strands them on the wrong server, or redirects a sync they didn't ask to redirect."
 ---
 
 # Skill: `rshop-source-routing`
@@ -8,7 +8,7 @@ description: "Touch anything about sources, connection routes, the active source
 ## Role
 
 這一塊的設計繞了四圈才對，因為需求很容易被讀成別的意思。
-底下四條不變式是**整個功能之所以能用的原因**，改任何相關的檔之前先讀。
+底下五條不變式是**整個功能之所以能用的原因**，改任何相關的檔之前先讀。
 
 ---
 
@@ -36,7 +36,27 @@ description: "Touch anything about sources, connection routes, the active source
 
 ---
 
-## 不變式 2：備援是暫時代打，不改變偏好
+## 不變式 2：「使用中」與「顯示」是兩個欄位，不要合併
+
+| 欄位 | 意思 | 誰在改 |
+| --- | --- | --- |
+| `primarySourceId` | **使用中**：同步的目標，以及主畫面預設顯示 | 來源清單的 `[X]`／眼睛（`setPrimarySource`） |
+| `activeSourceId` | **顯示**：主畫面現在在看哪一個 | 主畫面的 L2/R2（`setActiveSource`） |
+
+**`resolveForSync` 讀的是 `primarySourceId ?? activeSourceId`。**
+`?? activeSourceId` 是分家之前的設定檔的相容路徑，`fromJson` 也做同樣的回填 ——
+**兩處要一起改，不然舊安裝會突然改同步對象。**
+
+為什麼是 `activeSourceId` 留給「顯示」而不是反過來：顯示是靠
+`_writeAndPublish` 依它重寫 `system.providers` 生效的，換一邊就得動整條讀取鏈。
+
+**別再把「目前選的來源」鏡像成 State 的欄位。** 先前用 `_activeSourceId ??= stored`
+種值，而 **`??=` 表達不了「刻意是 null」**——取消之後下一次 build 又種回去，
+使用者要按兩次才取消得掉。畫面上的標籤一律直接讀設定檔。
+
+---
+
+## 不變式 3：備援是暫時代打，不改變偏好
 
 `chooseSource()` 選到備援時，**`activeSourceId` 不會被改寫**。
 `withEffectiveSource()` 重建的是**記憶體中的 config，磁碟完全不動**。
@@ -46,7 +66,7 @@ description: "Touch anything about sources, connection routes, the active source
 
 ---
 
-## 不變式 3：`url`/`host`/`port`/`share` 就是「現行路線」
+## 不變式 4：`url`/`host`/`port`/`share` 就是「現行路線」
 
 `Source` 的頂層欄位**不是預設值，是當下生效的那條路**。
 `withLiveEndpoint()` 會把選中的 endpoint 的值寫上去。
@@ -59,7 +79,7 @@ description: "Touch anything about sources, connection routes, the active source
 
 ---
 
-## 不變式 4：路線共用來源的憑證 ⚠️
+## 不變式 5：路線共用來源的憑證 ⚠️
 
 `auth` 掛在 `Source` 上，**endpoint 沒有自己的憑證**。
 
