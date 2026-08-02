@@ -3215,6 +3215,18 @@ abstract class L {
   /// **'{count, plural, =1{1 source} other{{count} sources}}'**
   String sources_countLabel(num count);
 
+  /// No description provided for @sources_showThisShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Show this'**
+  String get sources_showThisShort;
+
+  /// No description provided for @sources_showAllShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all'**
+  String get sources_showAllShort;
+
   /// No description provided for @sources_useThisShort.
   ///
   /// In en, this message translates to:

@@ -128,6 +128,11 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
         const SingleActivator(LogicalKeyboardKey.gameButtonRight1,
                 includeRepeats: false):
             const _SourceShortcutIntent(_SourceShortcut.remove),
+        // The trigger, because that is what changes the shown source on the
+        // home screen — same gesture, same meaning, one screen over.
+        const SingleActivator(LogicalKeyboardKey.gameButtonLeft2,
+                includeRepeats: false):
+            const _SourceShortcutIntent(_SourceShortcut.toggleShown),
       };
 
   @override
@@ -232,6 +237,9 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
       case _SourceShortcut.toggleActive:
         ref.read(feedbackServiceProvider).confirm();
         _toggleActiveSource(source);
+      case _SourceShortcut.toggleShown:
+        ref.read(feedbackServiceProvider).confirm();
+        _toggleShownSource(source);
       case _SourceShortcut.toggleEnabled:
         ref.read(feedbackServiceProvider).confirm();
         _toggleSourceEnabled(source);
@@ -511,6 +519,24 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     }
   }
 
+  /// Puts this source on the home screen, or goes back to showing all of them.
+  ///
+  /// The same thing the home triggers do, offered here so choosing what to
+  /// look at does not mean leaving this screen first. Changes nothing about
+  /// what syncs — that is the tick, not the eye.
+  Future<void> _toggleShownSource(Source source) async {
+    final shown =
+        ref.read(bootstrappedConfigProvider).valueOrNull?.activeSourceId;
+    final next = shown == source.id ? null : source.id;
+    setState(() => _activeActionsSource = null);
+    try {
+      await ref.read(sourcesProvider.notifier).setActiveSource(next);
+      ref.invalidate(bootstrappedConfigProvider);
+    } catch (e) {
+      debugPrint('SourcesScreen: setActiveSource failed: $e');
+    }
+  }
+
   void _closeSourceActions() {
     if (_activeActionsSource == null) return;
     final source = _activeActionsSource!;
@@ -628,12 +654,25 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// The per-source hints only appear once a card is focused, because their
   /// labels depend on that card: "disable" or "enable", "use this" or "stop
   /// using". With nothing focused they would have to guess.
-  Widget _buildHud(BuildContext context, SourcesState state, String? primary) {
+  Widget _buildHud(
+    BuildContext context,
+    SourcesState state,
+    String? primary,
+    String? shown,
+  ) {
     final l = L.of(context);
     final source = state.loading ? null : _focusedSource(state.sources);
     return ConsoleHud(
       b: HudAction(l.common_back, onTap: _goBack),
       y: HudAction(l.sources_addSource, onTap: _addSource),
+      lt: source == null
+          ? null
+          : HudAction(
+              shown == source.id
+                  ? l.sources_showAllShort
+                  : l.sources_showThisShort,
+              onTap: () => _toggleShownSource(source),
+            ),
       x: source == null
           ? null
           : HudAction(
@@ -663,8 +702,9 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final state = ref.watch(sourcesProvider);
     // Watched, not mirrored: the config is the only thing that knows which
     // source is in use, and every label on this screen reads from it.
-    final primary =
-        ref.watch(bootstrappedConfigProvider).valueOrNull?.primarySourceId;
+    final cfg = ref.watch(bootstrappedConfigProvider).valueOrNull;
+    final primary = cfg?.primarySourceId;
+    final shown = cfg?.activeSourceId;
     _gcFocusNodes(state.sources);
     _ensureInteractiveFocus(state);
 
@@ -689,6 +729,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                               focusForId: _focusFor,
                               onTap: _openSourceActions,
                               onToggleActive: _toggleActiveSource,
+                              onToggleShown: _toggleShownSource,
                               scrollController: _scrollController,
                               rs: rs,
                             ),
@@ -697,7 +738,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
             ),
             // Every hint here is also a button: the HUD is the finger half of
             // the same three shortcuts, so neither input is a dead end.
-            _buildHud(context, state, primary),
+            _buildHud(context, state, primary, shown),
             if (_activeActionsSource != null)
               _SourceActionsOverlay(
                 source: _activeActionsSource!,
@@ -763,7 +804,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
 /// The list-level shortcuts. One intent with a payload rather than three
 /// intent types, because [ConsoleScreenMixin.screenActions] is keyed by type
 /// and three keys would need three near-identical actions.
-enum _SourceShortcut { toggleActive, toggleEnabled, remove }
+enum _SourceShortcut { toggleActive, toggleShown, toggleEnabled, remove }
 
 class _SourceShortcutIntent extends Intent {
   const _SourceShortcutIntent(this.shortcut);
@@ -925,6 +966,7 @@ class _SourceList extends ConsumerWidget {
     required this.focusForId,
     required this.onTap,
     required this.onToggleActive,
+    required this.onToggleShown,
     required this.scrollController,
     required this.rs,
   });
@@ -933,6 +975,7 @@ class _SourceList extends ConsumerWidget {
   final FocusNode Function(String sourceId) focusForId;
   final void Function(Source source) onTap;
   final void Function(Source source) onToggleActive;
+  final void Function(Source source) onToggleShown;
   final ScrollController scrollController;
   final Responsive rs;
 
@@ -972,11 +1015,10 @@ class _SourceList extends ConsumerWidget {
                 onTap: () => onTap(source),
                 rs: rs,
                 mappingCount: mappingCounts[source.id] ?? 0,
-                // The eye and the badge mark the source **in use**, not the one
-                // the home screen happens to be showing — this list is where
-                // that decision is made.
                 isActive: cfg?.primarySourceId == source.id,
                 onToggleActive: () => onToggleActive(source),
+                isShown: cfg?.activeSourceId == source.id,
+                onToggleShown: () => onToggleShown(source),
               );
             },
           ),
@@ -997,6 +1039,8 @@ class _SourceCard extends ConsumerWidget {
     this.mappingCount = 0,
     this.isActive = false,
     this.onToggleActive,
+    this.isShown = false,
+    this.onToggleShown,
   });
 
   final Source source;
@@ -1006,12 +1050,19 @@ class _SourceCard extends ConsumerWidget {
   final Responsive rs;
   final int mappingCount;
 
-  /// True when the library is currently showing only this source. Marked on
-  /// the card because "which source am I looking at" is otherwise invisible.
+  /// True when this is the source in use — what syncs, and what the home
+  /// screen opens on. Marked with a tick.
   final bool isActive;
 
-  /// Toggles this source in or out of view, from the eye on the row.
+  /// Designates this source as the one in use, from the tick on the row.
   final VoidCallback? onToggleActive;
+
+  /// True when the home screen is currently showing this source. Marked with
+  /// an eye, because "which library am I looking at" is otherwise invisible.
+  final bool isShown;
+
+  /// Puts this source on screen, or goes back to showing every source.
+  final VoidCallback? onToggleShown;
 
   Color get _accent {
     if (source.borrowed) return Colors.lightBlueAccent;
@@ -1092,17 +1143,37 @@ class _SourceCard extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            // Choosing which source is in view is one tap on the row itself,
-            // with no menu to open first. It is the thing done most often
-            // here, so it does not belong three presses deep.
+            // Two separate decisions, two separate marks. Both are one tap on
+            // the row, with no menu to open first — they are what this screen
+            // is for, so they do not belong three presses deep.
+            //
+            // The eye is what is on screen; the tick is what the app works
+            // against. Same shape for both would put the user back where the
+            // one conflated setting had them.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onToggleShown,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Icon(
+                  isShown ? Icons.visibility : Icons.visibility_outlined,
+                  size: 21,
+                  color: isShown
+                      ? const Color(0xFF7BC67B)
+                      : Colors.white24,
+                ),
+              ),
+            ),
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onToggleActive,
               child: Padding(
                 padding: const EdgeInsets.only(right: 10),
                 child: Icon(
-                  isActive ? Icons.visibility : Icons.visibility_outlined,
-                  size: 22,
+                  isActive
+                      ? Icons.check_circle
+                      : Icons.radio_button_unchecked,
+                  size: 21,
                   color: isActive
                       ? const Color(0xFF7BC67B)
                       : Colors.white24,
@@ -1566,10 +1637,14 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                               // here would go stale against the user's
                               // controller layout anyway — the footer hint
                               // is where the key belongs.
+                              //
+                              // A tick, not an eye: this marks the source in
+                              // use. The eye means what is on screen, and the
+                              // two must not wear the same icon.
                               child: Icon(
                                 widget.isActive
-                                    ? Icons.visibility
-                                    : Icons.visibility_outlined,
+                                    ? Icons.check_circle
+                                    : Icons.radio_button_unchecked,
                                 size: 18,
                                 color: widget.isActive
                                     ? const Color(0xFF7BC67B)

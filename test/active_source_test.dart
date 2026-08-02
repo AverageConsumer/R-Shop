@@ -272,6 +272,25 @@ void main() {
       expect(cfg.activeSourceId, isNull);
     });
 
+    test('showing another source from the list leaves the one in use alone',
+        () async {
+      // Both toggles now live on the same row, so the risk is one quietly
+      // moving the other.
+      final storage = await _storageWithSystem();
+      final notifier = SourcesNotifier(storage, db: _SpyDb());
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+      await notifier.addSource(_romm('b', 'http://home.example.org:9080'));
+      await notifier.setPrimarySource('a');
+
+      await notifier.setActiveSource('b');
+      await notifier.setActiveSource(null);
+
+      final cfg = await storage.loadConfig();
+      expect(cfg!.activeSourceId, isNull);
+      expect(cfg.primarySourceId, 'a');
+    });
+
     test('designating never purges either library', () async {
       final storage = await _storageWithSystem();
       final db = _SpyDb();

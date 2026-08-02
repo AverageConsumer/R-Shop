@@ -1713,6 +1713,12 @@ class LEn extends L {
   }
 
   @override
+  String get sources_showThisShort => 'Show this';
+
+  @override
+  String get sources_showAllShort => 'Show all';
+
+  @override
   String get sources_useThisShort => 'Use this';
 
   @override

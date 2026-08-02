@@ -596,6 +596,8 @@
   "sources_routeCannotRemoveLast": "The last route cannot be removed",
   "sources_countLabel": "{count, plural, =1{1 source} other{{count} sources}}",
   "@sources_countLabel": { "placeholders": { "count": { "type": "num" } } },
+  "sources_showThisShort": "Show this",
+  "sources_showAllShort": "Show all",
   "sources_useThisShort": "Use this",
   "sources_stopUsingShort": "Stop using",
   "sources_removeConfirmTitle": "Remove source?",

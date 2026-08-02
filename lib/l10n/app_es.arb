@@ -515,6 +515,8 @@
   "sources_routeSameServerHint": "Solo para direcciones que no requieren iniciar sesión aparte. Si te pide iniciar sesión de nuevo, añádela como fuente propia y empareja ambas como respaldo.",
   "sources_routeCannotRemoveLast": "No se puede eliminar la última ruta",
   "sources_countLabel": "{count, plural, =1{1 fuente} other{{count} fuentes}}",
+  "sources_showThisShort": "Mostrar esta",
+  "sources_showAllShort": "Mostrar todas",
   "sources_useThisShort": "Usar esta",
   "sources_stopUsingShort": "Dejar de usar",
   "sources_removeConfirmTitle": "¿Eliminar la fuente?",

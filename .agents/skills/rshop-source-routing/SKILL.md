@@ -40,8 +40,11 @@ description: "Touch anything about sources, connection routes, which source is i
 
 | 欄位 | 意思 | 誰在改 |
 | --- | --- | --- |
-| `primarySourceId` | **使用中**：同步的目標，以及主畫面預設顯示 | 來源清單的 `[X]`／眼睛（`setPrimarySource`） |
-| `activeSourceId` | **顯示**：主畫面現在在看哪一個 | 主畫面的 L2/R2（`setActiveSource`） |
+| `primarySourceId` | **使用中**：同步的目標，以及主畫面預設顯示 | 來源清單的 `[X]`／**打勾**圖示（`setPrimarySource`） |
+| `activeSourceId` | **顯示**：主畫面現在在看哪一個 | 主畫面的 L2/R2、來源清單的 `L2`／**眼睛**圖示（`setActiveSource`） |
+
+**兩個功能不能共用同一個圖示。** 眼睛只代表「在看哪一個」，打勾只代表「用哪一個」——
+它們一度是同一個設定，使用者分不清正是當初要拆開的原因。
 
 **`resolveForSync` 讀的是 `primarySourceId ?? activeSourceId`。**
 `?? activeSourceId` 是分家之前的設定檔的相容路徑，`fromJson` 也做同樣的回填 ——

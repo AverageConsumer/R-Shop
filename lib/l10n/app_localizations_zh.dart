@@ -1662,6 +1662,12 @@ class LZh extends L {
   }
 
   @override
+  String get sources_showThisShort => '顯示這個';
+
+  @override
+  String get sources_showAllShort => '顯示全部';
+
+  @override
   String get sources_useThisShort => '目前使用這個';
 
   @override
