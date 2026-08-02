@@ -632,9 +632,13 @@ class _HomeViewState extends ConsumerState<HomeView>
 
     // A real row in the layout, not an overlay: it must push the console list
     // down rather than cover whatever scrolls beneath it.
-    return SafeArea(
-      bottom: false,
-      child: IgnorePointer(
+    //
+    // Deliberately not wrapped in SafeArea. The app goes immersive in
+    // initState, so the first frame still has a status bar inset and later
+    // frames do not — the banner would render a row taller on entry and then
+    // shrink, which is exactly the jump the user saw. A fixed height is
+    // stable, and there is no inset to avoid once immersive takes effect.
+    return IgnorePointer(
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(14, 5, 14, 5),
@@ -666,7 +670,6 @@ class _HomeViewState extends ConsumerState<HomeView>
               // changed in Settings.
             ],
           ),
-        ),
       ),
     );
   }

@@ -1403,28 +1403,19 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                             onTap: widget.onToggleActive,
                             child: Padding(
                               padding: const EdgeInsets.only(left: 8),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    widget.isActive
-                                        ? Icons.visibility
-                                        : Icons.visibility_outlined,
-                                    size: 18,
-                                    color: widget.isActive
-                                        ? const Color(0xFF7BC67B)
-                                        : Colors.white38,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Text(
-                                    'X',
-                                    style: TextStyle(
-                                      color: Colors.white30,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
+                              // Icon only. A bare "X" beside it read as a
+                              // close button, and spelling out a button name
+                              // here would go stale against the user's
+                              // controller layout anyway — the footer hint
+                              // is where the key belongs.
+                              child: Icon(
+                                widget.isActive
+                                    ? Icons.visibility
+                                    : Icons.visibility_outlined,
+                                size: 18,
+                                color: widget.isActive
+                                    ? const Color(0xFF7BC67B)
+                                    : Colors.white38,
                               ),
                             ),
                           ),
