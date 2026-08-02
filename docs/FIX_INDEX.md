@@ -4,6 +4,7 @@
 > 再依需要讀本專案 `docs/` 的其餘各份：
 > - [ARCHITECTURE.md](ARCHITECTURE.md) — 模組分層與依賴方向
 > - [FIX_LOGS.md](FIX_LOGS.md) — 修復與功能紀錄（細節、取捨、教訓）
+> - [HANDOVER.md](HANDOVER.md) — **還沒做完的事、等實機確認的事**。「繼續任務」先讀這份
 > - [FIX_BY_FILE.md](FIX_BY_FILE.md) — **反查表：我要改這個檔，它身上以前發生過什麼**（自動產生）
 > - [SPEC.md](SPEC.md) — 規格；**§12 定位指引回答「我要改 X，該動哪些檔」**
 >
