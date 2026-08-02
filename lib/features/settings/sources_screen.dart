@@ -565,6 +565,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                               sources: state.sources,
                               focusForId: _focusFor,
                               onTap: _openSourceActions,
+                              onToggleActive: _toggleActiveSource,
                               scrollController: _scrollController,
                               rs: rs,
                             ),
@@ -768,6 +769,7 @@ class _SourceList extends ConsumerWidget {
     required this.sources,
     required this.focusForId,
     required this.onTap,
+    required this.onToggleActive,
     required this.scrollController,
     required this.rs,
   });
@@ -775,6 +777,7 @@ class _SourceList extends ConsumerWidget {
   final List<Source> sources;
   final FocusNode Function(String sourceId) focusForId;
   final void Function(Source source) onTap;
+  final void Function(Source source) onToggleActive;
   final ScrollController scrollController;
   final Responsive rs;
 
@@ -815,6 +818,7 @@ class _SourceList extends ConsumerWidget {
                 rs: rs,
                 mappingCount: mappingCounts[source.id] ?? 0,
                 isActive: cfg?.activeSourceId == source.id,
+                onToggleActive: () => onToggleActive(source),
               );
             },
           ),
@@ -834,6 +838,7 @@ class _SourceCard extends ConsumerWidget {
     required this.rs,
     this.mappingCount = 0,
     this.isActive = false,
+    this.onToggleActive,
   });
 
   final Source source;
@@ -846,6 +851,9 @@ class _SourceCard extends ConsumerWidget {
   /// True when the library is currently showing only this source. Marked on
   /// the card because "which source am I looking at" is otherwise invisible.
   final bool isActive;
+
+  /// Toggles this source in or out of view, from the eye on the row.
+  final VoidCallback? onToggleActive;
 
   Color get _accent {
     if (source.borrowed) return Colors.lightBlueAccent;
@@ -926,6 +934,23 @@ class _SourceCard extends ConsumerWidget {
         ),
         child: Row(
           children: [
+            // Choosing which source is in view is one tap on the row itself,
+            // with no menu to open first. It is the thing done most often
+            // here, so it does not belong three presses deep.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onToggleActive,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Icon(
+                  isActive ? Icons.visibility : Icons.visibility_outlined,
+                  size: 22,
+                  color: isActive
+                      ? const Color(0xFF7BC67B)
+                      : Colors.white24,
+                ),
+              ),
+            ),
             Container(
               width: 44,
               height: 44,
@@ -1213,17 +1238,10 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
           label: l.sources_editMappings,
           onActivate: widget.onEditMappings,
         ),
-      // Selectable here as well as on the home screen. The triggers there are
-      // the fast path, but you are already looking at the source list when you
-      // decide which one you want — walking back to the home screen to act on
-      // that decision is a detour.
-      _OverlayAction(
-        icon: widget.isActive ? Icons.visibility : Icons.visibility_outlined,
-        label: widget.isActive
-            ? l.sources_showAllSources
-            : l.sources_useThisSource,
-        onActivate: widget.onToggleActive,
-      ),
+      // Choosing which source is in view is not here: it is an eye button on
+      // each row of the list itself, one tap with nothing to open first. This
+      // menu is for things that need a screen of their own.
+      //
       // Only meaningful once there is another source to stand in.
       if (widget.hasOtherSources)
         _OverlayAction(
@@ -1338,7 +1356,12 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.white12),
                   ),
-                  child: Column(
+                  // Scrollable so the menu can outgrow a 3.92" screen without
+                  // painting Flutter's yellow overflow stripe, which looks
+                  // like a feature nobody can explain. It already overflowed
+                  // by 39px once the routes and backup entries were added.
+                  child: SingleChildScrollView(
+                    child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1389,6 +1412,7 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                         ),
                       ),
                     ],
+                  ),
                   ),
                 ),
               ),
