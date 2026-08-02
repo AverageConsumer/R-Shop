@@ -259,6 +259,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       await _refreshInstalledFiles();
     }
 
+    // Rows are read straight from the table here, not through a system's
+    // providers, so a switched-off source would still show up. Turning one
+    // off no longer deletes its rows — that made off-on cost a re-sync — so
+    // the filtering happens on this side instead. Anything already on disk
+    // stays listed: it is on the device whatever the source is doing.
+    final offSourceIds = ref
+        .read(sourcesProvider)
+        .sources
+        .where((s) => !s.enabled)
+        .map((s) => s.id)
+        .toSet();
+
     final entries = <LibraryEntry>[];
     for (final row in rawGames) {
       final systemSlug = row['systemSlug'] as String;
@@ -273,6 +285,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       }
 
       final fname = row['filename'] as String;
+      final sourceId = providerConfig?.sourceId;
+      if (sourceId != null &&
+          offSourceIds.contains(sourceId) &&
+          !_installedFiles.contains(fname)) {
+        continue;
+      }
       entries.add(LibraryEntry(
         filename: fname,
         displayName: GameMetadata.cleanTitle(fname),

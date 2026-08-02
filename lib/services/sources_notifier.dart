@@ -266,17 +266,21 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     await _purgeCachedGamesFor(id);
   }
 
-  /// Toggle helper for the off-switch in the Sources screen. When the
-  /// caller disables a source we also drop its cached games — otherwise
-  /// the system grids would keep displaying entries from a source the
-  /// user just turned off until the next manual rescan.
+  /// Toggle helper for the on/off switch in the Sources screen.
   ///
-  /// **The purge is deliberately not awaited.** It walks every cached row for
-  /// the source and stats the file behind each one, which on a real library is
-  /// long enough to be felt as lag on the toggle. Nothing waiting on this call
-  /// needs it finished: `updateSource` has already rewritten the providers, so
-  /// the disabled source is out of every query before the first row is
-  /// touched. The purge is housekeeping behind that.
+  /// **Keeps the cached games.** It used to purge them, on the reasoning that
+  /// the grids would otherwise keep showing a source you just turned off —
+  /// which stopped being true at schema v14, where rows are stored per route
+  /// and read back through the system's current providers. A disabled source
+  /// is not in those providers, so its rows are simply never queried.
+  ///
+  /// Purging made off-on cost a full re-sync, which is what the user felt as
+  /// a pause on the second press, and it raced: the purge ran in the
+  /// background and could delete rows the re-enabled source had just fetched.
+  /// [removeSource] still purges — that source is not coming back.
+  ///
+  /// The one place that reads rows without going through providers is the
+  /// library screen, which filters disabled sources out itself.
   Future<void> setEnabled(String id, bool enabled) async {
     final src = state.sources.firstWhere(
       (s) => s.id == id,
@@ -284,9 +288,6 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     );
     if (src.enabled == enabled) return;
     await updateSource(src.copyWith(enabled: enabled));
-    if (!enabled) {
-      unawaited(_purgeCachedGamesFor(id));
-    }
   }
 
   /// Designates [fallbackId] as the stand-in to use when [sourceId] does not

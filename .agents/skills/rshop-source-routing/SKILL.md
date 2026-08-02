@@ -50,7 +50,10 @@ description: "Touch anything about sources, connection routes, which source is i
 使用者一句話打回：「**你的停用啟用不就是眼睛嗎，不用再做一個**」。
 `enabled` 為 false 的來源本來就不出現也不同步。
 
-**代價要記得講**：`setEnabled(false)` **會清掉那個來源的快取清單**，再打開要重新同步。
+**`setEnabled(false)` 不清快取。** 曾經會清，理由是「不然格線還會顯示剛關掉的來源」——
+**v14 之後那個理由消失了**：讀取一律走該系統當下的 providers，停用的來源不在裡面。
+清了的話停用→啟用要重抓整份清單，而且背景清除會刪掉剛重抓回來的資料。
+唯一直接讀表的是圖書館頁，過濾在那一側做。**`removeSource` 仍然清。**
 
 **`resolveForSync` 讀的是 `primarySourceId ?? activeSourceId`。**
 `?? activeSourceId` 是分家之前的設定檔的相容路徑，`fromJson` 也做同樣的回填 ——

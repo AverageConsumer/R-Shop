@@ -136,8 +136,10 @@ void main() {
       expect(db.purged, isEmpty);
     });
 
-    test('but disabling a source still purges it', () async {
-      // Guards the boundary: "not in view" and "turned off" stay different.
+    test('and neither does turning one off', () async {
+      // Off used to purge, which made off-on cost a full re-sync — felt as a
+      // pause on the second press. Rows are read through the system's
+      // providers, and a disabled source is not in them, so they can stay.
       final storage = await _storageWithSystem();
       final db = _SpyDb();
       final notifier = SourcesNotifier(storage, db: db);
@@ -145,6 +147,18 @@ void main() {
       await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
 
       await notifier.setEnabled('a', false);
+
+      expect(db.purged, isEmpty);
+    });
+
+    test('removing one does still purge — it is not coming back', () async {
+      final storage = await _storageWithSystem();
+      final db = _SpyDb();
+      final notifier = SourcesNotifier(storage, db: db);
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+
+      await notifier.removeSource('a');
 
       expect(db.purged, ['a']);
     });

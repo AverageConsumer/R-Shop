@@ -344,5 +344,9 @@
 - **切換會 lag**：使用者說「在來源清單 切換啟用 跟使用 時 會 lag」。兩個成因：
   - **UI 在等磁碟**：畫面的標籤讀 `bootstrappedConfigProvider`，而切換後要 `invalidate` 再等重新讀檔；**在那之前 `valueOrNull` 回的還是舊值**，所以按下去看起來沒反應。解：`SourcesState` 加上 `primarySourceId`／`activeSourceId` 兩個鏡像，`_writeAndPublish` 設 state 時一起發佈，畫面改讀 notifier——同一幀就更新。
   - **清快取擋在路上**：`setEnabled(false)` 會 `await _purgeCachedGamesFor`，那支要走過該來源每一筆快取並對每筆做 `File.existsSync`。改成 `unawaited`——`updateSource` 已經先把 providers 重寫掉了，被關掉的來源在第一筆被碰到之前就已經不在任何查詢裡，清除只是後續整理。
+- **停用→啟用第二次按會停頓**：使用者原話「啟用後在停用 在起用 會停頓一下」。上一輪只把清快取改成不擋，**但快取還是被清掉了**——所以重新啟用時整份清單要重抓，那才是停頓。而且清除在背景跑，使用者手快的話**會刪掉剛重抓回來的資料**。
+  - **改成停用完全不清快取。** 當初清除的理由是「不然格線還會顯示剛關掉的來源」，那在 schema v14 之後就不成立了：每筆列按路線存，讀取一律走該系統當下的 providers，**停用的來源不在 providers 裡，那些列根本不會被查到**。
+  - 唯一直接讀表不走 providers 的是圖書館頁（`getAllGames`），所以過濾改在那一側做：`provider_config.sourceId` 屬於已停用的來源、而且檔案不在裝置上，就跳過。**已經下載到裝置上的照樣列出**——它就在機器上，跟來源開不開無關。
+  - `removeSource` 仍然清除，那個來源不會回來了。
 - **測試基準的教訓（再一次）**：完整套件先跑出 8 個失敗，其中 `game_list_controller: restoreFilters` 看起來像回歸；單獨執行也失敗一次，我一度判定是我改壞的。**但接著連跑三次都通過**，完整套件重跑也回到 7 個。**單次的隔離執行不足以認定回歸**——這個測試就是既有紀錄裡點名的時序敏感型之一。
 - **Commit**：見下
