@@ -593,5 +593,12 @@
   "sources_fallbackNone": "None",
   "sources_fallbackShort": "Backup",
   "sources_routeSameServerHint": "Only for addresses that need no separate login. If it asks you to sign in again, add it as its own source and pair the two as backups.",
-  "sources_routeCannotRemoveLast": "The last route cannot be removed"
+  "sources_routeCannotRemoveLast": "The last route cannot be removed",
+  "sources_countLabel": "{count, plural, =1{1 source} other{{count} sources}}",
+  "@sources_countLabel": { "placeholders": { "count": { "type": "num" } } },
+  "sources_viewOnlyShort": "Only this",
+  "sources_viewAllShort": "Show all",
+  "sources_removeConfirmTitle": "Remove source?",
+  "sources_removeConfirmMessage": "Remove \"{name}\"? Its list disappears from the library, but games already downloaded to this device are kept.",
+  "@sources_removeConfirmMessage": { "placeholders": { "name": { "type": "String" } } }
 }

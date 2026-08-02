@@ -1660,4 +1660,23 @@ class LJa extends L {
 
   @override
   String get sources_routeCannotRemoveLast => '最後の経路は削除できません';
+
+  @override
+  String sources_countLabel(num count) {
+    return '$count 件のソース';
+  }
+
+  @override
+  String get sources_viewOnlyShort => 'これだけ';
+
+  @override
+  String get sources_viewAllShort => 'すべて';
+
+  @override
+  String get sources_removeConfirmTitle => 'ソースを削除しますか？';
+
+  @override
+  String sources_removeConfirmMessage(String name) {
+    return '「$name」を削除しますか？このソースの一覧はライブラリから消えますが、すでに端末にダウンロードしたゲームは残ります。';
+  }
 }

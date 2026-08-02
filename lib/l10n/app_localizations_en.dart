@@ -1700,4 +1700,29 @@ class LEn extends L {
   @override
   String get sources_routeCannotRemoveLast =>
       'The last route cannot be removed';
+
+  @override
+  String sources_countLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sources',
+      one: '1 source',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sources_viewOnlyShort => 'Only this';
+
+  @override
+  String get sources_viewAllShort => 'Show all';
+
+  @override
+  String get sources_removeConfirmTitle => 'Remove source?';
+
+  @override
+  String sources_removeConfirmMessage(String name) {
+    return 'Remove \"$name\"? Its list disappears from the library, but games already downloaded to this device are kept.';
+  }
 }

@@ -286,3 +286,16 @@
 - **高度會跳**：使用者說「主頁面的標題在初始時跟下面圖示隔了兩行，但是向下移動後又變成隔一行」。根因是 `SystemChrome.setEnabledSystemUIMode(immersiveSticky)` 在 `initState` 才執行，所以**第一幀還帶著狀態列 inset，後面的幀沒有**——標題列包了 `SafeArea`，就會進場高一列然後縮回去。**解**：全螢幕沉浸的畫面不要包 `SafeArea`，改用純 `IgnorePointer`。
 - **教訓**：**`SafeArea` 的 inset 在沉浸模式下是會變的量，不是常數。** 只要 `initState` 之後才切沉浸，第一幀跟穩態就不一致。這種「只在進場時出現一次」的差異，靜態分析與截圖都抓不到，只有真的進出畫面才看得見。
 - **Commit**：`dac11d6`
+
+## [來源清單快捷鍵] R-Shop: 停用／移除／目前顯示原本都得先開選單，改成清單上直接按 ✨ 功能新增（非修復）
+
+- **檔案**：`lib/features/settings/sources_screen.dart`（`additionalShortcuts` 三個綁定、`_SourceShortcutIntent`／`_SourceShortcutAction`、`_focusedSourceId`／`_focusedSource`、`_confirmRemoveSource`、`_buildHud`、`_Header` 計數列）· `lib/l10n/app_*.arb`（七個語系各 5 個新字串）· `test/widgets/sources_screen_test.dart`
+- **需求**：使用者要「停用／移除／使用中」在**來源清單上就能按**，不要每次都先進動作選單。
+- **綁定**：`[X]` 目前顯示（與動作選單標頭同一顆，語意一致）· `L1` 停用／啟用 · `R1` 移除。三個都同時出現在 HUD 上，而 **HUD 的每個提示本身就是可點的按鈕**——手把與觸控各自都走得完，符合雙入口規則。
+- **L1／R1 是全域搶來的**：`app_actions.dart` 把 L1/R1 綁在 `AdjustColumnsIntent`（格線欄數）。`ScreenActionsWrapper` 把 `additionalShortcuts` **展開在預設之後**，所以本畫面覆蓋得掉，其他畫面不受影響。
+- **一定要擋浮層**：動作選單自己吃掉 `[X]`，但**沒有任何東西處理 L1/R1**——不擋的話浮層開著時按下去會作用在看不見的那張卡上。`_SourceShortcutAction.isEnabled` 用 `overlayPriorityProvider == OverlayPriority.none` 擋掉，跟 `_GridNavigateAction` 同一套判準。
+- **移除要先問**：`_removeSource` 原本**完全沒有確認**。在選單裡要三次刻意的按壓才點得到，勉強可以；掛到 `R1` 之後變成一鍵，所以補了 `showConsoleDialog`。訊息據實寫：清單會消失，但**已下載到裝置上的遊戲會保留**——`purgeOrDetachSource` 對檔案還在的那些是 `detach`（把 `provider_config` 設 NULL）而不是 delete。
+- **焦點要自己記**：HUD 的字要跟著焦點那張卡變（停用／啟用、只看這個／看全部），但**焦點變動不會觸發 rebuild**。所以在 `_focusFor` 建節點時掛 listener 記進 `_focusedSourceId`。**只在取得焦點時寫，失焦不清**——卡片之間移動會經過一個誰都沒有焦點的瞬間，清掉的話每按一次方向鍵 HUD 就閃一次。
+- **順手修掉的中文化漏洞**：標題副標原本是 `'$count source${count == 1 ? "" : "s"} · [Y] add new'` ——**寫死英文，又把 `[Y]` 寫死在字串裡**（裝置支援三種手把配置，按鍵名不能寫死）。改成 `sources_countLabel`，按鍵名交給 HUD 依 `ControllerLayout` 繪製。標題本身依使用者要求改成「來源清單」。
+- **驗證**：`analyze` 無新增問題；`sources_screen_test.dart` 9 項全過（新增 3 項：三個提示都在、停用的來源顯示「啟用」、沒有焦點時不顯示）。HUD 從 2 顆變 5 顆，1080×1920@369dpi 橫向邏輯寬約 832，估算約 460 不會溢位，且 `ControlButton` 的文字有 `maxWidth` + ellipsis 保底。
+- **Commit**：見下

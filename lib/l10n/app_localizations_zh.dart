@@ -685,7 +685,7 @@ class LZh extends L {
   String get systemDetail_sectionSources => '來源';
 
   @override
-  String get sources_title => '來源';
+  String get sources_title => '來源清單';
 
   @override
   String get sources_noSourcesConfigured => '尚未配置來源';
@@ -1655,4 +1655,23 @@ class LZh extends L {
 
   @override
   String get sources_routeCannotRemoveLast => '最後一條連線方式不能移除';
+
+  @override
+  String sources_countLabel(num count) {
+    return '$count 個來源';
+  }
+
+  @override
+  String get sources_viewOnlyShort => '只看這個';
+
+  @override
+  String get sources_viewAllShort => '看全部';
+
+  @override
+  String get sources_removeConfirmTitle => '移除來源？';
+
+  @override
+  String sources_removeConfirmMessage(String name) {
+    return '確定要移除「$name」嗎？這個來源的清單會從圖書館消失，但已經下載到裝置上的遊戲會保留。';
+  }
 }

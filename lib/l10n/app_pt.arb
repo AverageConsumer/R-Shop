@@ -551,5 +551,10 @@
   "sources_fallbackNone": "Nenhuma",
   "sources_fallbackShort": "Reserva",
   "sources_routeSameServerHint": "Apenas para endereços que não exigem início de sessão separado. Se pedir para entrar de novo, adicione como fonte própria e emparelhe as duas como reserva.",
-  "sources_routeCannotRemoveLast": "Não é possível remover a última rota"
+  "sources_routeCannotRemoveLast": "Não é possível remover a última rota",
+  "sources_countLabel": "{count, plural, =1{1 fonte} other{{count} fontes}}",
+  "sources_viewOnlyShort": "Só esta",
+  "sources_viewAllShort": "Ver todas",
+  "sources_removeConfirmTitle": "Remover a fonte?",
+  "sources_removeConfirmMessage": "Remover \"{name}\"? A lista dela desaparece da biblioteca, mas os jogos já baixados neste aparelho são mantidos."
 }

@@ -80,7 +80,9 @@ void main() {
       expect(find.text('Mein RomM'), findsOneWidget);
       expect(find.textContaining('192.168.1.50'), findsOneWidget);
       expect(find.text('3 platforms'), findsOneWidget);
-      expect(find.text('1 source · [Y] add new'), findsOneWidget);
+      // The count line is localised now, and the key name lives in the HUD
+      // where it follows the configured controller layout.
+      expect(find.text('1 source'), findsOneWidget);
     });
 
     testWidgets('shows BORROWED badge for borrowed sources', (tester) async {
@@ -181,7 +183,69 @@ void main() {
 
       expect(find.text('A'), findsOneWidget);
       expect(find.text('B'), findsOneWidget);
-      expect(find.text('2 sources · [Y] add new'), findsOneWidget);
+      expect(find.text('2 sources'), findsOneWidget);
+    });
+  });
+
+  group('SourcesScreen — list shortcuts', () {
+    // The hints are the point of the test: a shortcut nobody can see is a
+    // shortcut nobody uses, and each hint is also the tappable half of the
+    // same action. If these disappear the feature is half gone even though
+    // the key handler still works.
+    testWidgets('the focused card puts its three actions in the HUD',
+        (tester) async {
+      final storage = await _initMockStorage();
+      await tester.pumpWidget(_wrap(
+        storage,
+        const SourcesScreen(),
+        seed: const [
+          Source(
+            id: 'mine',
+            name: 'Mein RomM',
+            type: SourceType.romm,
+            url: 'http://192.168.1.50:8090',
+            autoMap: true,
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Only this'), findsOneWidget);
+      expect(find.text('Disable'), findsOneWidget);
+      expect(find.text('Remove'), findsOneWidget);
+    });
+
+    testWidgets('the disable hint reads Enable on a source already off',
+        (tester) async {
+      final storage = await _initMockStorage();
+      await tester.pumpWidget(_wrap(
+        storage,
+        const SourcesScreen(),
+        seed: const [
+          Source(
+            id: 'mine',
+            name: 'Mein RomM',
+            type: SourceType.romm,
+            url: 'http://192.168.1.50:8090',
+            autoMap: true,
+            enabled: false,
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Enable'), findsOneWidget);
+      expect(find.text('Disable'), findsNothing);
+    });
+
+    testWidgets('no card focused means no per-source hints', (tester) async {
+      final storage = await _initMockStorage();
+      await tester.pumpWidget(_wrap(storage, const SourcesScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Only this'), findsNothing);
+      expect(find.text('Disable'), findsNothing);
+      expect(find.text('Remove'), findsNothing);
     });
   });
 }

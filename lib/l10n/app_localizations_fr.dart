@@ -1712,4 +1712,29 @@ class LFr extends L {
   @override
   String get sources_routeCannotRemoveLast =>
       'La dernière voie ne peut pas être supprimée';
+
+  @override
+  String sources_countLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sources',
+      one: '1 source',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sources_viewOnlyShort => 'Celle-ci';
+
+  @override
+  String get sources_viewAllShort => 'Tout voir';
+
+  @override
+  String get sources_removeConfirmTitle => 'Supprimer la source ?';
+
+  @override
+  String sources_removeConfirmMessage(String name) {
+    return 'Supprimer « $name » ? Sa liste disparaît de la bibliothèque, mais les jeux déjà téléchargés sur cet appareil sont conservés.';
+  }
 }

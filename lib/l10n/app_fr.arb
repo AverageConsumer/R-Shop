@@ -513,5 +513,10 @@
   "sources_fallbackNone": "Aucune",
   "sources_fallbackShort": "Secours",
   "sources_routeSameServerHint": "Uniquement pour les adresses ne demandant pas de connexion distincte. Si elle redemande une connexion, ajoutez-la comme source et associez les deux en secours.",
-  "sources_routeCannotRemoveLast": "La dernière voie ne peut pas être supprimée"
+  "sources_routeCannotRemoveLast": "La dernière voie ne peut pas être supprimée",
+  "sources_countLabel": "{count, plural, =1{1 source} other{{count} sources}}",
+  "sources_viewOnlyShort": "Celle-ci",
+  "sources_viewAllShort": "Tout voir",
+  "sources_removeConfirmTitle": "Supprimer la source ?",
+  "sources_removeConfirmMessage": "Supprimer « {name} » ? Sa liste disparaît de la bibliothèque, mais les jeux déjà téléchargés sur cet appareil sont conservés."
 }

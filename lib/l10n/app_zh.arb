@@ -245,7 +245,7 @@
   "systemDetail_autoSyncDisabled": "僅透過 Start 選單手動同步",
   "systemDetail_sectionSources": "來源",
 
-  "sources_title": "來源",
+  "sources_title": "來源清單",
   "sources_noSourcesConfigured": "尚未配置來源",
   "sources_noSourcesYet": "目前無來源",
   "sources_noSourcesDescription": "配對 RomM 伺服器以開始下載遊戲。",
@@ -593,5 +593,10 @@
   "sources_fallbackNone": "不設定",
   "sources_fallbackShort": "備援",
   "sources_routeSameServerHint": "只適用不需要另外登入的位址。如果那個位址要你重新登入，請改成「新增來源」，再把兩個互設備援。",
-  "sources_routeCannotRemoveLast": "最後一條連線方式不能移除"
+  "sources_routeCannotRemoveLast": "最後一條連線方式不能移除",
+  "sources_countLabel": "{count} 個來源",
+  "sources_viewOnlyShort": "只看這個",
+  "sources_viewAllShort": "看全部",
+  "sources_removeConfirmTitle": "移除來源？",
+  "sources_removeConfirmMessage": "確定要移除「{name}」嗎？這個來源的清單會從圖書館消失，但已經下載到裝置上的遊戲會保留。"
 }

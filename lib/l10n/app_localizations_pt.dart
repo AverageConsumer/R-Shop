@@ -1710,4 +1710,29 @@ class LPt extends L {
   @override
   String get sources_routeCannotRemoveLast =>
       'Não é possível remover a última rota';
+
+  @override
+  String sources_countLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fontes',
+      one: '1 fonte',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sources_viewOnlyShort => 'Só esta';
+
+  @override
+  String get sources_viewAllShort => 'Ver todas';
+
+  @override
+  String get sources_removeConfirmTitle => 'Remover a fonte?';
+
+  @override
+  String sources_removeConfirmMessage(String name) {
+    return 'Remover \"$name\"? A lista dela desaparece da biblioteca, mas os jogos já baixados neste aparelho são mantidos.';
+  }
 }

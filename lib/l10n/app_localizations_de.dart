@@ -1711,4 +1711,29 @@ class LDe extends L {
   @override
   String get sources_routeCannotRemoveLast =>
       'Der letzte Weg kann nicht entfernt werden';
+
+  @override
+  String sources_countLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Quellen',
+      one: '1 Quelle',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sources_viewOnlyShort => 'Nur diese';
+
+  @override
+  String get sources_viewAllShort => 'Alle zeigen';
+
+  @override
+  String get sources_removeConfirmTitle => 'Quelle entfernen?';
+
+  @override
+  String sources_removeConfirmMessage(String name) {
+    return '\"$name\" entfernen? Ihre Liste verschwindet aus der Bibliothek, bereits heruntergeladene Spiele bleiben erhalten.';
+  }
 }

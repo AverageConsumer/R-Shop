@@ -19,6 +19,7 @@ import '../../services/romm_api_service.dart';
 import '../../services/romm_pairing_service.dart';
 import '../../services/romm_platform_matcher.dart';
 import '../../services/sources_notifier.dart';
+import '../../widgets/console_dialog.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../onboarding/widgets/romm_legacy_login_screen.dart';
@@ -74,6 +75,14 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// renders the freshest source.
   String? _fallbackPickerSourceId;
 
+  /// Which card the gamepad is sitting on. The list-level shortcuts act on
+  /// this source, and the HUD reads its state — the disable hint has to say
+  /// which of the two things it is about to do.
+  ///
+  /// Kept rather than recomputed on demand because focus changes do not
+  /// rebuild this widget by themselves, and a stale hint is worse than none.
+  String? _focusedSourceId;
+
   /// True once we've successfully moved focus off of the screen-level
   /// Focus stub created by [ConsoleScreenMixin.buildWithActions]. Until
   /// that happens, the gamepad input bypasses our cards entirely (the
@@ -92,12 +101,28 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
         // leak focus into the screen-level Focus stub or the HUD when
         // there is nothing to move to.
         NavigateIntent: NavigateAction(ref, onNavigate: _onNavigate),
+        _SourceShortcutIntent: _SourceShortcutAction(ref, _onSourceShortcut),
       };
 
   @override
   Map<ShortcutActivator, Intent>? get additionalShortcuts => {
         const SingleActivator(LogicalKeyboardKey.gameButtonY,
             includeRepeats: false): const SearchIntent(),
+        // The three things done most often here, bound on the list itself so
+        // they no longer cost a menu. The menu keeps them as well: the eye on
+        // the row and the menu rows are the finger half of the same actions.
+        //
+        // L1/R1 are the grid column controls globally; this map is merged
+        // after the defaults, so on this screen they mean these instead.
+        const SingleActivator(LogicalKeyboardKey.gameButtonX,
+                includeRepeats: false):
+            const _SourceShortcutIntent(_SourceShortcut.toggleActive),
+        const SingleActivator(LogicalKeyboardKey.gameButtonLeft1,
+                includeRepeats: false):
+            const _SourceShortcutIntent(_SourceShortcut.toggleEnabled),
+        const SingleActivator(LogicalKeyboardKey.gameButtonRight1,
+                includeRepeats: false):
+            const _SourceShortcutIntent(_SourceShortcut.remove),
       };
 
   @override
@@ -148,7 +173,18 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   FocusNode _focusFor(String sourceId) {
     return _cardFocusNodes.putIfAbsent(
       sourceId,
-      () => FocusNode(debugLabel: 'source_card_$sourceId'),
+      () {
+        final node = FocusNode(debugLabel: 'source_card_$sourceId');
+        // Only ever set, never cleared on focus loss: moving between cards
+        // passes through a moment where nothing is focused, and clearing
+        // there would blank the HUD hints on every press.
+        node.addListener(() {
+          if (!mounted || !node.hasFocus) return;
+          if (_focusedSourceId == sourceId) return;
+          setState(() => _focusedSourceId = sourceId);
+        });
+        return node;
+      },
     );
   }
 
@@ -163,6 +199,58 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     for (final id in stale) {
       _cardFocusNodes.remove(id)?.dispose();
     }
+    // A removed source must not keep driving the HUD hints.
+    if (_focusedSourceId != null && !liveIds.contains(_focusedSourceId)) {
+      _focusedSourceId = null;
+    }
+  }
+
+  /// The source the shortcuts and the HUD act on. Reads live focus first so a
+  /// press is always applied to what the border is drawn around, and falls
+  /// back to the last remembered card for the gap between two cards.
+  Source? _focusedSource(List<Source> sources) {
+    for (final entry in _cardFocusNodes.entries) {
+      if (entry.value.hasFocus) {
+        return sources.where((s) => s.id == entry.key).firstOrNull;
+      }
+    }
+    final id = _focusedSourceId;
+    if (id == null) return null;
+    return sources.where((s) => s.id == id).firstOrNull;
+  }
+
+  /// Runs one of the three list-level shortcuts against the focused card.
+  void _onSourceShortcut(_SourceShortcut shortcut) {
+    final source = _focusedSource(ref.read(sourcesProvider).sources);
+    if (source == null) return;
+    switch (shortcut) {
+      case _SourceShortcut.toggleActive:
+        ref.read(feedbackServiceProvider).confirm();
+        _toggleActiveSource(source);
+      case _SourceShortcut.toggleEnabled:
+        ref.read(feedbackServiceProvider).confirm();
+        _toggleSourceEnabled(source);
+      case _SourceShortcut.remove:
+        _confirmRemoveSource(source);
+    }
+  }
+
+  /// Removal from the list asks first. In the menu it takes three deliberate
+  /// presses to reach; here it is one, and it drops the source's whole
+  /// library listing — so the one press has to be the one that opens a
+  /// question, not the one that does it.
+  Future<void> _confirmRemoveSource(Source source) async {
+    final l = L.of(context);
+    ref.read(feedbackServiceProvider).tick();
+    final confirmed = await showConsoleDialog(
+      context,
+      title: l.sources_removeConfirmTitle,
+      message: l.sources_removeConfirmMessage(source.name),
+      primaryLabel: l.common_remove,
+      isDestructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+    await _removeSource(source);
   }
 
   void _goBack() {
@@ -531,6 +619,38 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     }
   }
 
+  /// The per-source hints only appear once a card is focused, because their
+  /// labels depend on that card: "disable" or "enable", "only this" or
+  /// "show all". With nothing focused they would have to guess.
+  Widget _buildHud(BuildContext context, SourcesState state) {
+    final l = L.of(context);
+    final source = state.loading ? null : _focusedSource(state.sources);
+    return ConsoleHud(
+      b: HudAction(l.common_back, onTap: _goBack),
+      y: HudAction(l.sources_addSource, onTap: _addSource),
+      x: source == null
+          ? null
+          : HudAction(
+              _activeSourceId == source.id
+                  ? l.sources_viewAllShort
+                  : l.sources_viewOnlyShort,
+              onTap: () => _toggleActiveSource(source),
+            ),
+      lb: source == null
+          ? null
+          : HudAction(
+              source.enabled ? l.sources_disable : l.sources_enable,
+              onTap: () => _toggleSourceEnabled(source),
+            ),
+      rb: source == null
+          ? null
+          : HudAction(
+              l.common_remove,
+              onTap: () => _confirmRemoveSource(source),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
@@ -572,10 +692,9 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                 ),
               ],
             ),
-            ConsoleHud(
-              b: HudAction(L.of(context).common_back, onTap: _goBack),
-              y: HudAction(L.of(context).sources_addSource, onTap: _addSource),
-            ),
+            // Every hint here is also a button: the HUD is the finger half of
+            // the same three shortcuts, so neither input is a dead end.
+            _buildHud(context, state),
             if (_activeActionsSource != null)
               _SourceActionsOverlay(
                 source: _activeActionsSource!,
@@ -638,6 +757,36 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   }
 }
 
+/// The list-level shortcuts. One intent with a payload rather than three
+/// intent types, because [ConsoleScreenMixin.screenActions] is keyed by type
+/// and three keys would need three near-identical actions.
+enum _SourceShortcut { toggleActive, toggleEnabled, remove }
+
+class _SourceShortcutIntent extends Intent {
+  const _SourceShortcutIntent(this.shortcut);
+  final _SourceShortcut shortcut;
+}
+
+class _SourceShortcutAction extends Action<_SourceShortcutIntent> {
+  _SourceShortcutAction(this.ref, this.onShortcut);
+
+  final WidgetRef ref;
+  final void Function(_SourceShortcut) onShortcut;
+
+  /// Held off while any overlay is up. The action menu answers X itself, but
+  /// nothing answers L1/R1 — without this they would fire underneath an open
+  /// overlay, acting on a card the user can no longer see.
+  @override
+  bool isEnabled(_SourceShortcutIntent intent) =>
+      ref.read(overlayPriorityProvider) == OverlayPriority.none;
+
+  @override
+  Object? invoke(_SourceShortcutIntent intent) {
+    onShortcut(intent.shortcut);
+    return null;
+  }
+}
+
 class _Header extends StatelessWidget {
   const _Header({required this.rs, required this.count});
   final Responsive rs;
@@ -666,9 +815,12 @@ class _Header extends StatelessWidget {
           ),
           SizedBox(height: rs.spacing.xs),
           Text(
+            // Was an English literal with a hardcoded [Y] in it. The key name
+            // is the HUD's job — it draws from the configured controller
+            // layout, which this line could not.
             count == 0
                 ? L.of(context).sources_noSourcesConfigured
-                : '$count source${count == 1 ? "" : "s"} · [Y] add new',
+                : L.of(context).sources_countLabel(count),
             style: TextStyle(
               fontSize: rs.isSmall ? 10 : 12,
               color: Colors.grey.shade500,

@@ -33,6 +33,7 @@
 - [浮層只做了手把](FIX_LOGS.md)
 - [黃色條與雙入口](FIX_LOGS.md)
 - [標頭高度與誤讀的按鍵字](FIX_LOGS.md)
+- [來源清單快捷鍵](FIX_LOGS.md)
 
 ### `lib/features/sources/endpoint_edit_screen.dart`
 - [R-Shop 連線路由](FIX_LOGS.md)
@@ -50,6 +51,7 @@
 ### `lib/l10n/app_*.arb`
 - [連線方式共用憑證](FIX_LOGS.md)
 - [同步不知道是哪一台](FIX_LOGS.md)
+- [來源清單快捷鍵](FIX_LOGS.md)
 
 ### `lib/models/config/app_config.dart`
 - [R-Shop 目前來源](FIX_LOGS.md)
@@ -105,6 +107,9 @@
 
 ### `lib/widgets/sync_badge.dart`
 - [同步不知道是哪一台](FIX_LOGS.md)
+
+### `test/widgets/sources_screen_test.dart`
+- [來源清單快捷鍵](FIX_LOGS.md)
 
 ---
 

@@ -35,6 +35,7 @@
 
 | 關鍵字 | 症狀 / 根因 | 主要動到的檔案 |
 | :--- | :--- | :--- |
+| **來源清單快捷鍵** ✨ | 停用／移除／目前顯示原本都得先開選單。綁 `[X]`／`L1`／`R1`，**L1/R1 是從全域的格線欄數搶過來的**，且**必須用 `overlayPriorityProvider` 擋浮層**（沒有東西處理 L1/R1，會作用在看不見的卡上）。移除補了確認框 | `lib/features/settings/sources_screen.dart`（`_SourceShortcutIntent`／`_focusedSourceId`／`_confirmRemoveSource`／`_buildHud`） · `lib/l10n/app_*.arb` · `test/widgets/sources_screen_test.dart` |
 | **黃色條與雙入口** ⚠️ | 那條黃黑斜紋是 `RenderFlex` **版面溢位警示**不是功能；把功能從選單列搬到圖示上會**弄丟手把入口**（圖示預設只有觸控） | `lib/features/settings/sources_screen.dart`（選單改 `SingleChildScrollView`、卡片列與標頭各加一個眼睛） |
 | **標頭高度與誤讀的按鍵字** | 圖示旁的裸字母 `X` 被讀成關閉鈕；沉浸模式在 `initState` 才切，**第一幀還有狀態列 inset**，包了 `SafeArea` 的標題列會進場高一列再縮回去 | `lib/features/settings/sources_screen.dart` · `lib/features/home/home_view.dart`（`_buildSourceBanner` 拿掉 `SafeArea`） |
 | **浮層只做了手把** ⚠️ | ① 刪掉最後一筆來源後**手把完全失效只剩觸控**——`_initialFocusClaimed` 一旦為 true 永不重置，持有焦點的卡片被回收後螢幕上沒有任何節點有焦點。② 三個浮層的列是純 `Container`，**零觸控處理**；而 `ConsoleFocusable` 本身有 `GestureDetector`，所以卡片點得動、浮層點不動，**外觀完全看不出差別** | `lib/features/settings/sources_screen.dart`（`_ensureInteractiveFocus` 放棄宣告、`_OverlayButton.onTap`） · `lib/features/sources/endpoint_picker_overlay.dart` · `lib/features/sources/fallback_picker_overlay.dart` |

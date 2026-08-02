@@ -1710,4 +1710,29 @@ class LEs extends L {
   @override
   String get sources_routeCannotRemoveLast =>
       'No se puede eliminar la última ruta';
+
+  @override
+  String sources_countLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count fuentes',
+      one: '1 fuente',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sources_viewOnlyShort => 'Solo esta';
+
+  @override
+  String get sources_viewAllShort => 'Ver todas';
+
+  @override
+  String get sources_removeConfirmTitle => '¿Eliminar la fuente?';
+
+  @override
+  String sources_removeConfirmMessage(String name) {
+    return '¿Eliminar \"$name\"? Su lista desaparece de la biblioteca, pero los juegos ya descargados en este dispositivo se conservan.';
+  }
 }

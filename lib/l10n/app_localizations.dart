@@ -3208,6 +3208,36 @@ abstract class L {
   /// In en, this message translates to:
   /// **'The last route cannot be removed'**
   String get sources_routeCannotRemoveLast;
+
+  /// No description provided for @sources_countLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 source} other{{count} sources}}'**
+  String sources_countLabel(num count);
+
+  /// No description provided for @sources_viewOnlyShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Only this'**
+  String get sources_viewOnlyShort;
+
+  /// No description provided for @sources_viewAllShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Show all'**
+  String get sources_viewAllShort;
+
+  /// No description provided for @sources_removeConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove source?'**
+  String get sources_removeConfirmTitle;
+
+  /// No description provided for @sources_removeConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove \"{name}\"? Its list disappears from the library, but games already downloaded to this device are kept.'**
+  String sources_removeConfirmMessage(String name);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {
