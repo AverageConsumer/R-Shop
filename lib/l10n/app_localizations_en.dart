@@ -1704,9 +1704,6 @@ class LEn extends L {
   }
 
   @override
-  String get sources_showOnHome => 'Show on home';
-
-  @override
   String get sources_useThisShort => 'Use this';
 
   @override

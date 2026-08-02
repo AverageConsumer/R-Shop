@@ -47,7 +47,11 @@ class HomeGridView extends ConsumerWidget {
           padding: EdgeInsets.only(
             left: horizontalPadding,
             right: horizontalPadding,
-            top: rs.safeAreaTop + 40.0,
+            // No safe-area inset. The app turns immersive in HomeView's
+            // initState, so the first frame still reports a status bar and
+            // every frame after does not — adding it here renders a blank row
+            // above the grid on entry that vanishes as soon as you move.
+            top: 40.0,
             bottom: bottomPadding,
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

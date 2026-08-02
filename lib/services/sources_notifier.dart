@@ -23,6 +23,8 @@ class SourcesState {
     required this.sources,
     this.loading = false,
     this.error,
+    this.primarySourceId,
+    this.activeSourceId,
   });
 
   static const initial = SourcesState(sources: [], loading: true);
@@ -31,15 +33,28 @@ class SourcesState {
   final bool loading;
   final String? error;
 
+  /// Mirrors of the same two fields on [AppConfig], published here so a screen
+  /// can render them the frame the toggle is pressed.
+  ///
+  /// Reading them back through `bootstrappedConfigProvider` means invalidating
+  /// it and waiting for a disk read, during which the old value is still what
+  /// comes out — the press looked like it had not registered.
+  final String? primarySourceId;
+  final String? activeSourceId;
+
   SourcesState copyWith({
     List<Source>? sources,
     bool? loading,
     Object? error = _sentinel,
+    String? primarySourceId,
+    String? activeSourceId,
   }) {
     return SourcesState(
       sources: sources ?? this.sources,
       loading: loading ?? this.loading,
       error: identical(error, _sentinel) ? this.error : error as String?,
+      primarySourceId: primarySourceId ?? this.primarySourceId,
+      activeSourceId: activeSourceId ?? this.activeSourceId,
     );
   }
 
@@ -113,6 +128,8 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       state = SourcesState(
         sources: List<Source>.unmodifiable(_cachedConfig.sources),
         loading: false,
+        primarySourceId: _cachedConfig.primarySourceId,
+        activeSourceId: _cachedConfig.activeSourceId,
       );
     } catch (e) {
       debugPrint('SourcesNotifier: bootstrap failed: $e');
@@ -253,6 +270,13 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
   /// caller disables a source we also drop its cached games — otherwise
   /// the system grids would keep displaying entries from a source the
   /// user just turned off until the next manual rescan.
+  ///
+  /// **The purge is deliberately not awaited.** It walks every cached row for
+  /// the source and stats the file behind each one, which on a real library is
+  /// long enough to be felt as lag on the toggle. Nothing waiting on this call
+  /// needs it finished: `updateSource` has already rewritten the providers, so
+  /// the disabled source is out of every query before the first row is
+  /// touched. The purge is housekeeping behind that.
   Future<void> setEnabled(String id, bool enabled) async {
     final src = state.sources.firstWhere(
       (s) => s.id == id,
@@ -261,7 +285,7 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     if (src.enabled == enabled) return;
     await updateSource(src.copyWith(enabled: enabled));
     if (!enabled) {
-      await _purgeCachedGamesFor(id);
+      unawaited(_purgeCachedGamesFor(id));
     }
   }
 
@@ -309,59 +333,33 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     await _writeAndPublish(state.sources, activeSourceId: id, setActive: true);
   }
 
-  /// Shows or hides this source's library on the home screen.
-  ///
-  /// A tick-box: any number of sources can be visible at once. Off hides the
-  /// library and nothing else — **no purge**, because the games are still
-  /// there and the eye is expected to be flipped back. `setEnabled(false)` is
-  /// the one that discards a cache.
-  ///
-  /// Clears the single-source view when it was pointed at this source: the
-  /// home screen would otherwise be narrowed to a library it must not show.
-  Future<void> setShowOnHome(String id, bool visible) async {
-    final src = state.sources.firstWhere(
-      (s) => s.id == id,
-      orElse: () => throw StateError('Unknown source: $id'),
-    );
-    if (src.showOnHome == visible) return;
-    final next = [
-      for (final s in state.sources)
-        if (s.id == id) s.copyWith(showOnHome: visible) else s,
-    ];
-    final clearView = !visible && _cachedConfig.activeSourceId == id;
-    await _writeAndPublish(
-      next,
-      activeSourceId: clearView ? null : _cachedConfig.activeSourceId,
-      setActive: clearView,
-    );
-  }
-
   /// Designates the source in use: the one that syncs, and the one the home
   /// screen shows by default.
   ///
-  /// Also puts it in view and turns its eye on, because "use this" while it is
-  /// hidden would sync a library the user cannot see.
+  /// Also puts it in view and switches it back on if it was off, because "use
+  /// this" while it is turned off would designate a library that cannot sync.
   ///
-  /// **Clearing does not turn the eye back off.** Giving up the designation
-  /// says nothing about whether you still want to look at it, and silently
-  /// hiding a library nobody asked to hide is the worse of the two guesses.
+  /// **Clearing does not switch it back off.** Giving up the designation says
+  /// nothing about whether you still want the library, and turning something
+  /// off nobody asked to turn off is the worse of the two guesses — it would
+  /// also discard that source's cached games.
   ///
   /// Purges nothing, for the same reason [setActiveSource] does not.
   Future<void> setPrimarySource(String? id) async {
     if (id != null && !state.sources.any((s) => s.id == id)) {
       throw StateError('Unknown source: $id');
     }
-    final wasHidden = id != null &&
-        state.sources.any((s) => s.id == id && !s.showOnHome);
-    final next = wasHidden
+    final wasOff =
+        id != null && state.sources.any((s) => s.id == id && !s.enabled);
+    final next = wasOff
         ? [
             for (final s in state.sources)
-              if (s.id == id) s.copyWith(showOnHome: true) else s,
+              if (s.id == id) s.copyWith(enabled: true) else s,
           ]
         : state.sources;
     final alreadySet = _cachedConfig.primarySourceId == id &&
         _cachedConfig.activeSourceId == id;
-    if (alreadySet && !wasHidden) return;
+    if (alreadySet && !wasOff) return;
     await _writeAndPublish(
       next,
       activeSourceId: id,
@@ -689,6 +687,8 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       state = SourcesState(
         sources: List<Source>.unmodifiable(next),
         loading: false,
+        primarySourceId: updated.primarySourceId,
+        activeSourceId: updated.activeSourceId,
       );
     } catch (e) {
       debugPrint('SourcesNotifier: persist failed: $e');

@@ -192,7 +192,7 @@ void main() {
     // shortcut nobody uses, and each hint is also the tappable half of the
     // same action. If these disappear the feature is half gone even though
     // the key handler still works.
-    testWidgets('the focused card puts its four actions in the HUD',
+    testWidgets('the focused card puts its three actions in the HUD',
         (tester) async {
       final storage = await _initMockStorage();
       await tester.pumpWidget(_wrap(
@@ -210,14 +210,11 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // Showing a source and using one are separate decisions, so they are
-      // separate hints — and separate marks on the row.
-      expect(find.text('Show on home'), findsOneWidget);
       expect(find.text('Use this'), findsOneWidget);
       expect(find.text('Disable'), findsOneWidget);
       expect(find.text('Remove'), findsOneWidget);
-      // Visible by default, so the eye is filled; not in use, so the tick is
-      // an empty ring.
+      // On by default, so the eye is filled; not in use, so the tick is an
+      // empty ring. Two marks, two different decisions.
       expect(find.byIcon(Icons.visibility), findsOneWidget);
       expect(find.byIcon(Icons.radio_button_unchecked), findsOneWidget);
     });
@@ -250,7 +247,6 @@ void main() {
       await tester.pumpWidget(_wrap(storage, const SourcesScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.text('Show on home'), findsNothing);
       expect(find.text('Use this'), findsNothing);
       expect(find.text('Disable'), findsNothing);
       expect(find.text('Remove'), findsNothing);

@@ -550,7 +550,6 @@
   "sources_routeSameServerHint": "Apenas para endereços que não exigem início de sessão separado. Se pedir para entrar de novo, adicione como fonte própria e emparelhe as duas como reserva.",
   "sources_routeCannotRemoveLast": "Não é possível remover a última rota",
   "sources_countLabel": "{count, plural, =1{1 fonte} other{{count} fontes}}",
-  "sources_showOnHome": "Ver no início",
   "sources_useThisShort": "Usar esta",
   "sources_stopUsingShort": "Parar de usar",
   "sources_removeConfirmTitle": "Remover a fonte?",

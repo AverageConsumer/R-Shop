@@ -334,5 +334,15 @@
   - 多個同時顯示時**把名字列出來**（`A · B`），不是佔位字。這是實話——畫面上就是那幾個。
   - 這樣高度也穩定了：使用者問「原始 移動時候 到底是 有橫幅那行還是沒有」，答案現在是**一直都有**。
 - **選使用中會強制打開眼睛，取消不會關掉**：使用者原話。**同步一個看不到的來源不是一個值得存在的狀態**；反過來，放棄指派並不代表不想再看它，**偷偷把別人沒要求隱藏的東西藏起來是比較糟的那個猜測**。
+- **`showOnHome` 整個收回去**：使用者說「**你的停用 啟用 不就是眼睛嗎 = = 不用再做一個**」。對——`enabled` 為 false 的來源本來就不會出現在主畫面也不會同步，我等於做了第二個一樣的開關。
+  - `Source.showOnHome` 刪除，`setShowOnHome` 刪除，`L2` 綁定刪除，`sources_showOnHome` 七語系刪除。
+  - **卡片上的眼睛改成 `enabled` 的開關**，`L1` 停用／啟用維持不變（同一件事的按鍵入口）。`setPrimarySource` 改成把 `enabled` 打開。
+  - 代價要記住：**眼睛關掉會清掉那個來源的快取清單**（`setEnabled(false)` 一直都會清），再打開需要重新同步。這是併回 `enabled` 的必然後果。
+- **主畫面進場多一列空白**：使用者說「一開始兩行(有一行空白行) 但是移動後 變成一行」。不是橫幅——是 `home_grid_view.dart` 的 `top: rs.safeAreaTop + 40.0`。**沉浸模式在 `initState` 才切，第一幀還有狀態列 inset**，跟先前橫幅那次是同一個成因，只是換一個地方。改成固定 `40.0`。
+  - **教訓：這個專案裡任何 `rs.safeAreaTop` 都要懷疑。** 全螢幕沉浸之下它不是常數。
+- **RA 設定頁的白框貼著字**：`ra_onboarding_screen.dart` 的 `_textBox` 把 `ConsoleFocusable` 直接包住 Column，焦點白框緊貼標籤與輸入框自己的邊框，兩條線差幾個像素，看起來像畫錯而不是焦點。加內距 `fromLTRB(8,6,8,8)` 並把 `borderRadius` 提到 12。
+- **切換會 lag**：使用者說「在來源清單 切換啟用 跟使用 時 會 lag」。兩個成因：
+  - **UI 在等磁碟**：畫面的標籤讀 `bootstrappedConfigProvider`，而切換後要 `invalidate` 再等重新讀檔；**在那之前 `valueOrNull` 回的還是舊值**，所以按下去看起來沒反應。解：`SourcesState` 加上 `primarySourceId`／`activeSourceId` 兩個鏡像，`_writeAndPublish` 設 state 時一起發佈，畫面改讀 notifier——同一幀就更新。
+  - **清快取擋在路上**：`setEnabled(false)` 會 `await _purgeCachedGamesFor`，那支要走過該來源每一筆快取並對每筆做 `File.existsSync`。改成 `unawaited`——`updateSource` 已經先把 providers 重寫掉了，被關掉的來源在第一筆被碰到之前就已經不在任何查詢裡，清除只是後續整理。
 - **測試基準的教訓（再一次）**：完整套件先跑出 8 個失敗，其中 `game_list_controller: restoreFilters` 看起來像回歸；單獨執行也失敗一次，我一度判定是我改壞的。**但接著連跑三次都通過**，完整套件重跑也回到 7 個。**單次的隔離執行不足以認定回歸**——這個測試就是既有紀錄裡點名的時序敏感型之一。
 - **Commit**：見下

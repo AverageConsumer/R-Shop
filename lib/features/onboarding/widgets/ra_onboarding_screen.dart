@@ -488,12 +488,19 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
       focusNode: f.consoleFocus,
       focusScale: 1.0,
       onSelect: () => f.textFocus.requestFocus(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _label(f.label),
-          ListenableBuilder(
+      // The white focus frame is drawn tight around the child, so without
+      // room of its own it lands on the label and on the field's own border —
+      // two lines a couple of pixels apart, which reads as a rendering fault
+      // rather than as focus.
+      borderRadius: 12,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _label(f.label),
+            ListenableBuilder(
             listenable: f.textFocus,
             builder: (context, _) {
               final hasFocus = f.textFocus.hasFocus;
@@ -529,9 +536,10 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
                   ),
                 ),
               );
-            },
-          ),
-        ],
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -291,22 +291,23 @@ void main() {
       expect(cfg.primarySourceId, 'a');
     });
 
-    test('designating a hidden source turns its eye back on', () async {
-      // Working against a library you cannot see is not a state worth having.
+    test('designating a switched-off source turns it back on', () async {
+      // Designating a library that cannot sync is not a state worth having.
       final storage = await _storageWithSystem();
       final notifier = SourcesNotifier(storage, db: _SpyDb());
       await notifier.ready;
       await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
-      await notifier.setShowOnHome('a', false);
+      await notifier.setEnabled('a', false);
 
       await notifier.setPrimarySource('a');
 
       final cfg = await storage.loadConfig();
-      expect(cfg!.sources.single.showOnHome, isTrue);
+      expect(cfg!.sources.single.enabled, isTrue);
     });
 
-    test('but clearing it leaves the eye alone', () async {
-      // Giving up the designation says nothing about wanting to stop looking.
+    test('but clearing it leaves the switch alone', () async {
+      // Giving it up says nothing about wanting the library gone — and
+      // switching it off would discard that source's cached games.
       final storage = await _storageWithSystem();
       final notifier = SourcesNotifier(storage, db: _SpyDb());
       await notifier.ready;
@@ -317,7 +318,26 @@ void main() {
 
       final cfg = await storage.loadConfig();
       expect(cfg!.primarySourceId, isNull);
-      expect(cfg.sources.single.showOnHome, isTrue);
+      expect(cfg.sources.single.enabled, isTrue);
+    });
+
+    test('the notifier publishes both ids without a config re-read', () async {
+      // The screen renders from these. Going back through the config future
+      // means invalidating it and waiting on a disk read, and until that
+      // lands the old id is still what comes out — the press reads as lag.
+      final storage = await _storageWithSystem();
+      final notifier = SourcesNotifier(storage, db: _SpyDb());
+      await notifier.ready;
+      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
+      await notifier.addSource(_romm('b', 'http://home.example.org:9080'));
+
+      await notifier.setPrimarySource('b');
+      expect(notifier.state.primarySourceId, 'b');
+      expect(notifier.state.activeSourceId, 'b');
+
+      await notifier.setActiveSource('a');
+      expect(notifier.state.activeSourceId, 'a');
+      expect(notifier.state.primarySourceId, 'b');
     });
 
     test('designating never purges either library', () async {
@@ -372,9 +392,9 @@ void main() {
     });
   });
 
-  // The eye is a tick-box: every source wearing one is on the home screen,
-  // all together. Not a choice between them.
-  group('showOnHome', () {
+  // The eye on each row is the on/off switch — there was briefly a second,
+  // separate "show on home" flag, but turning a source off already did that.
+  group('the eye is the on/off switch', () {
     const system = SystemConfig(
       id: 'snes',
       name: 'SNES',
@@ -382,21 +402,18 @@ void main() {
       providers: [],
     );
 
-    test('two visible sources both reach the home screen', () {
-      final all = [
-        _romm('a', 'http://a'),
-        _romm('b', 'http://b'),
-      ];
+    test('every switched-on source reaches the home screen', () {
+      final all = [_romm('a', 'http://a'), _romm('b', 'http://b')];
 
       final out = SourceResolver.providersFor(system, all);
 
       expect(out.map((p) => p.sourceId), ['a', 'b']);
     });
 
-    test('a hidden one drops out, the rest stay', () {
+    test('a switched-off one drops out, the rest stay', () {
       final all = [
         _romm('a', 'http://a'),
-        _romm('b', 'http://b').copyWith(showOnHome: false),
+        _romm('b', 'http://b').copyWith(enabled: false),
         _romm('c', 'http://c'),
       ];
 
@@ -405,64 +422,13 @@ void main() {
       expect(out.map((p) => p.sourceId), ['a', 'c']);
     });
 
-    test('but a named source still resolves while hidden', () {
-      // Hiding is a view filter. A sync against the source in use has to run
-      // whether or not its library is on screen.
-      final all = [_romm('a', 'http://a').copyWith(showOnHome: false)];
+    test('and stays out even when named — off means off', () {
+      final all = [_romm('a', 'http://a').copyWith(enabled: false)];
 
-      final out =
-          SourceResolver.providersFor(system, all, activeSourceId: 'a');
-
-      expect(out.map((p) => p.sourceId), ['a']);
-    });
-
-    test('hiding never purges — the games are still there to come back to',
-        () async {
-      final storage = await _storageWithSystem();
-      final db = _SpyDb();
-      final notifier = SourcesNotifier(storage, db: db);
-      await notifier.ready;
-      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
-
-      await notifier.setShowOnHome('a', false);
-
-      expect(db.purged, isEmpty);
-      final cfg = await storage.loadConfig();
-      expect(cfg!.sources.single.showOnHome, isFalse);
-    });
-
-    test('hiding the source being viewed alone widens the view', () async {
-      // Otherwise the home screen is narrowed to a library it must not show,
-      // and comes up empty.
-      final storage = await _storageWithSystem();
-      final notifier = SourcesNotifier(storage, db: _SpyDb());
-      await notifier.ready;
-      await notifier.addSource(_romm('a', 'http://192.168.0.20:9080'));
-      await notifier.addSource(_romm('b', 'http://home.example.org:9080'));
-      await notifier.setActiveSource('a');
-
-      await notifier.setShowOnHome('a', false);
-
-      final cfg = await storage.loadConfig();
-      expect(cfg!.activeSourceId, isNull);
-      expect(cfg.systems.single.providers.map((p) => p.sourceId), ['b']);
-    });
-
-    test('sources configured before the tick-box existed are visible', () {
-      final src = Source.fromJson({
-        'id': 'a',
-        'name': 'a',
-        'type': 'romm',
-        'url': 'http://a',
-      });
-
-      expect(src.showOnHome, isTrue);
-    });
-
-    test('round-trips through JSON', () {
-      final src = _romm('a', 'http://a').copyWith(showOnHome: false);
-
-      expect(Source.fromJson(src.toJson()).showOnHome, isFalse);
+      expect(
+        SourceResolver.providersFor(system, all, activeSourceId: 'a'),
+        isEmpty,
+      );
     });
   });
 }

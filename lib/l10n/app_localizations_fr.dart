@@ -1716,9 +1716,6 @@ class LFr extends L {
   }
 
   @override
-  String get sources_showOnHome => 'Sur l\'accueil';
-
-  @override
   String get sources_useThisShort => 'Utiliser celle-ci';
 
   @override

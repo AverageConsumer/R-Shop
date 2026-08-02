@@ -1714,9 +1714,6 @@ class LPt extends L {
   }
 
   @override
-  String get sources_showOnHome => 'Ver no início';
-
-  @override
   String get sources_useThisShort => 'Usar esta';
 
   @override

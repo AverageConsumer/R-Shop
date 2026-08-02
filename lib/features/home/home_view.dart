@@ -586,7 +586,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     final sources = ref
         .read(sourcesProvider)
         .sources
-        .where((s) => s.enabled && s.showOnHome)
+        .where((s) => s.enabled)
         .toList();
     if (sources.isEmpty) return;
 
@@ -639,7 +639,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     // then as SizedBox.shrink — a genuine zero-height row rather than a blank
     // one, so nothing below shifts by a line depending on state.
     final visible =
-        sources.where((s) => s.enabled && s.showOnHome).toList(growable: false);
+        sources.where((s) => s.enabled).toList(growable: false);
     if (standIn == null && visible.isEmpty) return const SizedBox.shrink();
 
     // Singled out with the triggers, or the only one visible — either way one

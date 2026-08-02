@@ -592,7 +592,6 @@
   "sources_routeSameServerHint": "只適用不需要另外登入的位址。如果那個位址要你重新登入，請改成「新增來源」，再把兩個互設備援。",
   "sources_routeCannotRemoveLast": "最後一條連線方式不能移除",
   "sources_countLabel": "{count} 個來源",
-  "sources_showOnHome": "主畫面顯示",
   "sources_useThisShort": "目前使用這個",
   "sources_stopUsingShort": "取消使用",
   "sources_removeConfirmTitle": "移除來源？",

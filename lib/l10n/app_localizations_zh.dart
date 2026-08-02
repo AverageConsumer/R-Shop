@@ -1653,9 +1653,6 @@ class LZh extends L {
   }
 
   @override
-  String get sources_showOnHome => '主畫面顯示';
-
-  @override
   String get sources_useThisShort => '目前使用這個';
 
   @override

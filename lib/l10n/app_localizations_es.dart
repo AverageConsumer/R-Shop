@@ -1714,9 +1714,6 @@ class LEs extends L {
   }
 
   @override
-  String get sources_showOnHome => 'Ver en inicio';
-
-  @override
   String get sources_useThisShort => 'Usar esta';
 
   @override

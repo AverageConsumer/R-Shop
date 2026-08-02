@@ -26,9 +26,9 @@ class SourceResolver {
 
   /// Returns the effective providers for [system].
   /// [activeSourceId] narrows the result to a single source — the library is
-  /// showing and syncing that one alone. Null keeps every enabled source that
-  /// is not hidden from the home screen, which is what a one-source setup gets
-  /// and what the app did before switching existed.
+  /// showing and syncing that one alone. Null keeps every enabled source, which
+  /// is what a one-source setup gets and what the app did before switching
+  /// existed.
   ///
   /// An unknown id is ignored rather than yielding nothing: a source deleted
   /// while selected should leave the user with a full library, not an empty one.
@@ -51,11 +51,6 @@ class SourceResolver {
     for (final source in allSources) {
       if (!source.enabled) continue;
       if (active != null && source.id != active) continue;
-      // Hiding is a home-screen filter, so it only applies when the caller
-      // asked for "whatever is visible". A named source is named on purpose —
-      // a sync against the source in use must still run when its library is
-      // hidden from view.
-      if (active == null && !source.showOnHome) continue;
       if (allow != null && !allow.contains(source.id)) continue;
 
       final mapping = mappingBySourceId[source.id];

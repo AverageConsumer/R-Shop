@@ -1658,9 +1658,6 @@ class LJa extends L {
   }
 
   @override
-  String get sources_showOnHome => 'ホームに表示';
-
-  @override
   String get sources_useThisShort => 'この提供元を使用';
 
   @override

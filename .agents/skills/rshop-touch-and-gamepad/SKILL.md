@@ -72,6 +72,12 @@ R-Shop 跑在 **AYN Thor** —— 3.92 吋掌機，**手把與觸控兩套輸入
 - **高度會跳**：`SystemChrome.setEnabledSystemUIMode(immersiveSticky)` 是在 `initState`
   跑的，所以**第一幀還有狀態列 inset，後面的幀沒有**。頂部元件若包 `SafeArea`，
   進場時會高一列然後縮回去。全螢幕沉浸的畫面**不要包 `SafeArea`**。
+  **`rs.safeAreaTop` 也一樣，它不是常數。** 這個坑犯了兩次：橫幅的 `SafeArea`，
+  以及 `home_grid_view` 的 `top: rs.safeAreaTop + 40.0`——症狀一模一樣
+  （進場多一列空白，一移動就不見）。**看到 `safeAreaTop` 先懷疑。**
+- **焦點白框要留內距**：`ConsoleFocusable` 的白框是緊貼 child 畫的。child 自己也有
+  邊框（輸入框那種）時，兩條線差幾個像素，看起來像畫錯而不是焦點。
+  **包一層 `Padding`，並給比內層大的 `borderRadius`。**
 - **浮層會蓋住內容**：小螢幕上「疊在上面」跟「擠掉內容」的差別很明顯，
   設計時要想清楚要哪一種。
 

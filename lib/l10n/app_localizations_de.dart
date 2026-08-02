@@ -1715,9 +1715,6 @@ class LDe extends L {
   }
 
   @override
-  String get sources_showOnHome => 'Auf Startseite';
-
-  @override
   String get sources_useThisShort => 'Diese nutzen';
 
   @override

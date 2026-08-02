@@ -67,14 +67,13 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// route as still live.
   String? _routePickerSourceId;
 
-  /// Which source is designated as in use, read straight from the config.
+  /// Which source is designated as in use, read straight from the notifier.
   ///
-  /// Deliberately not mirrored in a field. It used to be, seeded with
-  /// `_activeSourceId ??= stored` — and `??=` cannot represent "deliberately
-  /// none", so the next build re-seeded it from the stored value and the
-  /// toggle needed a second press to take. One source of truth instead.
-  String? get _primarySourceId =>
-      ref.read(bootstrappedConfigProvider).valueOrNull?.primarySourceId;
+  /// Deliberately not mirrored in a field of this State. It used to be, seeded
+  /// with `_activeSourceId ??= stored` — and `??=` cannot represent
+  /// "deliberately none", so the next build re-seeded it from the stored value
+  /// and the toggle needed a second press to take. One source of truth.
+  String? get _primarySourceId => ref.read(sourcesProvider).primarySourceId;
 
   /// Set while the fallback picker is open, held by id so the overlay always
   /// renders the freshest source.
@@ -128,11 +127,6 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
         const SingleActivator(LogicalKeyboardKey.gameButtonRight1,
                 includeRepeats: false):
             const _SourceShortcutIntent(_SourceShortcut.remove),
-        // The trigger, because that is what changes the shown source on the
-        // home screen — same gesture, same meaning, one screen over.
-        const SingleActivator(LogicalKeyboardKey.gameButtonLeft2,
-                includeRepeats: false):
-            const _SourceShortcutIntent(_SourceShortcut.toggleShown),
       };
 
   @override
@@ -237,9 +231,6 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
       case _SourceShortcut.toggleActive:
         ref.read(feedbackServiceProvider).confirm();
         _toggleActiveSource(source);
-      case _SourceShortcut.toggleShown:
-        ref.read(feedbackServiceProvider).confirm();
-        _toggleShownSource(source);
       case _SourceShortcut.toggleEnabled:
         ref.read(feedbackServiceProvider).confirm();
         _toggleSourceEnabled(source);
@@ -519,24 +510,6 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     }
   }
 
-  /// Shows or hides this source's library on the home screen.
-  ///
-  /// A tick-box, not a choice between sources — every source with an eye is
-  /// visible, all at once. Changes nothing about what syncs (that is the
-  /// tick) and **discards nothing** (that is disabling).
-  Future<void> _toggleShownSource(Source source) async {
-    setState(() => _activeActionsSource = null);
-    try {
-      await ref
-          .read(sourcesProvider.notifier)
-          .setShowOnHome(source.id, !source.showOnHome);
-      ref.invalidate(bootstrappedConfigProvider);
-      ref.invalidate(gamesProvider);
-      ref.read(gameDbChangedProvider.notifier).state++;
-    } catch (e) {
-      debugPrint('SourcesScreen: setShowOnHome failed: $e');
-    }
-  }
 
   void _closeSourceActions() {
     if (_activeActionsSource == null) return;
@@ -665,15 +638,6 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     return ConsoleHud(
       b: HudAction(l.common_back, onTap: _goBack),
       y: HudAction(l.sources_addSource, onTap: _addSource),
-      // One label, both ways. A tick-box does not need the hint to spell out
-      // which direction the press goes — the eye on the row already says
-      // whether it is on.
-      lt: source == null
-          ? null
-          : HudAction(
-              l.sources_showOnHome,
-              onTap: () => _toggleShownSource(source),
-            ),
       x: source == null
           ? null
           : HudAction(
@@ -703,8 +667,10 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final state = ref.watch(sourcesProvider);
     // Watched, not mirrored: the config is the only thing that knows which
     // source is in use, and every label on this screen reads from it.
-    final primary =
-        ref.watch(bootstrappedConfigProvider).valueOrNull?.primarySourceId;
+    // From the notifier, not the config future. Invalidating that one means a
+    // disk read, and until it lands `valueOrNull` still hands back the old id
+    // — the press looked like it had not registered.
+    final primary = state.primarySourceId;
     _gcFocusNodes(state.sources);
     _ensureInteractiveFocus(state);
 
@@ -729,7 +695,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                               focusForId: _focusFor,
                               onTap: _openSourceActions,
                               onToggleActive: _toggleActiveSource,
-                              onToggleShown: _toggleShownSource,
+                              onToggleShown: _toggleSourceEnabled,
                               scrollController: _scrollController,
                               rs: rs,
                             ),
@@ -804,7 +770,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
 /// The list-level shortcuts. One intent with a payload rather than three
 /// intent types, because [ConsoleScreenMixin.screenActions] is keyed by type
 /// and three keys would need three near-identical actions.
-enum _SourceShortcut { toggleActive, toggleShown, toggleEnabled, remove }
+enum _SourceShortcut { toggleActive, toggleEnabled, remove }
 
 class _SourceShortcutIntent extends Intent {
   const _SourceShortcutIntent(this.shortcut);
@@ -1015,9 +981,12 @@ class _SourceList extends ConsumerWidget {
                 onTap: () => onTap(source),
                 rs: rs,
                 mappingCount: mappingCounts[source.id] ?? 0,
-                isActive: cfg?.primarySourceId == source.id,
+                isActive: ref.watch(sourcesProvider).primarySourceId == source.id,
                 onToggleActive: () => onToggleActive(source),
-                isShown: source.showOnHome,
+                // The eye is the on/off switch. It was briefly a second,
+                // separate "show on home" flag — but that is what turning a
+                // source off already did, so there is one switch again.
+                isShown: source.enabled,
                 onToggleShown: () => onToggleShown(source),
               );
             },
@@ -1057,11 +1026,11 @@ class _SourceCard extends ConsumerWidget {
   /// Designates this source as the one in use, from the tick on the row.
   final VoidCallback? onToggleActive;
 
-  /// True when this source's library appears on the home screen. A tick-box,
-  /// so any number of rows can carry the eye at once.
+  /// True when this source is switched on: its library is on the home screen
+  /// and it takes part in syncs.
   final bool isShown;
 
-  /// Shows or hides this source's library, from the eye on the row.
+  /// Switches this source on or off, from the eye on the row.
   final VoidCallback? onToggleShown;
 
   Color get _accent {
@@ -1147,10 +1116,10 @@ class _SourceCard extends ConsumerWidget {
             // the row, with no menu to open first — they are what this screen
             // is for, so they do not belong three presses deep.
             //
-            // The eye is a tick-box — every source wearing one is on the home
-            // screen, all together. The tick is single: it names the one the
-            // app works against. Same shape for both would put the user back
-            // where the one conflated setting had them.
+            // The eye is on/off: switched on, the library is on the home
+            // screen. The tick is single and names the one the app works
+            // against. Same shape for both would put the user back where the
+            // one conflated setting had them.
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onToggleShown,

@@ -512,7 +512,6 @@
   "sources_routeSameServerHint": "Uniquement pour les adresses ne demandant pas de connexion distincte. Si elle redemande une connexion, ajoutez-la comme source et associez les deux en secours.",
   "sources_routeCannotRemoveLast": "La dernière voie ne peut pas être supprimée",
   "sources_countLabel": "{count, plural, =1{1 source} other{{count} sources}}",
-  "sources_showOnHome": "Sur l'accueil",
   "sources_useThisShort": "Utiliser celle-ci",
   "sources_stopUsingShort": "Ne plus utiliser",
   "sources_removeConfirmTitle": "Supprimer la source ?",
