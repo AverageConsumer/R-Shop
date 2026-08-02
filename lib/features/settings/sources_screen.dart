@@ -1317,6 +1317,13 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
       widget.onClose();
       return KeyEventResult.handled;
     }
+    // The gamepad half of the eye in the header. Without it that toggle would
+    // be reachable by finger only.
+    if (key == LogicalKeyboardKey.gameButtonX) {
+      ref.read(feedbackServiceProvider).confirm();
+      widget.onToggleActive();
+      return KeyEventResult.handled;
+    }
     return KeyEventResult.ignored;
   }
 
@@ -1374,13 +1381,54 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        src.hostLabel,
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                          fontFamily: 'monospace',
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              src.hostLabel,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ),
+                          // Second entry for "show this source": the row eye
+                          // is touch-only, this one answers [X] as well. A
+                          // corner icon rather than another row — the menu
+                          // already outgrew a 3.92" screen once.
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: widget.onToggleActive,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    widget.isActive
+                                        ? Icons.visibility
+                                        : Icons.visibility_outlined,
+                                    size: 18,
+                                    color: widget.isActive
+                                        ? const Color(0xFF7BC67B)
+                                        : Colors.white38,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'X',
+                                    style: TextStyle(
+                                      color: Colors.white30,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 20),
                       for (int i = 0; i < actions.length; i++) ...[
@@ -1403,7 +1451,7 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                       const SizedBox(height: 12),
                       const Center(
                         child: Text(
-                          '↑↓ navigate · [A] select · [B] back',
+                          '↑↓ · [A] 選擇 · [X] 顯示切換 · [B] 返回',
                           style: TextStyle(
                             color: Colors.white30,
                             fontSize: 10,
@@ -1682,7 +1730,7 @@ class _SourceTypePickerOverlayState
                       const SizedBox(height: 14),
                       const Center(
                         child: Text(
-                          '↑↓ navigate · [A] select · [B] back',
+                          '↑↓ · [A] 選擇 · [X] 顯示切換 · [B] 返回',
                           style: TextStyle(
                             color: Colors.white30,
                             fontSize: 10,
