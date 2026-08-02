@@ -3,8 +3,36 @@
 > **這份是「未完成」清單，不是紀錄。** 做完的事寫進 [FIX_LOGS.md](FIX_LOGS.md) 並在
 > [FIX_INDEX.md](FIX_INDEX.md) 補一列，然後**把它從這裡刪掉**。
 > 留在這裡的每一條都應該是真的還沒做完。
->
-> 使用者說「繼續任務」時，先讀這份。
+
+---
+
+## 開工前必做：載入確認（不是說明，是要執行）
+
+**這份檔常常是被單獨打開的**——使用者的講法是「繼續未完成的事，先看 HANDOVER」。
+所以先讀完下面五項再動待辦，**並在回覆裡以一行列出你實際讀到什麼**。
+沒列出來就等於沒讀，只說「已讀取」不算。
+
+| # | 要讀的 | 回覆裡要講出什麼 |
+| :--- | :--- | :--- |
+| 1 | `D:\ThorAPK\StudioProjects\GLOBAL_DEV_NOTES.md` | 建置工具鏈有沒有變、有無新增規則 |
+| 2 | `R-Shop/AGENTS.md` | 這個專案特有的限制，哪幾條跟這次任務有關 |
+| 3 | `docs/FIX_INDEX.md` 與 `docs/FIX_BY_FILE.md` | 你要碰的檔或症狀有沒有前例（**有就讀那一條**） |
+| 4 | `R-Shop/.agents/skills/` | 跟這次任務相關的技能有哪些 |
+| 5 | 長期記憶的 `MEMORY.md` | 使用者偏好裡跟這次任務有關的是哪幾條 |
+
+**第 4 項**：`rshop-build-deploy`（建置的三個陷阱，含 `scripts/deploy.ps1`）·
+`rshop-touch-and-gamepad`（**動 UI 之前一定先讀**）·
+`rshop-source-routing`（來源／路由／備援的不變式）· `rshop-l10n`。
+
+**第 5 項**：長期記憶在
+`C:\Users\Guset\.claude\projects\D--ThorAPK-StudioProjects\memory\`。
+**只有 Claude Code 開在這個工作區才會自動載入，其他 AI 工具拿不到，必須自己 Read。**
+裡面是使用者的偏好與工作方式（回答要多短、批次多大就該部署、哪些坑重複踩過），
+不讀的話會用錯的方式工作而不自知。
+
+**收尾時同樣要執行**：寫 `docs/FIX_LOGS.md`（問題／修復／檔案 三個固定欄位）、
+補 `docs/FIX_INDEX.md`、重跑 `python scripts/build_fix_by_file.py`、
+**把做完的那條從本檔刪掉**。少做一件都不算完成。
 
 ---
 
