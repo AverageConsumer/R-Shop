@@ -628,6 +628,16 @@ class _HomeViewState extends ConsumerState<HomeView>
     // on a 3.92" display. The user confirmed this is what they want.
     if (sources.length < 2) return const SizedBox.shrink();
 
+    // Same reasoning once the eyes have narrowed it down to one: with a
+    // single library on screen and it being the one in use, there is nothing
+    // left for this row to answer. "All sources" would be a wrong answer too —
+    // it is one source, it just happens to be all of the visible ones.
+    final visible =
+        sources.where((s) => s.enabled && s.showOnHome).toList(growable: false);
+    if (visible.length == 1 && visible.single.id == cfg?.primarySourceId) {
+      return const SizedBox.shrink();
+    }
+
     // When the selected source was unreachable and its partner stood in, say
     // so. Quietly showing a different server's library would look like games
     // had gone missing.
@@ -635,7 +645,10 @@ class _HomeViewState extends ConsumerState<HomeView>
     final standIn = syncing != null && syncing.isFallback ? syncing : null;
     final name = standIn != null
         ? '${standIn.name}（${l.sources_fallbackShort}）'
-        : (active?.name ?? l.sources_allSources);
+        // With one library visible, name it. Nothing is being collapsed, so
+        // calling it "all sources" would describe a choice that isn't there.
+        : (active?.name ??
+            (visible.length == 1 ? visible.single.name : l.sources_allSources));
     // Green means "this is also the source in use" — what a sync would talk
     // to. Browsing off it with the triggers greys the strip, so it is visible
     // at a glance that the library on screen is not the one being kept up to
