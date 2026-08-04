@@ -113,6 +113,9 @@
 ### `lib/widgets/sync_badge.dart`
 - [同步不知道是哪一台](FIX_LOGS.md)
 
+### `scripts/build_fix_by_file.py`
+- [R-Shop 反查不到](FIX_LOGS.md)
+
 ### `test/active_source_test.dart`
 - [使用中與顯示分家](FIX_LOGS.md)
 
@@ -126,7 +129,10 @@
 
 ## 尚未指明檔案的條目
 
-這些條目的 `**檔案**` 欄缺漏或標為待補，所以無法反查。補上之後重跑即可。
+這些條目沒有可反查的檔案。**多數是正確狀態**——環境診斷、部署作業、需求判定本來就沒有程式碼變更，`**檔案**` 欄寫的是「無程式碼變更」。
+
+只有標成「待補」的才是真的欠一份說明。
 
 - R-Shop 測試基準
 - R-Shop 實機重裝
+- R-Shop 自動選最快

@@ -28,6 +28,7 @@
 | **同步不知道是哪一台** | 徽章只寫進度不寫來源；連線方式只能新增不能刪；提示用的是「同一台伺服器」這種**使用者判斷不了**的判準 | `lib/providers/app_providers.dart`（`syncingSourceProvider`，標題列與徽章共用） · `lib/widgets/sync_badge.dart`（`_withSource`） · `lib/features/home/home_view.dart`（`_resolveSyncTarget` 抽出，**修掉自動同步沒走備援解析的漏洞**） · `lib/features/sources/endpoint_picker_overlay.dart`（`[X]` 刪 `[Y]` 改） |
 | **備援接進同步** | 同步前先探測，連不上就換備援。**重建的是記憶體中的 config，磁碟不動**——所以偏好的來源會自己回來 | `lib/services/source_failover.dart`（`withEffectiveSource`／`resolveForSync`） · `lib/features/home/home_view.dart`（`_syncAll` 注入、`_fallbackInUse`、標題列橘色） · `lib/services/endpoint_probe_service.dart`（`_probeableEndpoints` 修復：**endpoints 為空時原本會靜默判定不可達**，而不可達正是觸發備援的條件） |
 | **連線方式共用憑證** ⚠️ | `auth` 掛在 `Source`，**路由沒有自己的憑證**。同一台伺服器的多位址共用一個 token 沒問題；**指向另一台會送錯 token 回 401，而錯誤看起來像伺服器掛了**。兩台不同伺服器要用「兩個來源 + 備援」 | `lib/models/config/source.dart`（`endpoints` 註解說明假設） · `lib/features/sources/endpoint_picker_overlay.dart`（提示） · `lib/l10n/app_*.arb`（`sources_routeSameServerHint`） |
+| **R-Shop 自動選最快** | 自動探測延遲挑最快的路線 —— **決定不做**。在「同一台也當不同台」之下，換路等於替使用者換來源；連不上走備援才是既有解 | 無程式碼變更（需求判定） |
 | **AppID 衝突** | `applicationId` 與原廠主線一致，無法共存 | `android/app/build.gradle.kts` · Kotlin package 重構 |
 | **R-Shop Channel 名稱硬編** | 5 個 channel 名稱含 `applicationId`，Kotlin＋Dart 各自硬編共 20 處。**危險在靜默半合併** | `lib/services/platform_channels.dart`（新增，單一前綴） · `android/app/src/main/kotlin/.../MainActivity.kt`（`BuildConfig.APPLICATION_ID`） · `android/app/build.gradle.kts`（`buildFeatures.buildConfig = true`） · `native_smb_service` / `download_service` / `disk_space_service` / `device_info_service` |
 | **R-Shop ProviderFactory 隱式初始化** | 文件稱「未 init 就崩」，查證後**生產不可達**，是契約缺陷 | `lib/services/provider_factory.dart`（具名 `StateError` + `@visibleForTesting reset()`） |
@@ -56,6 +57,7 @@
 | **R-Shop 建置環境失聯** ⚠️ | 文件的 `D:\flutter` 是上一台機器的，本機從未裝過 | `AGENTS.md §5`（加註警告） |
 | **R-Shop 測試基準** | `flutter test` 的 7 個既有環境失敗**不是回歸** | 無程式碼變更。診斷方法紀錄 |
 | **R-Shop 實機重裝** | 裝置上是別台機器建的 **release** 版，debug 版覆蓋不上且資料備不出來 | 無程式碼變更。`run-as` 判斷法 |
+| **R-Shop 反查不到** | `build_fix_by_file.py` 報的 `entries without paths` **不是待辦**——沒動到檔的紀錄在反查表上無處可去，數字只會隨這類紀錄往上走 | `scripts/build_fix_by_file.py`（改掉誤導的說明字串） |
 
 ---
 

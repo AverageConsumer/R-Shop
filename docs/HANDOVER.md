@@ -81,18 +81,6 @@ UI 的東西 `analyze` 與單元測試都驗不到——見 `.agents/skills/rsho
     lib/features/game_list/widgets/game_grid.dart:178                  cacheExtent 已棄用
     lib/features/library/library_screen.dart:1294                      cacheExtent 已棄用
 
-### 2.3 自動選最快的那條路線
-
-使用者提過但**當時決定先不做**：兩個位址即使是同一台伺服器，他也要當成獨立來源
-（見 `.agents/skills/rshop-source-routing`）。所以「自動挑最快」目前沒有意義，
-除非之後改變那個前提。
-
-### 2.4 `FIX_BY_FILE.md` 有 2 條反查不到
-
-`R-Shop 測試基準`、`R-Shop 實機重裝` —— 這兩條**本來就沒有程式碼變更**，
-`**檔案**` 欄寫的是「無程式碼變更」。**這是正確狀態，不用補。**
-只是每次跑 `scripts/build_fix_by_file.py` 都會提醒你有 2 條，別被它嚇到。
-
 ---
 
 ## 3. 已知不修
@@ -110,7 +98,20 @@ UI 的東西 `analyze` 與單元測試都驗不到——見 `.agents/skills/rsho
 `game_list_controller: restoreFilters applies saved filters`。
 **單次隔離執行失敗不足以認定回歸**——我為此誤判過一次，連跑三次就會發現它自己會過。
 
-### 3.2 桌面平台的 7 個產生檔一直是未提交狀態
+### 3.2 自動選最快的那條路線：決定不做
+
+不是「還沒做」，是**做了會違反來源路由的不變式**——「同一台也當不同台」之下，
+替使用者換一條路等於替他換了一個來源。連不上時走**備援**已經涵蓋真正需要的情境。
+理由與重開條件見 `docs/FIX_LOGS.md` 的 `[R-Shop 自動選最快]`。
+
+### 3.3 `FIX_BY_FILE.md` 的「反查不到」不是待辦
+
+`build_fix_by_file.py` 印的 `entries without paths` **不用歸零**——環境診斷、部署作業、
+需求判定本來就沒有程式碼變更，在反查表上無處可去。這個數字會隨這類紀錄往上走
+（現在是 3）。腳本裡誤導的說明字串已改掉。
+見 `docs/FIX_LOGS.md` 的 `[R-Shop 反查不到]`。
+
+### 3.4 桌面平台的 7 個產生檔一直是未提交狀態
 
     linux/flutter/generated_plugin_registrant.{cc,h}
     linux/flutter/generated_plugins.cmake
