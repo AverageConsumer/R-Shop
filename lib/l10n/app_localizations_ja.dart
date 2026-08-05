@@ -1705,4 +1705,96 @@ class LJa extends L {
   String sources_removeConfirmMessage(String name) {
     return '「$name」を削除しますか？このソースの一覧はライブラリから消えますが、すでに端末にダウンロードしたゲームは残ります。';
   }
+
+  @override
+  String get sources_groupBadge => 'グループ';
+
+  @override
+  String get sources_groupCreate => '他のソースとグループにする…';
+
+  @override
+  String get sources_groupCreateHint => '実際には同じサーバーである 2 つのアドレス向け';
+
+  @override
+  String get sources_groupPickMember => 'グループにするソースを選択';
+
+  @override
+  String get sources_groupSameTypeOnly => '同じ種類のソースだけをグループにできます';
+
+  @override
+  String get sources_groupNoCandidates => '同じ種類のソースが他にありません';
+
+  @override
+  String get sources_groupManage => 'グループ設定';
+
+  @override
+  String get sources_groupRename => 'グループ名を変更';
+
+  @override
+  String get sources_groupNameLabel => 'グループ名';
+
+  @override
+  String get sources_groupModeTitle => 'どれを使うか';
+
+  @override
+  String get sources_groupModeAuto => '先に応答したもの';
+
+  @override
+  String get sources_groupModeAutoHint => '順序を管理する必要はありません。先に応答したアドレスが最も早く使えます';
+
+  @override
+  String get sources_groupModeOrdered => '自分の順序';
+
+  @override
+  String get sources_groupModeOrderedHint => '順序どおりに、最初に応答したものを使用';
+
+  @override
+  String get sources_groupPreferred => '第 1 候補';
+
+  @override
+  String get sources_groupAddMember => 'ソースを追加';
+
+  @override
+  String get sources_groupLeave => 'グループから外す';
+
+  @override
+  String sources_groupLeaveConfirm(String name) {
+    return '「$name」の一覧は残らず、同期し直す必要があります。共有の一覧はグループに残ります。';
+  }
+
+  @override
+  String get sources_groupLeaveTitle => 'グループから外しますか？';
+
+  @override
+  String get sources_groupDissolve => 'グループを解散';
+
+  @override
+  String sources_groupDissolveConfirm(String name) {
+    return '共有の一覧は「$name」に残り、他のソースは同期し直します。';
+  }
+
+  @override
+  String get sources_groupDissolveTitle => 'グループを解散しますか？';
+
+  @override
+  String sources_groupMembersCount(int count) {
+    return '$count 個のソース';
+  }
+
+  @override
+  String sources_groupUsing(String name) {
+    return '「$name」を使用中';
+  }
+
+  @override
+  String get sources_moveUp => '上へ移動';
+
+  @override
+  String get sources_moveDown => '下へ移動';
+
+  @override
+  String get sources_routeOrdered => '自分の順序';
+
+  @override
+  String get sources_routeOrderedHint => '順序どおりに、最初に応答した経路を使用';
 }

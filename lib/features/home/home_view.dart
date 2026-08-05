@@ -587,15 +587,27 @@ class _HomeViewState extends ConsumerState<HomeView>
     // Switched-off sources are not in the ring. The eye in the sources list is
     // what decides whether a library reaches this screen at all; stepping onto
     // one that was turned off would undo that with a trigger press.
-    final sources = ref
-        .read(sourcesProvider)
-        .sources
-        .where((s) => s.enabled)
-        .toList();
+    // A group is one server, so it is one stop on the ring: stepping through
+    // its members would walk the user through several views of the same
+    // library — the "third library nobody asked for" problem, one level up.
+    final cfg = ref.read(bootstrappedConfigProvider).valueOrNull;
+    final sources = cfg?.collapsedSources() ??
+        ref
+            .read(sourcesProvider)
+            .sources
+            .where((s) => s.enabled)
+            .toList();
     if (sources.isEmpty) return;
 
     final current = ref.read(sourcesProvider).activeSourceId;
-    final currentPos = sources.indexWhere((s) => s.id == current);
+    // The selected member may not be the one representing its group, so match
+    // by group first — otherwise the ring restarts from the beginning every
+    // time the group is showing through a different member.
+    final currentGroup =
+        current == null ? null : cfg?.groupContaining(current);
+    final currentPos = currentGroup != null
+        ? sources.indexWhere((s) => currentGroup.contains(s.id))
+        : sources.indexWhere((s) => s.id == current);
     // Nothing selected, or a dangling id: the first press lands on a source
     // rather than stepping off nowhere.
     final nextPos = currentPos < 0
@@ -642,7 +654,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     // ones" has to be there to answer it. Only an empty screen drops it, and
     // then as SizedBox.shrink — a genuine zero-height row rather than a blank
     // one, so nothing below shifts by a line depending on state.
-    final visible =
+    final visible = cfg?.collapsedSources() ??
         sources.where((s) => s.enabled).toList(growable: false);
     if (standIn == null && visible.isEmpty) return const SizedBox.shrink();
 
@@ -652,9 +664,16 @@ class _HomeViewState extends ConsumerState<HomeView>
     // join with a separator.
     final named = active ?? (visible.length == 1 ? visible.single : null);
     if (standIn == null && named == null) return const SizedBox.shrink();
+    // Inside a group the banner names the member that is really answering —
+    // "which server am I looking at" has to have a server for an answer, not
+    // the group's label.
+    final group = named == null ? null : cfg?.groupContaining(named.id);
+    // A stand-in is now always a member of the same group, so it is named the
+    // same way: "using X" says which server answered without implying the
+    // user's choice moved.
     final name = standIn != null
-        ? '${standIn.name}（${l.sources_fallbackShort}）'
-        : named!.name;
+        ? l.sources_groupUsing(standIn.name)
+        : (group != null ? l.sources_groupUsing(named!.name) : named!.name);
     // Green means "this is also the source in use" — what a sync would talk
     // to. Browsing off it with the triggers greys the strip, so it is visible
     // at a glance that the library on screen is not the one being kept up to

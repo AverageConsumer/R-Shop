@@ -227,6 +227,20 @@ cache_owner_id  TEXT NOT NULL DEFAULT ''    -- 這份清單屬於誰 ← 唯一�
 **R-Shop 來源備援**、**備援接進同步**、**連線方式共用憑證** 五條 —— 檔案清單在那裡，
 不要重新搜尋。
 
-UI 那一面另見 `rshop-touch-and-gamepad`：這個功能的四個浮層
-（endpoint picker、fallback picker、actions overlay、type picker）
-**每一個都曾經是觸控死的**。
+## 畫面（2026-08-05 群組完成後）
+
+    群組編輯          lib/features/sources/group_picker_overlay.dart
+                      未分組＝可選的同類型來源；已分組＝兩種模式＋成員（可排序、可退出）＋解散
+    連線方式浮層      多一列「照我排的順序」。點某條路線一律是**釘選＝覆寫**，
+                      跟 ordered 是兩件事，不能共用同一個手勢
+    來源卡片          顯示「群組 · 名字」；「備援 → X」已經不存在
+    主畫面            collapsedSources()：一個群組只佔 L2/R2 的一格；
+                      橫幅寫「目前使用「某台」」，講的是實際在答的那一台
+
+`fallback_picker_overlay.dart` **已刪除**。「備援」這個詞在畫面上不該再出現，
+`sources_setFallback` / `sources_fallbackNone` 兩個字串已無人使用。
+
+UI 那一面另見 `rshop-touch-and-gamepad`：這個功能的浮層
+（endpoint picker、group picker、actions overlay、type picker）
+**每一個都曾經是觸控死的**。群組浮層一開始就配了 widget 測試盯著每一列可點，
+成員排序是「角落小圖示（觸控）＋ `[X]`／`[Y]`（手把）」，路線排序是 ◀ ▶ ＋角落箭頭。

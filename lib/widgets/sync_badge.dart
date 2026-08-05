@@ -60,8 +60,11 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
   String? _withSource(BuildContext context, String? systemName) {
     final src = ref.watch(syncingSourceProvider);
     if (src == null) return systemName;
+    // A stand-in is a member of the same group as the one the user picked, so
+    // it is named the way the home banner names it: which server answered,
+    // without implying their choice moved.
     final label = src.isFallback
-        ? '${src.name}（${L.of(context).sources_fallbackShort}）'
+        ? L.of(context).sources_groupUsing(src.name)
         : src.name;
     return systemName == null || systemName.isEmpty
         ? label

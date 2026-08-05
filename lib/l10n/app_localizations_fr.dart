@@ -1766,4 +1766,101 @@ class LFr extends L {
   String sources_removeConfirmMessage(String name) {
     return 'Supprimer « $name » ? Sa liste disparaît de la bibliothèque, mais les jeux déjà téléchargés sur cet appareil sont conservés.';
   }
+
+  @override
+  String get sources_groupBadge => 'Groupe';
+
+  @override
+  String get sources_groupCreate => 'Grouper avec une autre source…';
+
+  @override
+  String get sources_groupCreateHint =>
+      'Pour deux adresses qui sont en réalité le même serveur';
+
+  @override
+  String get sources_groupPickMember => 'Choisissez la source à grouper';
+
+  @override
+  String get sources_groupSameTypeOnly =>
+      'Seules des sources du même type peuvent être groupées';
+
+  @override
+  String get sources_groupNoCandidates => 'Aucune autre source de ce type';
+
+  @override
+  String get sources_groupManage => 'Réglages du groupe';
+
+  @override
+  String get sources_groupRename => 'Renommer le groupe';
+
+  @override
+  String get sources_groupNameLabel => 'Nom du groupe';
+
+  @override
+  String get sources_groupModeTitle => 'Quel membre utiliser';
+
+  @override
+  String get sources_groupModeAuto => 'Le premier qui répond';
+
+  @override
+  String get sources_groupModeAutoHint =>
+      'Aucun ordre à tenir : l\'adresse qui répond en premier est la première utilisable';
+
+  @override
+  String get sources_groupModeOrdered => 'Mon ordre';
+
+  @override
+  String get sources_groupModeOrderedHint =>
+      'Prend le premier de votre ordre qui répond';
+
+  @override
+  String get sources_groupPreferred => 'Premier choix';
+
+  @override
+  String get sources_groupAddMember => 'Ajouter une source';
+
+  @override
+  String get sources_groupLeave => 'Quitter le groupe';
+
+  @override
+  String sources_groupLeaveConfirm(String name) {
+    return '« $name » ne garde aucun jeu et devra se synchroniser à nouveau. La liste partagée reste au groupe.';
+  }
+
+  @override
+  String get sources_groupLeaveTitle => 'Quitter le groupe ?';
+
+  @override
+  String get sources_groupDissolve => 'Dissoudre le groupe';
+
+  @override
+  String sources_groupDissolveConfirm(String name) {
+    return 'La liste partagée reste à « $name » ; les autres devront se synchroniser à nouveau.';
+  }
+
+  @override
+  String get sources_groupDissolveTitle => 'Dissoudre le groupe ?';
+
+  @override
+  String sources_groupMembersCount(int count) {
+    return '$count sources';
+  }
+
+  @override
+  String sources_groupUsing(String name) {
+    return 'Utilise « $name »';
+  }
+
+  @override
+  String get sources_moveUp => 'Monter';
+
+  @override
+  String get sources_moveDown => 'Descendre';
+
+  @override
+  String get sources_routeOrdered => 'Mon ordre';
+
+  @override
+  String get sources_routeOrderedHint =>
+      'Utiliser la première route de votre ordre qui répond';
 }

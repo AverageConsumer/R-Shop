@@ -94,9 +94,15 @@ class _EndpointPickerOverlayState
     super.dispose();
   }
 
-  /// Row 0 is "Automatic"; rows 1..n are the routes; then "add"; then cancel.
-  int get _rowCount => widget.source.endpoints.length + 3;
-  int get _addIndex => widget.source.endpoints.length + 1;
+  /// Row 0 is "Automatic", row 1 is "my order"; rows 2..n+1 are the routes;
+  /// then "add"; then cancel.
+  ///
+  /// `ordered` needs a row of its own because tapping a route means "pin this
+  /// one" — an override — and following the list is the opposite of that.
+  int get _rowCount => widget.source.endpoints.length + 4;
+  int get _orderedIndex => 1;
+  int get _firstRouteIndex => 2;
+  int get _addIndex => widget.source.endpoints.length + 2;
   int get _cancelIndex => _rowCount - 1;
 
   /// The cursor, clamped to the rows that exist *now*. Removing a route
@@ -137,6 +143,18 @@ class _EndpointPickerOverlayState
     // switching — the thing you do constantly — stays a single press. Both go
     // through the same methods the per-row icons call, so the two inputs can
     // never drift apart.
+    // ◀ ▶ move the highlighted route up and down the list. The order is only
+    // a setting in `ordered` mode, but it is stored in every mode, so letting
+    // it be arranged before switching modes is what makes the mode usable the
+    // moment it is picked.
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _moveHighlighted(-1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      _moveHighlighted(1);
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.gameButtonX) {
       _removeHighlighted();
       return KeyEventResult.handled;
@@ -150,7 +168,7 @@ class _EndpointPickerOverlayState
 
   /// The route under the cursor, or null when the cursor is on a non-route row.
   SourceEndpoint? get _highlightedEndpoint {
-    final i = _sel - 1;
+    final i = _sel - _firstRouteIndex;
     if (i < 0 || i >= widget.source.endpoints.length) return null;
     return widget.source.endpoints[i];
   }
@@ -169,6 +187,22 @@ class _EndpointPickerOverlayState
   }
 
   Future<void> _removeHighlighted() => _remove(_highlightedEndpoint);
+
+  /// Moves the highlighted route [delta] places, and follows it with the
+  /// cursor so a second press moves the same route again.
+  Future<void> _moveHighlighted(int delta) async {
+    final ep = _highlightedEndpoint;
+    if (ep == null) return;
+    final from = widget.source.endpoints.indexWhere((e) => e.id == ep.id);
+    final to = from + delta;
+    if (from < 0 || to < 0 || to >= widget.source.endpoints.length) return;
+    ref.read(feedbackServiceProvider).tick();
+    await ref
+        .read(sourcesProvider.notifier)
+        .moveEndpointTo(widget.source.id, ep.id, to, probe: _probeService);
+    if (!mounted) return;
+    setState(() => _selectedIndex = _sel + delta);
+  }
   Future<void> _editHighlighted() => _edit(_highlightedEndpoint);
 
   Future<void> _remove(SourceEndpoint? ep) async {
@@ -247,8 +281,10 @@ class _EndpointPickerOverlayState
       // stopped asking for, which reads as the button having done nothing.
       // The probe behind this hits the cache filled when the overlay opened.
       await notifier.clearEndpointOverride(id, probe: _probeService);
+    } else if (_sel == _orderedIndex) {
+      await notifier.useOrderedSelection(id, probe: _probeService);
     } else {
-      final ep = widget.source.endpoints[_sel - 1];
+      final ep = widget.source.endpoints[_sel - _firstRouteIndex];
       await notifier.switchEndpoint(id, ep.id, pin: true);
     }
     if (!mounted) return;
@@ -443,6 +479,19 @@ class _EndpointPickerOverlayState
         onTap: () => _tapRow(0),
         active: isAuto,
       ),
+      const SizedBox(height: 8),
+      _RouteRow(
+        icon: Icons.format_list_numbered,
+        title: l.sources_routeOrdered,
+        subtitle: l.sources_routeOrderedHint,
+        badges: [
+          if (src.endpointSelection == EndpointSelection.ordered)
+            l.sources_routeInUse
+        ],
+        selected: _sel == _orderedIndex,
+        onTap: () => _tapRow(_orderedIndex),
+        active: src.endpointSelection == EndpointSelection.ordered,
+      ),
       for (int i = 0; i < src.endpoints.length; i++) ...[
         const SizedBox(height: 8),
         _RouteRow(
@@ -453,17 +502,30 @@ class _EndpointPickerOverlayState
           status: _statusFor(src.endpoints[i], l),
           statusOk: _results?.contains(src.endpoints[i].id),
           badges: _badgesFor(src.endpoints[i], l),
-          selected: _sel == i + 1,
-          onTap: () => _tapRow(i + 1),
+          selected: _sel == i + _firstRouteIndex,
+          onTap: () => _tapRow(i + _firstRouteIndex),
+          // Touch counterpart of ◀ ▶.
+          onMoveUp: i > 0
+              ? () {
+                  setState(() => _selectedIndex = i + _firstRouteIndex);
+                  _moveHighlighted(-1);
+                }
+              : null,
+          onMoveDown: i < src.endpoints.length - 1
+              ? () {
+                  setState(() => _selectedIndex = i + _firstRouteIndex);
+                  _moveHighlighted(1);
+                }
+              : null,
           // Touch counterparts of [Y] and [X]. Without them the only way to
           // edit or remove a route is the gamepad, because a tap on the row
           // itself switches to it and closes the overlay.
           onEdit: () {
-            setState(() => _selectedIndex = i + 1);
+            setState(() => _selectedIndex = i + _firstRouteIndex);
             _edit(src.endpoints[i]);
           },
           onRemove: () {
-            setState(() => _selectedIndex = i + 1);
+            setState(() => _selectedIndex = i + _firstRouteIndex);
             _remove(src.endpoints[i]);
           },
           editLabel: l.sources_editRoute,
@@ -513,6 +575,8 @@ class _RouteRow extends StatelessWidget {
     this.onTap,
     this.onEdit,
     this.onRemove,
+    this.onMoveUp,
+    this.onMoveDown,
     this.editLabel,
     this.removeLabel,
   });
@@ -527,6 +591,11 @@ class _RouteRow extends StatelessWidget {
   /// the pencil does not also switch to the route.
   final VoidCallback? onEdit;
   final VoidCallback? onRemove;
+
+  /// Touch equivalents of ◀ ▶. Null at the ends of the list, so the arrows
+  /// never offer a move that does nothing.
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
   final String? editLabel;
   final String? removeLabel;
 
@@ -637,6 +706,16 @@ class _RouteRow extends StatelessWidget {
               ),
             ),
           ],
+          if (onMoveUp != null)
+            _RowAction(
+              icon: Icons.keyboard_arrow_up,
+              onTap: onMoveUp!,
+            ),
+          if (onMoveDown != null)
+            _RowAction(
+              icon: Icons.keyboard_arrow_down,
+              onTap: onMoveDown!,
+            ),
           if (onEdit != null)
             _RowAction(
               icon: Icons.edit_outlined,

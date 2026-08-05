@@ -25,7 +25,7 @@ import '../../widgets/console_notification.dart';
 import '../onboarding/widgets/romm_legacy_login_screen.dart';
 import '../pairing/qr_pairing_screen.dart';
 import '../sources/endpoint_picker_overlay.dart';
-import '../sources/fallback_picker_overlay.dart';
+import '../sources/group_picker_overlay.dart';
 import '../sources/manual_source_add_screen.dart';
 import '../sources/source_mappings_screen.dart';
 
@@ -75,9 +75,9 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// and the toggle needed a second press to take. One source of truth.
   String? get _primarySourceId => ref.read(sourcesProvider).primarySourceId;
 
-  /// Set while the fallback picker is open, held by id so the overlay always
+  /// Set while the group editor is open, held by id so the overlay always
   /// renders the freshest source.
-  String? _fallbackPickerSourceId;
+  String? _groupPickerSourceId;
 
   /// Which card the gamepad is sitting on. The list-level shortcuts act on
   /// this source, and the HUD reads its state — the disable hint has to say
@@ -475,18 +475,18 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _routePickerSourceId = null);
   }
 
-  /// Hands off from the actions overlay to the fallback picker, closing the
+  /// Hands off from the actions overlay to the group editor, closing the
   /// former first so only one dialog-priority scope is ever live.
-  void _pickFallback(Source source) {
+  void _editGroup(Source source) {
     setState(() {
       _activeActionsSource = null;
-      _fallbackPickerSourceId = source.id;
+      _groupPickerSourceId = source.id;
     });
   }
 
-  void _closeFallbackPicker() {
-    if (_fallbackPickerSourceId == null) return;
-    setState(() => _fallbackPickerSourceId = null);
+  void _closeGroupPicker() {
+    if (_groupPickerSourceId == null) return;
+    setState(() => _groupPickerSourceId = null);
   }
 
   /// Designates the source in use — what syncs, and what the home screen
@@ -720,8 +720,11 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                 onToggleActive: () =>
                     _toggleActiveSource(_activeActionsSource!),
                 hasOtherSources: state.sources.length > 1,
-                onPickFallback: () =>
-                    _pickFallback(_activeActionsSource!),
+                onEditGroup: () => _editGroup(_activeActionsSource!),
+                groupName: ref
+                    .watch(sourcesProvider)
+                    .groupContaining(_activeActionsSource!.id)
+                    ?.name,
               ),
             if (_showTypePicker)
               _SourceTypePickerOverlay(
@@ -745,18 +748,18 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                   );
                 },
               ),
-            if (_fallbackPickerSourceId != null)
+            if (_groupPickerSourceId != null)
               Builder(
                 builder: (context) {
                   final src = ref
                       .watch(sourcesProvider)
                       .sources
-                      .where((s) => s.id == _fallbackPickerSourceId)
+                      .where((s) => s.id == _groupPickerSourceId)
                       .firstOrNull;
                   if (src == null) return const SizedBox.shrink();
-                  return FallbackPickerOverlay(
+                  return GroupPickerOverlay(
                     source: src,
-                    onClose: _closeFallbackPicker,
+                    onClose: _closeGroupPicker,
                   );
                 },
               ),
@@ -1208,18 +1211,19 @@ class _SourceCard extends ConsumerWidget {
                           ),
                         ),
                       ],
-                      // Naming the stand-in on the card is the only way to
-                      // tell a configured pairing from an unconfigured one.
-                      if (source.fallbackSourceId != null) ...[
+                      // Naming the group on the card is the only way to tell
+                      // a grouped source from a lone one at a glance.
+                      if (ref
+                              .watch(sourcesProvider)
+                              .groupContaining(source.id) !=
+                          null) ...[
                         const SizedBox(width: 6),
                         Builder(
                           builder: (context) {
-                            final target = ref
+                            final group = ref
                                 .watch(sourcesProvider)
-                                .sources
-                                .where((s) => s.id == source.fallbackSourceId)
-                                .firstOrNull;
-                            if (target == null) return const SizedBox.shrink();
+                                .groupContaining(source.id);
+                            if (group == null) return const SizedBox.shrink();
                             return Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 2),
@@ -1228,7 +1232,7 @@ class _SourceCard extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
-                                '${L.of(context).sources_fallbackShort} → ${target.name}',
+                                '${L.of(context).sources_groupBadge} · ${group.name}',
                                 style: const TextStyle(
                                   color: Colors.white54,
                                   fontSize: 9,
@@ -1393,7 +1397,8 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
     required this.onPickRoute,
     required this.onToggleActive,
     required this.isActive,
-    required this.onPickFallback,
+    required this.onEditGroup,
+    this.groupName,
     required this.hasOtherSources,
   });
 
@@ -1406,7 +1411,11 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
   final VoidCallback onPickRoute;
   final VoidCallback onToggleActive;
   final bool isActive;
-  final VoidCallback onPickFallback;
+  final VoidCallback onEditGroup;
+
+  /// The group this source is in, if any — the menu says "group settings"
+  /// rather than "group with…" once there is one.
+  final String? groupName;
   final bool hasOtherSources;
 
   @override
@@ -1442,11 +1451,16 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
       // menu is for things that need a screen of their own.
       //
       // Only meaningful once there is another source to stand in.
+      // Grouping replaced the old one-way fallback: the user declares that
+      // several sources are one server, and the group decides which of them
+      // answers. Only offered when there is another source to group with.
       if (widget.hasOtherSources)
         _OverlayAction(
-          icon: Icons.swap_horiz,
-          label: l.sources_setFallback,
-          onActivate: widget.onPickFallback,
+          icon: Icons.workspaces_outline,
+          label: widget.groupName == null
+              ? l.sources_groupCreate
+              : l.sources_groupManage,
+          onActivate: widget.onEditGroup,
         ),
       // Offered whenever the source has an address at all — with a single
       // route the picker still shows which one is live and why.

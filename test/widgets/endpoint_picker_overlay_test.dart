@@ -195,4 +195,37 @@ void main() {
 
     await _teardown(tester, overrides);
   });
+
+  testWidgets('the order row is offered next to automatic, and is tappable',
+      (tester) async {
+    // Tapping a route means "pin this one" — an override. Following the list
+    // is the opposite of that, so it needs a row of its own rather than being
+    // hidden behind the same gesture.
+    final overrides = await _overrides([_source]);
+
+    await tester.pumpWidget(createTestAppWithProviders(
+      EndpointPickerOverlay(
+        source: _source,
+        onClose: () {},
+        probeService: _probe(),
+      ),
+      size: const Size(640, 480),
+      overrides: overrides,
+    ));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('My order'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('My order'),
+        matching: find.byType(GestureDetector),
+      ),
+      findsAtLeastNWidgets(1),
+    );
+    // Reordering by finger, so the order is not a gamepad-only setting.
+    expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
+    expect(find.byIcon(Icons.keyboard_arrow_up), findsOneWidget);
+
+    await _teardown(tester, overrides);
+  });
 }

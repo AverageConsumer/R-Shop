@@ -62,6 +62,7 @@
 | **R-Shop onboarding 五語系缺字串** | `DE has all EN keys` 長期紅——**是真的缺三個 onboarding 字串**（de/es/fr/ja/pt），不是環境問題。缺字串不會讓建置失敗，會出貨成空白 | `lib/l10n/app_{de,es,fr,ja,pt}.arb` · `test/l10n_completeness_test.dart` |
 | **R-Shop analyze 六項** | 累積的 6 個 analyze 問題（未用 import／未用區域變數／`cacheExtent` 已棄用）。`cacheExtent` 要換 `ScrollCacheExtent.pixels()` 而非 `.viewport()`，**單位不同** | `lib/features/game_list/widgets/game_grid.dart` · `lib/features/library/library_screen.dart` · `lib/widgets/console_dialog.dart` · `lib/features/onboarding/widgets/{romm_legacy_login_screen,welcome_chooser_step}.dart` · `lib/features/sources/manual_source_add_screen.dart` |
 | **R-Shop 反查不到** | `build_fix_by_file.py` 報的 `entries without paths` **不是待辦**——沒動到檔的紀錄在反查表上無處可去，數字只會隨這類紀錄往上走 | `scripts/build_fix_by_file.py`（改掉誤導的說明字串） |
+| **R-Shop 來源群組** ✨ | 「備援」被**群組**取代：使用者宣告幾個來源是同一台伺服器，模式 `auto`（誰先回應）／`ordered`（照他的順序）。**一個群組只存一份清單**（schema v16 `cache_owner_id`）；加入＝合併去重、退出＝那個來源什麼都不留要重新同步 | `lib/services/database_service.dart`（v16、`adoptCacheInto`／`moveCacheOwnership`／`releaseCacheFrom`） · `lib/models/config/app_config.dart`（`SourceGroup`、`cacheOwnerIdFor`、`collapsedSources`、`sanitizeGroups`） · `lib/services/sources_notifier.dart`（群組 CRUD） · `lib/services/source_failover.dart`（`chooseSource` 不再讀 `fallbackSourceId`） · `lib/features/sources/group_picker_overlay.dart`（取代 `fallback_picker_overlay.dart`） · `lib/features/sources/endpoint_picker_overlay.dart`（`ordered` 那一列） · `lib/features/home/home_view.dart`（群組只佔一格） · `lib/l10n/app_*.arb` |
 
 ---
 

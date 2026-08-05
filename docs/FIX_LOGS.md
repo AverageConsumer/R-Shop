@@ -453,3 +453,21 @@
 **`.pixels()` 不是 `.viewport()`，這個選擇有理由。** Flutter 3.41 起 `cacheExtent`（double，邏輯像素）換成 `ScrollCacheExtent`，兩個 factory 的**單位不同**：`.pixels(double)` 與舊的完全等價，`.viewport(double)` 是 viewport 主軸長度的倍數。這兩處的值來自 `device_info_service.dart` 依記憶體分級算出的像素值（格線 200/400/600、圖書館 300/600/800），**本來就是以像素為單位設計的**，換成 `.viewport()` 會把分級意圖整個破壞掉。SDK 自己的相容轉接也是 `ScrollCacheExtent.pixels(cacheExtent!)`。
 
 **`console_dialog.dart` 刪掉未使用的 `rs` 之後，`responsive.dart` 的 import 跟著變成未使用**——只清一半會換來一個新 warning。焦點白框的樣式完全沒動：那份樣式同時存在於這個檔與 `core/widgets/console_focusable.dart`，**動一邊就會兩邊不同步**（`AGENTS.md` §3）。
+
+## [R-Shop 來源群組] 「備援」換成群組：幾個來源是同一台，就只有一份清單
+
+- **問題**：使用者要的不是備援。他的話是「應該不是備援 而是 我想指定兩個來源 其實是指向同一台伺服器，那它們可以選擇誰優先 或著自動」「應該是設成群組」「因為同一群組 應該實際是同一台之類 所以清單也只需要一份」。舊的 `fallbackSourceId` 是單向配對，他上一輪就抱怨過功能重複（「不覺得功能重複了嗎?」）。
+- **修復**：`SourceGroup`（成員有序、模式 `auto`／`ordered`）取代備援；`games` 表加 `cache_owner_id`，唯一鍵從來源改成擁有者，一個群組只存一份清單；notifier 補齊群組 CRUD，每個動作都同時把快取安置好；畫面上「備援」整個消失，換成群組編輯浮層與連線方式浮層的「照我排的順序」。
+- **檔案**：`lib/models/config/app_config.dart`（`SourceGroup`／`sourceGroupsFromFallbacks`／`sanitizeGroups`／`cacheOwnerIdFor`／`collapsedSources`） · `lib/services/database_service.dart`（schema v16、`_collapseDuplicates`、`adoptCacheInto`／`moveCacheOwnership`／`releaseCacheFrom`、`purgeOrDetachSource` 的 `protectedOwnerIds`） · `lib/services/sources_notifier.dart`（群組 CRUD、`ordered` 分支、`reorderEndpoints`／`moveEndpointTo`／`useOrderedSelection`） · `lib/services/source_failover.dart`（`chooseSource`／`resolveForSync` 走群組） · `lib/services/endpoint_probe_service.dart`（`resolve()`） · `lib/features/sources/group_picker_overlay.dart`（新增，取代刪掉的 `fallback_picker_overlay.dart`） · `lib/features/sources/endpoint_picker_overlay.dart` · `lib/features/settings/sources_screen.dart` · `lib/features/home/home_view.dart` · `lib/widgets/sync_badge.dart` · `lib/features/game_list/{game_list_screen.dart,logic/game_list_controller.dart}` · `lib/services/library_sync_service.dart` · `lib/l10n/app_{de,en,es,fr,ja,pt,zh}.arb` · `test/{database_service_v16_migration,sources_notifier_groups,widgets/group_picker_overlay}_test.dart`
+
+**遷移為什麼一列都不刪。** v16 只加欄位、把 `cache_owner_id` 從 `source_id` 一對一補上、換索引。合併留給 `adoptCacheInto`，因為群組住在設定檔裡、資料庫層讀不到——在遷移裡猜使用者分了哪些群組，就是憑猜測刪列。舊的配對照樣自動變成群組，但那發生在 `AppConfig.fromJson`（`sourceGroupsFromFallbacks`），而且群組的擁有者就是配對的排頭，所以既有安裝**一次也不用重新同步**。
+
+**去重判準沒有另發明。** `_v15OnDeviceRank` 改名 `_onDeviceRank`（現在不只 v15 用），規則照舊：已經下載到機器上的那一列贏，因為那是使用者真的擁有的東西，遠端的重抓就有。合併時會**暫時 drop 唯一索引**再重建——重建就是驗證，還有殘留就整筆 rollback，不會留下半合併的圖書館。
+
+**移出群組什麼都拿不到，是刻意的。** 合併之後沒有任何欄位記得哪一筆是哪個成員先看到的，而「這個問題不重要」正是群組的前提。所以要嘛騙人地平分，要嘛老實讓它重新同步——選後者，並且 UI 一定要先問。
+
+**刪掉群組成員時的連坐。** `purgeOrDetachSource` 是用 `provider_config` 的 JSON 比對的，刪掉的成員名字還印在那些列上，即使 `source_id` 已經改蓋成擁有者。所以多了 `protectedOwnerIds`：屬於還活著的群組的列不准動。順便修掉一個舊的過度殺傷——那兩個 UPDATE／DELETE 只比對 `(systemSlug, filename)`，會連別的來源同名遊戲一起清掉。
+
+**群組是對稱的，舊配對是單向的。** 這讓兩個舊測試的前提失效：以前「wan 沒有備援所以原地不動」，現在 wan 和 lan 同在一個群組，選誰都是選那個群組，偏好一律是群組的排頭。測試改成「不在群組裡的來源才原地不動」，另外補一條把新語意釘住。
+
+**兩套入口都做了。** 群組浮層每一列都能點，成員順序有角落的上下箭頭（觸控）也綁 `[X]`／`[Y]`（手把）；連線方式浮層的「照我排的順序」是自己一列（點某條路線一律是釘選＝覆寫，兩件事不能共用同一個手勢），路線順序用 ◀ ▶ 與角落箭頭。這一塊的四個浮層每一個都曾經是觸控死的，所以新的那個一開始就補了 widget 測試盯著。
