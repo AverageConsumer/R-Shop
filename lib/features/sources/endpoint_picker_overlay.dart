@@ -7,13 +7,22 @@ import '../../l10n/app_localizations.dart';
 import '../../models/config/source.dart';
 import '../../providers/app_providers.dart';
 import '../../services/endpoint_probe_service.dart';
+import '../../widgets/console_hud.dart';
 import 'endpoint_edit_screen.dart';
 
 /// Lets the user pick which way to reach a source — the same RomM server over
 /// the LAN or over the internet, an SMB share direct or via VPN.
 ///
-/// Picking a route pins it: an explicit choice should not be moved by the next
-/// probe. "Automatic" releases the pin and lets reachability decide again.
+/// Every route is probed on its own and the result is shown as a **latency**,
+/// not as a yes/no: when two routes both answer, "both reachable" is not an
+/// answer to the question the user is actually asking, which is which one to
+/// take. The row the machine would take on its own is named on the automatic
+/// row, so leaving the choice to it is an informed decision rather than a
+/// leap.
+///
+/// Picking a route pins it — an explicit choice must not be moved by the next
+/// probe. The automatic row hands the choice back ([clearEndpointOverride]),
+/// which drops the pin *and* immediately moves to the fastest live route.
 /// **Switching never touches cached games** — see [SourcesNotifier].
 ///
 /// Reachability is probed fresh every time this opens rather than read from
@@ -44,9 +53,15 @@ class _EndpointPickerOverlayState
   final FocusNode _scopeFocus = FocusNode(debugLabel: 'endpoint_picker');
   int _selectedIndex = 0;
 
+  /// One service for the whole overlay, and the same one handed to the
+  /// notifier: it caches, so the automatic row does not pay for a second probe
+  /// of the routes we measured a moment ago while the user watched.
+  late final EndpointProbeService _probeService =
+      widget.probeService ?? EndpointProbeService();
+
   /// null while the probe is in flight, so the UI can say "checking" rather
   /// than claiming every route is dead.
-  Set<String>? _reachable;
+  ProbeResults? _results;
 
   /// Shown when an action was refused, e.g. removing the only route.
   String? _error;
@@ -68,10 +83,9 @@ class _EndpointPickerOverlayState
   }
 
   Future<void> _probe() async {
-    final svc = widget.probeService ?? EndpointProbeService();
-    final result = await svc.reachableFor(widget.source);
+    final result = await _probeService.probeFor(widget.source);
     if (!mounted) return;
-    setState(() => _reachable = result);
+    setState(() => _results = result);
   }
 
   @override
@@ -85,6 +99,11 @@ class _EndpointPickerOverlayState
   int get _addIndex => widget.source.endpoints.length + 1;
   int get _cancelIndex => _rowCount - 1;
 
+  /// The cursor, clamped to the rows that exist *now*. Removing a route
+  /// shortens the list under the cursor, and an index left dangling past the
+  /// end would make [A] hit nothing at all.
+  int get _sel => _selectedIndex.clamp(0, _rowCount - 1);
+
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
@@ -92,13 +111,13 @@ class _EndpointPickerOverlayState
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.arrowUp) {
       setState(() {
-        _selectedIndex = (_selectedIndex - 1 + _rowCount) % _rowCount;
+        _selectedIndex = (_sel - 1 + _rowCount) % _rowCount;
       });
       ref.read(feedbackServiceProvider).tick();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      setState(() => _selectedIndex = (_selectedIndex + 1) % _rowCount);
+      setState(() => _selectedIndex = (_sel + 1) % _rowCount);
       ref.read(feedbackServiceProvider).tick();
       return KeyEventResult.handled;
     }
@@ -111,12 +130,13 @@ class _EndpointPickerOverlayState
     if (key == LogicalKeyboardKey.gameButtonB ||
         key == LogicalKeyboardKey.escape ||
         key == LogicalKeyboardKey.goBack) {
-      ref.read(feedbackServiceProvider).cancel();
-      widget.onClose();
+      _close();
       return KeyEventResult.handled;
     }
     // [X] removes and [Y] edits the highlighted route. Kept off [A] so that
-    // switching — the thing you do constantly — stays a single press.
+    // switching — the thing you do constantly — stays a single press. Both go
+    // through the same methods the per-row icons call, so the two inputs can
+    // never drift apart.
     if (key == LogicalKeyboardKey.gameButtonX) {
       _removeHighlighted();
       return KeyEventResult.handled;
@@ -130,13 +150,28 @@ class _EndpointPickerOverlayState
 
   /// The route under the cursor, or null when the cursor is on a non-route row.
   SourceEndpoint? get _highlightedEndpoint {
-    final i = _selectedIndex - 1;
+    final i = _sel - 1;
     if (i < 0 || i >= widget.source.endpoints.length) return null;
     return widget.source.endpoints[i];
   }
 
-  Future<void> _removeHighlighted() async {
-    final ep = _highlightedEndpoint;
+  void _close() {
+    ref.read(feedbackServiceProvider).cancel();
+    widget.onClose();
+  }
+
+  /// Touch entry point for every row: move the cursor there first, so a tap
+  /// leaves the overlay in the state a gamepad user would have put it in, then
+  /// run the identical activation path.
+  void _tapRow(int index) {
+    setState(() => _selectedIndex = index);
+    _activate();
+  }
+
+  Future<void> _removeHighlighted() => _remove(_highlightedEndpoint);
+  Future<void> _editHighlighted() => _edit(_highlightedEndpoint);
+
+  Future<void> _remove(SourceEndpoint? ep) async {
     if (ep == null) return;
     final removed = await ref
         .read(sourcesProvider.notifier)
@@ -156,12 +191,13 @@ class _EndpointPickerOverlayState
     });
   }
 
-  Future<void> _editHighlighted() async {
-    final ep = _highlightedEndpoint;
+  Future<void> _edit(SourceEndpoint? ep) async {
     if (ep == null) return;
     ref.read(feedbackServiceProvider).confirm();
+    final notifier = ref.read(sourcesProvider.notifier);
+    final navigator = Navigator.of(context);
     widget.onClose();
-    final edited = await Navigator.of(context).push<SourceEndpoint?>(
+    final edited = await navigator.push<SourceEndpoint?>(
       MaterialPageRoute(
         builder: (_) => EndpointEditScreen(
           sourceType: widget.source.type,
@@ -171,9 +207,7 @@ class _EndpointPickerOverlayState
       ),
     );
     if (edited != null) {
-      await ref
-          .read(sourcesProvider.notifier)
-          .updateEndpoint(widget.source.id, edited);
+      await notifier.updateEndpoint(widget.source.id, edited);
     }
   }
 
@@ -181,19 +215,19 @@ class _EndpointPickerOverlayState
     final notifier = ref.read(sourcesProvider.notifier);
     final id = widget.source.id;
 
-    if (_selectedIndex == _cancelIndex) {
-      ref.read(feedbackServiceProvider).cancel();
-      widget.onClose();
+    if (_sel == _cancelIndex) {
+      _close();
       return;
     }
     ref.read(feedbackServiceProvider).confirm();
 
-    if (_selectedIndex == _addIndex) {
+    if (_sel == _addIndex) {
       // Close first: the editor is a route (Navigator) and leaving a
       // dialog-priority overlay mounted underneath it would keep swallowing
       // the gamepad keys the editor needs.
+      final navigator = Navigator.of(context);
       widget.onClose();
-      final created = await Navigator.of(context).push<SourceEndpoint?>(
+      final created = await navigator.push<SourceEndpoint?>(
         MaterialPageRoute(
           builder: (_) => EndpointEditScreen(
             sourceType: widget.source.type,
@@ -207,21 +241,55 @@ class _EndpointPickerOverlayState
       return;
     }
 
-    if (_selectedIndex == 0) {
-      await notifier.setEndpointSelection(id, EndpointSelection.auto);
+    if (_sel == 0) {
+      // Hand the choice back *and* act on it in one press: dropping the pin
+      // alone would leave the source sitting on the route the user just
+      // stopped asking for, which reads as the button having done nothing.
+      // The probe behind this hits the cache filled when the overlay opened.
+      await notifier.clearEndpointOverride(id, probe: _probeService);
     } else {
-      final ep = widget.source.endpoints[_selectedIndex - 1];
+      final ep = widget.source.endpoints[_sel - 1];
       await notifier.switchEndpoint(id, ep.id, pin: true);
     }
+    if (!mounted) return;
     widget.onClose();
   }
 
-  String? _statusFor(SourceEndpoint ep, L l) {
-    final reachable = _reachable;
-    if (reachable == null) return l.sources_routeChecking;
-    return reachable.contains(ep.id)
-        ? l.sources_routeReachable
-        : l.sources_routeNoAnswer;
+  /// What one route's probe said: a latency, an explicit "no answer", or
+  /// "checking" while the probe is still out.
+  String _statusFor(SourceEndpoint ep, L l) {
+    final results = _results;
+    if (results == null) return l.sources_routeChecking;
+    final latency = results.latencyOf(ep.id);
+    if (latency == null) return l.sources_routeNoAnswer;
+    return l.sources_routeLatencyMs(latency.inMilliseconds);
+  }
+
+  /// Which route automatic selection would take, named rather than implied.
+  String _autoOutcome(L l) {
+    final results = _results;
+    if (results == null) return l.sources_routeChecking;
+    final fastest = results.fastestId;
+    if (fastest == null) return l.sources_routeAutoNoneReachable;
+    final ep = widget.source.endpointById(fastest);
+    return l.sources_routeAutoPicks(ep == null ? fastest : _nameOf(ep));
+  }
+
+  String _nameOf(SourceEndpoint ep) =>
+      ep.label.isEmpty ? ep.addressLabel : ep.label;
+
+  List<String> _badgesFor(SourceEndpoint ep, L l) {
+    final src = widget.source;
+    final isAuto = src.endpointSelection == EndpointSelection.auto;
+    return [
+      if (!isAuto && src.pinnedEndpointId == ep.id) l.sources_routePinned,
+      if (src.liveEndpoint?.id == ep.id) l.sources_routeInUse,
+      if (_results?.fastestId == ep.id) l.sources_routeFastest,
+      // A route with its own credentials is worth calling out: it is the one
+      // that will keep working when the source's login is rotated, and the one
+      // to look at when only this address returns 401.
+      if (ep.hasOwnAuth) l.sources_routeOwnLogin,
+    ];
   }
 
   @override
@@ -229,7 +297,7 @@ class _EndpointPickerOverlayState
     final l = L.of(context);
     final src = widget.source;
     final isAuto = src.endpointSelection == EndpointSelection.auto;
-    final liveId = src.liveEndpoint?.id;
+    final onRoute = _highlightedEndpoint != null;
 
     return OverlayFocusScope(
       priority: OverlayPriority.dialog,
@@ -257,100 +325,17 @@ class _EndpointPickerOverlayState
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        l.sources_connectionRoute,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        src.name,
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Routes share the source's credentials, so they only
-                      // work for addresses of the *same* server. Pointing one
-                      // at a different server sends the wrong token and fails
-                      // with a 401 that looks like an outage. Say so here —
-                      // the alternative (a second source with its own login,
-                      // paired as a fallback) is not obvious otherwise.
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.info_outline,
-                              size: 12, color: Colors.white38),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              l.sources_routeSameServerHint,
-                              style: const TextStyle(
-                                color: Colors.white38,
-                                fontSize: 10,
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      _RouteRow(
-                        icon: Icons.auto_mode,
-                        title: l.sources_routeAuto,
-                        subtitle: l.sources_routeAutoHint,
-                        selected: _selectedIndex == 0,
-                        onTap: () { setState(() => _selectedIndex = 0); _activate(); },
-                        active: isAuto,
-                      ),
-                      for (int i = 0; i < src.endpoints.length; i++) ...[
-                        const SizedBox(height: 8),
-                        _RouteRow(
-                          icon: Icons.lan_outlined,
-                          title: src.endpoints[i].label.isEmpty
-                              ? src.endpoints[i].addressLabel
-                              : src.endpoints[i].label,
-                          subtitle: src.endpoints[i].addressLabel,
-                          status: _statusFor(src.endpoints[i], l),
-                          statusOk: _reachable?.contains(src.endpoints[i].id),
-                          selected: _selectedIndex == i + 1,
-                          onTap: () { setState(() => _selectedIndex = i + 1); _activate(); },
-                          active: src.endpoints[i].id == liveId,
-                          badge: !isAuto && src.pinnedEndpointId == src.endpoints[i].id
-                              ? l.sources_routePinned
-                              : (src.endpoints[i].id == liveId
-                                  ? l.sources_routeInUse
-                                  : null),
-                        ),
-                      ],
-                      if (src.endpoints.length <= 1) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          l.sources_routeOnlyOne,
-                          style: const TextStyle(
-                            color: Colors.white38,
-                            fontSize: 11,
+                      // Scrollable so latencies, badges and a fourth route can
+                      // be added without painting the yellow overflow stripe
+                      // on a 3.92" screen. The hints below stay pinned.
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: _rows(l, src, isAuto),
                           ),
                         ),
-                      ],
-                      const SizedBox(height: 8),
-                      _RouteRow(
-                        icon: Icons.add,
-                        title: l.sources_addRoute,
-                        selected: _selectedIndex == _addIndex,
-                        onTap: () { setState(() => _selectedIndex = _addIndex); _activate(); },
-                      ),
-                      const SizedBox(height: 8),
-                      _RouteRow(
-                        icon: Icons.close,
-                        title: l.common_cancel,
-                        selected: _selectedIndex == _cancelIndex,
-                        onTap: () { setState(() => _selectedIndex = _cancelIndex); _activate(); },
-                        subdued: true,
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 10),
@@ -362,15 +347,39 @@ class _EndpointPickerOverlayState
                           ),
                         ),
                       ],
-                      const SizedBox(height: 12),
-                      const Center(
-                        child: Text(
-                          '↑↓ navigate · [A] select · [Y] edit · [X] remove · [B] back',
-                          style: TextStyle(
-                            color: Colors.white30,
-                            fontSize: 10,
-                            letterSpacing: 0.5,
-                          ),
+                      const SizedBox(height: 8),
+                      // D-pad arrows are the same glyphs on every layout, so
+                      // they can be written out; the face buttons cannot, and
+                      // [ConsoleHud] draws those as the icons of whichever
+                      // layout is configured. A bare letter would name the
+                      // wrong physical button on two of the three.
+                      Text(
+                        '↑↓  ${l.common_navigate}',
+                        style: const TextStyle(
+                          color: Colors.white30,
+                          fontSize: 10,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      // Scaled down rather than allowed to overflow: four
+                      // hints with localised labels are wider than the panel
+                      // on a 3.92" screen, and an overflowing HUD paints the
+                      // yellow stripe over the row above it.
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: ConsoleHud(
+                          embedded: true,
+                          a: HudAction(l.common_select, onTap: _activate),
+                          b: HudAction(l.common_back, onTap: _close),
+                          x: onRoute
+                              ? HudAction(l.sources_removeRoute,
+                                  onTap: _removeHighlighted)
+                              : null,
+                          y: onRoute
+                              ? HudAction(l.sources_editRoute,
+                                  onTap: _editHighlighted)
+                              : null,
                         ),
                       ),
                     ],
@@ -383,6 +392,109 @@ class _EndpointPickerOverlayState
       ),
     );
   }
+
+  List<Widget> _rows(L l, Source src, bool isAuto) {
+    return [
+      Text(
+        l.sources_connectionRoute,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        src.name,
+        style: const TextStyle(color: Colors.white54, fontSize: 12),
+      ),
+      const SizedBox(height: 8),
+      // Routes are addresses of one server, and each may want its own login —
+      // which is why a route that asks you to sign in again is no longer a
+      // reason to split the source in two.
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, size: 12, color: Colors.white38),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              l.sources_routeSameServerHint,
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 10,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 14),
+      _RouteRow(
+        icon: Icons.auto_mode,
+        title: l.sources_routeAuto,
+        subtitle: l.sources_routeAutoHint,
+        notes: [
+          _autoOutcome(l),
+          if (!isAuto) l.sources_routeReleasePin,
+        ],
+        badges: [if (isAuto) l.sources_routeInUse],
+        selected: _sel == 0,
+        onTap: () => _tapRow(0),
+        active: isAuto,
+      ),
+      for (int i = 0; i < src.endpoints.length; i++) ...[
+        const SizedBox(height: 8),
+        _RouteRow(
+          icon: Icons.lan_outlined,
+          title: _nameOf(src.endpoints[i]),
+          subtitle: src.endpoints[i].addressLabel,
+          monoSubtitle: true,
+          status: _statusFor(src.endpoints[i], l),
+          statusOk: _results?.contains(src.endpoints[i].id),
+          badges: _badgesFor(src.endpoints[i], l),
+          selected: _sel == i + 1,
+          onTap: () => _tapRow(i + 1),
+          // Touch counterparts of [Y] and [X]. Without them the only way to
+          // edit or remove a route is the gamepad, because a tap on the row
+          // itself switches to it and closes the overlay.
+          onEdit: () {
+            setState(() => _selectedIndex = i + 1);
+            _edit(src.endpoints[i]);
+          },
+          onRemove: () {
+            setState(() => _selectedIndex = i + 1);
+            _remove(src.endpoints[i]);
+          },
+          editLabel: l.sources_editRoute,
+          removeLabel: l.sources_removeRoute,
+          active: src.liveEndpoint?.id == src.endpoints[i].id,
+        ),
+      ],
+      if (src.endpoints.length <= 1) ...[
+        const SizedBox(height: 10),
+        Text(
+          l.sources_routeOnlyOne,
+          style: const TextStyle(color: Colors.white38, fontSize: 11),
+        ),
+      ],
+      const SizedBox(height: 8),
+      _RouteRow(
+        icon: Icons.add,
+        title: l.sources_addRoute,
+        selected: _sel == _addIndex,
+        onTap: () => _tapRow(_addIndex),
+      ),
+      const SizedBox(height: 8),
+      _RouteRow(
+        icon: Icons.close,
+        title: l.common_cancel,
+        selected: _sel == _cancelIndex,
+        onTap: () => _tapRow(_cancelIndex),
+        subdued: true,
+      ),
+    ];
+  }
 }
 
 class _RouteRow extends StatelessWidget {
@@ -391,12 +503,18 @@ class _RouteRow extends StatelessWidget {
     required this.title,
     required this.selected,
     this.subtitle,
+    this.monoSubtitle = false,
+    this.notes = const [],
     this.status,
     this.statusOk,
     this.active = false,
     this.subdued = false,
-    this.badge,
+    this.badges = const [],
     this.onTap,
+    this.onEdit,
+    this.onRemove,
+    this.editLabel,
+    this.removeLabel,
   });
 
   /// The overlay is gamepad-driven, but the device has a touchscreen and the
@@ -404,15 +522,32 @@ class _RouteRow extends StatelessWidget {
   /// frozen rather than as "use the buttons".
   final VoidCallback? onTap;
 
+  /// Per-row touch equivalents of the buttons in the HUD. They sit inside the
+  /// row's own [GestureDetector]; the inner detector wins the tap, so hitting
+  /// the pencil does not also switch to the route.
+  final VoidCallback? onEdit;
+  final VoidCallback? onRemove;
+  final String? editLabel;
+  final String? removeLabel;
+
   final IconData icon;
   final String title;
   final String? subtitle;
+  final bool monoSubtitle;
+
+  /// Extra explanatory lines, e.g. which route automatic selection would take.
+  final List<String> notes;
+
   final String? status;
   final bool? statusOk;
   final bool selected;
   final bool active;
   final bool subdued;
-  final String? badge;
+
+  /// Badges wrap onto their own line rather than sharing the title's row:
+  /// three of them beside a long label is exactly how a RenderFlex overflow
+  /// gets onto a 3.92" screen.
+  final List<String> badges;
 
   @override
   Widget build(BuildContext context) {
@@ -446,51 +581,44 @@ class _RouteRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        title,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: selected ? Colors.white : fg,
-                          fontSize: 14,
-                          fontWeight:
-                              active ? FontWeight.w700 : FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                    if (badge != null) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          badge!,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected ? Colors.white : fg,
+                    fontSize: 14,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+                  ),
                 ),
+                if (badges.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [for (final b in badges) _Badge(b)],
+                    ),
+                  ),
                 if (subtitle != null)
                   Text(
                     subtitle!,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white38,
                       fontSize: 10,
-                      fontFamily: 'monospace',
+                      fontFamily: monoSubtitle ? 'monospace' : null,
+                    ),
+                  ),
+                for (final note in notes)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      note,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 10,
+                        height: 1.3,
+                      ),
                     ),
                   ),
               ],
@@ -505,10 +633,74 @@ class _RouteRow extends StatelessWidget {
                     ? Colors.white38
                     : (statusOk! ? const Color(0xFF7BC67B) : Colors.white38),
                 fontSize: 10,
+                fontFamily: 'monospace',
               ),
             ),
           ],
+          if (onEdit != null)
+            _RowAction(
+              icon: Icons.edit_outlined,
+              tooltip: editLabel,
+              onTap: onEdit!,
+            ),
+          if (onRemove != null)
+            _RowAction(
+              icon: Icons.delete_outline,
+              tooltip: removeLabel,
+              onTap: onRemove!,
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 9,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+/// A tap target inside a row. Sized well past the icon so a thumb on a 3.92"
+/// screen can hit it without hitting the row.
+class _RowAction extends StatelessWidget {
+  const _RowAction({required this.icon, required this.onTap, this.tooltip});
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Icon(icon, size: 18, color: Colors.white54),
+        ),
       ),
     );
   }

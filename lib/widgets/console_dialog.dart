@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/responsive/responsive.dart';
 import '../core/theme/app_theme.dart';
 import '../core/widgets/console_focusable.dart';
 import '../l10n/app_localizations.dart';
@@ -88,7 +87,6 @@ class _ConsoleDialogState extends ConsumerState<ConsoleDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final rs = context.rs;
     final l = L.of(context);
 
     return Focus(

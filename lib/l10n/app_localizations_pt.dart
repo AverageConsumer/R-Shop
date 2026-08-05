@@ -1286,14 +1286,15 @@ class LPt extends L {
   String get onboarding_serverType => 'Tipo de servidor';
 
   @override
-  String get onboarding_folderExplanationTitle => 'Setup your Library Path';
+  String get onboarding_folderExplanationTitle =>
+      'Configure o caminho da sua biblioteca';
 
   @override
   String get onboarding_folderExplanationMessage =>
-      'R-Shop needs a base folder to store your downloaded games. This helps organize your files and is required for Android folder permissions.\n\nWe recommend creating a folder named \'ROMs\' and selecting it.';
+      'O R-Shop precisa de uma pasta base para guardar os jogos baixados. Isso ajuda a organizar seus arquivos e é necessário para as permissões de pasta do Android.\n\nRecomendamos criar uma pasta chamada \'ROMs\' e selecioná-la.';
 
   @override
-  String get onboarding_continueToPicker => 'Select Folder';
+  String get onboarding_continueToPicker => 'Selecionar pasta';
 
   @override
   String get onboarding_hangOn => 'Um momento, testando a conexão...';
@@ -1640,7 +1641,7 @@ class LPt extends L {
 
   @override
   String get sources_routeAutoHint =>
-      'Usar a rota que responder, preferindo a primeira';
+      'Usar a rota mais rápida que responder; volta a verificar quando a rede muda';
 
   @override
   String get sources_routeInUse => 'Em uso';
@@ -1656,6 +1657,42 @@ class LPt extends L {
 
   @override
   String get sources_routeChecking => 'A verificar…';
+
+  @override
+  String sources_routeLatencyMs(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String sources_routeAutoPicks(String route) {
+    return 'Usaria $route';
+  }
+
+  @override
+  String get sources_routeAutoNoneReachable => 'Nada respondeu';
+
+  @override
+  String get sources_routeFastest => 'Mais rápida';
+
+  @override
+  String get sources_routeReleasePin =>
+      'Liberta a fixação e volta a escolher a mais rápida';
+
+  @override
+  String get sources_routeOwnLogin => 'Início de sessão próprio';
+
+  @override
+  String get sources_routeAuthTitle => 'Início de sessão desta rota';
+
+  @override
+  String get sources_routeAuthHint =>
+      'Deixe em branco para usar o início de sessão da fonte. Preencha apenas se este endereço pedir outro.';
+
+  @override
+  String get sources_routeAuthInherited => 'A usar o início de sessão da fonte';
+
+  @override
+  String get sources_routeAuthOwn => 'Esta rota inicia sessão por si própria';
 
   @override
   String get sources_routeOnlyOne => 'Esta fonte só tem uma rota';
@@ -1696,7 +1733,7 @@ class LPt extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      'Apenas para endereços que não exigem início de sessão separado. Se pedir para entrar de novo, adicione como fonte própria e emparelhe as duas como reserva.';
+      'Todas as rotas chegam ao mesmo servidor. Uma rota pode ter o seu próprio início de sessão se esse endereço pedir outro.';
 
   @override
   String get sources_routeCannotRemoveLast =>

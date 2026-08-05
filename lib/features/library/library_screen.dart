@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -1291,7 +1292,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       onNotification: _handleScrollNotification,
       child: RepaintBoundary(
         child: GridView.builder(
-        cacheExtent: deviceMemory.libraryCacheExtent,
+        scrollCacheExtent:
+            ScrollCacheExtent.pixels(deviceMemory.libraryCacheExtent),
         controller: _scrollController,
         padding: EdgeInsets.only(
           left: rs.spacing.lg,

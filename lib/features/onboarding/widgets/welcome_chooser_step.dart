@@ -431,7 +431,6 @@ class _ChoiceTile extends StatelessWidget {
       listenable: focusNode,
       builder: (context, _) {
         final isFocused = focusNode.hasFocus;
-        final color = isFocused ? Colors.white : AppTheme.primaryColor;
         final bgColor = isFocused
             ? AppTheme.primaryColor.withValues(alpha: 0.35)
             : const Color(0xFF1C1C1C);

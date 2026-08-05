@@ -122,22 +122,38 @@ void main() {
   });
 
   group('resolveEndpoint', () {
-    test('auto picks the first reachable route in list order', () {
+    test('auto takes the head of the ranking — the fastest route', () {
       final source = rommWithRoutes();
 
-      // Both up: the LAN route is listed first, so it wins — this is what
-      // makes "fast at home" fall out of ordering alone.
+      // The caller ranks by latency, so this list says "the remote address
+      // answered quicker than the LAN one" and auto follows the measurement
+      // rather than the list order.
       expect(
-        source.resolveEndpoint(reachable: {'ep-lan', 'ep-remote'})?.id,
+        source.resolveEndpoint(reachable: ['ep-remote', 'ep-lan'])?.id,
+        'ep-remote',
+      );
+      expect(
+        source.resolveEndpoint(reachable: ['ep-lan', 'ep-remote'])?.id,
         'ep-lan',
       );
     });
 
-    test('auto skips an unreachable earlier route', () {
+    test('auto ignores routes that did not answer at all', () {
       final source = rommWithRoutes();
 
       expect(
-        source.resolveEndpoint(reachable: {'ep-remote'})?.id,
+        source.resolveEndpoint(reachable: ['ep-remote'])?.id,
+        'ep-remote',
+      );
+    });
+
+    test('a ranked route that has since been deleted yields to the next', () {
+      // The probe and the config are read a moment apart; the runner-up is a
+      // better answer than dropping back to list order.
+      final source = rommWithRoutes();
+
+      expect(
+        source.resolveEndpoint(reachable: ['ep-gone', 'ep-remote'])?.id,
         'ep-remote',
       );
     });
@@ -147,7 +163,7 @@ void main() {
       // Returning a route makes it fail with a real connection error.
       final source = rommWithRoutes();
 
-      expect(source.resolveEndpoint(reachable: const {})?.id, 'ep-lan');
+      expect(source.resolveEndpoint(reachable: const [])?.id, 'ep-lan');
     });
 
     test('pinned wins even when that route is unreachable', () {
@@ -159,7 +175,20 @@ void main() {
       );
 
       expect(
-        source.resolveEndpoint(reachable: {'ep-lan'})?.id,
+        source.resolveEndpoint(reachable: ['ep-lan'])?.id,
+        'ep-remote',
+      );
+    });
+
+    test('pinned wins even when another route is faster', () {
+      // An override outranks a measurement; that is what overriding means.
+      final source = rommWithRoutes(
+        selection: EndpointSelection.pinned,
+        pinned: 'ep-remote',
+      );
+
+      expect(
+        source.resolveEndpoint(reachable: ['ep-lan', 'ep-remote'])?.id,
         'ep-remote',
       );
     });
@@ -171,7 +200,7 @@ void main() {
       );
 
       expect(
-        source.resolveEndpoint(reachable: {'ep-remote'})?.id,
+        source.resolveEndpoint(reachable: ['ep-remote'])?.id,
         'ep-remote',
       );
     });

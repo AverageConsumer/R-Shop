@@ -14,19 +14,19 @@ void main() {
         as Map<String, dynamic>;
   });
 
-  Set<String> _translationKeys(Map<String, dynamic> arb) =>
+  Set<String> translationKeys(Map<String, dynamic> arb) =>
       arb.keys.where((k) => !k.startsWith('@')).toSet();
 
   test('DE has all EN keys', () {
-    final enKeys = _translationKeys(en);
-    final deKeys = _translationKeys(de);
+    final enKeys = translationKeys(en);
+    final deKeys = translationKeys(de);
     final missing = enKeys.difference(deKeys);
     expect(missing, isEmpty, reason: 'Keys in EN but missing in DE: $missing');
   });
 
   test('DE has no extra keys beyond EN', () {
-    final enKeys = _translationKeys(en);
-    final deKeys = _translationKeys(de);
+    final enKeys = translationKeys(en);
+    final deKeys = translationKeys(de);
     final extra = deKeys.difference(enKeys);
     expect(extra, isEmpty, reason: 'Keys in DE but not in EN: $extra');
   });

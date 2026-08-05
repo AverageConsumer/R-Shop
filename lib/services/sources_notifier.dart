@@ -11,6 +11,7 @@ import '../models/config/provider_config.dart';
 import '../models/system_model.dart';
 import 'config_storage_service.dart';
 import 'database_service.dart';
+import 'endpoint_probe_service.dart';
 import 'romm_pairing_service.dart';
 import 'source_resolver.dart';
 
@@ -103,6 +104,22 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
           await _storage.saveConfig(jsonEncode(_cachedConfig.toJson()));
         } catch (e) {
           debugPrint('SourcesNotifier: retag persist failed: $e');
+        }
+      }
+
+      // A stored override only counts while it still names a route, and the
+      // connection fields have to agree with it (invariant: the top-level
+      // url/host/port/share *are* the live route). Deterministic and offline —
+      // finding the fastest route is a probe, and startup does not wait on the
+      // network for it; that is [autoSelectAllEndpoints], called once the app
+      // is up and again whenever the network changes.
+      final realigned = _alignEndpointOverrides(_cachedConfig);
+      if (!identical(realigned, _cachedConfig)) {
+        _cachedConfig = realigned;
+        try {
+          await _storage.saveConfig(jsonEncode(_cachedConfig.toJson()));
+        } catch (e) {
+          debugPrint('SourcesNotifier: route realign persist failed: $e');
         }
       }
 
@@ -399,8 +416,14 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
 
   /// Makes [endpointId] the live route for [sourceId].
   ///
-  /// [pin] records it as the user's explicit choice so auto-selection stops
-  /// moving it. Pass false when the switch came from a probe.
+  /// [pin] records it as the user **overriding** auto-selection: from then on
+  /// that route is used even when a faster one answers, and nothing but the
+  /// user takes it off again. It defaults to true because the only caller that
+  /// is not the user is [autoSelectEndpoint], which passes false.
+  ///
+  /// Picking a route by hand is the override — there is no separate "and now
+  /// keep it" step, because a user who just chose the remote address and then
+  /// watched it jump back to the LAN would rightly call that broken.
   Future<void> switchEndpoint(
     String sourceId,
     String endpointId, {
@@ -421,8 +444,13 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     await updateSource(src.withLiveEndpoint(ep, pin: pin));
   }
 
-  /// Switches between probing for a working route and staying on the pinned
-  /// one. Selecting [EndpointSelection.auto] clears the pin.
+  /// Takes the user's override off ([EndpointSelection.auto]) or puts one on
+  /// ([EndpointSelection.pinned]).
+  ///
+  /// Dropping the override clears the pin but does **not** itself go and find
+  /// the fastest route — that costs a probe, and a config write is not the
+  /// place to wait on the network. Call [autoSelectEndpoint] after it, which is
+  /// what [clearEndpointOverride] does in one step.
   Future<void> setEndpointSelection(
     String sourceId,
     EndpointSelection selection,
@@ -440,14 +468,92 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
         ),
       );
     } else {
-      // Pinning with nothing chosen yet pins whatever is live right now,
-      // which is what the user sees and therefore what they mean.
+      // Overriding without naming a route means "the one I am looking at",
+      // which is whatever is live right now.
       await updateSource(
         src.copyWith(
           endpointSelection: selection,
           pinnedEndpointId: src.pinnedEndpointId ?? src.liveEndpoint?.id,
         ),
       );
+    }
+  }
+
+  /// Probes [sourceId]'s routes and makes the fastest live one, without
+  /// recording an override.
+  ///
+  /// Returns the id of the route now live, or null when the source has none,
+  /// so a caller can tell whether anything moved.
+  ///
+  /// **Refuses to move a source the user overrode.** That is the entire
+  /// difference between `auto` and `pinned`: a pin is a promise that this route
+  /// and no other gets used, and a probe that quietly beats it would break the
+  /// promise precisely when the user is least expecting it — on a network they
+  /// pinned the route to avoid.
+  ///
+  /// Goes through [updateSource], so **no cached game is touched** and no
+  /// re-sync is provoked; that is what makes re-deciding on every network
+  /// change free.
+  Future<String?> autoSelectEndpoint(
+    String sourceId, {
+    EndpointProbeService? probe,
+  }) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == sourceId,
+      orElse: () => throw StateError('Unknown source: $sourceId'),
+    );
+    if (src.endpointSelection == EndpointSelection.pinned &&
+        src.pinnedEndpointId != null &&
+        src.endpointById(src.pinnedEndpointId!) != null) {
+      return src.liveEndpoint?.id;
+    }
+    if (src.endpoints.length < 2) {
+      // One route is not a choice, and probing to confirm that would cost a
+      // second of startup per source for an answer that cannot differ.
+      return src.liveEndpoint?.id ?? src.endpoints.firstOrNull?.id;
+    }
+
+    final svc = probe ?? EndpointProbeService();
+    final results = await svc.probeFor(src);
+    final best = src.resolveEndpoint(reachable: results.rankedIds);
+    if (best == null) return null;
+    // Re-read: probing is the one thing here that takes real time, and the
+    // user may have edited or pinned this source while it ran.
+    final current = state.sources.where((s) => s.id == sourceId).firstOrNull;
+    if (current == null) return null;
+    if (current.endpointSelection == EndpointSelection.pinned) {
+      return current.liveEndpoint?.id;
+    }
+    if (current.liveEndpoint?.id == best.id) return best.id;
+    await updateSource(current.withLiveEndpoint(best));
+    return best.id;
+  }
+
+  /// Hands [sourceId] back to auto-selection and immediately moves it to the
+  /// fastest route — the "自動" row of the route picker, in one call.
+  Future<String?> clearEndpointOverride(
+    String sourceId, {
+    EndpointProbeService? probe,
+  }) async {
+    await setEndpointSelection(sourceId, EndpointSelection.auto);
+    return autoSelectEndpoint(sourceId, probe: probe);
+  }
+
+  /// Re-runs auto-selection for every source that has more than one route.
+  ///
+  /// The network changing — a different Wi-Fi, a cable pulled — is what makes
+  /// yesterday's answer wrong, so invalidate the probe cache before calling
+  /// this. Failures are swallowed per source: one server that hangs must not
+  /// stop the others from being re-routed.
+  Future<void> autoSelectAllEndpoints({EndpointProbeService? probe}) async {
+    final svc = probe ?? EndpointProbeService();
+    for (final s in [...state.sources]) {
+      if (!s.enabled || s.endpoints.length < 2) continue;
+      try {
+        await autoSelectEndpoint(s.id, probe: svc);
+      } catch (e) {
+        debugPrint('SourcesNotifier: auto route selection failed for ${s.id}: $e');
+      }
     }
   }
 
@@ -786,6 +892,39 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     }).toList(growable: false);
     if (!anyChange) return config;
     return config.copyWith(systems: newSystems);
+  }
+
+  /// Makes every stored route override coherent, without any I/O.
+  ///
+  /// Two things can be wrong in a config on disk:
+  ///
+  /// * a pin naming a route that no longer exists — an override of nothing,
+  ///   which would otherwise sit there suppressing auto-selection forever;
+  /// * a pin the connection fields do not agree with, which would leave the
+  ///   picker showing "已釘選 遠端" while every provider talks to the LAN.
+  ///
+  /// Sources on `auto` are left exactly as they were: picking the fastest
+  /// route means probing, and nothing that runs before the first frame is
+  /// allowed to wait on the network.
+  AppConfig _alignEndpointOverrides(AppConfig config) {
+    var anyChange = false;
+    final sources = config.sources.map((s) {
+      if (s.endpointSelection != EndpointSelection.pinned) return s;
+      final pinned =
+          s.pinnedEndpointId == null ? null : s.endpointById(s.pinnedEndpointId!);
+      if (pinned == null) {
+        anyChange = true;
+        return s.copyWith(
+          endpointSelection: EndpointSelection.auto,
+          clearPinnedEndpoint: true,
+        );
+      }
+      if (s.liveEndpoint?.id == pinned.id) return s;
+      anyChange = true;
+      return s.withLiveEndpoint(pinned);
+    }).toList(growable: false);
+    if (!anyChange) return config;
+    return config.copyWith(sources: sources);
   }
 
   static bool _providerMatchesSource(ProviderConfig p, Source s) {

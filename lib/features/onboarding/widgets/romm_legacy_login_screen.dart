@@ -8,7 +8,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/console_focusable.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/config/source.dart';
-import '../../../widgets/console_hud.dart';
 import '../../../models/system_model.dart';
 import '../../../providers/app_providers.dart';
 import '../../../services/romm_api_service.dart';

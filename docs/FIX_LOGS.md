@@ -358,6 +358,16 @@
 
 ## [R-Shop 自動選最快] R-Shop: 「自動挑最快的那條路線」在現行前提下沒有意義，決定不做
 
+> ⚠️ **這條的結論已被 `[R-Shop 路線各自驗證]` 與 `[R-Shop 自動選最優路線]` 推翻，2026-08-05。**
+> 底下的推理沒有錯，**錯在前提**：當時把「兩個位址」一律當成兩個來源，所以替使用者換一條路
+> ＝替他換一個來源。使用者後來確認的前提是——**同一個來源底下的多條路線就是同一台伺服器**
+> （只是各自需要登入），清單也收斂成一份。在那個前提下換路線**換不到別的清單、也換不掉他選的來源**，
+> 不變式 2 與 3 都沒有被碰到，所以自動選最快是可以做的，而且已經做了。
+>
+> **「同一台也當不同台」仍然成立**——它管的是**來源之間**，不是同一個來源底下的路線之間。
+> 這兩件事當初被混為一談，這條紀錄就是那次混淆的產物。**要看現行行為請讀
+> `[R-Shop 自動選最優路線]`，不要照這條。**
+
 - **問題**：待辦裡掛著「自動選最快的那條路線」——多個位址時由程式探測延遲、自己挑最快的那個。使用者提過，但當時就決定先不做，理由沒有寫下來，所以每次讀交接都會再想一次「這條到底還要不要做」。
 - **修復**：不做，並把理由寫進紀錄。前提是使用者的原話「**就算是同一台，我也要當不同台**」（`.agents/skills/rshop-source-routing`「使用者要的到底是什麼」那節）。來源一律各自獨立，**與背後是不是同一台伺服器無關**——這是他的模型，不是可以從 URL 推論出來的東西。
 - **檔案**：無程式碼變更（需求判定）
@@ -367,6 +377,10 @@
 真正需要自動換路的情境已經有東西在做了：連不上時走**備援**（`chooseSource` / `withEffectiveSource`），而備援刻意**只改記憶體中的 config、不寫磁碟**，所以偏好的那台醒過來就自己回去。速度不是那條路的觸發條件，**可達性才是**——這也是對的，延遲高一點跟連不上是兩件事，只有後者值得替使用者做決定。
 
 **要重開這條的唯一理由**：使用者哪天改變「同一台也當不同台」的前提。在那之前把它留在待辦只會讓每個工作階段重新評估一次。
+
+> **後記**：前提真的改了——不是他推翻了「同一台也當不同台」，是我們發現那句話講的是**來源之間**，
+> 而「路線」這一層從頭到尾都在同一台伺服器裡面。條件觸發了，這條就重開並做掉了。
+> **一條寫清楚重開條件的「不做」是有用的**：它讓下一次的判斷變成核對條件，而不是重新辯論一遍。
 
 ## [R-Shop 反查不到] R-Shop: `build_fix_by_file.py` 每次都報 2 條沒有路徑，那是正確狀態不是漏洞
 
@@ -396,3 +410,46 @@
 `deleteRoute` 改名 `deleteSourceCache` 不只是換字：**刪一條路線現在不准順手刪快取**，舊名字會讓人以為要。
 
 **未完成的部分見 `docs/HANDOVER.md` §2.0**——自動選最優路線、UI、七語系都還沒做。
+
+
+## [R-Shop 自動選最優路線] R-Shop: 探測改回延遲並排序，沒有覆寫就自己挑最快的那條
+
+- **問題**：`EndpointProbeService` 只回「通不通」，所以「自動」等於「清單裡第一條通的」——使用者要用最快的那條就得自己去挑，而挑了之後 `pin: true` 又把它永久固定住，網路換了也不會變。同時路線各自驗證的資料層已經完成，UI 卻還沒有地方輸入路線自己的憑證，功能等於沒接上。
+- **修復**：探測改回延遲：`probeFor()` 給 `ProbeResults`（`ranked` 最快在前、`latencyOf(id)`、`fastestId`），`resolve()` 在沒有覆寫時挑能通的裡面最快的；`pin: true` 的語意從「選定」改成「**使用者覆寫**」，浮層加一列「自動」走 `clearEndpointOverride`。連線方式編輯頁補上路線自己的登入欄位（留空＝沿用來源的），浮層每一列顯示延遲、最快、使用中、已鎖定、專屬登入。
+- **檔案**：`lib/services/endpoint_probe_service.dart`（`ProbeResults`／`RouteLatency`／`probeFor`） · `lib/models/config/source.dart`（`resolveEndpoint` 改吃排序後的 `List<String>`） · `lib/services/sources_notifier.dart`（`autoSelectEndpoint`／`clearEndpointOverride`／`autoSelectAllEndpoints`、bootstrap 離線對齊） · `lib/features/sources/endpoint_picker_overlay.dart`（延遲欄、自動列、徽章） · `lib/features/sources/endpoint_edit_screen.dart`（路線憑證欄位＋繼承說明） · `lib/l10n/app_*.arb`（10 個新 key，`sources_routeAutoHint`／`sources_routeSameServerHint` 改寫） · `test/endpoint_probe_service_test.dart` · `test/source_endpoint_test.dart` · `test/sources_notifier_endpoints_test.dart` · `test/widgets/endpoint_picker_overlay_test.dart`（新增）
+
+**這條做的事，`[R-Shop 自動選最快]` 當初判定「不做」。** 不是那次判斷草率，是**前提真的變了**：當時把「兩個位址」一律當成兩個來源，換路＝替使用者換來源；`[R-Shop 路線各自驗證]` 之後，同一個來源底下的路線就是同一台伺服器、同一份清單，換路換不到別的清單也換不掉他選的來源。**「同一台也當不同台」管的是來源之間，不是路線之間**——這兩層被混為一談，才生出那條「不做」。舊紀錄已加註取代，不要照它。
+
+**`resolveEndpoint` 吃的是排序後的 id 清單，不是延遲。** `lib/models` 不准 import 服務層的型別，這是一個理由；更實際的理由是**傳清單比傳「最快的那一個」多一層韌性**——探測到套用之間那條最快的路被刪掉時，會自動退到第二快，傳單一 id 就只剩清單順序可退。
+
+**`_bootstrap` 不探測，是刻意的。** 開機不能等網路，而且測試裡建一個 notifier 就會開真的 socket。它只做離線對齊：釘選指向不存在的路線就退回 `auto`，有效的釘選把值鏡回頂層欄位（不變式 4），真的有變才寫磁碟。
+
+**`autoSelectEndpoint` 探測完會重讀一次狀態才動手。** 探測那一秒內使用者可能剛好按下釘選，不重讀就會把他的覆寫蓋掉——**自動化蓋掉使用者剛做的決定，比自動化沒生效更糟**。
+
+**順手修掉一個既有的競態**：被整體預算放棄的探測，原本仍可能把自己加進**已經回傳且已經寫進快取**的那個 `Set`，於是「這條路通」會在快取裡憑空出現。現在結果先快照再進快取，並補了測試。
+
+**UI 兩個入口**：浮層每一列的 `onTap` 走 `_tapRow`，它先把游標移過去再呼叫 `_activate()`——**跟按 `[A]` 完全同一條路徑**，不是各寫一份（`rshop-touch-and-gamepad` 的鐵則；這四個浮層每一個都曾經是觸控死的）。新增的 widget 測試就是在測這件事。
+
+**憑證欄位留空必須產生 `null`，不是空的 `AuthConfig`。** `hasOwnAuth` 只問物件在不在，空物件會宣稱「這條路線用自己的登入，而且沒有帳密」——那會讓一個本來繼承得好好的路線變成 401。`_authOrNull()` 就是為這件事存在的。畫面上還即時顯示現在是「沿用來源的登入資訊」還是「用自己的」，因為「空白＝繼承」是一條**看不見的規則**，只寫在說明裡不夠。
+
+
+## [R-Shop onboarding 五語系缺字串] R-Shop: `DE has all EN keys` 一直紅，是真的缺字串不是環境問題
+
+- **問題**：`test/l10n_completeness_test.dart` 的 `DE has all EN keys` 長期失敗，混在「7 個既有失敗」裡被當成環境問題略過。實際上 `onboarding_folderExplanationTitle`／`onboarding_folderExplanationMessage`／`onboarding_continueToPicker` 只有 en 與 zh 有，**de / es / fr / ja / pt 五個語系全缺**——使用者在那五個語系下看到的是空白。
+- **修復**：五個 `.arb` 各補三個 key，位置與 en 一致。順便拿 en 的 key 集合對六個語系全掃一次，確認沒有別的缺口。
+- **檔案**：`lib/l10n/app_{de,es,fr,ja,pt}.arb` · `test/l10n_completeness_test.dart`（區域函式 `_translationKeys` 改名，清掉 analyze 的 info）
+
+**教訓在「既有失敗」這個標籤本身。** 一旦某個失敗被寫進交接的「已知不修」，之後每個工作階段都會直接跳過它——**包括它其實是真的壞掉的那一個**。這次是交接文件自己點名「它是真的缺，不是環境問題」才沒有繼續被略過。所以基準清單裡的每一條都該寫**為什麼**它不算回歸（Windows socket、Windows 路徑、需要真的伺服器），寫不出理由的那條就是還沒查清楚。
+
+**缺字串不會讓建置失敗，會直接出貨成空白**（`rshop-l10n`）。這也是為什麼字串要跟功能同一次補齊，而不是「之後補」。
+
+
+## [R-Shop analyze 六項] R-Shop: 清掉累積的 6 個 analyze 問題，含兩處已棄用的 `cacheExtent`
+
+- **問題**：`flutter analyze` 長期帶著 6 個問題：2 個未使用的 import、2 個未使用的區域變數、2 處已棄用的 `cacheExtent`。不是某一次改動造成的，但沒人清，於是每次跑 analyze 都要先分辨「這 6 個是舊的」。
+- **修復**：全部清掉。`cacheExtent: X` 改成 `scrollCacheExtent: ScrollCacheExtent.pixels(X)`，兩檔各補 `import 'package:flutter/rendering.dart'`（`material.dart` 沒轉出 `ScrollCacheExtent`）。現在 `flutter analyze` 是乾淨的。
+- **檔案**：`lib/features/onboarding/widgets/romm_legacy_login_screen.dart` · `lib/features/sources/manual_source_add_screen.dart` · `lib/features/onboarding/widgets/welcome_chooser_step.dart` · `lib/widgets/console_dialog.dart` · `lib/features/game_list/widgets/game_grid.dart` · `lib/features/library/library_screen.dart`
+
+**`.pixels()` 不是 `.viewport()`，這個選擇有理由。** Flutter 3.41 起 `cacheExtent`（double，邏輯像素）換成 `ScrollCacheExtent`，兩個 factory 的**單位不同**：`.pixels(double)` 與舊的完全等價，`.viewport(double)` 是 viewport 主軸長度的倍數。這兩處的值來自 `device_info_service.dart` 依記憶體分級算出的像素值（格線 200/400/600、圖書館 300/600/800），**本來就是以像素為單位設計的**，換成 `.viewport()` 會把分級意圖整個破壞掉。SDK 自己的相容轉接也是 `ScrollCacheExtent.pixels(cacheExtent!)`。
+
+**`console_dialog.dart` 刪掉未使用的 `rs` 之後，`responsive.dart` 的 import 跟著變成未使用**——只清一半會換來一個新 warning。焦點白框的樣式完全沒動：那份樣式同時存在於這個檔與 `core/widgets/console_focusable.dart`，**動一邊就會兩邊不同步**（`AGENTS.md` §3）。

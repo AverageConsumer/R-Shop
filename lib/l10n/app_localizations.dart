@@ -3074,7 +3074,7 @@ abstract class L {
   /// No description provided for @sources_routeAutoHint.
   ///
   /// In en, this message translates to:
-  /// **'Use whichever route answers, preferring the top one'**
+  /// **'Use the fastest route that answers, re-checked as the network changes'**
   String get sources_routeAutoHint;
 
   /// No description provided for @sources_routeInUse.
@@ -3106,6 +3106,66 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Checking…'**
   String get sources_routeChecking;
+
+  /// No description provided for @sources_routeLatencyMs.
+  ///
+  /// In en, this message translates to:
+  /// **'{ms} ms'**
+  String sources_routeLatencyMs(int ms);
+
+  /// No description provided for @sources_routeAutoPicks.
+  ///
+  /// In en, this message translates to:
+  /// **'Would use {route}'**
+  String sources_routeAutoPicks(String route);
+
+  /// No description provided for @sources_routeAutoNoneReachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing answered'**
+  String get sources_routeAutoNoneReachable;
+
+  /// No description provided for @sources_routeFastest.
+  ///
+  /// In en, this message translates to:
+  /// **'Fastest'**
+  String get sources_routeFastest;
+
+  /// No description provided for @sources_routeReleasePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Drops the lock and re-picks the fastest'**
+  String get sources_routeReleasePin;
+
+  /// No description provided for @sources_routeOwnLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Own login'**
+  String get sources_routeOwnLogin;
+
+  /// No description provided for @sources_routeAuthTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Login for this route'**
+  String get sources_routeAuthTitle;
+
+  /// No description provided for @sources_routeAuthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave blank to use the source\'s login. Fill it in only when this address asks for a different one.'**
+  String get sources_routeAuthHint;
+
+  /// No description provided for @sources_routeAuthInherited.
+  ///
+  /// In en, this message translates to:
+  /// **'Using the source\'s login'**
+  String get sources_routeAuthInherited;
+
+  /// No description provided for @sources_routeAuthOwn.
+  ///
+  /// In en, this message translates to:
+  /// **'This route logs in on its own'**
+  String get sources_routeAuthOwn;
 
   /// No description provided for @sources_routeOnlyOne.
   ///
@@ -3182,7 +3242,7 @@ abstract class L {
   /// No description provided for @sources_routeSameServerHint.
   ///
   /// In en, this message translates to:
-  /// **'Only for addresses that need no separate login. If it asks you to sign in again, add it as its own source and pair the two as backups.'**
+  /// **'All routes reach the same server. A route can carry its own login when that address asks for a different one.'**
   String get sources_routeSameServerHint;
 
   /// No description provided for @sources_routeCannotRemoveLast.

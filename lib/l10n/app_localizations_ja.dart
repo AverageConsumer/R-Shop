@@ -1254,14 +1254,14 @@ class LJa extends L {
   String get onboarding_serverType => 'サーバータイプ';
 
   @override
-  String get onboarding_folderExplanationTitle => 'Setup your Library Path';
+  String get onboarding_folderExplanationTitle => 'ライブラリのパスを設定';
 
   @override
   String get onboarding_folderExplanationMessage =>
-      'R-Shop needs a base folder to store your downloaded games. This helps organize your files and is required for Android folder permissions.\n\nWe recommend creating a folder named \'ROMs\' and selecting it.';
+      'R-Shop はダウンロードしたゲームを保存するベースフォルダが必要です。ファイルの整理に役立ち、Android のフォルダ権限にも必要です。\n\n「ROMs」という名前のフォルダを作成して選択することをおすすめします。';
 
   @override
-  String get onboarding_continueToPicker => 'Select Folder';
+  String get onboarding_continueToPicker => 'フォルダを選択';
 
   @override
   String get onboarding_hangOn => 'ちょっと待ってね、接続テスト中...';
@@ -1592,7 +1592,7 @@ class LJa extends L {
   String get sources_routeAuto => '自動選択';
 
   @override
-  String get sources_routeAutoHint => '応答した経路を使用（上にあるものを優先）';
+  String get sources_routeAutoHint => '応答が最も速い経路を使用（ネットワークが変わると選び直します）';
 
   @override
   String get sources_routeInUse => '使用中';
@@ -1608,6 +1608,41 @@ class LJa extends L {
 
   @override
   String get sources_routeChecking => '確認中…';
+
+  @override
+  String sources_routeLatencyMs(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String sources_routeAutoPicks(String route) {
+    return '「$route」を使用します';
+  }
+
+  @override
+  String get sources_routeAutoNoneReachable => '応答した経路がありません';
+
+  @override
+  String get sources_routeFastest => '最速';
+
+  @override
+  String get sources_routeReleasePin => '固定を解除して最速の経路を選び直します';
+
+  @override
+  String get sources_routeOwnLogin => '専用ログイン';
+
+  @override
+  String get sources_routeAuthTitle => 'この経路のログイン情報';
+
+  @override
+  String get sources_routeAuthHint =>
+      '空欄にすると提供元のログイン情報を使います。このアドレスが別のログインを求める場合のみ入力してください。';
+
+  @override
+  String get sources_routeAuthInherited => '提供元のログイン情報を使用中';
+
+  @override
+  String get sources_routeAuthOwn => 'この経路は独自のログイン情報を使用します';
 
   @override
   String get sources_routeOnlyOne => 'この提供元の経路は1つだけです';
@@ -1647,7 +1682,7 @@ class LJa extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      '別途ログインが不要なアドレス専用です。再ログインを求められる場合は提供元として追加し、2つをバックアップとして紐付けてください。';
+      'すべての経路は同じサーバーにつながります。そのアドレスが別のログインを求める場合、経路ごとに専用のログイン情報を持たせられます。';
 
   @override
   String get sources_routeCannotRemoveLast => '最後の経路は削除できません';

@@ -22,12 +22,24 @@
 - [AppID 衝突](FIX_LOGS.md)
 - [R-Shop Channel 名稱硬編](FIX_LOGS.md)
 
+### `lib/features/game_list/widgets/game_grid.dart`
+- [R-Shop analyze 六項](FIX_LOGS.md)
+
 ### `lib/features/home/home_view.dart`
 - [R-Shop 目前來源](FIX_LOGS.md)
 - [備援接進同步](FIX_LOGS.md)
 - [同步不知道是哪一台](FIX_LOGS.md)
 - [標頭高度與誤讀的按鍵字](FIX_LOGS.md)
 - [使用中與顯示分家](FIX_LOGS.md)
+
+### `lib/features/library/library_screen.dart`
+- [R-Shop analyze 六項](FIX_LOGS.md)
+
+### `lib/features/onboarding/widgets/romm_legacy_login_screen.dart`
+- [R-Shop analyze 六項](FIX_LOGS.md)
+
+### `lib/features/onboarding/widgets/welcome_chooser_step.dart`
+- [R-Shop analyze 六項](FIX_LOGS.md)
 
 ### `lib/features/settings/sources_screen.dart`
 - [R-Shop 目前來源](FIX_LOGS.md)
@@ -39,21 +51,30 @@
 
 ### `lib/features/sources/endpoint_edit_screen.dart`
 - [R-Shop 連線路由](FIX_LOGS.md)
+- [R-Shop 自動選最優路線](FIX_LOGS.md)
 
 ### `lib/features/sources/endpoint_picker_overlay.dart`
 - [R-Shop 連線路由](FIX_LOGS.md)
 - [連線方式共用憑證](FIX_LOGS.md)
 - [同步不知道是哪一台](FIX_LOGS.md)
 - [浮層只做了手把](FIX_LOGS.md)
+- [R-Shop 自動選最優路線](FIX_LOGS.md)
 
 ### `lib/features/sources/fallback_picker_overlay.dart`
 - [R-Shop 來源備援](FIX_LOGS.md)
 - [浮層只做了手把](FIX_LOGS.md)
 
+### `lib/features/sources/manual_source_add_screen.dart`
+- [R-Shop analyze 六項](FIX_LOGS.md)
+
 ### `lib/l10n/app_*.arb`
 - [連線方式共用憑證](FIX_LOGS.md)
 - [同步不知道是哪一台](FIX_LOGS.md)
 - [來源清單快捷鍵](FIX_LOGS.md)
+- [R-Shop 自動選最優路線](FIX_LOGS.md)
+
+### `lib/l10n/app_{de,es,fr,ja,pt}.arb`
+- [R-Shop onboarding 五語系缺字串](FIX_LOGS.md)
 
 ### `lib/models/config/app_config.dart`
 - [R-Shop 目前來源](FIX_LOGS.md)
@@ -67,6 +88,7 @@
 - [R-Shop 來源備援](FIX_LOGS.md)
 - [連線方式共用憑證](FIX_LOGS.md)
 - [R-Shop 路線各自驗證](FIX_LOGS.md)
+- [R-Shop 自動選最優路線](FIX_LOGS.md)
 
 ### `lib/providers/app_providers.dart`
 - [同步不知道是哪一台](FIX_LOGS.md)
@@ -87,6 +109,7 @@
 ### `lib/services/endpoint_probe_service.dart`
 - [R-Shop 連線路由](FIX_LOGS.md)
 - [備援接進同步](FIX_LOGS.md)
+- [R-Shop 自動選最優路線](FIX_LOGS.md)
 
 ### `lib/services/native_smb_service.dart`
 - [R-Shop Channel 名稱硬編](FIX_LOGS.md)
@@ -112,6 +135,10 @@
 - [R-Shop 來源備援](FIX_LOGS.md)
 - [使用中與顯示分家](FIX_LOGS.md)
 - [R-Shop 路線各自驗證](FIX_LOGS.md)
+- [R-Shop 自動選最優路線](FIX_LOGS.md)
+
+### `lib/widgets/console_dialog.dart`
+- [R-Shop analyze 六項](FIX_LOGS.md)
 
 ### `lib/widgets/sync_badge.dart`
 - [同步不知道是哪一台](FIX_LOGS.md)
@@ -128,8 +155,15 @@
 ### `test/database_service_v15_migration_test.dart`
 - [R-Shop 路線各自驗證](FIX_LOGS.md)
 
+### `test/endpoint_probe_service_test.dart`
+- [R-Shop 自動選最優路線](FIX_LOGS.md)
+
+### `test/l10n_completeness_test.dart`
+- [R-Shop onboarding 五語系缺字串](FIX_LOGS.md)
+
 ### `test/source_endpoint_test.dart`
 - [R-Shop 路線各自驗證](FIX_LOGS.md)
+- [R-Shop 自動選最優路線](FIX_LOGS.md)
 
 ### `test/source_failover_sync_test.dart`
 - [使用中與顯示分家](FIX_LOGS.md)
@@ -139,6 +173,10 @@
 
 ### `test/sources_notifier_endpoints_test.dart`
 - [R-Shop 路線各自驗證](FIX_LOGS.md)
+- [R-Shop 自動選最優路線](FIX_LOGS.md)
+
+### `test/widgets/endpoint_picker_overlay_test.dart`
+- [R-Shop 自動選最優路線](FIX_LOGS.md)
 
 ### `test/widgets/sources_screen_test.dart`
 - [來源清單快捷鍵](FIX_LOGS.md)

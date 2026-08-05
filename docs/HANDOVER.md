@@ -57,94 +57,75 @@ UI 的東西 `analyze` 與單元測試都驗不到——見 `.agents/skills/rsho
 
 有黃黑斜紋就回報，那是版面溢位。
 
+### 1.1 這一批（2026-08-05，**尚未建置也尚未安裝**）
+
+> ⚠️ **裝上去之前一定要先問使用者**：這一批含 **schema v15 遷移，會改他的資料庫**（去重、換唯一鍵）。
+> 另外 `AGENTS.md` §5 本來就規定未經允許不得安裝或清資料。
+
+| 要看什麼 | 預期 |
+| :--- | :--- |
+| 連線方式浮層 | 每一列有**延遲毫秒數**；沒回應寫「沒有回應」，探測中寫「檢查中」 |
+| 浮層的「自動選擇」 | 講出**會選哪一條**（名字，不是「最上面那條」）；選它＝解除鎖定 |
+| 浮層的徽章 | 最快／使用中／已鎖定／專屬登入。**用手指點每一列都要會動**（不是只有手把） |
+| 連線方式編輯頁 | 有登入欄位；**留空時畫面要說「沿用來源的登入資訊」**，填了要說「用自己的」 |
+| 切到別條路線 | 清單不該重抓（換路不換清單），也不該把使用中的來源換掉 |
+| 五語系的引導頁 | de/es/fr/ja/pt 的「設定遊戲庫路徑」那三句不再是空白 |
+| 捲動 | 格線與圖書館換了 `scrollCacheExtent`，**捲動的順暢度應該完全沒變**（有變就是單位換錯了） |
+
 ---
 
 ## 2. 待辦
 
-### 2.0 進行中：路線各自驗證＋自動選最優路線（2026-08-04 暫停，資料層已完成）
+> 2026-08-05：原本掛在這裡的三項（自動選最優路線＋UI、五語系 onboarding 字串、analyze 六項）
+> **全部做完了**，紀錄見 `docs/FIX_LOGS.md` 的 `[R-Shop 自動選最優路線]`、
+> `[R-Shop onboarding 五語系缺字串]`、`[R-Shop analyze 六項]`。
+> 底下是做那三項時**新長出來的**，不是舊的殘留。
 
-**這一項推翻了不變式 5，不是繞過它。** 使用者確認的前提：同一個來源底下的多條連線方式
-**就是同一台伺服器**，但**各自需要驗證**（區網直連與 DDNS 走不同的前門）。
+### 2.1 同步的可達性判定還停在來源層級
 
-設計就兩句：**憑證跟著路線走，清單跟著來源走。**
-細節與取捨見 `docs/FIX_LOGS.md` 的 `[R-Shop 路線各自驗證]`。
+`resolveForSync` 判定一個來源「可達」的條件是**任一條路線通**，但它同步時走的是
+`liveEndpoint`——所以會出現「來源算通、實際走的那條是死的」而不觸發備援的情況。
+自動選最優路線只作用在使用者開浮層與明確呼叫 `autoSelectEndpoint` 的時候，**同步路徑沒接上**。
 
-#### 已完成（已提交，測試綠）
+修法大概是同步前先 `probeFor` 再挑最快的活路（只改記憶體中的 config，
+不變式 3：備援與換路都不准寫磁碟）。**這屬於備援那條路，不是路線那條**，
+所以刻意沒有夾在上一批裡做。
 
-    schema v15          唯一鍵改 (systemSlug, filename, source_id)；v14 重複列去重
-    路線憑證模型        SourceEndpoint.auth；Source.auth 改為 getter
-    測試                DB 三檔全過；endpoint/resolver/notifier 三檔 73 項全過
-    analyze             乾淨（只剩 §2.2 那 6 個既有問題）
+### 2.2 五語系的「已鎖定」用詞不一致
 
-#### 還沒做（**下次從這裡開始**）
+en/zh 是「Locked／已鎖定」，de/es/ja/pt 仍是「固定」（`Fixiert`／`Fijada`／`固定`／`Fixada`），
+只有 fr 是 `Verrouillée`。翻譯時是照各檔既有用詞走的，**不算錯，但六種語言講的不是同一件事**。
+要統一就六個檔一起改 `sources_routePinned` 與相關句子。
 
-1. **自動選最優路線** —— `endpoint_probe_service.dart` 目前只回「通不通」，
-   要改成**回延遲並排序**，能通的裡面挑最快。`switchEndpoint` 的 `pin: true`
-   從「選定」改成「使用者覆寫」，沒覆寫就自動。
-   **這支會動 `sources_notifier.dart`**，跟 UI 那項排開做，不要同時派。
-2. **UI** —— 連線方式編輯頁加憑證欄位；選擇浮層顯示延遲與「自動／已釘選」。
-   ⚠️ **兩套入口都要**（觸控＋手把），先讀 `.agents/skills/rshop-touch-and-gamepad`——
-   這四個浮層**每一個都曾經是觸控死的**。
-3. **七語系字串**（en/zh/de/es/fr/ja/pt），與功能同一次補齊。
-4. **`sources_routeSameServerHint` 的意思變了** —— 它原本是「同一台才能共用 token」的
-   401 警告，現在路線各自驗證，這句話要改寫或刪掉。
-5. `lib/models/config/source.dart` 的 `SourceEndpoint` 檔頭註解還寫著
-   「same server, same library, **same credentials**」，最後一項已過時。
-6. 改寫 `docs/FIX_LOGS.md` 的 `[R-Shop 自動選最快]` —— 那條的「決定不做」
-   **已被本項取代**，要標明，不要留著兩個相反的結論。
-7. 全部做完才實機驗證。**v15 遷移會改使用者的資料庫**，裝上去之前先問他。
-
-#### 一個要盯的點
-
-v15 去重「保留已下載到裝置上的那筆」用的判準是：`games` 表**沒有本機路徑欄位**，
-安裝狀態是從檔案系統推的，遷移不能做那種 IO。表內唯一的訊號是
-`purgeOrDetachSource` 留下的狀態（`provider_config` / `url` 被清空）。
-判準寫在 `_v15OnDeviceRank`，**要換訊號就改那一行**。
-實務上同一來源的重複列多半兩筆都同狀態，平手時取 `id` 最小的，
-而且合併前會先把 `cover_url` / `has_thumbnail` / `alternative_sources` 撿回來。
-
-### 2.1 五個語系缺三個 onboarding 字串
-
-`onboarding_folderExplanationTitle`、`onboarding_folderExplanationMessage`、
-`onboarding_continueToPicker` 只有 `en` 與 `zh` 有，**de / es / fr / ja / pt 全缺**。
-
-這就是 `test/l10n_completeness_test.dart` 的 `DE has all EN keys` 一直失敗的原因——
-**它是真的缺，不是環境問題**，補完那一項就會綠。
-（另外 6 個失敗才是環境造成的，見 §3。）
-
-### 2.2 `analyze` 的 6 個既有問題
-
-不是這幾輪造成的，但沒人清：
-
-    lib/features/onboarding/widgets/romm_legacy_login_screen.dart:11   未使用的 import
-    lib/features/sources/manual_source_add_screen.dart:14              未使用的 import
-    lib/features/onboarding/widgets/welcome_chooser_step.dart:434      未使用的區域變數 color
-    lib/widgets/console_dialog.dart:91                                 未使用的區域變數 rs
-    lib/features/game_list/widgets/game_grid.dart:178                  cacheExtent 已棄用
-    lib/features/library/library_screen.dart:1294                      cacheExtent 已棄用
+順帶：`app_ja.arb` 與 `app_pt.arb` 的 `sources_*` 區塊現在**跳脫方式混用**——
+檔案整體慣例是 `\uXXXX`，先前有人直接寫了原字。不影響行為，看得刺眼而已。
 
 ---
 
 ## 3. 已知不修
 
-### 3.1 測試基準：7 個失敗是既有的
+### 3.1 測試基準：6 個失敗是既有的
 
-`flutter test` 完整跑約 1760 通過 / 7 失敗。**7 個都不是回歸**：
+`flutter test` 完整跑 **1825 通過 / 6 失敗**（2026-08-05 實測）。**6 個都不是回歸**：
 
-    l10n_completeness: DE has all EN keys   真的缺字串，見 §2.1
     network_discovery: mDNS                 Windows socket errno 10042
     rom_folder_service ×3                   Windows 路徑行為
     romm_pairing_live_smoke ×2              需要真的有 RomM 跑在 localhost:8090
+
+> 原本是 7 個。第 7 個（`l10n_completeness: DE has all EN keys`）**是真的缺字串**，
+> 已補完並綠了——見 `docs/FIX_LOGS.md` 的 `[R-Shop onboarding 五語系缺字串]`。
+> **教訓**：基準清單裡的每一條都要寫得出「為什麼它不算回歸」，寫不出來的那條就是還沒查。
 
 **另外有一個時序敏感的測試會偶爾多失敗一個**：
 `game_list_controller: restoreFilters applies saved filters`。
 **單次隔離執行失敗不足以認定回歸**——我為此誤判過一次，連跑三次就會發現它自己會過。
 
-### 3.2 自動選最快的那條路線：決定不做
+### 3.2 ~~自動選最快的那條路線：決定不做~~ → 已重開並做完（2026-08-05）
 
-不是「還沒做」，是**做了會違反來源路由的不變式**——「同一台也當不同台」之下，
-替使用者換一條路等於替他換了一個來源。連不上時走**備援**已經涵蓋真正需要的情境。
-理由與重開條件見 `docs/FIX_LOGS.md` 的 `[R-Shop 自動選最快]`。
+**這條不再是「不修」。** 當初的理由是「同一台也當不同台，替他換路＝替他換來源」，
+但那句話管的是**來源之間**，不是同一個來源底下的**路線之間**——
+`[R-Shop 路線各自驗證]` 把路線收斂成同一台、同一份清單之後，重開條件就成立了。
+現行行為見 `docs/FIX_LOGS.md` 的 `[R-Shop 自動選最優路線]`。
 
 ### 3.3 `FIX_BY_FILE.md` 的「反查不到」不是待辦
 

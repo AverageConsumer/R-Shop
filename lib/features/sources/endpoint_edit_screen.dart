@@ -5,16 +5,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/console_focusable.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/config/provider_config.dart';
 import '../../models/config/source.dart';
 import '../../providers/app_providers.dart';
 import '../../widgets/console_hud.dart';
 
 /// Adds or edits one connection route on a source.
 ///
-/// A route is just an address: the same RomM server has one on the LAN and one
-/// on the internet. Credentials live on the [Source], not here — both routes
-/// reach the same server with the same account, so asking for the password
-/// again per route would be wrong.
+/// A route is an address plus, optionally, a login of its own. The same RomM
+/// server has one address on the LAN and one on the internet, and those two
+/// front doors can want different credentials — the LAN address answers
+/// straight from the box while the DDNS name arrives through a reverse proxy
+/// with its own gate.
+///
+/// **Leaving the login blank is the normal case**: the route then uses the
+/// source's own credentials ([Source.defaultAuth]). The screen says so out
+/// loud, because "blank" otherwise reads as "no login at all" — which for a
+/// server that does want one would look like a broken route rather than an
+/// inherited login.
 ///
 /// Returns the edited [SourceEndpoint] via `Navigator.pop`, or null on cancel.
 class EndpointEditScreen extends ConsumerStatefulWidget {
@@ -48,8 +56,18 @@ class _EndpointEditScreenState extends ConsumerState<EndpointEditScreen> {
   late final _port =
       TextEditingController(text: widget.initial?.port?.toString() ?? '');
   late final _share = TextEditingController(text: widget.initial?.share ?? '');
+  late final _user =
+      TextEditingController(text: widget.initial?.auth?.user ?? '');
+  late final _pass =
+      TextEditingController(text: widget.initial?.auth?.pass ?? '');
 
   List<_Field> _fields = const [];
+
+  /// Index in [_fields] where the credentials start. The explanatory block is
+  /// injected in front of it, so the two halves of the form stay one focus
+  /// order rather than becoming two lists the D-pad has to cross.
+  int _authStart = 0;
+
   String? _error;
   bool _built = false;
 
@@ -64,7 +82,7 @@ class _EndpointEditScreenState extends ConsumerState<EndpointEditScreen> {
     if (_built) return;
     _built = true;
     final l = L.of(context);
-    _fields = [
+    final address = <_Field>[
       _Field(l.manualSource_name, _label, hint: '區網 / 遠端'),
       if (_isUrlType)
         _Field(l.manualSource_url, _url,
@@ -78,6 +96,16 @@ class _EndpointEditScreenState extends ConsumerState<EndpointEditScreen> {
           _Field(l.manualSource_share, _share,
               hint: l.manualSource_shareHint, monospace: true),
       ],
+    ];
+    _authStart = address.length;
+    _fields = [
+      ...address,
+      // Same two credential fields the manual source form offers, so a route's
+      // login is filled in exactly the way the source's own login was.
+      _Field(l.manualSource_usernameOptional, _user,
+          hint: l.manualSource_usernameHint),
+      _Field(l.manualSource_passwordOptional, _pass,
+          hint: '••••••••', obscure: true),
     ];
   }
 
@@ -93,6 +121,8 @@ class _EndpointEditScreenState extends ConsumerState<EndpointEditScreen> {
     _host.dispose();
     _port.dispose();
     _share.dispose();
+    _user.dispose();
+    _pass.dispose();
     super.dispose();
   }
 
@@ -145,6 +175,22 @@ class _EndpointEditScreenState extends ConsumerState<EndpointEditScreen> {
     ref.read(feedbackServiceProvider).tick();
   }
 
+  /// The route's own credentials, or null when both fields are blank.
+  ///
+  /// Null is what makes the route inherit [Source.defaultAuth], so emptying
+  /// the fields has to produce null rather than an [AuthConfig] full of nulls:
+  /// [SourceEndpoint.hasOwnAuth] only asks whether the object exists, and an
+  /// empty one would claim this route logs in by itself with no credentials.
+  AuthConfig? _authOrNull() {
+    final user = _user.text.trim();
+    final pass = _pass.text;
+    if (user.isEmpty && pass.isEmpty) return null;
+    return AuthConfig(
+      user: user.isEmpty ? null : user,
+      pass: pass.isEmpty ? null : pass,
+    );
+  }
+
   SourceEndpoint? _build(L l) {
     final label = _label.text.trim();
     if (_isUrlType) {
@@ -157,6 +203,7 @@ class _EndpointEditScreenState extends ConsumerState<EndpointEditScreen> {
         id: widget.initial?.id ?? _newId(),
         label: label,
         url: url,
+        auth: _authOrNull(),
       );
     }
     final host = _host.text.trim();
@@ -174,6 +221,7 @@ class _EndpointEditScreenState extends ConsumerState<EndpointEditScreen> {
       host: host,
       port: int.tryParse(_port.text.trim()),
       share: widget.sourceType == SourceType.smb ? _share.text.trim() : null,
+      auth: _authOrNull(),
     );
   }
 
@@ -246,8 +294,49 @@ class _EndpointEditScreenState extends ConsumerState<EndpointEditScreen> {
                   children: [
                     for (int i = 0; i < _fields.length; i++) ...[
                       if (i > 0) const SizedBox(height: 14),
+                      if (i == _authStart) ...[
+                        _AuthHeader(
+                          title: l.sources_routeAuthTitle,
+                          hint: l.sources_routeAuthHint,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       _FieldEditor(field: _fields[i], autofocus: i == 0),
                     ],
+                    const SizedBox(height: 8),
+                    // Says which of the two states the form is currently in.
+                    // "Blank means inherited" is a rule nobody can see, so it
+                    // gets restated as a live answer rather than only as
+                    // instructions above the fields.
+                    ListenableBuilder(
+                      listenable: Listenable.merge([_user, _pass]),
+                      builder: (context, _) {
+                        final own = _authOrNull() != null;
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              own ? Icons.key : Icons.link,
+                              size: 12,
+                              color: Colors.white38,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                own
+                                    ? l.sources_routeAuthOwn
+                                    : l.sources_routeAuthInherited,
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 11,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                     if (_error != null) ...[
                       const SizedBox(height: 16),
                       Text(
@@ -296,12 +385,50 @@ class _EndpointEditScreenState extends ConsumerState<EndpointEditScreen> {
   }
 }
 
+/// Non-focusable heading that separates the address from the credentials and
+/// states the rule the fields below obey.
+class _AuthHeader extends StatelessWidget {
+  const _AuthHeader({required this.title, required this.hint});
+
+  final String title;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Divider(color: Colors.white12, height: 24),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          hint,
+          style: const TextStyle(
+            color: Colors.white38,
+            fontSize: 11,
+            height: 1.3,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _Field {
   _Field(
     this.label,
     this.controller, {
     this.hint = '',
     this.monospace = false,
+    this.obscure = false,
     this.keyboardType,
   })  : consoleFocus = FocusNode(debugLabel: 'ep_${label}_wrap'),
         textFocus =
@@ -311,6 +438,7 @@ class _Field {
   final TextEditingController controller;
   final String hint;
   final bool monospace;
+  final bool obscure;
   final TextInputType? keyboardType;
   final FocusNode consoleFocus;
   final FocusNode textFocus;
@@ -368,6 +496,7 @@ class _FieldEditor extends StatelessWidget {
                   controller: field.controller,
                   focusNode: field.textFocus,
                   keyboardType: field.keyboardType,
+                  obscureText: field.obscure,
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,

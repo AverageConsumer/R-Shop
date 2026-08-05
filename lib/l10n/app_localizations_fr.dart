@@ -1286,14 +1286,15 @@ class LFr extends L {
   String get onboarding_serverType => 'Type de serveur';
 
   @override
-  String get onboarding_folderExplanationTitle => 'Setup your Library Path';
+  String get onboarding_folderExplanationTitle =>
+      'Configure le chemin de ta bibliothèque';
 
   @override
   String get onboarding_folderExplanationMessage =>
-      'R-Shop needs a base folder to store your downloaded games. This helps organize your files and is required for Android folder permissions.\n\nWe recommend creating a folder named \'ROMs\' and selecting it.';
+      'R-Shop a besoin d\'un dossier de base pour stocker les jeux que tu télécharges. Cela aide à organiser tes fichiers et c\'est indispensable pour les autorisations de dossier d\'Android.\n\nNous te conseillons de créer un dossier nommé \'ROMs\' et de le sélectionner.';
 
   @override
-  String get onboarding_continueToPicker => 'Select Folder';
+  String get onboarding_continueToPicker => 'Choisir le dossier';
 
   @override
   String get onboarding_hangOn => 'Un instant, test de la connexion...';
@@ -1642,7 +1643,7 @@ class LFr extends L {
 
   @override
   String get sources_routeAutoHint =>
-      'Utiliser la voie qui répond, la première en priorité';
+      'Utiliser la voie la plus rapide qui répond, revérifiée quand le réseau change';
 
   @override
   String get sources_routeInUse => 'Utilisée';
@@ -1658,6 +1659,43 @@ class LFr extends L {
 
   @override
   String get sources_routeChecking => 'Vérification…';
+
+  @override
+  String sources_routeLatencyMs(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String sources_routeAutoPicks(String route) {
+    return 'Utiliserait $route';
+  }
+
+  @override
+  String get sources_routeAutoNoneReachable => 'Rien n\'a répondu';
+
+  @override
+  String get sources_routeFastest => 'La plus rapide';
+
+  @override
+  String get sources_routeReleasePin =>
+      'Déverrouille et resélectionne la plus rapide';
+
+  @override
+  String get sources_routeOwnLogin => 'Connexion dédiée';
+
+  @override
+  String get sources_routeAuthTitle => 'Connexion pour cette voie';
+
+  @override
+  String get sources_routeAuthHint =>
+      'Laisser vide pour utiliser la connexion de la source. À remplir uniquement si cette adresse en demande une autre.';
+
+  @override
+  String get sources_routeAuthInherited => 'Utilise la connexion de la source';
+
+  @override
+  String get sources_routeAuthOwn =>
+      'Cette voie se connecte avec ses propres identifiants';
 
   @override
   String get sources_routeOnlyOne => 'Cette source n\'a qu\'une seule voie';
@@ -1698,7 +1736,7 @@ class LFr extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      'Uniquement pour les adresses ne demandant pas de connexion distincte. Si elle redemande une connexion, ajoutez-la comme source et associez les deux en secours.';
+      'Toutes les voies mènent au même serveur. Une voie peut avoir sa propre connexion si cette adresse en demande une autre.';
 
   @override
   String get sources_routeCannotRemoveLast =>

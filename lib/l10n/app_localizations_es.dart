@@ -1285,14 +1285,15 @@ class LEs extends L {
   String get onboarding_serverType => 'Tipo de servidor';
 
   @override
-  String get onboarding_folderExplanationTitle => 'Setup your Library Path';
+  String get onboarding_folderExplanationTitle =>
+      'Configura la ruta de tu biblioteca';
 
   @override
   String get onboarding_folderExplanationMessage =>
-      'R-Shop needs a base folder to store your downloaded games. This helps organize your files and is required for Android folder permissions.\n\nWe recommend creating a folder named \'ROMs\' and selecting it.';
+      'R-Shop necesita una carpeta base para guardar los juegos que descargues. Esto ayuda a organizar tus archivos y es necesario para los permisos de carpetas de Android.\n\nTe recomendamos crear una carpeta llamada \'ROMs\' y seleccionarla.';
 
   @override
-  String get onboarding_continueToPicker => 'Select Folder';
+  String get onboarding_continueToPicker => 'Seleccionar carpeta';
 
   @override
   String get onboarding_hangOn => 'Un momento, probando la conexión...';
@@ -1640,7 +1641,7 @@ class LEs extends L {
 
   @override
   String get sources_routeAutoHint =>
-      'Usar la ruta que responda, priorizando la primera';
+      'Usar la ruta más rápida que responda; se comprueba de nuevo cuando cambia la red';
 
   @override
   String get sources_routeInUse => 'En uso';
@@ -1656,6 +1657,43 @@ class LEs extends L {
 
   @override
   String get sources_routeChecking => 'Comprobando…';
+
+  @override
+  String sources_routeLatencyMs(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String sources_routeAutoPicks(String route) {
+    return 'Usaría $route';
+  }
+
+  @override
+  String get sources_routeAutoNoneReachable => 'No respondió ninguna';
+
+  @override
+  String get sources_routeFastest => 'La más rápida';
+
+  @override
+  String get sources_routeReleasePin =>
+      'Quita la fijación y vuelve a elegir la más rápida';
+
+  @override
+  String get sources_routeOwnLogin => 'Inicio de sesión propio';
+
+  @override
+  String get sources_routeAuthTitle => 'Inicio de sesión de esta ruta';
+
+  @override
+  String get sources_routeAuthHint =>
+      'Déjalo en blanco para usar el inicio de sesión de la fuente. Rellénalo solo si esta dirección pide otro.';
+
+  @override
+  String get sources_routeAuthInherited =>
+      'Usa el inicio de sesión de la fuente';
+
+  @override
+  String get sources_routeAuthOwn => 'Esta ruta inicia sesión por su cuenta';
 
   @override
   String get sources_routeOnlyOne => 'Esta fuente solo tiene una ruta';
@@ -1696,7 +1734,7 @@ class LEs extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      'Solo para direcciones que no requieren iniciar sesión aparte. Si te pide iniciar sesión de nuevo, añádela como fuente propia y empareja ambas como respaldo.';
+      'Todas las rutas llegan al mismo servidor. Una ruta puede llevar su propio inicio de sesión si esa dirección pide otro.';
 
   @override
   String get sources_routeCannotRemoveLast =>

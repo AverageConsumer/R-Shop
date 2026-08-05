@@ -140,9 +140,29 @@ endpoint_id TEXT NOT NULL DEFAULT ''
 
 ---
 
-## 探測
+## 探測與自動選路（2026-08-05 改寫）
 
 `EndpointProbeService` 用 TCP connect，單點 1 秒／整體 3 秒，有 TTL 快取。
+**它現在回的是延遲不是通不通**：`probeFor()` 給 `ProbeResults`（`ranked` 最快在前、
+`latencyOf(id)` 給浮層顯示、`fastestId` 就是「自動」會挑的那一條）。
+`reachableFor()` 留著，因為 `resolveForSync` 問的真的只是「這個來源整台通不通」。
+
+`resolve()` 的規則：**釘選就用釘選的，否則挑能通的裡面最快的**。
+`resolveEndpoint({List<String> reachable})` 吃的是**排序後的 id 清單**不是延遲——
+`lib/models` 不准 import 服務層的型別，而且傳清單比只傳最快的那個好：
+最快的那條被刪掉時會自動退到第二快，傳單一 id 就沒有退路。
+
+**`pin: true` 的意思是「使用者覆寫」，不是「選定」。** 沒覆寫就自動，
+浮層的「自動」那一列走 `clearEndpointOverride`。`autoSelectEndpoint` 探測完會**重讀一次狀態**
+才動手——探測那一秒內使用者可能剛好釘選了，不重讀就會把他的覆寫蓋掉。
+
+**`_bootstrap` 不探測。** 開機不能等網路，而且測試裡建個 notifier 就會開真的 socket。
+它只做離線的對齊：釘選指向不存在的路線就退回 `auto`，有效的釘選把值鏡到頂層欄位（不變式 4），
+真的有變才寫回磁碟。
+
+> 為什麼自動選路現在合法：見 `docs/FIX_LOGS.md` 的 `[R-Shop 自動選最快]`——
+> 那條當初判定「不做」，**錯在把路線之間當成來源之間**。「同一台也當不同台」管的是來源，
+> 同一個來源底下的路線本來就是同一台、同一份清單，換路線換不掉使用者選的來源。
 
 **已修過的坑**：`_probeableEndpoints()` 在 `endpoints` 為空時，
 原本會靜默回報「不可達」—— 而不可達正是觸發備援的條件，

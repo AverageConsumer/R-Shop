@@ -5,6 +5,7 @@ import 'package:retro_eshop/models/config/provider_config.dart';
 import 'package:retro_eshop/models/config/source.dart';
 import 'package:retro_eshop/services/config_storage_service.dart';
 import 'package:retro_eshop/services/database_service.dart';
+import 'package:retro_eshop/services/endpoint_probe_service.dart';
 import 'package:retro_eshop/services/sources_notifier.dart';
 
 /// Records purge calls so the tests can assert the one invariant that makes
@@ -428,4 +429,194 @@ void main() {
       expect(notifier.state.sources.single.endpoints, hasLength(2));
     });
   });
+
+  group('autoSelectEndpoint', () {
+    test('moves to the fastest route without recording an override', () async {
+      final (notifier, db) = await _seeded();
+
+      final chosen = await notifier.autoSelectEndpoint(
+        's1',
+        probe: _probe(fast: _remoteAddress, slow: _lanAddress),
+      );
+
+      final src = notifier.state.sources.single;
+      expect(chosen, 'ep-remote');
+      expect(src.liveEndpoint?.id, 'ep-remote');
+      expect(src.endpointSelection, EndpointSelection.auto);
+      expect(src.pinnedEndpointId, isNull);
+      // The reason auto-selection can run as often as it likes.
+      expect(db.purged, isEmpty);
+    });
+
+    test('leaves a route the user overrode exactly where it is', () async {
+      final (notifier, _) = await _seeded();
+      await notifier.switchEndpoint('s1', 'ep-remote'); // pins by default
+
+      final chosen = await notifier.autoSelectEndpoint(
+        's1',
+        probe: _probe(fast: _lanAddress, slow: _remoteAddress),
+      );
+
+      expect(chosen, 'ep-remote');
+      expect(notifier.state.sources.single.liveEndpoint?.id, 'ep-remote');
+    });
+
+    test('ignores a route that did not answer, however it is listed', () async {
+      final (notifier, _) = await _seeded();
+
+      await notifier.autoSelectEndpoint(
+        's1',
+        probe: _probe(fast: _remoteAddress, down: {_lanAddress}),
+      );
+
+      expect(notifier.state.sources.single.liveEndpoint?.id, 'ep-remote');
+    });
+
+    test('stays put when nothing answers — a real error beats a silent move',
+        () async {
+      final (notifier, _) = await _seeded();
+
+      await notifier.autoSelectEndpoint(
+        's1',
+        probe: _probe(down: {_lanAddress, _remoteAddress}),
+      );
+
+      expect(notifier.state.sources.single.liveEndpoint?.id, 'ep-lan');
+    });
+
+    test('a single-route source is not worth a probe', () async {
+      final (notifier, _) = await _seeded();
+      await notifier.removeEndpoint('s1', 'ep-remote');
+      final net = _FakeNet(const {});
+
+      await notifier.autoSelectEndpoint(
+        's1',
+        probe: EndpointProbeService(connect: net.connect),
+      );
+
+      expect(net.asked, isEmpty);
+    });
+
+    test('clearEndpointOverride releases the pin and re-picks in one call',
+        () async {
+      final (notifier, _) = await _seeded();
+      await notifier.switchEndpoint('s1', 'ep-remote');
+
+      await notifier.clearEndpointOverride(
+        's1',
+        probe: _probe(fast: _lanAddress, slow: _remoteAddress),
+      );
+
+      final src = notifier.state.sources.single;
+      expect(src.endpointSelection, EndpointSelection.auto);
+      expect(src.pinnedEndpointId, isNull);
+      expect(src.liveEndpoint?.id, 'ep-lan');
+    });
+
+    test('autoSelectAllEndpoints skips disabled sources', () async {
+      final (notifier, _) = await _seeded();
+      await notifier.addSource(_rommWithRoutes(id: 's2'));
+      await notifier.setEnabled('s2', false);
+
+      await notifier.autoSelectAllEndpoints(
+        probe: _probe(fast: _remoteAddress, slow: _lanAddress),
+      );
+
+      final byId = {for (final s in notifier.state.sources) s.id: s};
+      expect(byId['s1']!.liveEndpoint?.id, 'ep-remote');
+      expect(byId['s2']!.liveEndpoint?.id, 'ep-lan');
+    });
+  });
+
+  group('bootstrap realigns stored overrides', () {
+    test('a pin naming a deleted route is not an override any more', () async {
+      final storage = _storageInTempDir();
+      final (notifier, _) = await _seeded(storage: storage);
+      await notifier.switchEndpoint('s1', 'ep-remote');
+      // Rewrite the config the way a hand-edit or an older build could leave
+      // it: pinned at a route the source no longer has.
+      await notifier.updateSource(
+        notifier.state.sources.single.copyWith(
+          pinnedEndpointId: 'ep-gone',
+        ),
+      );
+
+      final reloaded = SourcesNotifier(storage, db: _SpyDb());
+      await reloaded.ready;
+
+      final src = reloaded.state.sources.single;
+      expect(src.endpointSelection, EndpointSelection.auto);
+      expect(src.pinnedEndpointId, isNull);
+    });
+
+    test('the connection fields are made to agree with the pin', () async {
+      // Invariant: the top-level url *is* the live route. A stored config
+      // where they disagree would show "已釘選 遠端" while every provider
+      // talked to the LAN.
+      final storage = _storageInTempDir();
+      final (notifier, _) = await _seeded(storage: storage);
+      await notifier.updateSource(
+        notifier.state.sources.single.copyWith(
+          endpointSelection: EndpointSelection.pinned,
+          pinnedEndpointId: 'ep-remote',
+        ),
+      );
+      expect(notifier.state.sources.single.liveEndpoint?.id, 'ep-lan');
+
+      final reloaded = SourcesNotifier(storage, db: _SpyDb());
+      await reloaded.ready;
+
+      final src = reloaded.state.sources.single;
+      expect(src.liveEndpoint?.id, 'ep-remote');
+      expect(src.url, 'https://roms.example.org');
+      expect(src.endpointSelection, EndpointSelection.pinned);
+    });
+
+    test('an auto source is left alone — startup never waits on a probe',
+        () async {
+      final storage = _storageInTempDir();
+      final (notifier, _) = await _seeded(storage: storage);
+      await notifier.switchEndpoint('s1', 'ep-remote', pin: false);
+
+      final reloaded = SourcesNotifier(storage, db: _SpyDb());
+      await reloaded.ready;
+
+      expect(reloaded.state.sources.single.liveEndpoint?.id, 'ep-remote');
+    });
+  });
+}
+
+const _lanAddress = '192.168.1.50:8090';
+const _remoteAddress = 'roms.example.org:443';
+
+/// Fake connector so no test opens a socket. [down] never answers; [fast] and
+/// [slow] answer far enough apart that the ranking does not depend on how busy
+/// the machine is.
+class _FakeNet {
+  _FakeNet(this.down, {this.fast, this.slow});
+
+  final Set<String> down;
+  final String? fast;
+  final String? slow;
+  final asked = <String>[];
+
+  Future<void> connect(String host, int port, Duration timeout) async {
+    final address = '$host:$port';
+    asked.add(address);
+    if (address == slow) {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    } else if (address == fast) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+    if (down.contains(address)) throw Exception('down');
+  }
+}
+
+EndpointProbeService _probe({
+  String? fast,
+  String? slow,
+  Set<String> down = const {},
+}) {
+  final net = _FakeNet(down, fast: fast, slow: slow);
+  return EndpointProbeService(connect: net.connect);
 }

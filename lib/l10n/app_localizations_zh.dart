@@ -1587,7 +1587,7 @@ class LZh extends L {
   String get sources_routeAuto => '自動選擇';
 
   @override
-  String get sources_routeAutoHint => '用連得上的那條，優先用最上面的';
+  String get sources_routeAutoHint => '用回應最快的那條，網路變了會重新選';
 
   @override
   String get sources_routeInUse => '使用中';
@@ -1603,6 +1603,40 @@ class LZh extends L {
 
   @override
   String get sources_routeChecking => '檢查中…';
+
+  @override
+  String sources_routeLatencyMs(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String sources_routeAutoPicks(String route) {
+    return '會選「$route」';
+  }
+
+  @override
+  String get sources_routeAutoNoneReachable => '沒有任何連線方式有回應';
+
+  @override
+  String get sources_routeFastest => '最快';
+
+  @override
+  String get sources_routeReleasePin => '解除鎖定，重新選最快的那條';
+
+  @override
+  String get sources_routeOwnLogin => '專屬登入';
+
+  @override
+  String get sources_routeAuthTitle => '這條連線方式的登入資訊';
+
+  @override
+  String get sources_routeAuthHint => '留空就沿用來源的登入資訊；只有這個位址要求另一組登入時才填。';
+
+  @override
+  String get sources_routeAuthInherited => '沿用來源的登入資訊';
+
+  @override
+  String get sources_routeAuthOwn => '這條連線方式用自己的登入資訊';
 
   @override
   String get sources_routeOnlyOne => '這個來源只有一條連線方式';
@@ -1642,7 +1676,7 @@ class LZh extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      '只適用不需要另外登入的位址。如果那個位址要你重新登入，請改成「新增來源」，再把兩個互設備援。';
+      '這些都是通往同一台伺服器的路。某個位址要求另一組登入時，可以只幫那一條設定登入資訊。';
 
   @override
   String get sources_routeCannotRemoveLast => '最後一條連線方式不能移除';

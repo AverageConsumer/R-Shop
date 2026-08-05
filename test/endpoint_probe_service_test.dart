@@ -33,17 +33,25 @@ Source _romm({
 
 /// Fake connector: succeeds only for the addresses in [up], and records every
 /// address it was asked about so tests can assert what was and was not probed.
+///
+/// [delays] fakes how far away an address is. The gaps used below are tens of
+/// milliseconds apart so the ranking assertions do not depend on how busy the
+/// machine running them happens to be.
 class _FakeNet {
-  _FakeNet(this.up);
+  _FakeNet(this.up, {Map<String, Duration>? delays})
+      : delays = delays ?? const {};
 
   final Set<String> up;
+  final Map<String, Duration> delays;
   final asked = <String>[];
   Duration delay = Duration.zero;
 
   Future<void> connect(String host, int port, Duration timeout) async {
-    asked.add('$host:$port');
-    if (delay > Duration.zero) await Future<void>.delayed(delay);
-    if (!up.contains('$host:$port')) {
+    final address = '$host:$port';
+    asked.add(address);
+    final wait = delays[address] ?? delay;
+    if (wait > Duration.zero) await Future<void>.delayed(wait);
+    if (!up.contains(address)) {
       throw const SocketFailure();
     }
   }
@@ -124,12 +132,45 @@ void main() {
     });
   });
 
-  group('reachableFor', () {
+  group('probeFor', () {
     test('reports only the routes that answered', () async {
       final net = _FakeNet({'192.168.1.50:8090'});
       final svc = EndpointProbeService(connect: net.connect);
 
-      expect(await svc.reachableFor(_romm()), {'ep-lan'});
+      final results = await svc.probeFor(_romm());
+
+      expect(results.rankedIds, ['ep-lan']);
+      expect(results.contains('ep-remote'), isFalse);
+      expect(results.latencyOf('ep-remote'), isNull);
+    });
+
+    test('ranks by latency, not by list order', () async {
+      // The whole feature: the address further down the list wins when it is
+      // the one that actually answers quickly.
+      final net = _FakeNet(
+        {'192.168.1.50:8090', 'roms.example.org:443'},
+        delays: const {
+          '192.168.1.50:8090': Duration(milliseconds: 120),
+          'roms.example.org:443': Duration(milliseconds: 5),
+        },
+      );
+      final svc = EndpointProbeService(connect: net.connect);
+
+      final results = await svc.probeFor(_romm());
+
+      expect(results.rankedIds, ['ep-remote', 'ep-lan']);
+      expect(results.fastestId, 'ep-remote');
+      expect(
+        results.latencyOf('ep-lan')!,
+        greaterThan(results.latencyOf('ep-remote')!),
+      );
+    });
+
+    test('reachableFor still answers the up/down question', () async {
+      final net = _FakeNet({'roms.example.org:443'});
+      final svc = EndpointProbeService(connect: net.connect);
+
+      expect(await svc.reachableFor(_romm()), {'ep-remote'});
     });
 
     test('probes every route, not just the first', () async {
@@ -139,7 +180,7 @@ void main() {
       final net = _FakeNet({});
       final svc = EndpointProbeService(connect: net.connect);
 
-      await svc.reachableFor(_romm());
+      await svc.probeFor(_romm());
 
       expect(net.asked, containsAll(['192.168.1.50:8090', 'roms.example.org:443']));
     });
@@ -152,7 +193,7 @@ void main() {
         endpoints: const [SourceEndpoint(id: 'ep-blank', label: '空的')],
       );
 
-      expect(await svc.reachableFor(src), isEmpty);
+      expect((await svc.probeFor(src)).isEmpty, isTrue);
       expect(net.asked, isEmpty);
     });
 
@@ -166,7 +207,7 @@ void main() {
         path: '/roms',
       );
 
-      expect(await svc.reachableFor(src), isEmpty);
+      expect(await svc.probeFor(src), ProbeResults.empty);
       expect(net.asked, isEmpty);
     });
 
@@ -180,9 +221,28 @@ void main() {
         overallBudget: const Duration(milliseconds: 20),
       );
 
-      final reachable = await svc.reachableFor(_romm());
+      final results = await svc.probeFor(_romm());
 
-      expect(reachable, isEmpty); // nothing finished in time — but no throw
+      expect(results.isEmpty, isTrue); // nothing finished in time — no throw
+    });
+
+    test('a late answer never lands in an already-returned result', () async {
+      // The abandoned probes keep running; the snapshot must not grow behind
+      // the caller's back, nor inside the cache entry it was stored in.
+      final net = _FakeNet(
+        {'192.168.1.50:8090'},
+        delays: const {'192.168.1.50:8090': Duration(milliseconds: 60)},
+      );
+      final svc = EndpointProbeService(
+        connect: net.connect,
+        overallBudget: const Duration(milliseconds: 10),
+      );
+
+      final results = await svc.probeFor(_romm());
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+
+      expect(results.isEmpty, isTrue);
+      expect((await svc.probeFor(_romm())).isEmpty, isTrue, reason: 'cached');
     });
   });
 
@@ -196,10 +256,10 @@ void main() {
         cacheTtl: const Duration(minutes: 2),
       );
 
-      await svc.reachableFor(_romm());
+      await svc.probeFor(_romm());
       final firstCount = net.asked.length;
       clock = clock.add(const Duration(seconds: 30));
-      await svc.reachableFor(_romm());
+      await svc.probeFor(_romm());
 
       expect(net.asked, hasLength(firstCount));
     });
@@ -213,10 +273,10 @@ void main() {
         cacheTtl: const Duration(minutes: 2),
       );
 
-      await svc.reachableFor(_romm());
+      await svc.probeFor(_romm());
       final firstCount = net.asked.length;
       clock = clock.add(const Duration(minutes: 3));
-      await svc.reachableFor(_romm());
+      await svc.probeFor(_romm());
 
       expect(net.asked.length, greaterThan(firstCount));
     });
@@ -226,10 +286,10 @@ void main() {
       final net = _FakeNet({'192.168.1.50:8090'});
       final svc = EndpointProbeService(connect: net.connect);
 
-      await svc.reachableFor(_romm());
+      await svc.probeFor(_romm());
       final firstCount = net.asked.length;
       svc.invalidate();
-      await svc.reachableFor(_romm());
+      await svc.probeFor(_romm());
 
       expect(net.asked.length, greaterThan(firstCount));
     });
@@ -245,9 +305,27 @@ void main() {
       expect(ep?.id, 'ep-remote');
     });
 
-    test('auto prefers the LAN when both answer — list order is preference',
-        () async {
-      final net = _FakeNet({'192.168.1.50:8090', 'roms.example.org:443'});
+    test('auto takes the fastest of the routes that answered', () async {
+      final net = _FakeNet(
+        {'192.168.1.50:8090', 'roms.example.org:443'},
+        delays: const {
+          '192.168.1.50:8090': Duration(milliseconds: 120),
+          'roms.example.org:443': Duration(milliseconds: 5),
+        },
+      );
+      final svc = EndpointProbeService(connect: net.connect);
+
+      expect((await svc.resolve(_romm()))?.id, 'ep-remote');
+    });
+
+    test('auto keeps the LAN when it is the quick one', () async {
+      final net = _FakeNet(
+        {'192.168.1.50:8090', 'roms.example.org:443'},
+        delays: const {
+          '192.168.1.50:8090': Duration(milliseconds: 5),
+          'roms.example.org:443': Duration(milliseconds: 120),
+        },
+      );
       final svc = EndpointProbeService(connect: net.connect);
 
       expect((await svc.resolve(_romm()))?.id, 'ep-lan');
@@ -260,6 +338,21 @@ void main() {
       final svc = EndpointProbeService(connect: net.connect);
 
       expect((await svc.resolve(_romm()))?.id, 'ep-lan');
+    });
+
+    test('a user override is not overtaken by a faster route', () async {
+      // Pinned means pinned: being slower is not a reason to move.
+      final net = _FakeNet(
+        {'192.168.1.50:8090', 'roms.example.org:443'},
+        delays: const {'roms.example.org:443': Duration(milliseconds: 120)},
+      );
+      final svc = EndpointProbeService(connect: net.connect);
+      final src = _romm(
+        selection: EndpointSelection.pinned,
+        pinned: 'ep-remote',
+      );
+
+      expect((await svc.resolve(src))?.id, 'ep-remote');
     });
 
     test('pinned skips probing entirely — the answer cannot change it',

@@ -1285,14 +1285,14 @@ class LDe extends L {
   String get onboarding_serverType => 'Servertyp';
 
   @override
-  String get onboarding_folderExplanationTitle => 'Setup your Library Path';
+  String get onboarding_folderExplanationTitle => 'Bibliothekspfad einrichten';
 
   @override
   String get onboarding_folderExplanationMessage =>
-      'R-Shop needs a base folder to store your downloaded games. This helps organize your files and is required for Android folder permissions.\n\nWe recommend creating a folder named \'ROMs\' and selecting it.';
+      'R-Shop braucht einen Basisordner, um deine heruntergeladenen Spiele zu speichern. Das hilft beim Ordnen deiner Dateien und ist für die Android-Ordnerberechtigungen erforderlich.\n\nWir empfehlen, einen Ordner namens \'ROMs\' anzulegen und ihn auszuwählen.';
 
   @override
-  String get onboarding_continueToPicker => 'Select Folder';
+  String get onboarding_continueToPicker => 'Ordner wählen';
 
   @override
   String get onboarding_hangOn => 'Moment, teste die Verbindung...';
@@ -1641,7 +1641,7 @@ class LDe extends L {
 
   @override
   String get sources_routeAutoHint =>
-      'Den Weg nutzen, der antwortet – oberster zuerst';
+      'Den schnellsten Weg nutzen, der antwortet – wird bei Netzwechsel neu geprüft';
 
   @override
   String get sources_routeInUse => 'In Verwendung';
@@ -1657,6 +1657,42 @@ class LDe extends L {
 
   @override
   String get sources_routeChecking => 'Wird geprüft…';
+
+  @override
+  String sources_routeLatencyMs(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String sources_routeAutoPicks(String route) {
+    return 'Würde $route nutzen';
+  }
+
+  @override
+  String get sources_routeAutoNoneReachable => 'Nichts hat geantwortet';
+
+  @override
+  String get sources_routeFastest => 'Am schnellsten';
+
+  @override
+  String get sources_routeReleasePin =>
+      'Hebt die Fixierung auf und wählt wieder den schnellsten Weg';
+
+  @override
+  String get sources_routeOwnLogin => 'Eigene Anmeldung';
+
+  @override
+  String get sources_routeAuthTitle => 'Anmeldung für diesen Weg';
+
+  @override
+  String get sources_routeAuthHint =>
+      'Leer lassen, um die Anmeldung der Quelle zu nutzen. Nur ausfüllen, wenn diese Adresse eine andere verlangt.';
+
+  @override
+  String get sources_routeAuthInherited => 'Nutzt die Anmeldung der Quelle';
+
+  @override
+  String get sources_routeAuthOwn => 'Dieser Weg meldet sich selbst an';
 
   @override
   String get sources_routeOnlyOne => 'Diese Quelle hat nur einen Weg';
@@ -1697,7 +1733,7 @@ class LDe extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      'Nur für Adressen ohne separate Anmeldung. Verlangt sie eine neue Anmeldung, als eigene Quelle anlegen und beide als Ersatz verknüpfen.';
+      'Alle Wege erreichen denselben Server. Ein Weg kann eine eigene Anmeldung mitbringen, wenn diese Adresse eine andere verlangt.';
 
   @override
   String get sources_routeCannotRemoveLast =>

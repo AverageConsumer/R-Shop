@@ -11,7 +11,6 @@ import '../../models/config/provider_config.dart';
 import '../../models/config/source.dart';
 import '../../providers/app_providers.dart';
 import '../../services/network_discovery_service.dart';
-import '../../widgets/console_hud.dart';
 
 /// Form to add a manual (non-RomM) [Source]: SMB, FTP, or Web.
 ///

@@ -1630,7 +1630,7 @@ class LEn extends L {
 
   @override
   String get sources_routeAutoHint =>
-      'Use whichever route answers, preferring the top one';
+      'Use the fastest route that answers, re-checked as the network changes';
 
   @override
   String get sources_routeInUse => 'In use';
@@ -1646,6 +1646,42 @@ class LEn extends L {
 
   @override
   String get sources_routeChecking => 'Checking…';
+
+  @override
+  String sources_routeLatencyMs(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String sources_routeAutoPicks(String route) {
+    return 'Would use $route';
+  }
+
+  @override
+  String get sources_routeAutoNoneReachable => 'Nothing answered';
+
+  @override
+  String get sources_routeFastest => 'Fastest';
+
+  @override
+  String get sources_routeReleasePin =>
+      'Drops the lock and re-picks the fastest';
+
+  @override
+  String get sources_routeOwnLogin => 'Own login';
+
+  @override
+  String get sources_routeAuthTitle => 'Login for this route';
+
+  @override
+  String get sources_routeAuthHint =>
+      'Leave blank to use the source\'s login. Fill it in only when this address asks for a different one.';
+
+  @override
+  String get sources_routeAuthInherited => 'Using the source\'s login';
+
+  @override
+  String get sources_routeAuthOwn => 'This route logs in on its own';
 
   @override
   String get sources_routeOnlyOne => 'This source has only one route';
@@ -1686,7 +1722,7 @@ class LEn extends L {
 
   @override
   String get sources_routeSameServerHint =>
-      'Only for addresses that need no separate login. If it asks you to sign in again, add it as its own source and pair the two as backups.';
+      'All routes reach the same server. A route can carry its own login when that address asks for a different one.';
 
   @override
   String get sources_routeCannotRemoveLast =>

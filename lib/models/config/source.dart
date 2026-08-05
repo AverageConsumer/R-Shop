@@ -80,14 +80,20 @@ class SystemSourceMapping {
 
 /// How R-Shop decides which [SourceEndpoint] of a source to talk to.
 enum EndpointSelection {
-  /// Probe the endpoints in list order and use the first one that answers.
-  /// Falls back to the first endpoint when nothing is reachable, so a sync
-  /// still produces a real error instead of silently doing nothing.
+  /// Nobody overrode anything: probe every route and take the **fastest** one
+  /// that answers, re-deciding whenever the network changes. Falls back to the
+  /// first endpoint when nothing is reachable, so a sync still produces a real
+  /// error instead of silently doing nothing.
+  ///
+  /// This is not a preference the user has to maintain. Being at home or away
+  /// is not a setting, and asking them to flip one every time they walk out of
+  /// the door is asking them to do the probe's job by hand.
   auto,
 
-  /// Always use [Source.pinnedEndpointId]. The user asked for this exact
-  /// route, so we do not silently switch away from it even if it is down —
-  /// a failed sync is more honest than a route that moves behind their back.
+  /// The user overrode auto-selection: always use [Source.pinnedEndpointId].
+  /// They asked for this exact route, so we do not silently switch away from it
+  /// even if it is down, and not even if another route is faster — a failed
+  /// sync is more honest than a route that moves behind their back.
   pinned,
 }
 
@@ -96,8 +102,9 @@ enum EndpointSelection {
 /// The same RomM server is typically reachable both over the LAN
 /// (`http://192.168.1.50:8090`, fast, only at home) and over the internet
 /// (`https://roms.example.org`, slower, works anywhere). Those are not two
-/// sources — same server, same library, same credentials — they are two
-/// routes to one source.
+/// sources — same server, same library — they are two routes to one source.
+/// The credentials are *not* necessarily shared: a route may carry its own
+/// [auth] because the two front doors can want different logins.
 ///
 /// **Exactly one endpoint is live at a time.** The live endpoint's connection
 /// fields are mirrored onto the parent [Source] (`url` / `host` / `port` /
@@ -294,11 +301,14 @@ class Source {
   /// legacy fields so the rest of the app can assume a list.
   final List<SourceEndpoint> endpoints;
 
-  /// Whether to probe for a working route or stick to [pinnedEndpointId].
+  /// Whether to probe for the fastest working route or stick to
+  /// [pinnedEndpointId]. `auto` is the unattended default; `pinned` means the
+  /// user overrode it.
   final EndpointSelection endpointSelection;
 
-  /// The route the user explicitly chose. Only meaningful when
-  /// [endpointSelection] is [EndpointSelection.pinned].
+  /// The route the user overrode auto-selection with. Only meaningful when
+  /// [endpointSelection] is [EndpointSelection.pinned]; a pin that no longer
+  /// names an existing endpoint is not an override and gets cleared.
   final String? pinnedEndpointId;
 
   // --- Behaviour ---
@@ -489,19 +499,26 @@ class Source {
     return null;
   }
 
-  /// Which route *should* be live, given what is reachable right now.
+  /// Which route *should* be live, given what answered a probe just now.
   ///
-  /// - `pinned`: the user's choice wins outright. If it is unreachable they
+  /// [reachable] is a **ranked** list of endpoint ids, best first — that is
+  /// what `EndpointProbeService.probeFor` hands back, sorted by latency with
+  /// ties broken by this source's own endpoint order.
+  ///
+  /// - `pinned`: the user's override wins outright. If it is unreachable they
   ///   get a failed sync, not a silent reroute — a route that moves on its
   ///   own is exactly what pinning exists to prevent.
-  /// - `auto`: first endpoint in list order that is in [reachable]. List
-  ///   order is the user's preference order, so putting the LAN address
-  ///   first is what makes "fast at home, works away" fall out.
+  /// - `auto`: the first id in [reachable] that this source still has, i.e.
+  ///   the fastest live route. Nothing was overridden, so "fast at home, works
+  ///   away" is measured rather than configured.
   /// - `auto` with nothing reachable: the first endpoint, so the sync runs
   ///   and surfaces a real connection error instead of doing nothing.
   ///
-  /// Pure — [reachable] comes from the caller's probe, never from I/O here.
-  SourceEndpoint? resolveEndpoint({Set<String> reachable = const {}}) {
+  /// A ranked *list* rather than a set of ids plus a "winner" argument keeps
+  /// this pure and keeps the model free of the probe's types — and if the
+  /// fastest route was deleted between the probe and this call, the runner-up
+  /// takes over instead of the list-order default.
+  SourceEndpoint? resolveEndpoint({List<String> reachable = const []}) {
     if (endpoints.isEmpty) return null;
     if (endpointSelection == EndpointSelection.pinned &&
         pinnedEndpointId != null) {
@@ -509,8 +526,9 @@ class Source {
       if (pinned != null) return pinned;
       // Pinned route was deleted — fall through to auto rather than stall.
     }
-    for (final ep in endpoints) {
-      if (reachable.contains(ep.id)) return ep;
+    for (final id in reachable) {
+      final ep = endpointById(id);
+      if (ep != null) return ep;
     }
     return endpoints.first;
   }
@@ -518,8 +536,9 @@ class Source {
   /// Returns a copy with [endpoint]'s address mirrored onto the connection
   /// fields, making it the live route.
   ///
-  /// [pin] records it as the user's explicit choice; leave it false when the
-  /// switch came from auto-selection, so a later probe can still move.
+  /// [pin] records it as the user's **override** of auto-selection: from then
+  /// on this route is used even when a faster one answers. Leave it false when
+  /// the switch came from a probe, so the next one can still move.
   ///
   /// The credentials move with the address: [auth] now reports
   /// `endpoint.auth`, or this source's [defaultAuth] when the route does not
