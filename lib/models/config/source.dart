@@ -101,10 +101,10 @@ enum EndpointSelection {
 ///
 /// **Exactly one endpoint is live at a time.** The live endpoint's connection
 /// fields are mirrored onto the parent [Source] (`url` / `host` / `port` /
-/// `share`), which is what every downstream consumer — [SourceResolver],
-/// [Source.connectionKey], the providers — actually reads. Switching routes
-/// is therefore a config-only change: no re-sync is required and no cached
-/// game is touched.
+/// `share`), and its credentials surface through [Source.auth], which is what
+/// every downstream consumer — [SourceResolver], [Source.connectionKey], the
+/// providers — actually reads. Switching routes is therefore a config-only
+/// change: no re-sync is required and no cached game is touched.
 class SourceEndpoint {
   /// Stable identifier, unique within the parent source.
   final String id;
@@ -119,6 +119,19 @@ class SourceEndpoint {
   final int? port; // smb/ftp
   final String? share; // smb
 
+  /// Credentials for *this route only*, or null to use the source's own
+  /// [Source.auth].
+  ///
+  /// One server can insist on a different login per way in — the LAN address
+  /// answers straight from the box while the DDNS name comes through a
+  /// reverse proxy with its own gate. Same server, same library, two front
+  /// doors, two sets of credentials.
+  ///
+  /// Null is the normal case and the reason no config migration is needed: a
+  /// route written before per-route credentials existed simply keeps using the
+  /// source's login.
+  final AuthConfig? auth;
+
   const SourceEndpoint({
     required this.id,
     required this.label,
@@ -126,6 +139,7 @@ class SourceEndpoint {
     this.host,
     this.port,
     this.share,
+    this.auth,
   });
 
   factory SourceEndpoint.fromJson(Map<String, dynamic> json) {
@@ -136,6 +150,9 @@ class SourceEndpoint {
       host: json['host'] as String?,
       port: json['port'] as int?,
       share: json['share'] as String?,
+      auth: json['auth'] != null
+          ? AuthConfig.fromJson(json['auth'] as Map<String, dynamic>)
+          : null,
     );
   }
 
@@ -147,9 +164,16 @@ class SourceEndpoint {
       if (host != null) 'host': host,
       if (port != null) 'port': port,
       if (share != null) 'share': share,
+      if (auth != null) 'auth': auth!.toJson(),
     };
   }
 
+  /// True when this route logs in with its own credentials rather than the
+  /// source's.
+  bool get hasOwnAuth => auth != null;
+
+  /// [copyWith] cannot express "remove this route's credentials" — a null
+  /// argument means "leave it alone" — so removing them has its own flag.
   SourceEndpoint copyWith({
     String? id,
     String? label,
@@ -157,6 +181,8 @@ class SourceEndpoint {
     String? host,
     int? port,
     String? share,
+    AuthConfig? auth,
+    bool clearAuth = false,
   }) {
     return SourceEndpoint(
       id: id ?? this.id,
@@ -165,12 +191,17 @@ class SourceEndpoint {
       host: host ?? this.host,
       port: port ?? this.port,
       share: share ?? this.share,
+      auth: clearAuth ? null : (auth ?? this.auth),
     );
   }
 
   /// True when [other] points at the same place as this endpoint, ignoring
-  /// the label. Used to avoid creating a duplicate route for an address the
-  /// source already knows.
+  /// the label and the credentials. Used to avoid creating a duplicate route
+  /// for an address the source already knows.
+  ///
+  /// Credentials are deliberately not part of this: a route *is* its address.
+  /// Two entries for one address would make [Source.liveEndpoint] — and
+  /// therefore which token gets sent — depend on list order.
   bool sameAddressAs(SourceEndpoint other) =>
       Source._normalizeUrl(url) == Source._normalizeUrl(other.url) &&
       host?.toLowerCase() == other.host?.toLowerCase() &&
@@ -223,20 +254,39 @@ class Source {
   final int? port; // smb/ftp
   final String? share; // smb
   final String? path; // local
-  final AuthConfig? auth;
+
+  /// Credentials of the **live route** — the single thing every downstream
+  /// consumer reads, exactly like [url]/[host]/[port]/[share].
+  ///
+  /// Derived rather than stored so it can never fall out of step with the
+  /// address: it is the live route's own [SourceEndpoint.auth] when that route
+  /// has one, and the source-level [defaultAuth] otherwise. Storing a copy
+  /// would also destroy the default the moment a route with its own login went
+  /// live, and switching back would then send that route's token.
+  AuthConfig? get auth => liveEndpoint?.auth ?? _defaultAuth;
+
+  /// The source's own login — used by every route that does not carry one.
+  ///
+  /// This is what `auth` means in the config file, so a config written before
+  /// per-route credentials existed keeps working untouched.
+  AuthConfig? get defaultAuth => _defaultAuth;
+
+  final AuthConfig? _defaultAuth;
 
   // --- Routes ---
 
   /// Alternative ways to reach this same source, e.g. LAN vs internet.
   ///
-  /// **Every route shares this source's [auth].** A RomM token is issued by a
-  /// server, not by an address, so two addresses of one server work with one
-  /// token — but pointing a route at a *different* server sends it the wrong
-  /// token and fails with a 401 that reads like the server is down.
+  /// **Same server, but not necessarily the same front door.** The LAN address
+  /// may answer straight from the box while the DDNS name arrives through a
+  /// reverse proxy that wants its own login, so a route may carry its own
+  /// [SourceEndpoint.auth]; routes that do not fall back to [defaultAuth].
+  /// Whichever applies is mirrored onto [auth] for the live route.
   ///
-  /// Two genuinely different servers are two [Source]s, each with its own
-  /// login, optionally paired through [fallbackSourceId]. That path switches
-  /// the whole source, credentials included.
+  /// Routes are still *one* source: one library, one cache, one id. Two
+  /// genuinely different servers are two [Source]s, optionally paired through
+  /// [fallbackSourceId] — that path switches the whole source, cached games
+  /// and all.
   ///
   /// Empty for sources created before routes existed and for sources that
   /// only ever had one address; in that case the connection fields above
@@ -303,7 +353,7 @@ class Source {
     this.port,
     this.share,
     this.path,
-    this.auth,
+    AuthConfig? auth,
     this.endpoints = const [],
     this.endpointSelection = EndpointSelection.auto,
     this.pinnedEndpointId,
@@ -314,7 +364,7 @@ class Source {
     this.borrowed = false,
     this.tokenExpiresAt,
     this.knownPlatforms = const {},
-  });
+  }) : _defaultAuth = auth;
 
   factory Source.fromJson(Map<String, dynamic> json) {
     DateTime? exp;
@@ -390,7 +440,9 @@ class Source {
       if (port != null) 'port': port,
       if (share != null) 'share': share,
       if (path != null) 'path': path,
-      if (auth != null) 'auth': auth!.toJson(),
+      // The source-level login, not the live route's — a route's own
+      // credentials belong to the route and are written inside `endpoints`.
+      if (_defaultAuth != null) 'auth': _defaultAuth!.toJson(),
       if (endpoints.isNotEmpty)
         'endpoints': endpoints.map((e) => e.toJson()).toList(),
       'endpoint_selection': endpointSelection.name,
@@ -469,10 +521,14 @@ class Source {
   /// [pin] records it as the user's explicit choice; leave it false when the
   /// switch came from auto-selection, so a later probe can still move.
   ///
-  /// Credentials are deliberately untouched: two routes to one server share
-  /// one account, and re-authenticating on every switch would defeat the
-  /// point. Cached games are untouched too — the source id does not change,
-  /// so nothing in the database is orphaned by a switch.
+  /// The credentials move with the address: [auth] now reports
+  /// `endpoint.auth`, or this source's [defaultAuth] when the route does not
+  /// carry its own. The stored default is passed through unchanged so that
+  /// switching *back* to a route without its own login does not send it the
+  /// other route's token.
+  ///
+  /// Cached games are untouched — the source id does not change, so nothing in
+  /// the database is orphaned by a switch.
   Source withLiveEndpoint(SourceEndpoint endpoint, {bool pin = false}) {
     return Source(
       id: id,
@@ -483,7 +539,7 @@ class Source {
       port: endpoint.port,
       share: endpoint.share,
       path: path,
-      auth: auth,
+      auth: _defaultAuth,
       endpoints: endpoints,
       endpointSelection:
           pin ? EndpointSelection.pinned : endpointSelection,
@@ -491,6 +547,9 @@ class Source {
       autoMap: autoMap,
       priority: priority,
       enabled: enabled,
+      // Switching routes must not unpair the source from its stand-in:
+      // dropping this made the fallback silently disappear on every switch.
+      fallbackSourceId: fallbackSourceId,
       borrowed: borrowed,
       tokenExpiresAt: tokenExpiresAt,
       knownPlatforms: knownPlatforms,
@@ -505,9 +564,18 @@ class Source {
   int? rommPlatformIdFor(String systemId) => knownPlatforms[systemId];
 
   /// Like [toJson] but strips credentials. Used by config export.
+  ///
+  /// Routes can carry their own login, so stripping the source's is not
+  /// enough — an exported config must not leak a per-route token either.
   Map<String, dynamic> toJsonWithoutAuth() {
     final map = toJson();
     map.remove('auth');
+    final routes = map['endpoints'];
+    if (routes is List) {
+      for (final route in routes) {
+        if (route is Map) route.remove('auth');
+      }
+    }
     return map;
   }
 
@@ -518,6 +586,13 @@ class Source {
   /// even if they were attached to different systems. This identity is
   /// per-type so that an SMB and a Web source with the same hostname stay
   /// separate.
+  ///
+  /// **Credentials are deliberately not part of it.** Two legacy providers at
+  /// one address are one server whichever login they were saved with, so
+  /// folding auth in would split them back apart. It still changes on every
+  /// route switch — a route *is* its address ([SourceEndpoint.sameAddressAs]
+  /// refuses a second route to an address the source already has), so no two
+  /// routes can share a key and quietly reuse each other's connection.
   String get connectionKey {
     switch (type) {
       case SourceType.romm:
@@ -594,7 +669,9 @@ class Source {
       port: port ?? this.port,
       share: share ?? this.share,
       path: path ?? this.path,
-      auth: auth ?? this.auth,
+      // The source-level default, never the live route's credentials —
+      // copying those in would freeze one route's token onto the source.
+      auth: auth ?? _defaultAuth,
       endpoints: endpoints ?? this.endpoints,
       endpointSelection: endpointSelection ?? this.endpointSelection,
       pinnedEndpointId: clearPinnedEndpoint

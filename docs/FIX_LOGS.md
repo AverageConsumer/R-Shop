@@ -377,3 +377,22 @@
 反查表的用途是「**我要改這個檔，它身上以前發生過什麼**」。沒有動到任何檔的紀錄（環境診斷、部署作業、需求判定）**在這張表上本來就無處可去**，不是資料缺失。原本的說明寫「缺漏或標為待補，所以無法反查。**補上之後重跑即可**」——那句話對這幾條是錯的，等於每個工作階段都被指示去補一個不該存在的東西，交接文件為此還得反過來澄清一次。改成點名「多數是正確狀態」，只有「待補」才是真的欠。
 
 **這個數字不會歸零，也不該當成待辦。** 寫完上面那條 `[R-Shop 自動選最快]`（純需求判定，沒有程式碼變更）之後，它就從 2 變成 3。所以基準值會隨著這類紀錄增加而往上走，**只要對照最後新增的那幾條即可，不必整檔掃**。
+
+
+## [R-Shop 路線各自驗證] R-Shop: 憑證跟著路線走，清單跟著來源走（schema v15）
+
+- **問題**：一個來源底下的多條連線方式（區網直連、DDNS）**共用同一組憑證**——`auth` 掛在 `Source` 上，路線沒有自己的。使用者實際的設定是同一台伺服器、但兩個位址**各自需要驗證**，所以他只能拆成兩個來源才會動，而拆成兩個來源又拿到了兩份各自同步的清單。同時「連線方式手動切、來源自動備援」剛好是反的：**該自動的那個是手動，比較該由他決定的那個反而自動**。使用者原話：「不覺得功能重複了嗎?」
+- **修復**：`SourceEndpoint` 加自己的可選 `auth`，沒設就沿用來源層的（舊設定檔零遷移）；`Source.auth` 改成 getter `liveEndpoint?.auth ?? _defaultAuth`，下游照樣只讀這一個。清單反過來收斂：schema v15 把唯一鍵從 `(systemSlug, filename, source_id, endpoint_id)` 改成 `(systemSlug, filename, source_id)`，`endpoint_id` 留著只記「上次從哪條路抓的」。
+- **檔案**：`lib/models/config/source.dart`（`SourceEndpoint.auth`／`hasOwnAuth`／`Source.auth` getter／`defaultAuth`）· `lib/services/sources_notifier.dart`（endpoint 增刪改帶憑證）· `lib/services/database_service.dart`（v15 遷移與去重、`getGameCountsPerSource`／`getGameCountForSource`／`deleteSourceCache`）· `test/database_service_v15_migration_test.dart`（新增）· `test/database_service_routes_test.dart`（改寫）· `test/source_endpoint_test.dart` · `test/source_resolver_test.dart` · `test/sources_notifier_endpoints_test.dart`
+
+**整個設計就兩句：憑證跟著路線走，清單跟著來源走。** 這兩句是反方向的，而反方向才是對的——路線之所以是不同的路線，就是因為它們的**入口**不同（不同的前門、不同的登入）；而它們之所以是同一個來源的路線，是因為門後面是**同一台機器、同一份清單**。舊設計把兩者都綁在同一層，所以兩邊都錯。
+
+**我原本打算「讀取時把兩份清單合併」，那是錯的解。** 使用者一句話點掉：「你覺得清單只有一份 你分的出來嗎」。要寫合併邏輯，就表示分裂本身不該存在。**程式分不出兩個位址是不是同一台，也不該去猜**——先前從埠號推論過一次，推論是對的，但那不算數。能宣告這件事的只有使用者，這就是「同一台也當不同台」的真正意思：**預設不猜，他宣告了才照宣告走**。他宣告了，清單就是一份。
+
+**`connectionKey` 刻意不含憑證，查證後確認是對的。** 我一開始要求把憑證算進去，理由是「換路線換 token 時它必須跟著變，否則會重用錯的連線」。實際上它只用在舊設定檔的合併遷移（`app_config.dart:209` 是唯一呼叫點，**runtime 沒有任何連線快取用它**），而同一個位址不論當初存的是哪組登入都該收成一個來源——folding 進去反而會把它們拆回兩個。它本來就每換一條路就變，因為 `sameAddressAs` 不准同一個來源有兩條位址相同的路線。
+
+**v15 去重唯一有資料風險的地方**：`games` 表沒有本機路徑欄位，安裝狀態是從檔案系統推的，而遷移不能做那種 IO。表內唯一的訊號是 `purgeOrDetachSource` 留下的狀態（`provider_config` / `url` 被清空——那種列的存在本身就代表檔案在磁碟上找到過）。判準收在 `_v15OnDeviceRank`，換訊號只要改那一行。去重用 self-join 找**輸家**而不是找贏家，配一個全序（先看是否在裝置上，再看 `id` 最小），所以每組必定恰好活一筆；刪之前先把 `cover_url` / `has_thumbnail` / `alternative_sources` 從同組撿回來。最後還有一道 `NOT IN (SELECT MIN(id) …)` 保險並記 log——**留下任何一筆重複都會讓 `CREATE UNIQUE INDEX` 拋例外，而每次啟動都拋例外的遷移等於資料庫再也打不開**。
+
+`deleteRoute` 改名 `deleteSourceCache` 不只是換字：**刪一條路線現在不准順手刪快取**，舊名字會讓人以為要。
+
+**未完成的部分見 `docs/HANDOVER.md` §2.0**——自動選最優路線、UI、七語系都還沒做。

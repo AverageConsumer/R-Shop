@@ -389,9 +389,10 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
 
   // --- Routes (endpoints) ---
   //
-  // A route change is *not* a source change: same server, same library, same
-  // credentials, only a different way to reach it. Every method below goes
-  // through [updateSource] and therefore **never calls
+  // A route change is *not* a source change: same server, same library, only a
+  // different way in — possibly one with its own login, since the LAN address
+  // and a proxied DDNS name can want different credentials. Every method below
+  // goes through [updateSource] and therefore **never calls
   // [_purgeCachedGamesFor]** — dropping the cached games on a route switch
   // would make switching cost a full re-sync, which defeats the point.
   // [setEnabled] and [removeSource] purge; routes must not.
@@ -450,11 +451,13 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     }
   }
 
-  /// Adds another way to reach [sourceId].
+  /// Adds another way to reach [sourceId], optionally with credentials of its
+  /// own ([SourceEndpoint.auth]; null means "use the source's login").
   ///
   /// Returns false without changing anything if the source already has a
   /// route to that address — two entries for one address would make the
-  /// switcher ambiguous and [Source.liveEndpoint] arbitrary.
+  /// switcher ambiguous, [Source.liveEndpoint] arbitrary, and therefore which
+  /// token gets sent a matter of list order.
   Future<bool> addEndpoint(String sourceId, SourceEndpoint endpoint) async {
     final src = state.sources.firstWhere(
       (s) => s.id == sourceId,
@@ -468,10 +471,15 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     return true;
   }
 
-  /// Edits an existing route in place. If it is the live one, the source's
-  /// connection fields follow it, so editing the address you are currently
-  /// using takes effect immediately.
-  Future<void> updateEndpoint(
+  /// Edits an existing route in place, credentials included. If it is the live
+  /// one, the source's connection fields and [Source.auth] follow it, so
+  /// editing the address or the login you are currently using takes effect
+  /// immediately.
+  ///
+  /// Returns false without changing anything if the edit would move this route
+  /// onto an address another route already occupies — same reason
+  /// [addEndpoint] refuses a duplicate.
+  Future<bool> updateEndpoint(
     String sourceId,
     SourceEndpoint endpoint,
   ) async {
@@ -483,11 +491,46 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     if (idx < 0) {
       throw StateError('Unknown endpoint ${endpoint.id} on source $sourceId');
     }
+    final collides = src.endpoints.any(
+      (e) => e.id != endpoint.id && e.sameAddressAs(endpoint),
+    );
+    if (collides) return false;
     final wasLive = src.liveEndpoint?.id == endpoint.id;
     final next = [...src.endpoints]..[idx] = endpoint;
     final updated = src.copyWith(endpoints: next);
     await updateSource(
       wasLive ? updated.withLiveEndpoint(endpoint) : updated,
+    );
+    return true;
+  }
+
+  /// Sets or clears the credentials of a single route.
+  ///
+  /// Pass null for [auth] to drop the route's own login and go back to the
+  /// source's — [SourceEndpoint.copyWith] cannot express that on its own, and
+  /// "leave it alone" is not the same request as "stop using it".
+  ///
+  /// A no-op when the route already has exactly this, so the settings screen
+  /// can call it unconditionally. Never purges: credentials do not invalidate
+  /// a cached list, and re-scanning the library because a token was rotated is
+  /// exactly the cost this feature exists to avoid.
+  Future<void> setEndpointAuth(
+    String sourceId,
+    String endpointId,
+    AuthConfig? auth,
+  ) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == sourceId,
+      orElse: () => throw StateError('Unknown source: $sourceId'),
+    );
+    final ep = src.endpointById(endpointId);
+    if (ep == null) {
+      throw StateError('Unknown endpoint $endpointId on source $sourceId');
+    }
+    if (identical(ep.auth, auth)) return;
+    await updateEndpoint(
+      sourceId,
+      ep.copyWith(auth: auth, clearAuth: auth == null),
     );
   }
 

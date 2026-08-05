@@ -91,21 +91,32 @@ description: "Touch anything about sources, connection routes, which source is i
 
 ---
 
-## 不變式 5：路線共用來源的憑證 ⚠️
+## 不變式 5：憑證跟著路線走，清單跟著來源走（2026-08-04 改寫）⚠️
 
-`auth` 掛在 `Source` 上，**endpoint 沒有自己的憑證**。
+**舊版寫的是「路線共用來源的憑證」，那條已經作廢。** 使用者確認的前提是：
+同一個來源底下的多條路線**就是同一台伺服器**，但**各自需要驗證**
+（區網直連與 DDNS 走的是不同的前門）。所以：
 
-同一台伺服器的多個位址共用一個 token 沒問題。
-**指向另一台伺服器就會送錯 token 換回 401 —— 而 401 看起來像伺服器掛了**，
-使用者無從判斷。兩台不同的伺服器要用「**兩個來源 + 備援**」，不是兩條路線。
+- `SourceEndpoint` 有自己的可選 `auth`；**沒設就沿用來源層的**，舊設定檔因此零遷移。
+- `Source.auth` 現在是 **getter**：`liveEndpoint?.auth ?? _defaultAuth`。
+  下游（`SourceResolver`、各 provider）照樣只讀這一個，**不變式 4 不受影響**。
+- 清單相反：**一個來源只存一份**（見下面的資料庫那節）。同一台伺服器的清單只有一份，
+  存成多份是同一批資料的副本。
 
-UI 上的提示字串是 `sources_routeSameServerHint`。
+**程式分不出兩個位址是不是同一台，也不該去猜。** 曾經從埠號推論過一次，
+推論是對的，但那不算數——能宣告的只有使用者。這就是「同一台也當不同台」的真正意思：
+**預設不猜；他宣告了，才照宣告走。**
+
+`connectionKey` **刻意不含憑證**，而且這是對的：它只用在舊設定檔的合併遷移
+（`app_config.dart` 唯一的呼叫點，**runtime 沒有任何連線快取用它**），
+同一個位址不論當初存的是哪組登入都該收成一個來源。它仍然每換一條路就變，
+因為 `SourceEndpoint.sameAddressAs` 不准同一個來源有兩條位址相同的路線。
 
 ---
 
-## 資料庫：每條路線各存一份
+## 資料庫：一個來源存一份
 
-schema **v14**。`games` 表加了
+schema **v15**（v14 曾經是每條路線各一份，已收掉）。`games` 表有
 
 ```sql
 source_id  TEXT NOT NULL DEFAULT '',
@@ -115,12 +126,17 @@ endpoint_id TEXT NOT NULL DEFAULT ''
 **`NOT NULL DEFAULT ''` 不是隨便寫的** —— SQLite 的 UNIQUE 索引把 NULL 視為互不相同，
 用得到 NULL 的話唯一鍵形同虛設，同一筆遊戲會無限重複。
 
-唯一索引：`(systemSlug, filename, source_id, endpoint_id)`。
-孤兒清除也要**帶上這三個欄位**，否則會刪掉別條路線的資料。
+唯一索引：**`(systemSlug, filename, source_id)`**。`endpoint_id` **留著但不進唯一鍵**，
+只記「上次從哪條路抓的」。孤兒清除帶那三個欄位；
 串連刪 `game_metadata` / `ra_matches` 前要先檢查 `stillReferenced`。
 
-相關 API：`saveGamesByRoute()`（依每筆遊戲**自己的** `providerConfig` 分組）、
-`getGamesForRoutes()`、`getGameCountsPerRoute()`、`deleteRoute()`。
+**這是自動換路之所以無感的原因**：換路不會換到另一份清單，所以沒有空清單、
+沒有重抓、也沒有「合併兩份」的邏輯要寫。想寫合併就表示分裂本身是錯的。
+
+相關 API：`saveGamesByRoute()`（依來源分組，順便記下路線）、`getGamesForRoutes()`、
+`getGameCountsPerSource()`、`getGameCountForSource()`、`deleteSourceCache()`。
+**後三個是 v15 改的名**，因為語意真的變了——`deleteRoute` 這個名字會讓人以為
+刪一條路線要順手刪快取，而那正是現在不准做的事。
 
 ---
 

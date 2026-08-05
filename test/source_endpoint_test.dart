@@ -212,6 +212,21 @@ void main() {
       expect(switched.pinnedEndpointId, 'ep-remote');
     });
 
+    test('keeps the fallback pairing', () {
+      // Losing it here unpaired the source from its stand-in on every route
+      // switch, and nothing on screen said so.
+      final source = Source(
+        id: 'src-romm-1',
+        name: 'My RomM',
+        type: SourceType.romm,
+        url: lan.url,
+        endpoints: const [lan, remote],
+        fallbackSourceId: 'src-romm-2',
+      );
+
+      expect(source.withLiveEndpoint(remote).fallbackSourceId, 'src-romm-2');
+    });
+
     test('SMB switch carries host, port and share together', () {
       const nasLan = SourceEndpoint(
         id: 'ep-lan',
@@ -243,6 +258,106 @@ void main() {
       expect(switched.port, 4450);
       expect(switched.share, 'games');
       expect(switched.liveEndpoint?.id, 'ep-vpn');
+    });
+  });
+
+  group('per-route credentials', () {
+    // One server, two front doors: the LAN address answers straight from the
+    // box, the DDNS name comes through a proxy that wants its own login.
+    const gated = SourceEndpoint(
+      id: 'ep-remote',
+      label: '遠端',
+      url: 'https://roms.example.org',
+      auth: AuthConfig(clientToken: 'proxy-token'),
+    );
+    Source twoDoors({String? url}) => Source(
+          id: 'src-romm-1',
+          name: 'My RomM',
+          type: SourceType.romm,
+          url: url ?? lan.url,
+          auth: const AuthConfig(clientToken: 'tok', clientTokenId: 7),
+          endpoints: const [lan, gated],
+        );
+
+    test('a route without its own login uses the source\'s', () {
+      // The zero-migration case: every route in an existing config.
+      expect(twoDoors().auth?.clientToken, 'tok');
+      expect(twoDoors().defaultAuth?.clientToken, 'tok');
+    });
+
+    test('going live on a gated route puts its token on the top-level auth',
+        () {
+      // Invariant 4: the resolver and the providers read `source.auth` and
+      // must not know routes exist.
+      final switched = twoDoors().withLiveEndpoint(gated);
+
+      expect(switched.auth?.clientToken, 'proxy-token');
+      expect(switched.liveEndpoint?.id, 'ep-remote');
+    });
+
+    test('switching back restores the source login, not the other route\'s',
+        () {
+      // The bug a stored copy of the live credentials would cause: the proxy
+      // token would stick and the LAN address would start answering 401.
+      final there = twoDoors().withLiveEndpoint(gated);
+      final back = there.withLiveEndpoint(lan);
+
+      expect(back.auth?.clientToken, 'tok');
+      expect(back.defaultAuth?.clientToken, 'tok');
+    });
+
+    test('the token survives a save/load round-trip on both levels', () {
+      final back = Source.fromJson(twoDoors().toJson());
+
+      expect(back.defaultAuth?.clientToken, 'tok');
+      expect(back.endpointById('ep-remote')?.auth?.clientToken, 'proxy-token');
+      expect(back.endpointById('ep-lan')?.auth, isNull);
+      // Live route is still the LAN one, so the source login applies.
+      expect(back.auth?.clientToken, 'tok');
+    });
+
+    test('a pre-routes config gives its login to every route implicitly', () {
+      // No `endpoints` key at all: the backfilled route must not invent
+      // credentials of its own, or exporting it would leak the token twice.
+      final back = Source.fromJson({
+        'id': 'src-romm-1',
+        'name': 'My RomM',
+        'type': 'romm',
+        'url': 'http://192.168.1.50:8090',
+        'auth': {'client_token': 'tok'},
+      });
+
+      expect(back.endpoints.single.auth, isNull);
+      expect(back.endpoints.single.hasOwnAuth, isFalse);
+      expect(back.auth?.clientToken, 'tok');
+    });
+
+    test('toJsonWithoutAuth strips the routes\' credentials too', () {
+      // Stripping only the source's would still export the proxy token.
+      final json = twoDoors().toJsonWithoutAuth();
+      final routes = (json['endpoints'] as List).cast<Map<String, dynamic>>();
+
+      expect(json.containsKey('auth'), isFalse);
+      expect(routes.any((r) => r.containsKey('auth')), isFalse);
+      expect(routes, hasLength(2));
+    });
+
+    test('copyWith leaves the source login alone instead of freezing the '
+        'live route\'s onto it', () {
+      final onGated = twoDoors().withLiveEndpoint(gated);
+
+      final renamed = onGated.copyWith(name: 'Renamed');
+
+      expect(renamed.defaultAuth?.clientToken, 'tok');
+      expect(renamed.auth?.clientToken, 'proxy-token');
+    });
+
+    test('connectionKey moves with the route, so no connection is reused '
+        'across a credential change', () {
+      final onLan = twoDoors();
+      final onGated = onLan.withLiveEndpoint(gated);
+
+      expect(onLan.connectionKey == onGated.connectionKey, isFalse);
     });
   });
 

@@ -131,11 +131,21 @@ void main() {
       expect(db.purged, isEmpty);
     });
 
-    test('but disabling the source still does purge', () async {
-      // Guards the boundary: routes and the off-switch must not converge.
+    test('and neither does turning the source off', () async {
+      // Guards the boundary from the other side: since the read path filters
+      // on the enabled sources, disabling one no longer needs its cache gone —
+      // only removeSource discards a library.
       final (notifier, db) = await _seeded();
 
       await notifier.setEnabled('s1', false);
+
+      expect(db.purged, isEmpty);
+    });
+
+    test('but removing the source does purge', () async {
+      final (notifier, db) = await _seeded();
+
+      await notifier.removeSource('s1');
 
       expect(db.purged, ['s1']);
     });
@@ -258,6 +268,114 @@ void main() {
         ),
         throwsA(isA<StateError>()),
       );
+    });
+
+    test('refuses to move a route onto another route\'s address', () async {
+      // Two routes at one address make liveEndpoint — and so which token is
+      // sent — depend on list order.
+      final (notifier, _) = await _seeded();
+
+      final ok = await notifier.updateEndpoint(
+        's1',
+        const SourceEndpoint(
+          id: 'ep-remote',
+          label: '遠端',
+          url: 'http://192.168.1.50:8090',
+        ),
+      );
+
+      expect(ok, isFalse);
+      expect(
+        notifier.state.sources.single.endpointById('ep-remote')?.url,
+        'https://roms.example.org',
+      );
+    });
+  });
+
+  group('per-route credentials', () {
+    const proxyAuth = AuthConfig(clientToken: 'proxy-token');
+
+    test('a route can be added with a login of its own', () async {
+      final (notifier, _) = await _seeded();
+
+      await notifier.addEndpoint(
+        's1',
+        const SourceEndpoint(
+          id: 'ep-ddns',
+          label: 'DDNS',
+          url: 'https://roms.duckdns.org',
+          auth: proxyAuth,
+        ),
+      );
+
+      final src = notifier.state.sources.single;
+      expect(src.endpointById('ep-ddns')?.auth?.clientToken, 'proxy-token');
+      // Adding it does not change who is live, so the source login still wins.
+      expect(src.auth?.clientToken, 'tok');
+    });
+
+    test('switching to it sends that login and switching back sends the '
+        'source\'s', () async {
+      final (notifier, _) = await _seeded();
+      await notifier.setEndpointAuth('s1', 'ep-remote', proxyAuth);
+
+      await notifier.switchEndpoint('s1', 'ep-remote');
+      expect(notifier.state.sources.single.auth?.clientToken, 'proxy-token');
+
+      await notifier.switchEndpoint('s1', 'ep-lan');
+      expect(notifier.state.sources.single.auth?.clientToken, 'tok');
+    });
+
+    test('credentials survive a reload', () async {
+      final storage = _storageInTempDir();
+      final (notifier, _) = await _seeded(storage: storage);
+      await notifier.setEndpointAuth('s1', 'ep-remote', proxyAuth);
+
+      final reloaded = SourcesNotifier(storage, db: _SpyDb());
+      await reloaded.ready;
+
+      final src = reloaded.state.sources.single;
+      expect(src.endpointById('ep-remote')?.auth?.clientToken, 'proxy-token');
+      expect(src.defaultAuth?.clientToken, 'tok');
+    });
+
+    test('null clears the route\'s login and hands it back to the source',
+        () async {
+      final (notifier, _) = await _seeded();
+      await notifier.setEndpointAuth('s1', 'ep-remote', proxyAuth);
+
+      await notifier.setEndpointAuth('s1', 'ep-remote', null);
+
+      final src = notifier.state.sources.single;
+      expect(src.endpointById('ep-remote')?.auth, isNull);
+      await notifier.switchEndpoint('s1', 'ep-remote');
+      expect(notifier.state.sources.single.auth?.clientToken, 'tok');
+    });
+
+    test('editing the live route\'s login takes effect immediately', () async {
+      final (notifier, _) = await _seeded();
+
+      await notifier.setEndpointAuth('s1', 'ep-lan', proxyAuth);
+
+      expect(notifier.state.sources.single.auth?.clientToken, 'proxy-token');
+    });
+
+    test('throws on an unknown route rather than inventing one', () async {
+      final (notifier, _) = await _seeded();
+      expect(
+        () => notifier.setEndpointAuth('s1', 'ep-ghost', proxyAuth),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('NEVER purges — a rotated token is not a changed library', () async {
+      final (notifier, db) = await _seeded();
+
+      await notifier.setEndpointAuth('s1', 'ep-remote', proxyAuth);
+      await notifier.switchEndpoint('s1', 'ep-remote');
+      await notifier.setEndpointAuth('s1', 'ep-remote', null);
+
+      expect(db.purged, isEmpty);
     });
   });
 

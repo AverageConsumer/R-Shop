@@ -41,12 +41,13 @@ void main() {
           await db.execute('CREATE INDEX idx_systemSlug ON games (systemSlug)');
           await db.execute('CREATE INDEX idx_displayName ON games (displayName)');
           await db.execute('CREATE INDEX idx_filename ON games (filename)');
-          // Mirrors production v14: uniqueness is per route, so the same
-          // server reached two ways keeps two independent lists.
+          // Mirrors production v15: uniqueness is per source. endpoint_id is
+          // still stored (which route last fetched the row) but is not keyed
+          // on — the routes of one source are the same server.
           await db.execute(
-              'CREATE UNIQUE INDEX idx_games_system_filename_route ON games (systemSlug, filename, source_id, endpoint_id)');
+              'CREATE UNIQUE INDEX idx_games_system_filename_source ON games (systemSlug, filename, source_id)');
           await db.execute(
-              'CREATE INDEX idx_games_route ON games (source_id, endpoint_id)');
+              'CREATE INDEX idx_games_source ON games (source_id)');
           await db.execute('''
             CREATE TABLE game_metadata (
               filename TEXT NOT NULL,
@@ -105,8 +106,8 @@ void main() {
             'idx_systemSlug',
             'idx_displayName',
             'idx_filename',
-            'idx_games_system_filename_route',
-            'idx_games_route',
+            'idx_games_system_filename_source',
+            'idx_games_source',
           ]));
     });
   });
