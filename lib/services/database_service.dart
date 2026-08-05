@@ -428,25 +428,256 @@ class DatabaseService {
         );
       });
     }
+    if (oldVersion < 16) {
+      // One list per *cache owner*. A source owns its own list until the user
+      // puts it in a group; then the group owns it, because a group is the
+      // user declaring that its members are one server — the same declaration
+      // that collapsed a source's routes in v15, one level up.
+      //
+      // **This step deletes nothing.** The backfill is one-to-one
+      // (`cache_owner_id = source_id`), so the new unique key holds exactly the
+      // rows the old one did and no duplicate can appear. The merging — and
+      // therefore the only de-duplication groups need — happens later, in
+      // [adoptCacheInto], when the config layer tells us which sources the user
+      // actually grouped. That split is deliberate: groups live in the config
+      // file, which this layer cannot read, and a migration that guesses at
+      // them would be a migration that deletes rows on a guess.
+      await db.transaction((txn) async {
+        await txn.execute(
+          "ALTER TABLE $_tableName ADD COLUMN cache_owner_id TEXT NOT NULL DEFAULT ''",
+        );
+        await txn.rawUpdate('UPDATE $_tableName SET cache_owner_id = source_id');
+
+        await txn.execute(
+            'DROP INDEX IF EXISTS idx_games_system_filename_source');
+        await txn.execute(
+          'CREATE UNIQUE INDEX idx_games_system_filename_owner '
+          'ON $_tableName (systemSlug, filename, cache_owner_id)',
+        );
+        await txn.execute(
+          'CREATE INDEX IF NOT EXISTS idx_games_owner '
+          'ON $_tableName (cache_owner_id)',
+        );
+        // idx_games_source stays even though source_id left the key:
+        // re-stamping a departing member and purgeOrDetachSource both look
+        // rows up by the source that fetched them.
+      });
+    }
   }
 
   /// 0 for rows that are only in the table because the file is on the device
   /// (`purgeOrDetachSource` nulls `provider_config`/`url` for those), 1 for
-  /// rows that still point at a server. Lower wins the v15 de-duplication.
-  static String _v15OnDeviceRank(String alias) =>
+  /// rows that still point at a server. Lower wins de-duplication.
+  ///
+  /// Named for v15, which introduced it, but it is now the single de-dup
+  /// criterion for groups as well: dropping an on-device row makes the library
+  /// forget a game the user has actually downloaded, while a row that still
+  /// carries a remote url can always be re-fetched. Change the signal here and
+  /// every collapse changes with it.
+  static String _onDeviceRank(String alias) =>
       'CASE WHEN $alias.provider_config IS NULL '
       "OR $alias.url IS NULL OR $alias.url = '' THEN 0 ELSE 1 END";
 
-  /// Persists [games] for one system **within one source**.
+  /// Collapses rows that are the same game under the same [keyColumn] down to
+  /// one, salvaging the expensive fields onto the survivor. Returns how many
+  /// rows it deleted.
   ///
-  /// [sourceId] says whose list this is; it defaults to `''`, the bucket local
-  /// filesystem scans live in — local files belong to no source. [endpointId]
-  /// is recorded, not keyed on: it remembers which route last fetched these
-  /// rows. Every route of one source reaches the same server, so they share a
-  /// single list and re-syncing over another route updates it in place.
+  /// One shape, three callers: v15 collapsed a source's per-route copies, and
+  /// [adoptCacheInto]/[moveCacheOwnership] collapse a group's per-member ones.
   ///
-  /// Orphan deletion is scoped to the same source. That scoping is what stops
-  /// a sync of one source deleting another source's rows as "orphans".
+  /// The caller must make sure no unique index is in the way — a duplicate
+  /// cannot exist while one is enforced, so every caller either has not created
+  /// it yet (migration) or drops it for the duration ([_rekeyOwnership]).
+  static Future<int> _collapseDuplicates(
+    DatabaseExecutor txn, {
+    required String keyColumn,
+  }) async {
+    // Pick the survivor of each duplicate group by a *total* order, so exactly
+    // one row can survive: on-device copies first, then the oldest id. Finding
+    // the losers rather than the winners is what makes that guarantee hold —
+    // "keep the winner" leaves ties alive.
+    final rankA = _onDeviceRank('a');
+    final rankB = _onDeviceRank('b');
+    final loserRows = await txn.rawQuery('''
+      SELECT DISTINCT a.id AS id
+      FROM $_tableName a
+      JOIN $_tableName b
+        ON b.$keyColumn = a.$keyColumn
+       AND b.systemSlug = a.systemSlug
+       AND b.filename = a.filename
+       AND b.id <> a.id
+      WHERE ($rankB) < ($rankA)
+         OR (($rankB) = ($rankA) AND b.id < a.id)
+    ''');
+    final losers = loserRows.map((r) => r['id'] as int).toList();
+    if (losers.isEmpty) return 0;
+
+    // Salvage before deleting: covers and thumbnails are expensive to rebuild,
+    // and the survivor may be the copy that never had them. Every value
+    // written here already existed inside the same group.
+    final group = 'c.$keyColumn = $_tableName.$keyColumn '
+        'AND c.systemSlug = $_tableName.systemSlug '
+        'AND c.filename = $_tableName.filename';
+    await txn.rawUpdate('''
+      UPDATE $_tableName SET
+        cover_url = COALESCE(cover_url, (
+          SELECT c.cover_url FROM $_tableName c
+          WHERE $group AND c.cover_url IS NOT NULL
+          ORDER BY c.id LIMIT 1)),
+        has_thumbnail = COALESCE((
+          SELECT MAX(c.has_thumbnail) FROM $_tableName c
+          WHERE $group), has_thumbnail),
+        alternative_sources = COALESCE(alternative_sources, (
+          SELECT c.alternative_sources FROM $_tableName c
+          WHERE $group AND c.alternative_sources IS NOT NULL
+          ORDER BY c.id LIMIT 1))
+      WHERE EXISTS (
+        SELECT 1 FROM $_tableName c WHERE $group AND c.id <> $_tableName.id)
+    ''');
+
+    for (var i = 0; i < losers.length; i += 200) {
+      final chunk = losers.skip(i).take(200).toList();
+      final placeholders = List.filled(chunk.length, '?').join(',');
+      await txn.rawDelete(
+        'DELETE FROM $_tableName WHERE id IN ($placeholders)',
+        chunk,
+      );
+    }
+    return losers.length;
+  }
+
+  /// Moves every row owned by [fromOwners] under [toOwner] and collapses what
+  /// that makes duplicate. Returns the number of rows dropped as duplicates.
+  ///
+  /// The unique index is dropped for the duration and rebuilt inside the same
+  /// transaction. It has to be: re-stamping the owner column is exactly the
+  /// operation the index forbids, so the alternative is reconciling row by row
+  /// in Dart — a second de-dup rule that would drift from [_collapseDuplicates]
+  /// the first time either changed. Rebuilding it also *proves* the collapse
+  /// worked; if a duplicate survived, `CREATE UNIQUE INDEX` throws and the
+  /// whole transaction rolls back rather than leaving the user a half-merged
+  /// library.
+  static Future<int> _rekeyOwnership(
+    DatabaseExecutor txn, {
+    required String toOwner,
+    required List<String> fromOwners,
+  }) async {
+    if (fromOwners.isEmpty) return 0;
+    final placeholders = List.filled(fromOwners.length, '?').join(',');
+
+    await txn.execute('DROP INDEX IF EXISTS idx_games_system_filename_owner');
+    await txn.rawUpdate(
+      'UPDATE $_tableName SET cache_owner_id = ? '
+      'WHERE cache_owner_id IN ($placeholders)',
+      [toOwner, ...fromOwners],
+    );
+
+    final collapsed =
+        await _collapseDuplicates(txn, keyColumn: 'cache_owner_id');
+
+    // Safety net, same as v15: the pass above provably leaves one row per
+    // group, but a leftover here would make the index rebuild throw.
+    final swept = await txn.rawDelete('''
+      DELETE FROM $_tableName WHERE id NOT IN (
+        SELECT MIN(id) FROM $_tableName
+        GROUP BY systemSlug, filename, cache_owner_id
+      )
+    ''');
+    if (swept > 0) {
+      debugPrint('_rekeyOwnership: safety sweep removed $swept rows');
+    }
+
+    await txn.execute(
+      'CREATE UNIQUE INDEX idx_games_system_filename_owner '
+      'ON $_tableName (systemSlug, filename, cache_owner_id)',
+    );
+    return collapsed + swept;
+  }
+
+  /// Folds the cached libraries of [memberIds] into the one owned by
+  /// [ownerId] — what joining a group means for the database.
+  ///
+  /// A group is one server, so it has one list. Merging is not optional
+  /// bookkeeping: leaving each member its own copy would show the user the
+  /// same games twice on the home screen and let the copies drift apart with
+  /// nothing able to reconcile them.
+  ///
+  /// De-duplication uses [_onDeviceRank] — the copy the user has downloaded
+  /// survives. Everything happens in one transaction, so a failure leaves the
+  /// libraries exactly as they were.
+  Future<int> adoptCacheInto({
+    required String ownerId,
+    required Iterable<String> memberIds,
+  }) async {
+    if (ownerId.isEmpty) return 0;
+    final from = memberIds.where((id) => id.isNotEmpty && id != ownerId).toSet();
+    if (from.isEmpty) return 0;
+    final db = await database;
+    return db.transaction(
+      (txn) => _rekeyOwnership(txn, toOwner: ownerId, fromOwners: from.toList()),
+    );
+  }
+
+  /// Hands a group's cached library from [fromOwnerId] to [toOwnerId] — what
+  /// the *owner itself* leaving a group means for the database.
+  ///
+  /// `SourceGroup.withoutMember` re-points ownership to the first remaining
+  /// member; without this the rows would stay behind under the departed id and
+  /// the group would look freshly empty. Call both in the same step.
+  Future<int> moveCacheOwnership({
+    required String fromOwnerId,
+    required String toOwnerId,
+  }) async {
+    if (fromOwnerId.isEmpty || toOwnerId.isEmpty) return 0;
+    if (fromOwnerId == toOwnerId) return 0;
+    final db = await database;
+    return db.transaction(
+      (txn) =>
+          _rekeyOwnership(txn, toOwner: toOwnerId, fromOwners: [fromOwnerId]),
+    );
+  }
+
+  /// Cuts [sourceId] loose from the library owned by [ownerId] — what a
+  /// *non-owning* member leaving a group means for the database.
+  ///
+  /// **The leaver keeps nothing.** The rows are the group's, and there is no
+  /// honest way to split them: after a merge nothing records which member first
+  /// saw a given game, and the whole point of the group was that the answer did
+  /// not matter. So the source leaves with an empty library and re-syncs —
+  /// which is why the UI has to confirm this before calling it.
+  ///
+  /// What this does do is re-stamp `source_id` to the owner, so that removing
+  /// the departed source later cannot take the group's rows with it as
+  /// collateral. Returns the number of rows re-stamped.
+  Future<int> releaseCacheFrom({
+    required String sourceId,
+    required String ownerId,
+  }) async {
+    if (sourceId.isEmpty || ownerId.isEmpty || sourceId == ownerId) return 0;
+    final db = await database;
+    return db.rawUpdate(
+      'UPDATE $_tableName SET source_id = ? '
+      'WHERE source_id = ? AND cache_owner_id = ?',
+      [ownerId, sourceId, ownerId],
+    );
+  }
+
+  /// Persists [games] for one system **within one cached library**.
+  ///
+  /// [sourceId] says which source fetched them; it defaults to `''`, the bucket
+  /// local filesystem scans live in — local files belong to no source.
+  /// [endpointId] is recorded, not keyed on: it remembers which route last
+  /// fetched these rows.
+  ///
+  /// [cacheOwnerId] says whose list they go into, and defaults to [sourceId] —
+  /// a source owns its own library until the user puts it in a group. Pass
+  /// `AppConfig.cacheOwnerIdFor(sourceId)` and grouped members write into the
+  /// group's single list, so re-syncing over any member updates it in place
+  /// exactly the way re-syncing over another route already did.
+  ///
+  /// Orphan deletion is scoped to that library. The scoping is what stops a
+  /// sync of one source deleting another's rows as "orphans" — and, within a
+  /// group, what lets one member's sync prune games the server no longer has.
   Future<void> saveGames(
     String systemSlug,
     List<GameItem> games, {
@@ -454,7 +685,9 @@ class DatabaseService {
     bool forceDeleteOrphans = false,
     String sourceId = '',
     String endpointId = '',
+    String? cacheOwnerId,
   }) async {
+    final owner = cacheOwnerId ?? sourceId;
     final db = await database;
     await db.transaction((txn) async {
       // 1. Delete orphans when requested.
@@ -464,8 +697,8 @@ class DatabaseService {
         final existing = await txn.query(
           _tableName,
           columns: ['filename'],
-          where: 'systemSlug = ? AND source_id = ?',
-          whereArgs: [systemSlug, sourceId],
+          where: 'systemSlug = ? AND cache_owner_id = ?',
+          whereArgs: [systemSlug, owner],
         );
         final existingFiles =
             existing.map((r) => r['filename'] as String).toSet();
@@ -491,9 +724,9 @@ class DatabaseService {
               final placeholders = List.filled(chunk.length, '?').join(',');
               await txn.rawDelete(
                 'DELETE FROM $_tableName WHERE systemSlug = ? '
-                'AND source_id = ? '
+                'AND cache_owner_id = ? '
                 'AND filename IN ($placeholders)',
-                [systemSlug, sourceId, ...chunk],
+                [systemSlug, owner, ...chunk],
               );
               // Cascade: remove orphaned metadata and RA matches — but only
               // once no source still lists the file. Metadata and achievement
@@ -531,9 +764,9 @@ class DatabaseService {
       final batch = txn.batch();
       for (final game in games) {
         batch.rawInsert('''
-          INSERT INTO $_tableName (systemSlug, filename, displayName, url, region, cover_url, provider_config, has_thumbnail, is_folder, alternative_sources, source_id, endpoint_id)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(systemSlug, filename, source_id) DO UPDATE SET
+          INSERT INTO $_tableName (systemSlug, filename, displayName, url, region, cover_url, provider_config, has_thumbnail, is_folder, alternative_sources, source_id, endpoint_id, cache_owner_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(systemSlug, filename, cache_owner_id) DO UPDATE SET
             displayName = excluded.displayName,
             url = excluded.url,
             region = excluded.region,
@@ -542,7 +775,8 @@ class DatabaseService {
             has_thumbnail = MAX(has_thumbnail, excluded.has_thumbnail),
             is_folder = excluded.is_folder,
             alternative_sources = excluded.alternative_sources,
-            endpoint_id = excluded.endpoint_id
+            endpoint_id = excluded.endpoint_id,
+            source_id = excluded.source_id
         ''', [
           systemSlug,
           game.filename,
@@ -561,6 +795,7 @@ class DatabaseService {
                   game.alternativeSources.map((a) => a.toJson()).toList()),
           sourceId,
           endpointId,
+          owner,
         ]);
       }
       await batch.commit(noResult: true);
@@ -688,9 +923,10 @@ class DatabaseService {
 
   /// Games for one system.
   ///
-  /// Pass [sourceId] to see just one source's list. Passing nothing returns
-  /// every source's rows, which is what the global library and the thumbnail
-  /// jobs want.
+  /// Pass [sourceId] to see just one source's list, or [cacheOwnerId] to see a
+  /// group's — they are the same thing for an ungrouped source, which is why
+  /// [sourceId] alone still works. Passing nothing returns every row, which is
+  /// what the global library and the thumbnail jobs want.
   ///
   /// [endpointId] is accepted so callers can hand over a whole route without
   /// caring, but it does **not** narrow the result: the routes of one source
@@ -703,16 +939,17 @@ class DatabaseService {
     String? sourceId,
     String? endpointId,
     bool includeLocal = false,
+    String? cacheOwnerId,
   }) async {
     final db = await database;
     var where = 'systemSlug = ?';
     final args = <Object?>[systemSlug];
-    if (sourceId != null || endpointId != null) {
-      const sourceClause = 'source_id = ?';
-      args.add(sourceId ?? '');
+    if (sourceId != null || endpointId != null || cacheOwnerId != null) {
+      const ownerClause = 'cache_owner_id = ?';
+      args.add(cacheOwnerId ?? sourceId ?? '');
       where += includeLocal
-          ? " AND ($sourceClause OR source_id = '')"
-          : ' AND $sourceClause';
+          ? " AND ($ownerClause OR cache_owner_id = '')"
+          : ' AND $ownerClause';
     }
     final maps = await db.query(
       _tableName,
@@ -750,17 +987,24 @@ class DatabaseService {
     String systemSlug,
     Iterable<({String source, String endpoint})> routes, {
     bool includeLocal = true,
+    String Function(String sourceId)? cacheOwnerOf,
   }) async {
     final db = await database;
-    final sources = <String>{for (final r in routes) r.source};
-    if (includeLocal) sources.add('');
-    if (sources.isEmpty) return const [];
+    // Sources of one group resolve to the same owner and collapse to a single
+    // term, the same way two routes of one source already did. Without a
+    // resolver every source owns its own list, which is what an ungrouped
+    // install looks like.
+    final owners = <String>{
+      for (final r in routes) cacheOwnerOf?.call(r.source) ?? r.source,
+    };
+    if (includeLocal) owners.add('');
+    if (owners.isEmpty) return const [];
 
-    final placeholders = List.filled(sources.length, '?').join(',');
+    final placeholders = List.filled(owners.length, '?').join(',');
     final maps = await db.query(
       _tableName,
-      where: 'systemSlug = ? AND source_id IN ($placeholders)',
-      whereArgs: [systemSlug, ...sources],
+      where: 'systemSlug = ? AND cache_owner_id IN ($placeholders)',
+      whereArgs: [systemSlug, ...owners],
       orderBy: 'displayName ASC',
     );
     return maps.map(_gameFromRow).toList();
@@ -779,11 +1023,14 @@ class DatabaseService {
   /// The endpoint each game arrived over is carried through to the row so it
   /// still records the last route used, but it never splits the batch — one
   /// source, one list.
+  /// Pass [cacheOwnerOf] (`AppConfig.cacheOwnerIdFor`) so grouped members write
+  /// into the group's one list instead of each keeping a copy.
   Future<void> saveGamesByRoute(
     String systemSlug,
     List<GameItem> games, {
     bool deleteOrphans = false,
     bool forceDeleteOrphans = false,
+    String Function(String sourceId)? cacheOwnerOf,
   }) async {
     final bySource = <String, List<GameItem>>{};
     final endpointOf = <String, String>{};
@@ -805,56 +1052,76 @@ class DatabaseService {
       return;
     }
 
+    // Two sources of one group in a single batch would prune each other's rows
+    // as orphans and then put them back — the second list is not the whole
+    // library it is being compared against. It should not happen (the home
+    // screen resolves a group to one member at a time), so the guard logs
+    // rather than hides it, and only the first batch of an owner prunes.
+    final prunedOwners = <String>{};
     for (final entry in bySource.entries) {
+      final owner = cacheOwnerOf?.call(entry.key) ?? entry.key;
+      final firstForOwner = prunedOwners.add(owner);
+      if (!firstForOwner) {
+        debugPrint(
+          'saveGamesByRoute($systemSlug): two sources share cache owner '
+          '"$owner" in one batch — skipping orphan pruning for ${entry.key}',
+        );
+      }
       await saveGames(
         systemSlug,
         entry.value,
-        deleteOrphans: deleteOrphans,
-        forceDeleteOrphans: forceDeleteOrphans,
+        deleteOrphans: deleteOrphans && firstForOwner,
+        forceDeleteOrphans: forceDeleteOrphans && firstForOwner,
         sourceId: entry.key,
         endpointId: endpointOf[entry.key] ?? '',
+        cacheOwnerId: owner,
       );
     }
   }
 
-  /// How many games each source has cached, keyed by source id.
+  /// How many games each cached library holds, keyed by cache owner id.
   ///
-  /// This is the number the source list shows. The empty bucket (local
+  /// This is the number the source list shows: look it up with
+  /// `AppConfig.cacheOwnerIdFor(source.id)`, so every member of a group reports
+  /// the group's one list rather than a share of it. The empty bucket (local
   /// filesystem scans) is excluded — it belongs to no source and would
   /// otherwise be attributed to whichever one you opened.
-  Future<Map<String, int>> getGameCountsPerSource() async {
+  Future<Map<String, int>> getGameCountsPerCacheOwner() async {
     final db = await database;
     final rows = await db.rawQuery(
-      'SELECT source_id, COUNT(*) AS c FROM $_tableName '
-      "WHERE source_id != '' GROUP BY source_id",
+      'SELECT cache_owner_id, COUNT(*) AS c FROM $_tableName '
+      "WHERE cache_owner_id != '' GROUP BY cache_owner_id",
     );
     return {
-      for (final r in rows) r['source_id'] as String: (r['c'] as int?) ?? 0,
+      for (final r in rows)
+        r['cache_owner_id'] as String: (r['c'] as int?) ?? 0,
     };
   }
 
-  /// Games cached for one source, whichever route fetched them.
-  Future<int> getGameCountForSource(String sourceId) async {
+  /// Games in one cached library, whichever source or route fetched them.
+  Future<int> getGameCountForOwner(String cacheOwnerId) async {
     final db = await database;
     final rows = await db.rawQuery(
-      'SELECT COUNT(*) AS c FROM $_tableName WHERE source_id = ?',
-      [sourceId],
+      'SELECT COUNT(*) AS c FROM $_tableName WHERE cache_owner_id = ?',
+      [cacheOwnerId],
     );
     return (rows.first['c'] as int?) ?? 0;
   }
 
-  /// Drops every cached row for one source, leaving other sources untouched.
+  /// Drops one whole cached library, leaving every other one untouched.
   ///
   /// Deleting a *route* must not call this: the source's other routes still
-  /// reach the same server and the list they share is still valid. Only the
-  /// source going away justifies dropping it.
-  Future<int> deleteSourceCache(String sourceId) async {
-    if (sourceId.isEmpty) return 0;
+  /// reach the same server and the list they share is still valid. Nor may a
+  /// group member leaving — the list belongs to the group, and the leaver's
+  /// half of it does not exist as a separate thing ([releaseCacheFrom]). Only
+  /// the owner of the library going away justifies dropping it.
+  Future<int> deleteCacheOwnedBy(String cacheOwnerId) async {
+    if (cacheOwnerId.isEmpty) return 0;
     final db = await database;
     return db.delete(
       _tableName,
-      where: 'source_id = ?',
-      whereArgs: [sourceId],
+      where: 'cache_owner_id = ?',
+      whereArgs: [cacheOwnerId],
     );
   }
 
@@ -886,10 +1153,18 @@ class DatabaseService {
   ///
   /// The sourceId is validated against `[A-Za-z0-9_-]+` before it hits
   /// the LIKE pattern so it can't be hijacked into a wildcard.
+  ///
+  /// [protectedOwnerIds] names cached libraries the user still has — the groups
+  /// this source was a member of. Rows it fetched on the group's behalf are the
+  /// group's rows, and a member walking out must not take them along; without
+  /// this the remaining members would face a re-sync they never asked for.
+  /// Pass the ids **before** the source is dropped from the group.
+  ///
   /// Returns `(detached, deleted)` row counts for logging.
   Future<({int detached, int deleted})> purgeOrDetachSource(
     String sourceId, {
     required Map<String, String> systemTargetFolders,
+    Set<String> protectedOwnerIds = const {},
   }) async {
     if (!RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(sourceId)) {
       debugPrint('purgeOrDetachSource: refusing unsafe id "$sourceId"');
@@ -897,11 +1172,19 @@ class DatabaseService {
     }
     final db = await database;
     final pattern = '%"source_id":"$sourceId"%';
+    var where = 'provider_config LIKE ?';
+    final whereArgs = <Object?>[pattern];
+    if (protectedOwnerIds.isNotEmpty) {
+      final placeholders =
+          List.filled(protectedOwnerIds.length, '?').join(',');
+      where += ' AND cache_owner_id NOT IN ($placeholders)';
+      whereArgs.addAll(protectedOwnerIds);
+    }
     final rows = await db.query(
       _tableName,
       columns: ['systemSlug', 'filename'],
-      where: 'provider_config LIKE ?',
-      whereArgs: [pattern],
+      where: where,
+      whereArgs: whereArgs,
     );
 
     final installedFilenames = <(String, String)>[];
@@ -920,18 +1203,22 @@ class DatabaseService {
     int detached = 0;
     int deleted = 0;
     await db.transaction((txn) async {
+      // Both statements repeat the selection predicate rather than matching on
+      // (system, filename) alone: that pair is not unique across cached
+      // libraries, so the bare version reached into every other source's rows
+      // for the same game — and, once groups exist, into the group's.
       for (final (slug, filename) in installedFilenames) {
         detached += await txn.rawUpdate(
           'UPDATE $_tableName SET provider_config = NULL, url = NULL '
-          'WHERE systemSlug = ? AND filename = ?',
-          [slug, filename],
+          'WHERE systemSlug = ? AND filename = ? AND $where',
+          [slug, filename, ...whereArgs],
         );
       }
       for (final (slug, filename) in orphanFilenames) {
         deleted += await txn.delete(
           _tableName,
-          where: 'systemSlug = ? AND filename = ?',
-          whereArgs: [slug, filename],
+          where: 'systemSlug = ? AND filename = ? AND $where',
+          whereArgs: [slug, filename, ...whereArgs],
         );
       }
     });

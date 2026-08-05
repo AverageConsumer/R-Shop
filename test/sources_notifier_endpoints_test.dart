@@ -19,6 +19,7 @@ class _SpyDb extends DatabaseService {
   Future<({int detached, int deleted})> purgeOrDetachSource(
     String sourceId, {
     required Map<String, String> systemTargetFolders,
+    Set<String> protectedOwnerIds = const {},
   }) async {
     purged.add(sourceId);
     return (detached: 0, deleted: 0);

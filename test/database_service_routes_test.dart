@@ -3,13 +3,16 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:retro_eshop/models/game_item.dart';
 import 'package:retro_eshop/services/database_service.dart';
 
-/// One cached list per *source* (schema v15).
+/// One cached list per *source* (schema v16, ungrouped).
 ///
 /// The routes of one source are the same server reached by another address, so
 /// there is only ever one game list behind them. v14 stored a copy per route
 /// and nothing could tell whether the copies were supposed to agree; v15 keys
 /// on the source alone and keeps `endpoint_id` only as a record of which route
-/// last fetched the row.
+/// last fetched the row. v16 moved the key on again, from the source to the
+/// cache owner — which *is* the source until the user puts it in a group, so
+/// everything here still describes what an ungrouped install does. The grouped
+/// case is in `database_service_v16_migration_test.dart`.
 ///
 /// Everything here guards two things: syncing one source never touches
 /// another's rows, and switching route never splits or re-fetches a list.
@@ -53,7 +56,7 @@ void main() {
     db = await databaseFactoryFfi.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 15,
+        version: 16,
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE games (
@@ -70,11 +73,14 @@ void main() {
               is_folder INTEGER NOT NULL DEFAULT 0,
               alternative_sources TEXT,
               source_id TEXT NOT NULL DEFAULT '',
-              endpoint_id TEXT NOT NULL DEFAULT ''
+              endpoint_id TEXT NOT NULL DEFAULT '',
+              cache_owner_id TEXT NOT NULL DEFAULT ''
             )
           ''');
           await db.execute(
-              'CREATE UNIQUE INDEX idx_games_system_filename_source ON games (systemSlug, filename, source_id)');
+              'CREATE UNIQUE INDEX idx_games_system_filename_owner ON games (systemSlug, filename, cache_owner_id)');
+          await db.execute(
+              'CREATE INDEX idx_games_source ON games (source_id)');
           await db.execute('''
             CREATE TABLE game_metadata (
               filename TEXT NOT NULL,
@@ -299,36 +305,36 @@ void main() {
   });
 
   group('counts — what did this source actually find', () {
-    test('getGameCountsPerSource reports each source once', () async {
+    test('getGameCountsPerCacheOwner reports each library once', () async {
       await save('snes', ['A.zip', 'B.zip'], romm, endpointId: lan);
       await save('snes', ['B.zip'], romm, endpointId: remote);
       await save('snes', ['C.zip'], smb);
 
-      expect(await service.getGameCountsPerSource(), {romm: 2, smb: 1});
+      expect(await service.getGameCountsPerCacheOwner(), {romm: 2, smb: 1});
     });
 
-    test('the no-source bucket is excluded from per-source counts', () async {
+    test('the no-source bucket is excluded from per-library counts', () async {
       await save('snes', ['A.zip'], romm);
       await service.saveGames('snes', [game('OnDisk.nes')]);
 
-      expect(await service.getGameCountsPerSource(), {romm: 1});
+      expect(await service.getGameCountsPerCacheOwner(), {romm: 1});
     });
 
-    test('getGameCountForSource answers for one source', () async {
+    test('getGameCountForOwner answers for one library', () async {
       await save('snes', ['A.zip', 'B.zip'], romm);
       await save('nes', ['C.zip'], romm);
 
-      expect(await service.getGameCountForSource(romm), 3);
-      expect(await service.getGameCountForSource(smb), 0);
+      expect(await service.getGameCountForOwner(romm), 3);
+      expect(await service.getGameCountForOwner(smb), 0);
     });
   });
 
-  group('deleteSourceCache', () {
+  group('deleteCacheOwnedBy', () {
     test('removes one source and leaves its sibling intact', () async {
       await save('snes', ['A.zip'], romm);
       await save('snes', ['A.zip', 'B.zip'], smb);
 
-      expect(await service.deleteSourceCache(romm), 1);
+      expect(await service.deleteCacheOwnedBy(romm), 1);
       expect(await service.getGames('snes', sourceId: smb), hasLength(2));
     });
 
@@ -336,7 +342,7 @@ void main() {
         () async {
       await service.saveGames('snes', [game('OnDisk.nes')]);
 
-      expect(await service.deleteSourceCache(''), 0);
+      expect(await service.deleteCacheOwnedBy(''), 0);
       expect(await service.getGames('snes'), hasLength(1));
     });
   });

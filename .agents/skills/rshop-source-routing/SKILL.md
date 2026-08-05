@@ -114,29 +114,58 @@ description: "Touch anything about sources, connection routes, which source is i
 
 ---
 
-## 資料庫：一個來源存一份
+## 資料庫：一份清單屬於「快取擁有者」（schema v16，2026-08-05 改寫）
 
-schema **v15**（v14 曾經是每條路線各一份，已收掉）。`games` 表有
+演進：v14 每條路線一份 → v15 收成每個來源一份 → **v16 收成每個「擁有者」一份**。
+擁有者＝**有群組就是群組，沒有就是來源自己**（`AppConfig.cacheOwnerIdFor(sourceId)`）。
+同一個道理往上搬一層：使用者宣告「這幾個來源是同一台」，跟宣告「這幾條路線是同一台」
+一樣，結論都是**只該有一份清單**。
+
+`games` 表有
 
 ```sql
-source_id  TEXT NOT NULL DEFAULT '',
-endpoint_id TEXT NOT NULL DEFAULT ''
+source_id       TEXT NOT NULL DEFAULT '',   -- 誰抓的
+endpoint_id     TEXT NOT NULL DEFAULT '',   -- 從哪條路抓的
+cache_owner_id  TEXT NOT NULL DEFAULT ''    -- 這份清單屬於誰 ← 唯一鍵在這
 ```
 
 **`NOT NULL DEFAULT ''` 不是隨便寫的** —— SQLite 的 UNIQUE 索引把 NULL 視為互不相同，
-用得到 NULL 的話唯一鍵形同虛設，同一筆遊戲會無限重複。
+用得到 NULL 的話唯一鍵形同虛設，同一筆遊戲會無限重複。`''` 是本機掃描的桶子。
 
-唯一索引：**`(systemSlug, filename, source_id)`**。`endpoint_id` **留著但不進唯一鍵**，
-只記「上次從哪條路抓的」。孤兒清除帶那三個欄位；
-串連刪 `game_metadata` / `ra_matches` 前要先檢查 `stillReferenced`。
+唯一索引：**`(systemSlug, filename, cache_owner_id)`**。
+`source_id` 與 `endpoint_id` **都留著但都不進唯一鍵**，只做歸屬記錄。
+
+**v16 遷移一列都不刪**：只加欄位、把 `cache_owner_id` 從 `source_id` 一對一補進去、換索引。
+**合併與去重不在遷移裡**，在 `adoptCacheInto()` —— 群組存在設定檔裡，資料庫層讀不到，
+在遷移裡用猜的去合併就是「憑猜測刪列」。
+
+去重判準只有一條：`_onDeviceRank`（原 `_v15OnDeviceRank`）——
+**已經下載到機器上的那一列一定活下來**（`purgeOrDetachSource` 會把它的
+`provider_config`／`url` 清空，那就是識別記號），還有遠端 url 的可以重抓。
+`_collapseDuplicates` 是唯一的實作，v15 與群組合併共用它。
+
+群組的三個入口，**都在一個交易裡**：
+
+    adoptCacheInto(ownerId:, memberIds:)    加入群組＝把成員的清單併進擁有者的，順便去重
+    moveCacheOwnership(from:, to:)          擁有者自己退出＝整份清單交給下一個成員
+    releaseCacheFrom(sourceId:, ownerId:)   一般成員退出＝**什麼都拿不到**，要重新同步
+
+合併時會**暫時 drop 唯一索引**再重建——重建本身就是驗證，還有殘留就直接拋例外整筆 rollback。
+`releaseCacheFrom` 會把離開者的 `source_id` 改蓋成擁有者，
+而 `purgeOrDetachSource` 要帶 **`protectedOwnerIds`**（那個來源當時所在的群組），
+否則刪掉一個成員會連群組的列一起帶走——它是用 `provider_config` 的 JSON 比對的，
+欄位改了它也還是認得出那些列是誰抓的。
 
 **這是自動換路之所以無感的原因**：換路不會換到另一份清單，所以沒有空清單、
-沒有重抓、也沒有「合併兩份」的邏輯要寫。想寫合併就表示分裂本身是錯的。
+沒有重抓。**換群組成員同理**。
 
-相關 API：`saveGamesByRoute()`（依來源分組，順便記下路線）、`getGamesForRoutes()`、
-`getGameCountsPerSource()`、`getGameCountForSource()`、`deleteSourceCache()`。
-**後三個是 v15 改的名**，因為語意真的變了——`deleteRoute` 這個名字會讓人以為
-刪一條路線要順手刪快取，而那正是現在不准做的事。
+相關 API：`saveGamesByRoute(cacheOwnerOf:)`、`getGamesForRoutes(cacheOwnerOf:)`、
+`getGames(cacheOwnerId:)`、`saveGames(cacheOwnerId:)`、
+`getGameCountsPerCacheOwner()`、`getGameCountForOwner()`、`deleteCacheOwnedBy()`。
+**後三個是 v16 改的名**（v15 時叫 `…PerSource`／`ForSource`／`deleteSourceCache`），
+因為語意真的變了——名字裡寫 source 會讓人以為刪一個群組成員要順手刪快取，
+而那正是現在不准做的事。`cacheOwnerOf` 不傳就等於「每個來源各自擁有」，
+也就是沒有群組的安裝看到的行為。
 
 ---
 

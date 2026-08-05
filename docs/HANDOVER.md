@@ -57,10 +57,10 @@ UI 的東西 `analyze` 與單元測試都驗不到——見 `.agents/skills/rsho
 
 有黃黑斜紋就回報，那是版面溢位。
 
-### 1.1 這一批（2026-08-05，**尚未建置也尚未安裝**）
+### 1.1 這一批（2026-08-05，**已安裝，等他看螢幕**）
 
-> ⚠️ **裝上去之前一定要先問使用者**：這一批含 **schema v15 遷移，會改他的資料庫**（去重、換唯一鍵）。
-> 另外 `AGENTS.md` §5 本來就規定未經允許不得安裝或清資料。
+> 已徵得同意後裝上 AYN Thor（`d7195880`），debug 版，`logcat` 乾淨。
+> **v15 遷移在實機跑完**：`migration v15: collapsed 8534 duplicate rows`，沒有例外。
 
 | 要看什麼 | 預期 |
 | :--- | :--- |
@@ -76,20 +76,95 @@ UI 的東西 `analyze` 與單元測試都驗不到——見 `.agents/skills/rsho
 
 ## 2. 待辦
 
-> 2026-08-05：原本掛在這裡的三項（自動選最優路線＋UI、五語系 onboarding 字串、analyze 六項）
-> **全部做完了**，紀錄見 `docs/FIX_LOGS.md` 的 `[R-Shop 自動選最優路線]`、
-> `[R-Shop onboarding 五語系缺字串]`、`[R-Shop analyze 六項]`。
-> 底下是做那三項時**新長出來的**，不是舊的殘留。
+### 2.0 進行中：來源群組取代備援（2026-08-05 暫停，**程式在 `wip/source-groups` 分支上**）
+
+> **`main-zh` 停在 `a49cce3`，那是已經裝到機器上、驗過的版本。**
+> 這一項未完成的程式全部 commit 在 **`wip/source-groups`**（已推遠端）。
+> 要接手就 `git checkout wip/source-groups`。**這份交接的最新版在那個分支上**。
+>
+> **那個分支還是不能整體編譯**，但少了一個原因：`lib/` 只剩
+> `sources_notifier.dart` 的 `_prunedGroups` 未定義（就是下面第 2 項）。
+> 資料庫那一層已經好了、測試綠了——`cedce1e` 當時是連 `_collapseDuplicates`
+> 都只有呼叫沒有本體，所以**每一個 import 資料庫服務的測試檔都載入失敗**。
+
+#### 使用者要什麼（原話，不要再自行對映）
+
+    「應該不是備援 而是 我想指定兩個來源 其實是指向同一台伺服器
+      那它們可以選擇誰優先 或著自動」
+    「應該說 走同一個來源類型 可以設定自動選擇」
+    「應該是設成群組」
+    「A 通就先用A 我有順序」
+    「我要先回應的那台」
+    「因為同一群組 應該實際是同一台之類 所以清單也只需要一份」
+
+翻成規格，**這幾條是他確認過的，不要再改**：
+
+- **群組取代備援。** 不是在備援之外多一個功能——「備援」這個詞要從畫面上消失，
+  舊的 `fallbackSourceId` 遷成一個兩人群組（偏好在前、模式 `ordered`），那正是現行備援的行為。
+  他上次就抱怨過功能重複（「不覺得功能重複了嗎?」）。
+- **成員限同類型**（他的條件就是「走同一個來源類型」）。跨類型的既有配對照樣遷入，不然又變兩套機制。
+- **模式兩種**：`auto`＝**先回應的那台**（賽跑，不是排序）、`ordered`＝照他排的順序挑第一個通的。
+- **一個群組只存一份清單**（同一台就是同一份）。加入群組＝兩份快取合併去重；
+  **移出群組＝那個來源沒有自己的清單，要重新同步**（UI 要有確認框）。
+- 選中誰**只改記憶體中的 config，磁碟不動**（不變式 3，自癒的原因）。
+- 主畫面 L2/R2 **一個群組只佔一格**，橫幅要寫出實際用的是哪一台。
+
+#### 已完成（在 wip 分支上，測試綠）
+
+    連線方式三種模式    EndpointSelection 加 ordered；auto 改成「先回應就贏」；pinned 不變
+    firstResponder      先回應就回傳但不中斷整輪，其餘毫秒數照樣進 TTL 快取；同來源的探測併成一輪
+    順序 API            Source.withEndpointsReordered / moveEndpoint（純函式，重排不會自己換路）
+    資料庫 v16          快取擁有者改成群組（原第 1 項，2026-08-05 做完，見下）
+    測試                source_endpoint／endpoint_probe_service／database_service 四檔全綠
+
+**資料庫那一項做了什麼**（細節在 `.agents/skills/rshop-source-routing` 的資料庫那節）：
+
+    cache_owner_id      新欄位，唯一鍵改成 (systemSlug, filename, cache_owner_id)
+    v16 遷移            只加欄位、一對一補值、換索引，**一列都不刪**
+    合併與去重          不在遷移裡，在 adoptCacheInto()——群組在設定檔，資料庫層讀不到
+    _collapseDuplicates cedce1e 只有呼叫沒有本體，補上了；v15 與群組合併共用同一支
+    _v15OnDeviceRank    更名 _onDeviceRank（現在不只 v15 在用），判準本身沒動
+    三個入口            adoptCacheInto／moveCacheOwnership／releaseCacheFrom
+    改名                getGameCountsPerCacheOwner／getGameCountForOwner／deleteCacheOwnedBy
+    purgeOrDetachSource 多了 protectedOwnerIds，否則刪成員會帶走群組的列
+
+#### 還沒做（**下次從這裡開始**）
+
+1. ~~`database_service.dart` 的 v16 遷移~~ **已完成（2026-08-05）**。
+   接手的人要知道的只有兩件：讀寫都改吃 `cacheOwnerId`，而**呼叫端還沒傳**——
+   `saveGamesByRoute` / `getGamesForRoutes` 的 `cacheOwnerOf` 參數不傳就等於「沒有群組」，
+   所以第 2 項接上 `AppConfig.cacheOwnerIdFor` 之前，群組在畫面上不會生效。
+   要接的呼叫端有三處：`library_sync_service.dart`、`game_list_controller.dart`、
+   `sources_notifier.dart` 的 `purgeOrDetachSource`（要帶 `protectedOwnerIds`）。
+2. **`sources_notifier.dart` 的群組 CRUD 只做了一半** —— 建立／改名／刪除、加入／移出、
+   調順序、切模式；加入成員要擋不同類型。加入／移出要呼叫上面那個資料庫方法。
+3. **`setEndpointSelection` 要補 `ordered` 分支** —— 現在的 `else` 會把 `pinnedEndpointId` 種進去，
+   那只對 `pinned` 是對的；`auto` 與 `ordered` 都該 `clearPinnedEndpoint: true`。
+4. **`autoSelectEndpoint` 改呼叫 `probeService.resolve(src)`**，不要自己 `probeFor` 再挑——
+   否則 `auto` 拿不到先回應語意、`ordered` 拿不到順序。
+5. **notifier 補三個方法**：`reorderEndpoints`、`moveEndpointTo`、`useOrderedSelection`。
+   前兩個在模式是 `ordered` 時要順便重新解析一次（順序本身就是設定）。**都不准清快取**（不變式 1）。
+6. **UI 全部還沒動** —— 來源清單要有建立群組／加入／移出／排順序／切模式的入口，
+   浮層要能選 `ordered`（**現在點某一列一律是釘選＝覆寫**，`ordered` 需要自己的入口）。
+   ⚠️ **兩套入口都要**（觸控＋手把），先讀 `.agents/skills/rshop-touch-and-gamepad`。
+7. **七語系字串**，與功能同一次補齊。
+8. **`rshop-source-routing` 的不變式要改寫** —— 不變式 3 講的「備援」整段語彙要換成群組。
+9. 全部做完才實機驗證。**v16 遷移會改使用者的資料庫**，裝上去之前先問他（部署政策，見 `AGENTS.md §5`）。
+   > **不要為了這件事去查實機的資料。** 使用者 2026-08-05 明講「實機上資料的不管，只管你 app 開發就好」。
+   > 遷移的安全性靠**設計本身**保證：整件事在一個交易裡、去重判準照抄 v15 的 `_v15OnDeviceRank`，
+   > 而不是靠先去看他機器上有什麼。
+   >
+   > 順帶更正一個前提：本檔原本寫「他機器上約十萬列」，**那個數字在紀錄裡找不到出處**，已刪。
+   > 有出處的只有 v15 那次的遷移日誌 `collapsed 8534 duplicate rows`。
+   > 會被遷移碰到的是 `games` 表（遊戲庫快取，一列＝一款遊戲在某個來源底下的一筆），
+   > 不是存檔也不是已下載的 ROM——最壞的情況是要重新同步。
 
 ### 2.1 同步的可達性判定還停在來源層級
 
 `resolveForSync` 判定一個來源「可達」的條件是**任一條路線通**，但它同步時走的是
-`liveEndpoint`——所以會出現「來源算通、實際走的那條是死的」而不觸發備援的情況。
-自動選最優路線只作用在使用者開浮層與明確呼叫 `autoSelectEndpoint` 的時候，**同步路徑沒接上**。
-
-修法大概是同步前先 `probeFor` 再挑最快的活路（只改記憶體中的 config，
-不變式 3：備援與換路都不准寫磁碟）。**這屬於備援那條路，不是路線那條**，
-所以刻意沒有夾在上一批裡做。
+`liveEndpoint`——所以會出現「來源算通、實際走的那條是死的」而不觸發換路的情況。
+自動選路目前只作用在使用者開浮層與明確呼叫 `autoSelectEndpoint` 的時候，**同步路徑沒接上**。
+群組那一項做完後要一起看，兩者都在 `source_failover.dart`。
 
 ### 2.2 五語系的「已鎖定」用詞不一致
 
