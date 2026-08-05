@@ -1863,4 +1863,29 @@ class LFr extends L {
   @override
   String get sources_routeOrderedHint =>
       'Utiliser la première route de votre ordre qui répond';
+
+  @override
+  String get sources_reorderHint =>
+      'Déplacez-le avec haut et bas, puis appuyez à nouveau pour terminer';
+
+  @override
+  String get sources_groupMemberHint => '▶ la sort du groupe ; [A] réordonne';
+
+  @override
+  String get sources_routeRowHint =>
+      '▶ pour les icônes : réordonner, modifier ou supprimer';
+
+  @override
+  String get sources_routeUse => 'Utiliser cette route';
+
+  @override
+  String get sources_routeLock => 'Verrouiller sur cette route';
+
+  @override
+  String get sources_routeUnlock => 'Déverrouiller';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return 'Supprimer « $name » ? La liste en cache de cette source reste ; seule l\'adresse disparaît.';
+  }
 }

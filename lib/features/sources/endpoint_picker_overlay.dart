@@ -6,6 +6,7 @@ import '../../core/input/input.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/config/source.dart';
 import '../../providers/app_providers.dart';
+import '../../widgets/console_dialog.dart';
 import '../../services/endpoint_probe_service.dart';
 import '../../widgets/console_hud.dart';
 import 'endpoint_edit_screen.dart';
@@ -48,8 +49,8 @@ class EndpointPickerOverlay extends ConsumerStatefulWidget {
       _EndpointPickerOverlayState();
 }
 
-class _EndpointPickerOverlayState
-    extends ConsumerState<EndpointPickerOverlay> {
+class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
+    with SingleTickerProviderStateMixin {
   final FocusNode _scopeFocus = FocusNode(debugLabel: 'endpoint_picker');
   int _selectedIndex = 0;
 
@@ -90,8 +91,90 @@ class _EndpointPickerOverlayState
 
   @override
   void dispose() {
+    _slide.dispose();
     _scopeFocus.dispose();
     super.dispose();
+  }
+
+  /// The icons on the route at [index], in the order they are drawn. One
+  /// list, read by both the key handler and the row widget, so ▶ and a finger
+  /// can never land on different things.
+  List<_RowActionSpec> _actionsForRoute(int index) {
+    final src = widget.source;
+    if (index < 0 || index >= src.endpoints.length) return const [];
+    final ep = src.endpoints[index];
+    final l = L.of(context);
+    if (_sorting && _sel - _firstRouteIndex == index) {
+      // While the d-pad is moving this row the icons are the finger's version
+      // of the same thing.
+      return [
+        if (index > 0)
+          _RowActionSpec(
+            icon: Icons.keyboard_arrow_up,
+            label: l.sources_moveUp,
+            run: () => _moveRoute(ep, -1),
+          ),
+        if (index < src.endpoints.length - 1)
+          _RowActionSpec(
+            icon: Icons.keyboard_arrow_down,
+            label: l.sources_moveDown,
+            run: () => _moveRoute(ep, 1),
+          ),
+        _RowActionSpec(
+          icon: Icons.check,
+          label: l.common_done,
+          run: () => setState(() => _sorting = false),
+        ),
+      ];
+    }
+    return [
+      _RowActionSpec(
+        icon: Icons.drag_handle,
+        label: l.sources_moveUp,
+        run: () => setState(() {
+          _sorting = true;
+          _actionIndex = 0;
+        }),
+      ),
+      _RowActionSpec(
+        icon: Icons.edit_outlined,
+        label: l.sources_editRoute,
+        run: () => _edit(ep),
+      ),
+      _RowActionSpec(
+        icon: Icons.delete_outline,
+        label: l.sources_removeRoute,
+        run: () => _remove(ep),
+      ),
+    ];
+  }
+
+  /// The icons on the row the cursor is on, or empty for a non-route row.
+  List<_RowActionSpec> get _currentActions =>
+      _actionsForRoute(_sel - _firstRouteIndex);
+
+  Future<void> _moveRoute(SourceEndpoint ep, int delta) async {
+    final from = widget.source.endpoints.indexWhere((e) => e.id == ep.id);
+    final to = from + delta;
+    if (from < 0 || to < 0 || to >= widget.source.endpoints.length) return;
+    ref.read(feedbackServiceProvider).tick();
+    final fromY = _yOf(_sel);
+    await ref
+        .read(sourcesProvider.notifier)
+        .moveEndpointTo(widget.source.id, ep.id, to, probe: _probeService);
+    if (!mounted) return;
+    // Follow the row that moved, so a second press moves the same route.
+    setState(() => _selectedIndex = _sel + delta);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final toY = _yOf(_sel);
+      if (fromY == null || toY == null || (fromY - toY).abs() < 0.5) return;
+      setState(() {
+        _slidingId = ep.id;
+        _slideFrom = fromY - toY;
+      });
+      _slide.forward(from: 0);
+    });
   }
 
   /// Row 0 is "Automatic", row 1 is "my order"; rows 2..n+1 are the routes;
@@ -105,6 +188,56 @@ class _EndpointPickerOverlayState
   int get _addIndex => widget.source.endpoints.length + 2;
   int get _cancelIndex => _rowCount - 1;
 
+  /// Which control on the selected row has the cursor: 0 is the row itself,
+  /// 1..n are the small icons at its right end (reorder, edit, remove).
+  ///
+  /// ▶ walks onto them, ◀ walks back. The icons were already there for a
+  /// finger; this gives the pad the same target instead of a submenu.
+  int _actionIndex = 0;
+
+  /// Slides the row that just moved from where it was to where it is now —
+  /// a reorder is otherwise a single frame in which two rows swap, and the
+  /// list looks unchanged. Measured rather than assumed: rows carry latencies,
+  /// badges and a hint line, so they are not all the same height.
+  late final AnimationController _slide = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 180),
+  );
+  String? _slidingId;
+  double _slideFrom = 0;
+
+  double? _yOf(int index) {
+    final ctx = _rowKeys[index]?.currentContext;
+    final box = ctx?.findRenderObject() as RenderBox?;
+    return box?.localToGlobal(Offset.zero).dy;
+  }
+
+  /// True while ↑↓ moves the selected route instead of the cursor. [A] enters
+  /// and leaves it — reordering is repetitive, so it gets the whole d-pad.
+  bool _sorting = false;
+
+  /// One key per row so the cursor can be scrolled into view: with four
+  /// routes the list is taller than the panel, and a selection below the fold
+  /// looks like the pad has stopped working.
+  final Map<int, GlobalKey> _rowKeys = {};
+
+  GlobalKey _keyFor(int index) =>
+      _rowKeys.putIfAbsent(index, () => GlobalKey());
+
+  void _scrollToSelected() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctx = _rowKeys[_sel]?.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
   /// The cursor, clamped to the rows that exist *now*. Removing a route
   /// shortens the list under the cursor, and an index left dangling past the
   /// end would make [A] hit nothing at all.
@@ -115,16 +248,46 @@ class _EndpointPickerOverlayState
       return KeyEventResult.ignored;
     }
     final key = event.logicalKey;
+    final sortingRoute = _sorting ? _highlightedEndpoint : null;
+    if (sortingRoute != null) {
+      if (key == LogicalKeyboardKey.arrowUp) {
+        _moveRoute(sortingRoute, -1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        _moveRoute(sortingRoute, 1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.gameButtonA ||
+          key == LogicalKeyboardKey.enter ||
+          key == LogicalKeyboardKey.select ||
+          key == LogicalKeyboardKey.gameButtonB ||
+          key == LogicalKeyboardKey.escape ||
+          key == LogicalKeyboardKey.goBack) {
+        ref.read(feedbackServiceProvider).confirm();
+        setState(() => _sorting = false);
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
     if (key == LogicalKeyboardKey.arrowUp) {
       setState(() {
         _selectedIndex = (_sel - 1 + _rowCount) % _rowCount;
+        _actionIndex = 0;
+        _sorting = false;
       });
+      _scrollToSelected();
       ref.read(feedbackServiceProvider).tick();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      setState(() => _selectedIndex = (_sel + 1) % _rowCount);
+      setState(() {
+        _selectedIndex = (_sel + 1) % _rowCount;
+        _actionIndex = 0;
+        _sorting = false;
+      });
       ref.read(feedbackServiceProvider).tick();
+      _scrollToSelected();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.gameButtonA ||
@@ -143,19 +306,31 @@ class _EndpointPickerOverlayState
     // switching — the thing you do constantly — stays a single press. Both go
     // through the same methods the per-row icons call, so the two inputs can
     // never drift apart.
-    // ◀ ▶ move the highlighted route up and down the list. The order is only
-    // a setting in `ordered` mode, but it is stored in every mode, so letting
-    // it be arranged before switching modes is what makes the mode usable the
-    // moment it is picked.
-    if (key == LogicalKeyboardKey.arrowLeft) {
-      _moveHighlighted(-1);
+    // ▶ ◀ walk the cursor along the icons at the end of the row. Same gesture
+    // as the group editor, so one habit covers both.
+    final actions = _currentActions;
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (_actionIndex < actions.length) {
+        setState(() => _actionIndex++);
+        ref.read(feedbackServiceProvider).tick();
+      }
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowRight) {
-      _moveHighlighted(1);
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      if (_actionIndex > 0) {
+        setState(() => _actionIndex--);
+        ref.read(feedbackServiceProvider).tick();
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.gameButtonX) {
+      _toggleLockHighlighted();
+      return KeyEventResult.handled;
+    }
+    // Removing sits on a shoulder button, away from the two presses that get
+    // used constantly, and it asks before it acts.
+    if (key == LogicalKeyboardKey.gameButtonLeft1 ||
+        key == LogicalKeyboardKey.gameButtonRight1) {
       _removeHighlighted();
       return KeyEventResult.handled;
     }
@@ -188,25 +363,40 @@ class _EndpointPickerOverlayState
 
   Future<void> _removeHighlighted() => _remove(_highlightedEndpoint);
 
-  /// Moves the highlighted route [delta] places, and follows it with the
-  /// cursor so a second press moves the same route again.
-  Future<void> _moveHighlighted(int delta) async {
+  /// Locks the highlighted route, or releases the lock if it already has one.
+  ///
+  /// A lock is the one mode with no failover, so it is worth a press of its
+  /// own rather than riding along with "use this".
+  Future<void> _toggleLockHighlighted() async {
     final ep = _highlightedEndpoint;
     if (ep == null) return;
-    final from = widget.source.endpoints.indexWhere((e) => e.id == ep.id);
-    final to = from + delta;
-    if (from < 0 || to < 0 || to >= widget.source.endpoints.length) return;
-    ref.read(feedbackServiceProvider).tick();
-    await ref
-        .read(sourcesProvider.notifier)
-        .moveEndpointTo(widget.source.id, ep.id, to, probe: _probeService);
-    if (!mounted) return;
-    setState(() => _selectedIndex = _sel + delta);
+    final src = widget.source;
+    final notifier = ref.read(sourcesProvider.notifier);
+    ref.read(feedbackServiceProvider).confirm();
+    if (src.endpointSelection == EndpointSelection.pinned &&
+        src.pinnedEndpointId == ep.id) {
+      await notifier.clearEndpointOverride(src.id, probe: _probeService);
+    } else {
+      await notifier.switchEndpoint(src.id, ep.id, pin: true);
+    }
+    if (mounted) setState(() {});
   }
+
   Future<void> _editHighlighted() => _edit(_highlightedEndpoint);
+
 
   Future<void> _remove(SourceEndpoint? ep) async {
     if (ep == null) return;
+    final l = L.of(context);
+    ref.read(feedbackServiceProvider).tick();
+    final ok = await showConsoleDialog(
+      context,
+      title: l.sources_removeRoute,
+      message: l.sources_removeRouteConfirm(_nameOf(ep)),
+      primaryLabel: l.common_remove,
+      isDestructive: true,
+    );
+    if (ok != true || !mounted) return;
     final removed = await ref
         .read(sourcesProvider.notifier)
         .removeEndpoint(widget.source.id, ep.id);
@@ -246,6 +436,14 @@ class _EndpointPickerOverlayState
   }
 
   Future<void> _activate() async {
+    // The cursor may be on one of the row's icons rather than on the row.
+    final actions = _currentActions;
+    if (_actionIndex > 0 && _actionIndex <= actions.length) {
+      ref.read(feedbackServiceProvider).confirm();
+      actions[_actionIndex - 1].run();
+      return;
+    }
+
     final notifier = ref.read(sourcesProvider.notifier);
     final id = widget.source.id;
 
@@ -275,18 +473,29 @@ class _EndpointPickerOverlayState
       return;
     }
 
+    // The two mode rows **stay open**. They are a setting, not a destination:
+    // closing on the press hides the very thing the press was for — which
+    // route went live, and which badge moved onto it. Picking a route is the
+    // opposite: it is an override, the question is answered, so it closes.
     if (_sel == 0) {
       // Hand the choice back *and* act on it in one press: dropping the pin
       // alone would leave the source sitting on the route the user just
       // stopped asking for, which reads as the button having done nothing.
       // The probe behind this hits the cache filled when the overlay opened.
       await notifier.clearEndpointOverride(id, probe: _probeService);
-    } else if (_sel == _orderedIndex) {
-      await notifier.useOrderedSelection(id, probe: _probeService);
-    } else {
-      final ep = widget.source.endpoints[_sel - _firstRouteIndex];
-      await notifier.switchEndpoint(id, ep.id, pin: true);
+      if (mounted) setState(() {});
+      return;
     }
+    if (_sel == _orderedIndex) {
+      await notifier.useOrderedSelection(id, probe: _probeService);
+      if (mounted) setState(() {});
+      return;
+    }
+    // [A] is "use this one" — a switch, not a promise. Locking is a separate
+    // press because it means something stronger: never move off this route,
+    // not even when it stops answering.
+    final ep = widget.source.endpoints[_sel - _firstRouteIndex];
+    await notifier.switchEndpoint(id, ep.id, pin: false);
     if (!mounted) return;
     widget.onClose();
   }
@@ -366,6 +575,10 @@ class _EndpointPickerOverlayState
                       // on a 3.92" screen. The hints below stay pinned.
                       Flexible(
                         child: SingleChildScrollView(
+                          // The hint row below is pinned, so the last list row
+                          // sat underneath it. Padding, not a shorter list:
+                          // the row has to be reachable *and* readable.
+                          padding: const EdgeInsets.only(bottom: 8),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -406,15 +619,28 @@ class _EndpointPickerOverlayState
                         alignment: Alignment.centerLeft,
                         child: ConsoleHud(
                           embedded: true,
-                          a: HudAction(l.common_select, onTap: _activate),
+                          a: HudAction(
+                            onRoute ? l.sources_routeUse : l.common_select,
+                            onTap: _activate,
+                          ),
                           b: HudAction(l.common_back, onTap: _close),
                           x: onRoute
-                              ? HudAction(l.sources_removeRoute,
-                                  onTap: _removeHighlighted)
+                              ? HudAction(
+                                  widget.source.endpointSelection ==
+                                              EndpointSelection.pinned &&
+                                          widget.source.pinnedEndpointId ==
+                                              _highlightedEndpoint?.id
+                                      ? l.sources_routeUnlock
+                                      : l.sources_routeLock,
+                                  onTap: _toggleLockHighlighted)
                               : null,
                           y: onRoute
                               ? HudAction(l.sources_editRoute,
                                   onTap: _editHighlighted)
+                              : null,
+                          rb: onRoute
+                              ? HudAction(l.sources_removeRoute,
+                                  onTap: _removeHighlighted)
                               : null,
                         ),
                       ),
@@ -467,6 +693,7 @@ class _EndpointPickerOverlayState
       ),
       const SizedBox(height: 14),
       _RouteRow(
+        key: _keyFor(0),
         icon: Icons.auto_mode,
         title: l.sources_routeAuto,
         subtitle: l.sources_routeAutoHint,
@@ -481,6 +708,7 @@ class _EndpointPickerOverlayState
       ),
       const SizedBox(height: 8),
       _RouteRow(
+        key: _keyFor(_orderedIndex),
         icon: Icons.format_list_numbered,
         title: l.sources_routeOrdered,
         subtitle: l.sources_routeOrderedHint,
@@ -494,43 +722,39 @@ class _EndpointPickerOverlayState
       ),
       for (int i = 0; i < src.endpoints.length; i++) ...[
         const SizedBox(height: 8),
-        _RouteRow(
+        _SlideIn(
+          controller: _slide,
+          from: src.endpoints[i].id == _slidingId ? _slideFrom : 0,
+          child: _RouteRow(
+          key: _keyFor(i + _firstRouteIndex),
           icon: Icons.lan_outlined,
           title: _nameOf(src.endpoints[i]),
           subtitle: src.endpoints[i].addressLabel,
           monoSubtitle: true,
+          notes: [
+            _sorting && _sel == i + _firstRouteIndex
+                ? l.sources_reorderHint
+                : l.sources_routeRowHint,
+          ],
           status: _statusFor(src.endpoints[i], l),
           statusOk: _results?.contains(src.endpoints[i].id),
           badges: _badgesFor(src.endpoints[i], l),
           selected: _sel == i + _firstRouteIndex,
+          sorting: _sorting && _sel == i + _firstRouteIndex,
           onTap: () => _tapRow(i + _firstRouteIndex),
+          actions: _actionsForRoute(i),
+          focusedAction:
+              _sel == i + _firstRouteIndex ? _actionIndex : 0,
+          onAction: (a) {
+            setState(() {
+              _selectedIndex = i + _firstRouteIndex;
+              _actionIndex = 0;
+                    });
+            a.run();
+          },
           // Touch counterpart of ◀ ▶.
-          onMoveUp: i > 0
-              ? () {
-                  setState(() => _selectedIndex = i + _firstRouteIndex);
-                  _moveHighlighted(-1);
-                }
-              : null,
-          onMoveDown: i < src.endpoints.length - 1
-              ? () {
-                  setState(() => _selectedIndex = i + _firstRouteIndex);
-                  _moveHighlighted(1);
-                }
-              : null,
-          // Touch counterparts of [Y] and [X]. Without them the only way to
-          // edit or remove a route is the gamepad, because a tap on the row
-          // itself switches to it and closes the overlay.
-          onEdit: () {
-            setState(() => _selectedIndex = i + _firstRouteIndex);
-            _edit(src.endpoints[i]);
-          },
-          onRemove: () {
-            setState(() => _selectedIndex = i + _firstRouteIndex);
-            _remove(src.endpoints[i]);
-          },
-          editLabel: l.sources_editRoute,
-          removeLabel: l.sources_removeRoute,
           active: src.liveEndpoint?.id == src.endpoints[i].id,
+        ),
         ),
       ],
       if (src.endpoints.length <= 1) ...[
@@ -542,6 +766,7 @@ class _EndpointPickerOverlayState
       ],
       const SizedBox(height: 8),
       _RouteRow(
+        key: _keyFor(_addIndex),
         icon: Icons.add,
         title: l.sources_addRoute,
         selected: _sel == _addIndex,
@@ -549,6 +774,10 @@ class _EndpointPickerOverlayState
       ),
       const SizedBox(height: 8),
       _RouteRow(
+        // Keyed like every other row: without it, wrapping from the top row
+        // to this one scrolled nowhere and the cursor simply vanished below
+        // the fold.
+        key: _keyFor(_cancelIndex),
         icon: Icons.close,
         title: l.common_cancel,
         selected: _sel == _cancelIndex,
@@ -559,11 +788,27 @@ class _EndpointPickerOverlayState
   }
 }
 
+/// One icon at the right end of a route row: a target the cursor can land on
+/// with ▶ and a finger can hit directly.
+class _RowActionSpec {
+  const _RowActionSpec({
+    required this.icon,
+    required this.label,
+    required this.run,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback run;
+}
+
 class _RouteRow extends StatelessWidget {
   const _RouteRow({
+    super.key,
     required this.icon,
     required this.title,
     required this.selected,
+    this.sorting = false,
     this.subtitle,
     this.monoSubtitle = false,
     this.notes = const [],
@@ -573,12 +818,9 @@ class _RouteRow extends StatelessWidget {
     this.subdued = false,
     this.badges = const [],
     this.onTap,
-    this.onEdit,
-    this.onRemove,
-    this.onMoveUp,
-    this.onMoveDown,
-    this.editLabel,
-    this.removeLabel,
+    this.actions = const [],
+    this.focusedAction = 0,
+    this.onAction,
   });
 
   /// The overlay is gamepad-driven, but the device has a touchscreen and the
@@ -586,18 +828,12 @@ class _RouteRow extends StatelessWidget {
   /// frozen rather than as "use the buttons".
   final VoidCallback? onTap;
 
-  /// Per-row touch equivalents of the buttons in the HUD. They sit inside the
-  /// row's own [GestureDetector]; the inner detector wins the tap, so hitting
-  /// the pencil does not also switch to the route.
-  final VoidCallback? onEdit;
-  final VoidCallback? onRemove;
-
-  /// Touch equivalents of ◀ ▶. Null at the ends of the list, so the arrows
-  /// never offer a move that does nothing.
-  final VoidCallback? onMoveUp;
-  final VoidCallback? onMoveDown;
-  final String? editLabel;
-  final String? removeLabel;
+  /// Icons at the right end: reorder, edit, remove. 0 means the cursor is on
+  /// the row body; 1..n put it on one of these. The pad walks them with ▶ ◀
+  /// and a finger hits them directly, so both inputs reach the same set.
+  final List<_RowActionSpec> actions;
+  final int focusedAction;
+  final void Function(_RowActionSpec action)? onAction;
 
   final IconData icon;
   final String title;
@@ -610,6 +846,10 @@ class _RouteRow extends StatelessWidget {
   final String? status;
   final bool? statusOk;
   final bool selected;
+
+  /// True while the d-pad is moving this row rather than the cursor. Its own
+  /// colour, because "where I am" and "what I am dragging" are two states.
+  final bool sorting;
   final bool active;
   final bool subdued;
 
@@ -632,13 +872,19 @@ class _RouteRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: selected
-            ? const Color(0xFF8B0000).withValues(alpha: 0.35)
-            : Colors.white.withValues(alpha: 0.04),
+        color: sorting
+            ? const Color(0xFFB8860B).withValues(alpha: 0.35)
+            : selected
+                ? const Color(0xFF8B0000).withValues(alpha: 0.35)
+                : Colors.white.withValues(alpha: 0.04),
         borderRadius: BorderRadius.circular(8),
         // Pure white border on the focused row — project-wide convention.
         border: Border.all(
-          color: selected ? Colors.white : Colors.transparent,
+          color: sorting
+              ? const Color(0xFFFFC107)
+              : selected
+                  ? Colors.white
+                  : Colors.transparent,
           width: 1.5,
         ),
       ),
@@ -706,27 +952,12 @@ class _RouteRow extends StatelessWidget {
               ),
             ),
           ],
-          if (onMoveUp != null)
+          for (var i = 0; i < actions.length; i++)
             _RowAction(
-              icon: Icons.keyboard_arrow_up,
-              onTap: onMoveUp!,
-            ),
-          if (onMoveDown != null)
-            _RowAction(
-              icon: Icons.keyboard_arrow_down,
-              onTap: onMoveDown!,
-            ),
-          if (onEdit != null)
-            _RowAction(
-              icon: Icons.edit_outlined,
-              tooltip: editLabel,
-              onTap: onEdit!,
-            ),
-          if (onRemove != null)
-            _RowAction(
-              icon: Icons.delete_outline,
-              tooltip: removeLabel,
-              onTap: onRemove!,
+              icon: actions[i].icon,
+              tooltip: actions[i].label,
+              focused: focusedAction == i + 1,
+              onTap: () => onAction?.call(actions[i]),
             ),
         ],
       ),
@@ -762,11 +993,20 @@ class _Badge extends StatelessWidget {
 /// A tap target inside a row. Sized well past the icon so a thumb on a 3.92"
 /// screen can hit it without hitting the row.
 class _RowAction extends StatelessWidget {
-  const _RowAction({required this.icon, required this.onTap, this.tooltip});
+  const _RowAction({
+    required this.icon,
+    required this.onTap,
+    this.tooltip,
+    this.focused = false,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
   final String? tooltip;
+
+  /// True when ▶ has walked the cursor onto this icon. It gets the same white
+  /// ring the rows use, so "where am I" has one answer everywhere.
+  final bool focused;
 
   @override
   Widget build(BuildContext context) {
@@ -776,11 +1016,56 @@ class _RowAction extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Icon(icon, size: 18, color: Colors.white54),
+        child: Container(
+          margin: const EdgeInsets.only(left: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          decoration: BoxDecoration(
+            color: focused
+                ? const Color(0xFF8B0000).withValues(alpha: 0.5)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: focused ? Colors.white : Colors.transparent,
+              width: 1.5,
+            ),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: focused ? Colors.white : Colors.white54,
+          ),
         ),
       ),
+    );
+  }
+}
+
+/// Slides [child] in from [from] pixels away from its final position. Twin of
+/// the one in `group_picker_overlay.dart`; both exist because only the row
+/// that moved is animated and neither list is long enough to justify a
+/// reorderable list widget.
+class _SlideIn extends StatelessWidget {
+  const _SlideIn({
+    required this.controller,
+    required this.from,
+    required this.child,
+  });
+
+  final AnimationController controller;
+  final double from;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (from == 0) return child;
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, inner) => Transform.translate(
+        offset:
+            Offset(0, from * (1 - Curves.easeOut.transform(controller.value))),
+        child: inner,
+      ),
+      child: child,
     );
   }
 }

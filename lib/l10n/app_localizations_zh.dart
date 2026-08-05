@@ -1791,4 +1791,27 @@ class LZh extends L {
 
   @override
   String get sources_routeOrderedHint => '照你排的順序，用第一條通的';
+
+  @override
+  String get sources_reorderHint => '用上下鍵移動位置，再按一次完成';
+
+  @override
+  String get sources_groupMemberHint => '按 ▶ 可以讓它退出群組；按 [A] 調整順序';
+
+  @override
+  String get sources_routeRowHint => '按 ▶ 移到右邊的圖示：調整順序、修改或移除';
+
+  @override
+  String get sources_routeUse => '使用這條路線';
+
+  @override
+  String get sources_routeLock => '鎖定這條路線';
+
+  @override
+  String get sources_routeUnlock => '解除鎖定';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return '確定要移除「$name」嗎？這個來源的遊戲清單會留著，消失的只有這個位址。';
+  }
 }

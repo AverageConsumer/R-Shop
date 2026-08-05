@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/input/input.dart';
+import '../../widgets/console_hud.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/config/app_config.dart';
 import '../../models/config/source.dart';
@@ -40,12 +41,76 @@ class GroupPickerOverlay extends ConsumerStatefulWidget {
   ConsumerState<GroupPickerOverlay> createState() => _GroupPickerOverlayState();
 }
 
-class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
+class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay>
+    with SingleTickerProviderStateMixin {
   final FocusNode _scopeFocus = FocusNode(debugLabel: 'group_picker');
   int _selectedIndex = 0;
 
+  /// One key per row so the cursor can be scrolled into view. Without this the
+  /// selection walks off the bottom of the panel and the pad appears to stop
+  /// responding — the rows are there, they are just below the fold.
+  final Map<int, GlobalKey> _rowKeys = {};
+
+  GlobalKey _keyFor(int index) =>
+      _rowKeys.putIfAbsent(index, () => GlobalKey());
+
+  void _scrollToSelected() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctx = _rowKeys[_selectedIndex]?.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
   /// True while the "add a source" list is showing over a group that exists.
   bool _adding = false;
+
+  /// Which control on the selected row has the cursor: 0 is the row itself,
+  /// 1..n are the small icons at its right end.
+  ///
+  /// ▶ walks onto them, ◀ walks back. This is instead of a submenu: the user
+  /// asked for exactly this — "不是開視窗，是那邊會有小圖示，我焦點移到小圖示
+  /// 上面" — and it keeps every action visible on the row it belongs to.
+  int _actionIndex = 0;
+
+  /// True while ↑↓ moves the selected member instead of the cursor.
+  ///
+  /// [A] on a member enters it and [A] again leaves: reordering is the thing
+  /// people do repeatedly, so it gets the whole d-pad rather than one press
+  /// per step through the icons.
+  bool _sorting = false;
+
+  /// Slides the row that just moved from where it was to where it now is.
+  ///
+  /// A reorder is otherwise a single frame in which two rows swap: the list is
+  /// correct and nothing appears to have happened. The offset is measured, not
+  /// assumed — rows have a hint line under them and are not all the same
+  /// height, so a guessed row height would slide by the wrong amount.
+  late final AnimationController _slide = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 180),
+  );
+  String? _slidingId;
+  double _slideFrom = 0;
+
+  /// The top of row [index] in global coordinates, or null if it is not laid
+  /// out (scrolled far out of view).
+  double? _yOf(int index) {
+    final ctx = _rowKeys[index]?.currentContext;
+    final box = ctx?.findRenderObject() as RenderBox?;
+    return box?.localToGlobal(Offset.zero).dy;
+  }
+
+  /// True while a merge or hand-over is running. Joining a group rewrites the
+  /// cached library, which is fast but not instant on a large one — and a
+  /// second tap during it would start a second merge over half-moved rows.
+  bool _busy = false;
 
   SourceGroup? get _group =>
       ref.read(sourcesProvider).groupContaining(widget.source.id);
@@ -73,6 +138,7 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
 
   @override
   void dispose() {
+    _slide.dispose();
     _scopeFocus.dispose();
     super.dispose();
   }
@@ -111,6 +177,7 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
     }
 
     final members = _membersOf(group);
+
     return [
       _GroupRow(
         icon: Icons.bolt,
@@ -132,9 +199,14 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
           title: members[i].name,
           subtitle: i == 0 ? l.sources_groupPreferred : members[i].hostLabel,
           member: members[i].id,
+          hint: _sorting && _selectedIndex == i + 2
+              ? l.sources_reorderHint
+              : l.sources_groupMemberHint,
           canMoveUp: i > 0,
           canMoveDown: i < members.length - 1,
-          onActivate: () => _confirmLeave(members[i].id),
+          // [A] on a member turns the d-pad into a reorder control. The
+          // other things it can be put through are on the icons at its end.
+          onActivate: () => _toggleSorting(members[i].id),
         ),
       if (_candidates.isNotEmpty)
         _GroupRow(
@@ -160,6 +232,58 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
     ];
   }
 
+  /// The icons on [row], in the order they are drawn. One list, read by both
+  /// the key handler and the row widget, so ▶ and a finger can never land on
+  /// different things.
+  List<_RowAction> _actionsFor(_GroupRow row) {
+    final id = row.member;
+    if (id == null) return const [];
+    final l = L.of(context);
+    final sortingThis = _sorting && _sortingId == id;
+    if (sortingThis) {
+      // While the d-pad is moving this row, the icons become the finger's
+      // version of the same thing — otherwise reordering would be a pad-only
+      // feature the moment the standing arrows went away.
+      return [
+        if (row.canMoveUp)
+          _RowAction(
+            icon: Icons.keyboard_arrow_up,
+            label: l.sources_moveUp,
+            run: () => _move(id, -1),
+          ),
+        if (row.canMoveDown)
+          _RowAction(
+            icon: Icons.keyboard_arrow_down,
+            label: l.sources_moveDown,
+            run: () => _move(id, 1),
+          ),
+        _RowAction(
+          icon: Icons.check,
+          label: l.common_done,
+          run: () => setState(() {
+            _sorting = false;
+            _sortingId = null;
+          }),
+        ),
+      ];
+    }
+    return [
+      _RowAction(
+        icon: Icons.drag_handle,
+        label: l.sources_moveUp,
+        run: () => _toggleSorting(id),
+      ),
+      _RowAction(
+        icon: Icons.logout,
+        label: l.sources_groupLeave,
+        run: () => _confirmLeave(id),
+      ),
+    ];
+  }
+
+  /// The member the d-pad is currently moving, or null.
+  String? _sortingId;
+
   // --- actions --------------------------------------------------------------
 
   void _close() {
@@ -167,8 +291,33 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
     widget.onClose();
   }
 
-  Future<void> _addOrCreate(String otherId) async {
+  /// Takes the focus back after a write.
+  ///
+  /// Belt and braces alongside the guard in the sources screen: writing a
+  /// group rebuilds the list underneath, and anything that re-homes focus
+  /// during that rebuild leaves this overlay on screen but deaf to the pad.
+  void _toggleSorting(String memberId) {
     ref.read(feedbackServiceProvider).confirm();
+    setState(() {
+      _sorting = !_sorting;
+      _sortingId = _sorting ? memberId : null;
+      // The icons swap to arrows, so the cursor must not stay on whichever
+      // slot it happened to be in.
+      _actionIndex = 0;
+    });
+  }
+
+  void _reclaimFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _scopeFocus.hasFocus) return;
+      _scopeFocus.requestFocus();
+    });
+  }
+
+  Future<void> _addOrCreate(String otherId) async {
+    if (_busy) return;
+    ref.read(feedbackServiceProvider).confirm();
+    setState(() => _busy = true);
     final notifier = ref.read(sourcesProvider.notifier);
     final group = _group;
     try {
@@ -184,9 +333,12 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
     }
     if (!mounted) return;
     setState(() {
+      _busy = false;
       _adding = false;
+      _actionIndex = 0;
       _selectedIndex = 0;
     });
+    _reclaimFocus();
   }
 
   Future<void> _setMode(SourceGroupMode mode) async {
@@ -199,6 +351,7 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
       debugPrint('GroupPicker: setGroupMode failed: $e');
     }
     if (mounted) setState(() {});
+    _reclaimFocus();
   }
 
   Future<void> _move(String memberId, int delta) async {
@@ -209,6 +362,7 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
     final target = index + delta;
     if (target < 0 || target >= group.memberIds.length) return;
     ref.read(feedbackServiceProvider).tick();
+    final fromY = _yOf(_selectedIndex);
     try {
       await ref
           .read(sourcesProvider.notifier)
@@ -217,9 +371,20 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
       debugPrint('GroupPicker: moveGroupMember failed: $e');
     }
     if (!mounted) return;
-    // Follow the row that moved, otherwise the selection lands on whichever
-    // member swapped into the old slot and the next press moves the wrong one.
+    // Follow the row that moved, and keep the cursor on the arrow so the next
+    // press moves the same member again.
     setState(() => _selectedIndex += delta);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final toY = _yOf(_selectedIndex);
+      if (fromY == null || toY == null || (fromY - toY).abs() < 0.5) return;
+      setState(() {
+        _slidingId = memberId;
+        _slideFrom = fromY - toY;
+      });
+      _slide.forward(from: 0);
+    });
+    _reclaimFocus();
   }
 
   /// Leaving costs the member its whole cached list, so it asks first.
@@ -257,7 +422,8 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
 
   Future<void> _leave(String memberId) async {
     final group = _group;
-    if (group == null) return;
+    if (group == null || _busy) return;
+    setState(() => _busy = true);
     ref.read(feedbackServiceProvider).confirm();
     try {
       await ref
@@ -273,7 +439,12 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
       widget.onClose();
       return;
     }
-    setState(() => _selectedIndex = 0);
+    setState(() {
+      _busy = false;
+      _actionIndex = 0;
+      _selectedIndex = 0;
+    });
+    _reclaimFocus();
   }
 
   Future<void> _dissolve() async {
@@ -298,22 +469,83 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
     final l = L.of(context);
     final rows = _rows(l);
     if (rows.isEmpty) return KeyEventResult.ignored;
+    final row = rows[_selectedIndex.clamp(0, rows.length - 1)];
+
+    final sortingId = _sorting ? row.member : null;
+    if (sortingId != null) {
+      if (key == LogicalKeyboardKey.arrowUp) {
+        _move(sortingId, -1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowDown) {
+        _move(sortingId, 1);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.gameButtonA ||
+          key == LogicalKeyboardKey.enter ||
+          key == LogicalKeyboardKey.select ||
+          key == LogicalKeyboardKey.gameButtonB ||
+          key == LogicalKeyboardKey.escape ||
+          key == LogicalKeyboardKey.goBack) {
+        ref.read(feedbackServiceProvider).confirm();
+        setState(() {
+          _sorting = false;
+          _sortingId = null;
+        });
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
 
     if (key == LogicalKeyboardKey.arrowUp) {
-      setState(() =>
-          _selectedIndex = (_selectedIndex - 1 + rows.length) % rows.length);
+      setState(() {
+        _selectedIndex = (_selectedIndex - 1 + rows.length) % rows.length;
+        _actionIndex = 0;
+        _sorting = false;
+        _sortingId = null;
+      });
       ref.read(feedbackServiceProvider).tick();
+      _scrollToSelected();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowDown) {
-      setState(() => _selectedIndex = (_selectedIndex + 1) % rows.length);
+      setState(() {
+        _selectedIndex = (_selectedIndex + 1) % rows.length;
+        _actionIndex = 0;
+        _sorting = false;
+        _sortingId = null;
+      });
       ref.read(feedbackServiceProvider).tick();
+      _scrollToSelected();
       return KeyEventResult.handled;
     }
-    final row = rows[_selectedIndex.clamp(0, rows.length - 1)];
     // [X] and [Y] reorder the selected member. The order is the setting in
     // `ordered` mode, so it needs a key of its own — going through a submenu
     // to move one row would be worse than the problem.
+    // ▶ ◀ walk the cursor along the icons at the end of the row.
+    final actions = _actionsFor(row);
+    if (key == LogicalKeyboardKey.arrowRight) {
+      if (_actionIndex < actions.length) {
+        setState(() => _actionIndex++);
+        ref.read(feedbackServiceProvider).tick();
+      }
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      if (_actionIndex > 0) {
+        setState(() => _actionIndex--);
+        ref.read(feedbackServiceProvider).tick();
+      }
+      return KeyEventResult.handled;
+    }
+    // Leaving a group costs the member its cached list, so it sits on a
+    // shoulder button rather than next to reorder — and it asks first.
+    if ((key == LogicalKeyboardKey.gameButtonLeft1 ||
+            key == LogicalKeyboardKey.gameButtonRight1) &&
+        row.member != null) {
+      _confirmLeave(row.member!);
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.gameButtonX && row.canMoveUp) {
       _move(row.member!, -1);
       return KeyEventResult.handled;
@@ -325,7 +557,11 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
     if (key == LogicalKeyboardKey.gameButtonA ||
         key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.select) {
-      row.onActivate();
+      if (_actionIndex > 0 && _actionIndex <= actions.length) {
+        actions[_actionIndex - 1].run();
+      } else {
+        row.onActivate();
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.gameButtonB ||
@@ -350,6 +586,10 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
     final group = _group;
     final rows = _rows(l);
     if (_selectedIndex >= rows.length) _selectedIndex = rows.length - 1;
+
+    final onMember =
+        _selectedIndex < rows.length && rows[_selectedIndex].member != null;
+    final memberId = onMember ? rows[_selectedIndex].member : null;
 
     final title = group == null || _adding
         ? l.sources_groupPickMember
@@ -405,44 +645,91 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay> {
                       // overflows, and an overflow here is the yellow-and-black
                       // stripe the user has reported before.
                       Flexible(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              for (var i = 0; i < rows.length; i++) ...[
-                                if (i > 0) const SizedBox(height: 8),
-                                _Row(
-                                  row: rows[i],
-                                  selected: i == _selectedIndex,
-                                  onTap: () {
-                                    setState(() => _selectedIndex = i);
-                                    rows[i].onActivate();
-                                  },
-                                  onMoveUp: () {
-                                    setState(() => _selectedIndex = i);
-                                    _move(rows[i].member!, -1);
-                                  },
-                                  onMoveDown: () {
-                                    setState(() => _selectedIndex = i);
-                                    _move(rows[i].member!, 1);
-                                  },
-                                ),
-                              ],
-                            ],
+                        child: IgnorePointer(
+                          ignoring: _busy,
+                          child: Opacity(
+                            opacity: _busy ? 0.4 : 1,
+                            child: SingleChildScrollView(
+                              // The hint row below is pinned, so without this
+                              // the last row sat underneath it.
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  for (var i = 0; i < rows.length; i++) ...[
+                                    if (i > 0) const SizedBox(height: 8),
+                                    _SlideIn(
+                                      controller: _slide,
+                                      from: rows[i].member != null &&
+                                              rows[i].member == _slidingId
+                                          ? _slideFrom
+                                          : 0,
+                                      child: _Row(
+                                      key: _keyFor(i),
+                                      row: rows[i],
+                                      selected: i == _selectedIndex,
+                                      sorting: _sorting && i == _selectedIndex,
+                                      actions: _actionsFor(rows[i]),
+                                      focusedAction: i == _selectedIndex
+                                          ? _actionIndex
+                                          : 0,
+                                      onAction: (a) {
+                                        setState(() {
+                                          _selectedIndex = i;
+                                          _actionIndex = 0;
+                                        });
+                                        a.run();
+                                      },
+                                      onTap: () {
+                                        setState(() => _selectedIndex = i);
+                                        rows[i].onActivate();
+                                      },
+                                    ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Center(
-                        child: Text(
-                          group == null || _adding
-                              ? '↑↓ · [A] · [B]'
-                              : '↑↓ · [A] · [X]/[Y] ${l.sources_moveUp}/${l.sources_moveDown} · [B]',
-                          style: const TextStyle(
-                            color: Colors.white30,
-                            fontSize: 10,
-                            letterSpacing: 0.5,
+                      // Real buttons, not typed-out letters: ConsoleHud
+                      // draws them per the user's controller layout, so the
+                      // hint says ZL/ZR or LT/RT when that is what their pad
+                      // has. It is also the touch half — every hint is a
+                      // button.
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: ConsoleHud(
+                          embedded: true,
+                          a: HudAction(
+                            l.common_select,
+                            onTap: () {
+                              final row = rows[_selectedIndex];
+                              final acts = _actionsFor(row);
+                              if (_actionIndex > 0 &&
+                                  _actionIndex <= acts.length) {
+                                acts[_actionIndex - 1].run();
+                              } else {
+                                row.onActivate();
+                              }
+                            },
                           ),
+                          b: HudAction(l.common_back, onTap: _close),
+                          x: onMember
+                              ? HudAction(l.sources_moveUp,
+                                  onTap: () => _move(memberId!, -1))
+                              : null,
+                          y: onMember
+                              ? HudAction(l.sources_moveDown,
+                                  onTap: () => _move(memberId!, 1))
+                              : null,
+                          rb: onMember
+                              ? HudAction(l.sources_groupLeave,
+                                  onTap: () => _confirmLeave(memberId!))
+                              : null,
                         ),
                       ),
                     ],
@@ -479,6 +766,7 @@ class _GroupRow {
     this.member,
     this.canMoveUp = false,
     this.canMoveDown = false,
+    this.hint,
   });
 
   final IconData icon;
@@ -490,22 +778,52 @@ class _GroupRow {
   final String? member;
   final bool canMoveUp;
   final bool canMoveDown;
+
+  /// A line under the row saying what can be done to it, including how to
+  /// reach the icons. Without it the icons are a discovery problem.
+  final String? hint;
+}
+
+/// One action drawn at the right end of a row: an icon the cursor can land on
+/// with ▶ and a finger can hit directly.
+class _RowAction {
+  const _RowAction({
+    required this.icon,
+    required this.label,
+    required this.run,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback run;
 }
 
 class _Row extends StatelessWidget {
   const _Row({
+    super.key,
     required this.row,
     required this.selected,
     required this.onTap,
-    required this.onMoveUp,
-    required this.onMoveDown,
+    this.sorting = false,
+    this.actions = const [],
+    this.focusedAction = 0,
+    this.onAction,
   });
 
   final _GroupRow row;
   final bool selected;
+
+  /// True while the d-pad is moving this row rather than the cursor. It gets
+  /// its own colour: "where I am" and "what I am dragging" are different
+  /// states and the red selection cannot say both.
+  final bool sorting;
   final VoidCallback onTap;
-  final VoidCallback onMoveUp;
-  final VoidCallback onMoveDown;
+
+  /// Icons at the right end. 0 means the cursor is on the row body; 1..n put
+  /// it on one of these.
+  final List<_RowAction> actions;
+  final int focusedAction;
+  final void Function(_RowAction action)? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -516,12 +834,18 @@ class _Row extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? const Color(0xFF8B0000).withValues(alpha: 0.35)
-              : Colors.white.withValues(alpha: 0.04),
+          color: sorting
+              ? const Color(0xFFB8860B).withValues(alpha: 0.35)
+              : selected
+                  ? const Color(0xFF8B0000).withValues(alpha: 0.35)
+                  : Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: selected ? Colors.white : Colors.transparent,
+            color: sorting
+                ? const Color(0xFFFFC107)
+                : selected
+                    ? Colors.white
+                    : Colors.transparent,
             width: 1.5,
           ),
         ),
@@ -557,10 +881,12 @@ class _Row extends StatelessWidget {
             ),
             // The finger half of [X]/[Y]. Small icons in the corner rather
             // than rows of their own: another row per member would not fit.
-            if (row.canMoveUp)
-              _IconButton(icon: Icons.keyboard_arrow_up, onTap: onMoveUp),
-            if (row.canMoveDown)
-              _IconButton(icon: Icons.keyboard_arrow_down, onTap: onMoveDown),
+            for (var i = 0; i < actions.length; i++)
+              _ActionIcon(
+                action: actions[i],
+                focused: selected && focusedAction == i + 1,
+                onTap: () => onAction?.call(actions[i]),
+              ),
             if (row.active)
               const Icon(Icons.check, size: 16, color: Color(0xFF7BC67B)),
           ],
@@ -570,10 +896,18 @@ class _Row extends StatelessWidget {
   }
 }
 
-class _IconButton extends StatelessWidget {
-  const _IconButton({required this.icon, required this.onTap});
+/// An icon at the end of a row. Drawn with its own focus ring so ▶ landing on
+/// it is visible, and tappable on its own so a finger does not have to walk
+/// there first.
+class _ActionIcon extends StatelessWidget {
+  const _ActionIcon({
+    required this.action,
+    required this.focused,
+    required this.onTap,
+  });
 
-  final IconData icon;
+  final _RowAction action;
+  final bool focused;
   final VoidCallback onTap;
 
   @override
@@ -581,10 +915,54 @@ class _IconButton extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Padding(
+      child: Container(
+        margin: const EdgeInsets.only(left: 4),
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Icon(icon, size: 20, color: Colors.white70),
+        decoration: BoxDecoration(
+          color: focused
+              ? const Color(0xFF8B0000).withValues(alpha: 0.5)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: focused ? Colors.white : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Icon(
+          action.icon,
+          size: 18,
+          color: focused ? Colors.white : Colors.white54,
+        ),
       ),
+    );
+  }
+}
+
+/// Slides [child] in from [from] pixels above or below its final position.
+///
+/// Kept separate from the row so the row itself stays a plain widget: only the
+/// one that moved is ever animated, and every other row rebuilds as before.
+class _SlideIn extends StatelessWidget {
+  const _SlideIn({
+    required this.controller,
+    required this.from,
+    required this.child,
+  });
+
+  final AnimationController controller;
+  final double from;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (from == 0) return child;
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, inner) => Transform.translate(
+        offset: Offset(0, from * (1 - Curves.easeOut.transform(controller.value))),
+        child: inner,
+      ),
+      child: child,
     );
   }
 }

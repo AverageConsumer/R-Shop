@@ -595,5 +595,12 @@
   "sources_moveUp": "上へ移動",
   "sources_moveDown": "下へ移動",
   "sources_routeOrdered": "自分の順序",
-  "sources_routeOrderedHint": "順序どおりに、最初に応答した経路を使用"
+  "sources_routeOrderedHint": "順序どおりに、最初に応答した経路を使用",
+  "sources_reorderHint": "上下キーで位置を移動し、もう一度押すと完了",
+  "sources_groupMemberHint": "▶ でグループから除外、[A] で並べ替え",
+  "sources_routeRowHint": "▶ で右のアイコンへ：並べ替え・編集・削除",
+  "sources_routeUse": "この経路を使用",
+  "sources_routeLock": "この経路に固定",
+  "sources_routeUnlock": "固定を解除",
+  "sources_removeRouteConfirm": "「{name}」を削除しますか？このソースのゲーム一覧は残り、消えるのはアドレスだけです。"
 }

@@ -635,5 +635,12 @@
   "sources_moveUp": "往上移",
   "sources_moveDown": "往下移",
   "sources_routeOrdered": "照我排的順序",
-  "sources_routeOrderedHint": "照你排的順序，用第一條通的"
+  "sources_routeOrderedHint": "照你排的順序，用第一條通的",
+  "sources_reorderHint": "用上下鍵移動位置，再按一次完成",
+  "sources_groupMemberHint": "按 ▶ 可以讓它退出群組；按 [A] 調整順序",
+  "sources_routeRowHint": "按 ▶ 移到右邊的圖示：調整順序、修改或移除",
+  "sources_routeUse": "使用這條路線",
+  "sources_routeLock": "鎖定這條路線",
+  "sources_routeUnlock": "解除鎖定",
+  "sources_removeRouteConfirm": "確定要移除「{name}」嗎？這個來源的遊戲清單會留著，消失的只有這個位址。"
 }

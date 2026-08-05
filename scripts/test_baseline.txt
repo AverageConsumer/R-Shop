@@ -1,0 +1,15 @@
+﻿# flutter test 的既有失敗清單，check.ps1 用它判斷「這次的失敗算不算回歸」。
+#
+# 規則：每一條都要寫得出「為什麼它不算回歸」，寫不出來的那條就是還沒查。
+# 這份原本是 7 條，第 7 條（l10n_completeness: DE has all EN keys）查下去
+# 是真的缺字串，補完就綠了——所以不要把不確定的東西丟進來當背景雜訊。
+#
+# network_discovery   Windows socket errno 10042（本機沒有 mDNS 回應者）
+# rom_folder_service  Windows 路徑行為
+# romm_pairing_live   需要真的有 RomM 跑在 localhost:8090
+test/network_discovery_service_test.dart: NetworkDiscoveryService completes without crashing on a network without mDNS responders
+test/rom_folder_service_test.dart: scanAllSubfolders counts ROM files in each subfolder
+test/rom_folder_service_test.dart: scanAllSubfolders lists subfolders sorted alphabetically
+test/rom_folder_service_test.dart: scanAllSubfolders skips hidden folders
+test/romm_pairing_live_smoke_test.dart: exchangeCode with bogus code throws RommPairCodeExpiredException
+test/romm_pairing_live_smoke_test.dart: probeServer returns RomM 4.8+ version

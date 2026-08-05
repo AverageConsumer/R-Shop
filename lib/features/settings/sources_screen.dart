@@ -153,7 +153,12 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
         !_addEmptyFocus.hasFocus) {
       _initialFocusClaimed = false;
     }
-    if (_initialFocusClaimed || _activeActionsSource != null) return;
+    // ...and it must not run while an overlay owns the focus. Any overlay,
+    // not just the actions menu: the group editor stays open across a config
+    // write (creating a group rewrites the sources list), and the rebuild that
+    // followed used to yank focus onto the card behind it — the pad stopped
+    // driving the overlay mid-edit while it was still on screen.
+    if (_initialFocusClaimed || _anyOverlayOpen) return;
     if (state.loading) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _initialFocusClaimed) return;
@@ -170,6 +175,14 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
       }
     });
   }
+
+  /// True while anything is layered over the list. Each of these has its own
+  /// focus scope, so the list must not compete for focus with it.
+  bool get _anyOverlayOpen =>
+      _activeActionsSource != null ||
+      _groupPickerSourceId != null ||
+      _routePickerSourceId != null ||
+      _showTypePicker;
 
   /// Returns the focus node for [sourceId], creating it on first access.
   /// Stable across rebuilds so the visible focus indicator doesn't jump
@@ -472,8 +485,20 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
 
   void _closeRoutePicker() {
     if (_routePickerSourceId == null) return;
-    setState(() => _routePickerSourceId = null);
+    // Same as the group editor: back returns to the menu this was opened
+    // from, not to the list.
+    final source = _sourceById(_routePickerSourceId!);
+    setState(() {
+      _routePickerSourceId = null;
+      _activeActionsSource = source;
+    });
   }
+
+  /// The source with [id] as the notifier currently has it, or null once it
+  /// has been removed — reopening a menu for a deleted source would show one
+  /// whose every action is a no-op.
+  Source? _sourceById(String id) =>
+      ref.read(sourcesProvider).sources.where((s) => s.id == id).firstOrNull;
 
   /// Hands off from the actions overlay to the group editor, closing the
   /// former first so only one dialog-priority scope is ever live.
@@ -486,7 +511,14 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
 
   void _closeGroupPicker() {
     if (_groupPickerSourceId == null) return;
-    setState(() => _groupPickerSourceId = null);
+    // Back goes where the user came from: the source's own menu, not the list
+    // two levels up. Landing on the list means finding the card again and
+    // re-opening the menu to carry on with the same source.
+    final source = _sourceById(_groupPickerSourceId!);
+    setState(() {
+      _groupPickerSourceId = null;
+      _activeActionsSource = source;
+    });
   }
 
   /// Designates the source in use — what syncs, and what the home screen

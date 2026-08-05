@@ -159,8 +159,12 @@ void main() {
     await _teardown(tester, overrides);
   });
 
-  testWidgets('the member order can be changed by finger, not only by key',
+  testWidgets('a member row carries its own actions as icons',
       (tester) async {
+    // Not a submenu: the user asked for the icons to stay on the row and for
+    // ▶ to walk the cursor onto them — "不是開視窗，是那邊會有小圖示，我焦點
+    // 移到小圖示上面". Leaving is one of them, which is what he expected the
+    // arrows to be.
     final sources = [_src('lan', 'LAN RomM'), _src('wan', 'WAN RomM')];
     final overrides = await _overrides(sources, const [
       SourceGroup(
@@ -178,10 +182,44 @@ void main() {
     ));
     await tester.pump();
 
-    // First member can only go down, second only up — no arrow that does
-    // nothing.
-    expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
-    expect(find.byIcon(Icons.keyboard_arrow_up), findsOneWidget);
+    // A handle to start moving it and a way out, one of each per member. The
+    // arrows appear on the row being moved, not on every row at once.
+    expect(find.byIcon(Icons.drag_handle), findsNWidgets(2));
+    expect(find.byIcon(Icons.logout), findsNWidgets(2));
+    expect(find.byIcon(Icons.keyboard_arrow_up), findsNothing);
+
+    await _teardown(tester, overrides);
+  });
+
+  testWidgets('every row icon is its own tap target', (tester) async {
+    final sources = [_src('lan', 'LAN RomM'), _src('wan', 'WAN RomM')];
+    final overrides = await _overrides(sources, const [
+      SourceGroup(
+        id: 'grp-lan',
+        name: 'Home',
+        memberIds: ['lan', 'wan'],
+        cacheOwnerId: 'lan',
+      ),
+    ]);
+
+    await tester.pumpWidget(createTestAppWithProviders(
+      GroupPickerOverlay(source: sources.first, onClose: () {}),
+      size: const Size(640, 480),
+      overrides: overrides,
+    ));
+    await tester.pump();
+
+    // The pad reaches them with ▶; a finger must not have to.
+    for (final icon in const [Icons.logout, Icons.drag_handle]) {
+      expect(
+        find.ancestor(
+          of: find.byIcon(icon).first,
+          matching: find.byType(GestureDetector),
+        ),
+        findsAtLeastNWidgets(1),
+        reason: '$icon must be tappable on its own',
+      );
+    }
 
     await _teardown(tester, overrides);
   });

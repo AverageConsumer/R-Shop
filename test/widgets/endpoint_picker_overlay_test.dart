@@ -174,7 +174,10 @@ void main() {
     await _teardown(tester, overrides);
   });
 
-  testWidgets('tapping automatic runs to completion too', (tester) async {
+  testWidgets('tapping automatic applies it and stays open', (tester) async {
+    // A mode is a setting, not a destination: closing on the press would hide
+    // the thing the press was for — which route went live under the new mode.
+    // Picking a route is the opposite, and that one still closes (above).
     final overrides = await _overrides(const [_pinnedSource]);
     var closed = 0;
     await tester.pumpWidget(createTestAppWithProviders(
@@ -190,7 +193,8 @@ void main() {
 
     await _tapForReal(tester, find.text('Automatic'));
 
-    expect(closed, 1);
+    expect(closed, 0);
+    expect(find.text('Automatic'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await _teardown(tester, overrides);
@@ -222,9 +226,10 @@ void main() {
       ),
       findsAtLeastNWidgets(1),
     );
-    // Reordering by finger, so the order is not a gamepad-only setting.
-    expect(find.byIcon(Icons.keyboard_arrow_down), findsOneWidget);
-    expect(find.byIcon(Icons.keyboard_arrow_up), findsOneWidget);
+    // Reordering by finger, so the order is not a gamepad-only setting: a
+    // handle per route, and the arrows appear on the one being moved.
+    expect(find.byIcon(Icons.drag_handle), findsNWidgets(2));
+    expect(find.byIcon(Icons.keyboard_arrow_up), findsNothing);
 
     await _teardown(tester, overrides);
   });

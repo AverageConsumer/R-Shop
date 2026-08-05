@@ -595,5 +595,12 @@
   "sources_moveUp": "Mover para cima",
   "sources_moveDown": "Mover para baixo",
   "sources_routeOrdered": "A minha ordem",
-  "sources_routeOrderedHint": "Usar a primeira rota da tua ordem que responder"
+  "sources_routeOrderedHint": "Usar a primeira rota da tua ordem que responder",
+  "sources_reorderHint": "Move com cima e baixo e carrega outra vez para terminar",
+  "sources_groupMemberHint": "▶ tira-a do grupo; [A] reordena",
+  "sources_routeRowHint": "Carrega ▶ para os ícones: reordenar, editar ou remover",
+  "sources_routeUse": "Usar esta rota",
+  "sources_routeLock": "Bloquear nesta rota",
+  "sources_routeUnlock": "Desbloquear",
+  "sources_removeRouteConfirm": "Remover «{name}»? A lista guardada desta fonte fica; só desaparece o endereço."
 }

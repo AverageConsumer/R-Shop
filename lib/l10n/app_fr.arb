@@ -556,5 +556,12 @@
   "sources_moveUp": "Monter",
   "sources_moveDown": "Descendre",
   "sources_routeOrdered": "Mon ordre",
-  "sources_routeOrderedHint": "Utiliser la première route de votre ordre qui répond"
+  "sources_routeOrderedHint": "Utiliser la première route de votre ordre qui répond",
+  "sources_reorderHint": "Déplacez-le avec haut et bas, puis appuyez à nouveau pour terminer",
+  "sources_groupMemberHint": "▶ la sort du groupe ; [A] réordonne",
+  "sources_routeRowHint": "▶ pour les icônes : réordonner, modifier ou supprimer",
+  "sources_routeUse": "Utiliser cette route",
+  "sources_routeLock": "Verrouiller sur cette route",
+  "sources_routeUnlock": "Déverrouiller",
+  "sources_removeRouteConfirm": "Supprimer « {name} » ? La liste en cache de cette source reste ; seule l'adresse disparaît."
 }

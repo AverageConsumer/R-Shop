@@ -1,4 +1,4 @@
-# Build R-Shop and put it on the AYN Thor.
+﻿# Build R-Shop and put it on the AYN Thor.
 #
 # The same six steps were being typed out by hand every time, including the
 # JDK check that is easy to skip and expensive to skip — see
@@ -90,7 +90,16 @@ if ($NoLaunch) { Write-Host 'installed, not launched'; exit 0 }
 & $adb @target shell am start -n "$pkg/.MainActivity" | Out-Null
 Start-Sleep -Seconds 6
 
-$appPid = (& $adb @target shell pidof $pkg).Trim()
+# `pidof` prints nothing when the process has not appeared yet, and calling
+# .Trim() on that null is an InvokeMethodOnNull that hides the real state.
+# Six seconds is not always enough on a cold start, so poll instead.
+$appPid = ''
+foreach ($attempt in 1..10) {
+  $raw = & $adb @target shell pidof $pkg
+  if ($raw) { $appPid = "$raw".Trim() }
+  if ($appPid) { break }
+  Start-Sleep -Seconds 2
+}
 if (-not $appPid) { throw 'app is not running after launch' }
 Write-Host "running, pid $appPid" -ForegroundColor Green
 

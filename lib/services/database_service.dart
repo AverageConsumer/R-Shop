@@ -572,6 +572,17 @@ class DatabaseService {
       [toOwner, ...fromOwners],
     );
 
+    // Dropping the unique index above also drops the only thing backing the
+    // de-dup self-join, so it has to be replaced for the duration. Without it
+    // the join degrades to a scan per row: **65k rows took over ten minutes**
+    // and the app looked frozen — the tap that started it appeared to do
+    // nothing at all. v15's migration knew to do this; this path was written
+    // without it.
+    await txn.execute(
+      'CREATE INDEX IF NOT EXISTS idx_games_dedupe_tmp '
+      'ON $_tableName (cache_owner_id, systemSlug, filename)',
+    );
+
     final collapsed =
         await _collapseDuplicates(txn, keyColumn: 'cache_owner_id');
 
@@ -587,6 +598,7 @@ class DatabaseService {
       debugPrint('_rekeyOwnership: safety sweep removed $swept rows');
     }
 
+    await txn.execute('DROP INDEX IF EXISTS idx_games_dedupe_tmp');
     await txn.execute(
       'CREATE UNIQUE INDEX idx_games_system_filename_owner '
       'ON $_tableName (systemSlug, filename, cache_owner_id)',

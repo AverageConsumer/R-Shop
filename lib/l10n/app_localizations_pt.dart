@@ -1860,4 +1860,29 @@ class LPt extends L {
   @override
   String get sources_routeOrderedHint =>
       'Usar a primeira rota da tua ordem que responder';
+
+  @override
+  String get sources_reorderHint =>
+      'Move com cima e baixo e carrega outra vez para terminar';
+
+  @override
+  String get sources_groupMemberHint => '▶ tira-a do grupo; [A] reordena';
+
+  @override
+  String get sources_routeRowHint =>
+      'Carrega ▶ para os ícones: reordenar, editar ou remover';
+
+  @override
+  String get sources_routeUse => 'Usar esta rota';
+
+  @override
+  String get sources_routeLock => 'Bloquear nesta rota';
+
+  @override
+  String get sources_routeUnlock => 'Desbloquear';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return 'Remover «$name»? A lista guardada desta fonte fica; só desaparece o endereço.';
+  }
 }

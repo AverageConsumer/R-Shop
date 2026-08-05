@@ -1860,4 +1860,30 @@ class LDe extends L {
   @override
   String get sources_routeOrderedHint =>
       'Den ersten Weg in deiner Reihenfolge nutzen, der antwortet';
+
+  @override
+  String get sources_reorderHint =>
+      'Mit Auf und Ab verschieben, dann nochmals drücken zum Beenden';
+
+  @override
+  String get sources_groupMemberHint =>
+      '▶ nimmt sie aus der Gruppe, [A] sortiert';
+
+  @override
+  String get sources_routeRowHint =>
+      '▶ für die Symbole rechts: umsortieren, bearbeiten oder entfernen';
+
+  @override
+  String get sources_routeUse => 'Diesen Weg nutzen';
+
+  @override
+  String get sources_routeLock => 'Auf diesen Weg festlegen';
+
+  @override
+  String get sources_routeUnlock => 'Festlegung aufheben';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return '„$name“ entfernen? Die zwischengespeicherten Spiele bleiben, nur die Adresse verschwindet.';
+  }
 }

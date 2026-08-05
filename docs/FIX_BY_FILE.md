@@ -53,6 +53,7 @@
 - [來源清單快捷鍵](FIX_LOGS.md)
 - [使用中與顯示分家](FIX_LOGS.md)
 - [R-Shop 來源群組](FIX_LOGS.md)
+- [R-Shop 群組浮層焦點](FIX_LOGS.md)
 
 ### `lib/features/sources/endpoint_edit_screen.dart`
 - [R-Shop 連線路由](FIX_LOGS.md)
@@ -65,6 +66,7 @@
 - [浮層只做了手把](FIX_LOGS.md)
 - [R-Shop 自動選最優路線](FIX_LOGS.md)
 - [R-Shop 來源群組](FIX_LOGS.md)
+- [R-Shop 浮層操作形狀](FIX_LOGS.md)
 
 ### `lib/features/sources/fallback_picker_overlay.dart`
 - [R-Shop 來源備援](FIX_LOGS.md)
@@ -72,6 +74,9 @@
 
 ### `lib/features/sources/group_picker_overlay.dart`
 - [R-Shop 來源群組](FIX_LOGS.md)
+- [R-Shop 群組合併卡住](FIX_LOGS.md)
+- [R-Shop 群組浮層焦點](FIX_LOGS.md)
+- [R-Shop 浮層操作形狀](FIX_LOGS.md)
 
 ### `lib/features/sources/manual_source_add_screen.dart`
 - [R-Shop analyze 六項](FIX_LOGS.md)
@@ -110,6 +115,7 @@
 - [R-Shop 連線路由](FIX_LOGS.md)
 - [R-Shop 路線各自驗證](FIX_LOGS.md)
 - [R-Shop 來源群組](FIX_LOGS.md)
+- [R-Shop 群組合併卡住](FIX_LOGS.md)
 
 ### `lib/services/device_info_service.dart`
 - [R-Shop Channel 名稱硬編](FIX_LOGS.md)
@@ -170,6 +176,9 @@
 ### `test/active_source_test.dart`
 - [使用中與顯示分家](FIX_LOGS.md)
 
+### `test/database_service_merge_perf_test.dart`
+- [R-Shop 群組合併卡住](FIX_LOGS.md)
+
 ### `test/database_service_routes_test.dart`
 - [R-Shop 路線各自驗證](FIX_LOGS.md)
 
@@ -201,6 +210,9 @@
 
 ### `test/widgets/sources_screen_test.dart`
 - [來源清單快捷鍵](FIX_LOGS.md)
+
+### `test/widgets/{endpoint_picker_overlay,group_picker_overlay}_test.dart`
+- [R-Shop 浮層操作形狀](FIX_LOGS.md)
 
 ### `test/{database_service_v16_migration,sources_notifier_groups,widgets/group_picker_overlay}_test.dart`
 - [R-Shop 來源群組](FIX_LOGS.md)

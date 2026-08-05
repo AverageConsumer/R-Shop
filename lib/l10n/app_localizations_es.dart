@@ -1861,4 +1861,29 @@ class LEs extends L {
   @override
   String get sources_routeOrderedHint =>
       'Usar la primera ruta de tu orden que responda';
+
+  @override
+  String get sources_reorderHint =>
+      'Muévelo con arriba y abajo, y pulsa otra vez para terminar';
+
+  @override
+  String get sources_groupMemberHint => '▶ la saca del grupo; [A] reordena';
+
+  @override
+  String get sources_routeRowHint =>
+      'Pulsa ▶ para los iconos: reordenar, editar o quitar';
+
+  @override
+  String get sources_routeUse => 'Usar esta ruta';
+
+  @override
+  String get sources_routeLock => 'Bloquear en esta ruta';
+
+  @override
+  String get sources_routeUnlock => 'Desbloquear';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return '¿Quitar «$name»? Los juegos en caché de esta fuente se quedan; solo desaparece la dirección.';
+  }
 }

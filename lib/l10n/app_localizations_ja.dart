@@ -1797,4 +1797,27 @@ class LJa extends L {
 
   @override
   String get sources_routeOrderedHint => '順序どおりに、最初に応答した経路を使用';
+
+  @override
+  String get sources_reorderHint => '上下キーで位置を移動し、もう一度押すと完了';
+
+  @override
+  String get sources_groupMemberHint => '▶ でグループから除外、[A] で並べ替え';
+
+  @override
+  String get sources_routeRowHint => '▶ で右のアイコンへ：並べ替え・編集・削除';
+
+  @override
+  String get sources_routeUse => 'この経路を使用';
+
+  @override
+  String get sources_routeLock => 'この経路に固定';
+
+  @override
+  String get sources_routeUnlock => '固定を解除';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return '「$name」を削除しますか？このソースのゲーム一覧は残り、消えるのはアドレスだけです。';
+  }
 }

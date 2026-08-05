@@ -1849,4 +1849,30 @@ class LEn extends L {
   @override
   String get sources_routeOrderedHint =>
       'Use the first route in your order that answers';
+
+  @override
+  String get sources_reorderHint =>
+      'Move it with up and down, then press again to finish';
+
+  @override
+  String get sources_groupMemberHint =>
+      'Press ▶ to send it out of the group; [A] reorders';
+
+  @override
+  String get sources_routeRowHint =>
+      'Press ▶ for the icons: reorder, edit or remove';
+
+  @override
+  String get sources_routeUse => 'Use this route';
+
+  @override
+  String get sources_routeLock => 'Lock to this route';
+
+  @override
+  String get sources_routeUnlock => 'Unlock';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return 'Remove “$name”? The games cached for this source stay; only the address goes.';
+  }
 }

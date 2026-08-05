@@ -3448,6 +3448,48 @@ abstract class L {
   /// In en, this message translates to:
   /// **'Use the first route in your order that answers'**
   String get sources_routeOrderedHint;
+
+  /// No description provided for @sources_reorderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Move it with up and down, then press again to finish'**
+  String get sources_reorderHint;
+
+  /// No description provided for @sources_groupMemberHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Press ▶ to send it out of the group; [A] reorders'**
+  String get sources_groupMemberHint;
+
+  /// No description provided for @sources_routeRowHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Press ▶ for the icons: reorder, edit or remove'**
+  String get sources_routeRowHint;
+
+  /// No description provided for @sources_routeUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this route'**
+  String get sources_routeUse;
+
+  /// No description provided for @sources_routeLock.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock to this route'**
+  String get sources_routeLock;
+
+  /// No description provided for @sources_routeUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get sources_routeUnlock;
+
+  /// No description provided for @sources_removeRouteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove “{name}”? The games cached for this source stay; only the address goes.'**
+  String sources_removeRouteConfirm(String name);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {
