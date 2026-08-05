@@ -26,6 +26,7 @@ class SourcesState {
     this.error,
     this.primarySourceId,
     this.activeSourceId,
+    this.groups = const [],
   });
 
   static const initial = SourcesState(sources: [], loading: true);
@@ -33,6 +34,26 @@ class SourcesState {
   final List<Source> sources;
   final bool loading;
   final String? error;
+
+  /// The user's source groups, mirrored from [AppConfig.sourceGroups] for the
+  /// same reason the two ids below are: a screen that had to re-read the config
+  /// from disk would render the press one frame late and look unresponsive.
+  final List<SourceGroup> groups;
+
+  /// The group [sourceId] belongs to, or null when it stands alone.
+  SourceGroup? groupContaining(String sourceId) {
+    for (final g in groups) {
+      if (g.contains(sourceId)) return g;
+    }
+    return null;
+  }
+
+  SourceGroup? groupById(String groupId) {
+    for (final g in groups) {
+      if (g.id == groupId) return g;
+    }
+    return null;
+  }
 
   /// Mirrors of the same two fields on [AppConfig], published here so a screen
   /// can render them the frame the toggle is pressed.
@@ -49,6 +70,7 @@ class SourcesState {
     Object? error = _sentinel,
     String? primarySourceId,
     String? activeSourceId,
+    List<SourceGroup>? groups,
   }) {
     return SourcesState(
       sources: sources ?? this.sources,
@@ -56,6 +78,7 @@ class SourcesState {
       error: identical(error, _sentinel) ? this.error : error as String?,
       primarySourceId: primarySourceId ?? this.primarySourceId,
       activeSourceId: activeSourceId ?? this.activeSourceId,
+      groups: groups ?? this.groups,
     );
   }
 
@@ -164,6 +187,7 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
         loading: false,
         primarySourceId: _cachedConfig.primarySourceId,
         activeSourceId: _cachedConfig.activeSourceId,
+        groups: List<SourceGroup>.unmodifiable(_cachedConfig.sourceGroups),
       );
     } catch (e) {
       debugPrint('SourcesNotifier: bootstrap failed: $e');
@@ -327,10 +351,20 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
   /// Designates [fallbackId] as the stand-in to use when [sourceId] does not
   /// answer — typically an external address paired with an internal one.
   ///
+  /// **Superseded by source groups.** `Source.fallbackSourceId` is still stored
+  /// so an older build can read the config back, but nothing in the selection
+  /// path reads it any more: every pairing is migrated into a two-member
+  /// [SourceGroup] on load ([sourceGroupsFromFallbacks]) and the group is what
+  /// decides. New pairings should go through [createGroup] instead — writing
+  /// one here produces a field nothing acts on until the next migration, which
+  /// never runs again once `source_groups` has been written.
+  ///
   /// Pass null to clear. Refuses to point a source at itself, which would
   /// make failover a no-op that looks configured.
   ///
   /// Does not purge: naming a fallback changes nothing about what is cached.
+  // Not annotated @Deprecated only because the picker that still calls it is
+  // being replaced in a separate change; treat it as write-only legacy.
   Future<void> setFallbackSource(String sourceId, String? fallbackId) async {
     final src = state.sources.firstWhere(
       (s) => s.id == sourceId,
@@ -747,6 +781,7 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     bool setActive = false,
     String? primarySourceId,
     bool setPrimary = false,
+    List<SourceGroup>? groups,
   }) async {
     // Re-read the config from disk so any writes that happened outside
     // this notifier (e.g. the onboarding flow adding new systems) are
@@ -839,6 +874,11 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       return s.copyWith(providers: combined);
     }).toList(growable: false);
 
+    // Groups only survive while every member still exists and no member is in
+    // two of them; pruning here rather than at each call site means a source
+    // removal cannot leave a group pointing at a deleted id.
+    final nextGroups = _prunedGroups(groups ?? latest.sourceGroups, next);
+
     final updated = latest.copyWith(
       version: AppConfig.currentVersion,
       sources: next,
@@ -847,6 +887,7 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       primarySourceId: setPrimary ? primarySourceId : null,
       clearPrimarySource: setPrimary && primarySourceId == null,
       systems: rebuiltSystems,
+      sourceGroups: nextGroups,
     );
     try {
       await _storage.saveConfig(jsonEncode(updated.toJson()));
@@ -856,6 +897,7 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
         loading: false,
         primarySourceId: updated.primarySourceId,
         activeSourceId: updated.activeSourceId,
+        groups: List<SourceGroup>.unmodifiable(nextGroups),
       );
     } catch (e) {
       debugPrint('SourcesNotifier: persist failed: $e');

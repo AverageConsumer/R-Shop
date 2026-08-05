@@ -122,7 +122,7 @@ void main() {
   });
 
   group('resolveEndpoint', () {
-    test('auto takes the head of the ranking — the fastest route', () {
+    test('auto takes the head of the caller\'s list — the first responder', () {
       final source = rommWithRoutes();
 
       // The caller ranks by latency, so this list says "the remote address
@@ -203,6 +203,190 @@ void main() {
         source.resolveEndpoint(reachable: ['ep-remote'])?.id,
         'ep-remote',
       );
+    });
+
+    test('ordered takes the user\'s first route when it answers', () {
+      final source = rommWithRoutes(selection: EndpointSelection.ordered);
+
+      expect(
+        source.resolveEndpoint(reachable: ['ep-lan', 'ep-remote'])?.id,
+        'ep-lan',
+      );
+    });
+
+    test('ordered walks down the list when the first route is down', () {
+      // The whole reason `ordered` is not `pinned`: a preference with failover.
+      final source = rommWithRoutes(selection: EndpointSelection.ordered);
+
+      expect(
+        source.resolveEndpoint(reachable: ['ep-remote'])?.id,
+        'ep-remote',
+      );
+    });
+
+    test('ordered ignores latency — the order is the preference', () {
+      // The caller hands these back fastest first, and `ordered` must not care:
+      // a route the user put second does not get promoted for being quick.
+      final source = rommWithRoutes(selection: EndpointSelection.ordered);
+
+      expect(
+        source.resolveEndpoint(reachable: ['ep-remote', 'ep-lan'])?.id,
+        'ep-lan',
+      );
+    });
+
+    test('ordered follows the list after it has been rearranged', () {
+      final source = rommWithRoutes(selection: EndpointSelection.ordered)
+          .withEndpointsReordered(['ep-remote', 'ep-lan']);
+
+      expect(
+        source.resolveEndpoint(reachable: ['ep-lan', 'ep-remote'])?.id,
+        'ep-remote',
+      );
+    });
+
+    test('ordered falls back to the first route when nothing answers', () {
+      final source = rommWithRoutes(selection: EndpointSelection.ordered);
+
+      expect(source.resolveEndpoint(reachable: const [])?.id, 'ep-lan');
+    });
+
+    test('ordered ignores ids this source no longer has', () {
+      final source = rommWithRoutes(selection: EndpointSelection.ordered);
+
+      expect(
+        source.resolveEndpoint(reachable: ['ep-gone', 'ep-remote'])?.id,
+        'ep-remote',
+      );
+    });
+  });
+
+  group('endpoint order', () {
+    test('withEndpointsReordered rearranges the routes', () {
+      final source = rommWithRoutes()
+          .withEndpointsReordered(['ep-remote', 'ep-lan']);
+
+      expect(source.endpoints.map((e) => e.id), ['ep-remote', 'ep-lan']);
+    });
+
+    test('reordering does not reroute traffic on its own', () {
+      // The live route is derived from the address fields, so moving a route up
+      // the list must not silently switch the connection — or the source would
+      // change server the moment somebody dragged a row.
+      final source = rommWithRoutes()
+          .withEndpointsReordered(['ep-remote', 'ep-lan']);
+
+      expect(source.url, lan.url);
+      expect(source.liveEndpoint?.id, 'ep-lan');
+    });
+
+    test('reordering keeps identity, credentials and the pin', () {
+      final source = rommWithRoutes(
+        selection: EndpointSelection.pinned,
+        pinned: 'ep-remote',
+      ).withEndpointsReordered(['ep-remote', 'ep-lan']);
+
+      expect(source.id, 'src-romm-1');
+      expect(source.auth?.clientToken, 'tok');
+      expect(source.knownPlatforms, {'snes': 4});
+      expect(source.endpointSelection, EndpointSelection.pinned);
+      expect(source.pinnedEndpointId, 'ep-remote');
+    });
+
+    test('unmentioned routes keep their relative order at the end', () {
+      // A screen opened before a route was added hands back a stale list; it
+      // must reorder what it knew about rather than drop the rest.
+      const vpn = SourceEndpoint(id: 'ep-vpn', label: 'VPN', url: 'http://v:1');
+      final source = Source(
+        id: 'src-romm-1',
+        name: 'My RomM',
+        type: SourceType.romm,
+        url: lan.url,
+        endpoints: const [lan, remote, vpn],
+      ).withEndpointsReordered(['ep-remote']);
+
+      expect(source.endpoints.map((e) => e.id), [
+        'ep-remote',
+        'ep-lan',
+        'ep-vpn',
+      ]);
+    });
+
+    test('unknown ids are ignored', () {
+      final source = rommWithRoutes()
+          .withEndpointsReordered(['ep-gone', 'ep-remote', 'ep-lan']);
+
+      expect(source.endpoints.map((e) => e.id), ['ep-remote', 'ep-lan']);
+    });
+
+    test('the new order survives a save/load round-trip', () {
+      // `ordered` is stored as nothing but the list order, so a rearrangement
+      // that did not persist would silently revert on the next launch.
+      final source = rommWithRoutes(selection: EndpointSelection.ordered)
+          .withEndpointsReordered(['ep-remote', 'ep-lan']);
+
+      final back = Source.fromJson(source.toJson());
+
+      expect(back.endpoints.map((e) => e.id), ['ep-remote', 'ep-lan']);
+      expect(back.endpointSelection, EndpointSelection.ordered);
+    });
+
+    test('moveEndpoint moves one route and shifts the rest', () {
+      final source = rommWithRoutes().moveEndpoint('ep-remote', 0);
+
+      expect(source.endpoints.map((e) => e.id), ['ep-remote', 'ep-lan']);
+    });
+
+    test('moveEndpoint clamps instead of throwing', () {
+      // "Move the top one up" is a no-op, not an error the caller must guard.
+      final source = rommWithRoutes();
+
+      expect(source.moveEndpoint('ep-lan', -1).endpoints.first.id, 'ep-lan');
+      expect(source.moveEndpoint('ep-lan', 9).endpoints.last.id, 'ep-lan');
+    });
+
+    test('moveEndpoint leaves an unknown id alone', () {
+      final source = rommWithRoutes();
+
+      expect(
+        source.moveEndpoint('ep-gone', 0).endpoints.map((e) => e.id),
+        ['ep-lan', 'ep-remote'],
+      );
+    });
+  });
+
+  group('selection modes in the config file', () {
+    test('round-trips ordered', () {
+      final back = Source.fromJson(
+        rommWithRoutes(selection: EndpointSelection.ordered).toJson(),
+      );
+
+      expect(back.endpointSelection, EndpointSelection.ordered);
+    });
+
+    test('a config with no selection key reads back as auto', () {
+      final back = Source.fromJson({
+        'id': 'src-romm-1',
+        'name': 'My RomM',
+        'type': 'romm',
+        'url': 'http://192.168.1.50:8090',
+      });
+
+      expect(back.endpointSelection, EndpointSelection.auto);
+    });
+
+    test('an unknown selection value degrades to auto', () {
+      // A config touched by a newer build must not strand an older one on a
+      // mode it cannot honour.
+      final back = Source.fromJson({
+        'id': 'src-romm-1',
+        'name': 'My RomM',
+        'type': 'romm',
+        'url': 'http://192.168.1.50:8090',
+        'endpoint_selection': 'round_robin',
+      });
+
+      expect(back.endpointSelection, EndpointSelection.auto);
     });
   });
 

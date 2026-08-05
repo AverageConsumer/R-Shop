@@ -14,7 +14,7 @@ import '../utils/ra_name_matcher.dart';
 class DatabaseService {
   static Future<Database>? _initFuture;
   static const String _tableName = 'games';
-  static const int _dbVersion = 15;
+  static const int _dbVersion = 16;
 
   @visibleForTesting
   static Database? testDatabase;
@@ -71,7 +71,8 @@ class DatabaseService {
         is_folder INTEGER NOT NULL DEFAULT 0,
         alternative_sources TEXT,
         source_id TEXT NOT NULL DEFAULT '',
-        endpoint_id TEXT NOT NULL DEFAULT ''
+        endpoint_id TEXT NOT NULL DEFAULT '',
+        cache_owner_id TEXT NOT NULL DEFAULT ''
       )
     ''');
 
@@ -87,21 +88,32 @@ class DatabaseService {
       CREATE INDEX idx_filename ON $_tableName (filename)
     ''');
 
-    // Uniqueness is per *source*, not per route: every route of one source is
-    // the same server reached by another address, so there is only ever one
-    // game list behind them. endpoint_id stays as a column — it records which
-    // route last fetched the row — but it is deliberately NOT in the key:
-    // keying on it stored the same list once per route, and nothing could tell
-    // whether those copies were supposed to agree.
+    // Uniqueness is per *cache owner*. The owner is the group when the source
+    // belongs to one, otherwise the source itself — the user declaring "these
+    // sources are the same server" is the same declaration as "these routes
+    // are the same server", one level up, and it has the same consequence:
+    // one list, not one copy per member.
     //
-    // source_id is NOT NULL DEFAULT '' on purpose — SQLite treats NULLs as
-    // distinct inside a UNIQUE index, so a nullable column here would silently
-    // stop deduplicating local scans (which belong to no source).
+    // source_id and endpoint_id both stay as plain columns. They record who
+    // last fetched a row, which is useful for attribution and for re-stamping
+    // when a member leaves — but neither is in the key. Keying on them stored
+    // the same list once per member and nothing could tell whether those
+    // copies were supposed to agree.
+    //
+    // cache_owner_id is NOT NULL DEFAULT '' on purpose — SQLite treats NULLs
+    // as distinct inside a UNIQUE index, so a nullable column here would
+    // silently stop deduplicating local scans (which belong to no owner).
     await db.execute('''
-      CREATE UNIQUE INDEX idx_games_system_filename_source
-        ON $_tableName (systemSlug, filename, source_id)
+      CREATE UNIQUE INDEX idx_games_system_filename_owner
+        ON $_tableName (systemSlug, filename, cache_owner_id)
     ''');
 
+    await db.execute('''
+      CREATE INDEX idx_games_owner ON $_tableName (cache_owner_id)
+    ''');
+
+    // Still indexed even though it left the key: re-stamping a departing
+    // member and purgeOrDetachSource both look rows up by source.
     await db.execute('''
       CREATE INDEX idx_games_source ON $_tableName (source_id)
     ''');
@@ -384,61 +396,9 @@ class DatabaseService {
           'ON $_tableName (source_id, systemSlug, filename)',
         );
 
-        // Pick the survivor of each duplicate group by a *total* order, so
-        // exactly one row can survive: on-device copies first, then the oldest
-        // id. "On device" is the row whose provider_config/url were nulled out
-        // by purgeOrDetachSource — that row exists only because the file was
-        // found on disk, so dropping it would make the library forget a game
-        // the user has actually downloaded. A row still carrying a remote url
-        // can always be re-fetched.
-        final rankA = _v15OnDeviceRank('a');
-        final rankB = _v15OnDeviceRank('b');
-        final loserRows = await txn.rawQuery('''
-          SELECT DISTINCT a.id AS id
-          FROM $_tableName a
-          JOIN $_tableName b
-            ON b.source_id = a.source_id
-           AND b.systemSlug = a.systemSlug
-           AND b.filename = a.filename
-           AND b.id <> a.id
-          WHERE ($rankB) < ($rankA)
-             OR (($rankB) = ($rankA) AND b.id < a.id)
-        ''');
-        final losers = loserRows.map((r) => r['id'] as int).toList();
-
-        if (losers.isNotEmpty) {
-          // Salvage before deleting: covers and thumbnails are expensive to
-          // rebuild, and the survivor may be the copy that never had them.
-          // Every value written here already existed inside the same group.
-          const group = 'c.source_id = $_tableName.source_id '
-              'AND c.systemSlug = $_tableName.systemSlug '
-              'AND c.filename = $_tableName.filename';
-          await txn.rawUpdate('''
-            UPDATE $_tableName SET
-              cover_url = COALESCE(cover_url, (
-                SELECT c.cover_url FROM $_tableName c
-                WHERE $group AND c.cover_url IS NOT NULL
-                ORDER BY c.id LIMIT 1)),
-              has_thumbnail = COALESCE((
-                SELECT MAX(c.has_thumbnail) FROM $_tableName c
-                WHERE $group), has_thumbnail),
-              alternative_sources = COALESCE(alternative_sources, (
-                SELECT c.alternative_sources FROM $_tableName c
-                WHERE $group AND c.alternative_sources IS NOT NULL
-                ORDER BY c.id LIMIT 1))
-            WHERE EXISTS (
-              SELECT 1 FROM $_tableName c WHERE $group AND c.id <> $_tableName.id)
-          ''');
-
-          for (var i = 0; i < losers.length; i += 200) {
-            final chunk = losers.skip(i).take(200).toList();
-            final placeholders = List.filled(chunk.length, '?').join(',');
-            await txn.rawDelete(
-              'DELETE FROM $_tableName WHERE id IN ($placeholders)',
-              chunk,
-            );
-          }
-          debugPrint('migration v15: collapsed ${losers.length} duplicate rows');
+        final collapsed = await _collapseDuplicates(txn, keyColumn: 'source_id');
+        if (collapsed > 0) {
+          debugPrint('migration v15: collapsed $collapsed duplicate rows');
         }
 
         // Safety net. The pass above provably leaves one row per group, but a

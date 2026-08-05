@@ -137,6 +137,12 @@ class EndpointProbeService {
 
   final Map<String, ({DateTime at, ProbeResults results})> _cache = {};
 
+  /// Rounds still in flight, by source id. One round serves every caller:
+  /// [firstResponder] returns from it early while [probeFor] waits for the
+  /// whole thing, and neither opens a second set of sockets to ask the same
+  /// question a moment apart.
+  final Map<String, _ProbeRun> _inflight = {};
+
   static Future<void> _realConnect(
     String host,
     int port,
@@ -212,50 +218,125 @@ class EndpointProbeService {
     final endpoints = _probeableEndpoints(source);
     if (endpoints.isEmpty) return ProbeResults.empty;
 
-    final cached = _cache[source.id];
-    if (cached != null && _now().difference(cached.at) < _cacheTtl) {
-      return cached.results;
+    final cached = _freshResults(source.id);
+    if (cached != null) return cached;
+
+    return _runFor(source, endpoints).all;
+  }
+
+  /// The first route of [source] that answers — **returned the moment it
+  /// does**, without waiting for the slower ones.
+  ///
+  /// This is what [EndpointSelection.auto] asks for. Ranking every route means
+  /// paying the slowest one's timeout on every decision, and the user asked for
+  /// "the one that gets back to me first", which is a different question from
+  /// "the one with the lowest latency" only when both are about to answer
+  /// anyway.
+  ///
+  /// The round is **not** cut short: the remaining probes carry on, and their
+  /// answers still land in a full [ProbeResults] and in the TTL cache, so the
+  /// route picker can show every route's milliseconds without probing again.
+  /// A caller inside the TTL gets the cached ranking's leader instead of any
+  /// sockets at all.
+  ///
+  /// Null when nothing answered — the overall budget still caps how long that
+  /// takes, so this never outlives [probeFor].
+  Future<RouteLatency?> firstResponder(Source source) async {
+    final endpoints = _probeableEndpoints(source);
+    if (endpoints.isEmpty) return null;
+
+    final cached = _freshResults(source.id);
+    if (cached != null) {
+      return cached.ranked.isEmpty ? null : cached.ranked.first;
     }
+
+    final run = _runFor(source, endpoints);
+    // The rest of the round has to finish on its own: it is what fills the
+    // cache, and an error nobody is waiting on would otherwise go unhandled.
+    unawaited(run.all.then((_) {}, onError: (Object _) {}));
+    return run.first;
+  }
+
+  /// Cached results for [sourceId] while they are still inside the TTL.
+  ProbeResults? _freshResults(String sourceId) {
+    final cached = _cache[sourceId];
+    if (cached == null) return null;
+    if (_now().difference(cached.at) >= _cacheTtl) return null;
+    return cached.results;
+  }
+
+  /// The round in flight for [source], starting one if there is none.
+  _ProbeRun _runFor(Source source, List<SourceEndpoint> endpoints) {
+    final existing = _inflight[source.id];
+    if (existing != null) return existing;
 
     final answered = <String, Duration>{};
-    final probes = endpoints.map((ep) async {
-      final target = targetFor(ep, source.type);
-      if (target == null) return;
-      final watch = Stopwatch()..start();
+    final firstDone = Completer<RouteLatency?>();
+
+    final probes = <Future<void>>[
+      for (final ep in endpoints)
+        () async {
+          final target = targetFor(ep, source.type);
+          if (target == null) return;
+          final watch = Stopwatch()..start();
+          try {
+            await _connect(target.host, target.port, _perEndpointTimeout);
+            final latency = watch.elapsed;
+            answered[ep.id] = latency;
+            if (!firstDone.isCompleted) {
+              firstDone.complete((endpointId: ep.id, latency: latency));
+            }
+          } catch (_) {
+            // Unreachable is the normal outcome for the route you are not on.
+          }
+        }(),
+    ];
+
+    late final _ProbeRun run;
+    final all = () async {
       try {
-        await _connect(target.host, target.port, _perEndpointTimeout);
-        answered[ep.id] = watch.elapsed;
-      } catch (_) {
-        // Unreachable is the normal outcome for the route you are not on.
+        await Future.wait(probes).timeout(_overallBudget);
+      } on TimeoutException {
+        // Keep whatever answered inside the budget rather than failing the lot.
+        debugPrint('EndpointProbe: budget exhausted for source ${source.id}');
       }
-    });
 
-    try {
-      await Future.wait(probes).timeout(_overallBudget);
-    } on TimeoutException {
-      // Keep whatever answered inside the budget rather than failing the lot.
-      debugPrint('EndpointProbe: budget exhausted for source ${source.id}');
-    }
+      // Snapshot now: probes abandoned by the budget keep running and would
+      // otherwise land in the map — and, before this was a snapshot, inside the
+      // already-cached result — long after we told the caller what we found.
+      final results = _rank(answered, endpoints);
+      _cache[source.id] = (at: _now(), results: results);
+      if (identical(_inflight[source.id], run)) _inflight.remove(source.id);
+      // Nothing answered inside the budget, so nobody was ever first.
+      if (!firstDone.isCompleted) firstDone.complete(null);
+      return results;
+    }();
 
-    // Snapshot now: probes abandoned by the budget keep running and would
-    // otherwise land in the map — and, before this was a snapshot, inside the
-    // already-cached result — long after we told the caller what we found.
+    run = _ProbeRun(first: firstDone.future, all: all);
+    // Registered before anything can await: the removal above runs a microtask
+    // later at the earliest, so it can never race ahead of this line.
+    _inflight[source.id] = run;
+    return run;
+  }
+
+  /// Orders what answered, fastest first, ties broken by the source's own
+  /// endpoint order.
+  static ProbeResults _rank(
+    Map<String, Duration> answered,
+    List<SourceEndpoint> endpoints,
+  ) {
     final listOrder = <String, int>{
       for (var i = 0; i < endpoints.length; i++) endpoints[i].id: i,
     };
     final ranked = <RouteLatency>[
-      for (final e in answered.entries)
-        (endpointId: e.key, latency: e.value),
+      for (final e in answered.entries) (endpointId: e.key, latency: e.value),
     ]..sort((a, b) {
         final byLatency = a.latency.compareTo(b.latency);
         if (byLatency != 0) return byLatency;
         return (listOrder[a.endpointId] ?? 0)
             .compareTo(listOrder[b.endpointId] ?? 0);
       });
-
-    final results = ProbeResults(List<RouteLatency>.unmodifiable(ranked));
-    _cache[source.id] = (at: _now(), results: results);
-    return results;
+    return ProbeResults(List<RouteLatency>.unmodifiable(ranked));
   }
 
   /// Ids of [source]'s routes that answered, unordered.
@@ -269,19 +350,31 @@ class EndpointProbeService {
   /// Probes, then applies [Source.resolveEndpoint]. Returns the route that
   /// should serve this source, or null when it has none.
   ///
-  /// In `auto` this is "the fastest route that answered": the user did not
-  /// override anything, so the machine is free to take the quickest way in and
-  /// to change its mind the next time the network looks different.
+  /// Each mode gets the probe it actually needs:
+  ///
+  /// - `pinned`: **no probe at all.** The answer cannot change what we return,
+  ///   so spending a second to confirm it would be a second of startup thrown
+  ///   away. A pin naming a route that no longer exists is not an override and
+  ///   degrades to `auto`.
+  /// - `auto`: [firstResponder] — whoever gets back to us first wins, and we do
+  ///   not wait for the rest to see if one of them was quicker.
+  /// - `ordered`: [probeFor], because the answer needs to know about *every*
+  ///   route that is up, not just the quickest one. The user's order then
+  ///   decides which of them is taken.
   Future<SourceEndpoint?> resolve(Source source) async {
-    // A pinned route is the user's explicit override; probing would only waste
-    // a second, because the answer cannot change what we return.
     if (source.endpointSelection == EndpointSelection.pinned &&
         source.pinnedEndpointId != null &&
         source.endpointById(source.pinnedEndpointId!) != null) {
       return source.resolveEndpoint();
     }
-    final results = await probeFor(source);
-    return source.resolveEndpoint(reachable: results.rankedIds);
+    if (source.endpointSelection == EndpointSelection.ordered) {
+      final results = await probeFor(source);
+      return source.resolveEndpoint(reachable: results.rankedIds);
+    }
+    final winner = await firstResponder(source);
+    return source.resolveEndpoint(
+      reachable: [if (winner != null) winner.endpointId],
+    );
   }
 
   /// Drops cached results. Call when the network changes (Wi-Fi on/off, a
@@ -294,4 +387,20 @@ class EndpointProbeService {
       _cache.remove(sourceId);
     }
   }
+}
+
+/// One round of probing a source, seen two ways.
+///
+/// [first] answers "who got back to us first" and completes early; [all]
+/// answers "what does every route look like" and completes when the round is
+/// over. They are two views of the same sockets, which is what lets `auto` stop
+/// waiting without giving up the milliseconds the picker shows.
+class _ProbeRun {
+  const _ProbeRun({required this.first, required this.all});
+
+  /// The first route to answer, or null once the round ends with none.
+  final Future<RouteLatency?> first;
+
+  /// Every route that answered, ranked — also what fills the TTL cache.
+  final Future<ProbeResults> all;
 }

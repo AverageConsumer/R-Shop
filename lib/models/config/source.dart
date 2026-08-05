@@ -80,20 +80,36 @@ class SystemSourceMapping {
 
 /// How R-Shop decides which [SourceEndpoint] of a source to talk to.
 enum EndpointSelection {
-  /// Nobody overrode anything: probe every route and take the **fastest** one
-  /// that answers, re-deciding whenever the network changes. Falls back to the
-  /// first endpoint when nothing is reachable, so a sync still produces a real
-  /// error instead of silently doing nothing.
+  /// Nobody overrode anything: **whichever route answers first wins**, and the
+  /// decision is remade whenever the network changes. Falls back to the first
+  /// endpoint when nothing answers, so a sync still produces a real error
+  /// instead of silently doing nothing.
+  ///
+  /// First-to-answer, not fastest-of-all: waiting for every route so they can
+  /// be ranked spends the slowest route's timeout on every switch, and by then
+  /// the answer is stale anyway. The route that got back to us first is the one
+  /// that is *usable* first, which is what "auto" was always meant to mean.
   ///
   /// This is not a preference the user has to maintain. Being at home or away
   /// is not a setting, and asking them to flip one every time they walk out of
   /// the door is asking them to do the probe's job by hand.
   auto,
 
-  /// The user overrode auto-selection: always use [Source.pinnedEndpointId].
-  /// They asked for this exact route, so we do not silently switch away from it
-  /// even if it is down, and not even if another route is faster — a failed
-  /// sync is more honest than a route that moves behind their back.
+  /// Follow the user's **own order**: take the first route in
+  /// [Source.endpoints] that answers, however slow it is, and only move down
+  /// the list when a route above it is down.
+  ///
+  /// This is the "I have a preference, but I still want failover" mode. A
+  /// metered mobile route can be last and never get picked while the LAN is up,
+  /// even on a day when the mobile route happens to answer quicker. The order
+  /// *is* the setting — see [Source.withEndpointsReordered].
+  ordered,
+
+  /// The user overrode selection entirely: always use
+  /// [Source.pinnedEndpointId]. They asked for this exact route, so we do not
+  /// silently switch away from it even if it is down, and not even if another
+  /// route is faster — a failed sync is more honest than a route that moves
+  /// behind their back. This is the one mode with **no** failover.
   pinned,
 }
 
@@ -301,9 +317,13 @@ class Source {
   /// legacy fields so the rest of the app can assume a list.
   final List<SourceEndpoint> endpoints;
 
-  /// Whether to probe for the fastest working route or stick to
-  /// [pinnedEndpointId]. `auto` is the unattended default; `pinned` means the
-  /// user overrode it.
+  /// Whether to take the first route that answers (`auto`), walk this source's
+  /// own [endpoints] order and take the first one that answers (`ordered`), or
+  /// stick to [pinnedEndpointId] come what may (`pinned`).
+  ///
+  /// `auto` is the unattended default and the value a config written before
+  /// this field existed reads back as; an unrecognised value degrades to it
+  /// too, so a config touched by a newer build never strands an older one.
   final EndpointSelection endpointSelection;
 
   /// The route the user overrode auto-selection with. Only meaningful when
@@ -501,23 +521,28 @@ class Source {
 
   /// Which route *should* be live, given what answered a probe just now.
   ///
-  /// [reachable] is a **ranked** list of endpoint ids, best first — that is
-  /// what `EndpointProbeService.probeFor` hands back, sorted by latency with
-  /// ties broken by this source's own endpoint order.
+  /// [reachable] is a list of endpoint ids **in the caller's order of
+  /// preference**: `EndpointProbeService.firstResponder` hands back the single
+  /// route that answered first, and `probeFor` hands back every route that
+  /// answered, fastest first.
   ///
-  /// - `pinned`: the user's override wins outright. If it is unreachable they
-  ///   get a failed sync, not a silent reroute — a route that moves on its
-  ///   own is exactly what pinning exists to prevent.
-  /// - `auto`: the first id in [reachable] that this source still has, i.e.
-  ///   the fastest live route. Nothing was overridden, so "fast at home, works
-  ///   away" is measured rather than configured.
-  /// - `auto` with nothing reachable: the first endpoint, so the sync runs
-  ///   and surfaces a real connection error instead of doing nothing.
+  /// - `pinned`: the user's override wins outright, reachable or not. If it is
+  ///   down they get a failed sync, not a silent reroute — a route that moves
+  ///   on its own is exactly what pinning exists to prevent.
+  /// - `auto`: the first id in [reachable] that this source still has. Nothing
+  ///   was overridden, so "works here, works there" is measured rather than
+  ///   configured.
+  /// - `ordered`: **this source's own** [endpoints] order decides, and
+  ///   [reachable] only says which of them are usable. The order the user
+  ///   arranged is a preference, so a lower route never wins just by being
+  ///   quicker — it wins when everything above it is down.
+  /// - nothing reachable: the first endpoint, so the sync runs and surfaces a
+  ///   real connection error instead of doing nothing.
   ///
-  /// A ranked *list* rather than a set of ids plus a "winner" argument keeps
-  /// this pure and keeps the model free of the probe's types — and if the
-  /// fastest route was deleted between the probe and this call, the runner-up
-  /// takes over instead of the list-order default.
+  /// A *list* rather than a set of ids plus a "winner" argument keeps this pure
+  /// and keeps the model free of the probe's types — and if the winning route
+  /// was deleted between the probe and this call, the runner-up takes over
+  /// instead of the list-order default.
   SourceEndpoint? resolveEndpoint({List<String> reachable = const []}) {
     if (endpoints.isEmpty) return null;
     if (endpointSelection == EndpointSelection.pinned &&
@@ -526,11 +551,59 @@ class Source {
       if (pinned != null) return pinned;
       // Pinned route was deleted — fall through to auto rather than stall.
     }
+    if (endpointSelection == EndpointSelection.ordered) {
+      final answered = reachable.toSet();
+      for (final ep in endpoints) {
+        if (answered.contains(ep.id)) return ep;
+      }
+      return endpoints.first;
+    }
     for (final id in reachable) {
       final ep = endpointById(id);
       if (ep != null) return ep;
     }
     return endpoints.first;
+  }
+
+  /// Returns a copy whose routes are arranged in [orderedIds] order.
+  ///
+  /// In [EndpointSelection.ordered] the list order *is* the setting, so this is
+  /// how the user states a preference: put the LAN first and it is used
+  /// whenever it answers, whatever the mobile route's latency says.
+  ///
+  /// Ids that this source does not have are ignored, and routes [orderedIds]
+  /// does not mention keep their relative order at the end — a stale list from
+  /// a screen opened before a route was added reorders what it knew about
+  /// rather than dropping the rest.
+  ///
+  /// Nothing else moves: the live route is derived from the address fields
+  /// ([liveEndpoint]), so reordering never reroutes traffic by itself and never
+  /// touches a cached game. Re-resolving afterwards is the caller's decision.
+  Source withEndpointsReordered(List<String> orderedIds) {
+    if (endpoints.length < 2) return this;
+    final remaining = [...endpoints];
+    final reordered = <SourceEndpoint>[];
+    for (final id in orderedIds) {
+      final at = remaining.indexWhere((e) => e.id == id);
+      if (at >= 0) reordered.add(remaining.removeAt(at));
+    }
+    reordered.addAll(remaining);
+    return copyWith(endpoints: List<SourceEndpoint>.unmodifiable(reordered));
+  }
+
+  /// Returns a copy with [endpointId] moved to [newIndex] — the single-step
+  /// form of [withEndpointsReordered] for an up/down button or a drag handle.
+  ///
+  /// [newIndex] is clamped, so "move the top one up" is a no-op rather than an
+  /// error, and an unknown id leaves the source untouched.
+  Source moveEndpoint(String endpointId, int newIndex) {
+    final from = endpoints.indexWhere((e) => e.id == endpointId);
+    if (from < 0) return this;
+    final to = newIndex.clamp(0, endpoints.length - 1);
+    if (from == to) return this;
+    final moved = [...endpoints];
+    moved.insert(to, moved.removeAt(from));
+    return copyWith(endpoints: List<SourceEndpoint>.unmodifiable(moved));
   }
 
   /// Returns a copy with [endpoint]'s address mirrored onto the connection
