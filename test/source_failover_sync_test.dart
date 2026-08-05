@@ -43,13 +43,20 @@ AppConfig _config({String? active, String? primary}) => AppConfig(
           providers: [],
         ),
       ],
-      sources: [
-        _romm('lan', 'lan.local', fallback: 'wan'),
-        _romm('wan', 'wan.example.org'),
-      ],
+      sources: sources,
+      // The LAN/WAN pairing is a group now. A stored config gets one on load
+      // ([sourceGroupsFromFallbacks]); a config built in a test has to run the
+      // same migration, because the selection path stopped reading
+      // `fallbackSourceId` when groups replaced it.
+      sourceGroups: sourceGroupsFromFallbacks(sources),
       activeSourceId: active,
       primarySourceId: primary,
     );
+
+final sources = [
+  _romm('lan', 'lan.local', fallback: 'wan'),
+  _romm('wan', 'wan.example.org'),
+];
 
 void main() {
   group('withEffectiveSource', () {
@@ -176,14 +183,30 @@ void main() {
           reason: 'untouched config still has its original empty list');
     });
 
-    test('a source with no stand-in does not probe a second time', () async {
+    test('a source in no group does not probe a second time', () async {
+      // A grouped source races its whole group, so the one that proves this
+      // has to stand alone. It used to be the WAN one: the old pairing was
+      // one-way, so "the source nobody falls back from" and "the source with
+      // nothing to fall back to" were the same source. A group is symmetric,
+      // and both of its members probe the pair.
       final net = _FakeNet(const {});
       await resolveForSync(
-        config: _config(active: 'wan'),
+        config: AppConfig(
+          systems: const [
+            SystemConfig(
+              id: 'snes',
+              name: 'SNES',
+              targetFolder: '/roms/snes',
+              providers: [],
+            ),
+          ],
+          sources: [_romm('solo', 'solo.local')],
+          activeSourceId: 'solo',
+        ),
         probe: EndpointProbeService(connect: net.connect),
       );
 
-      expect(net.asked, ['wan.example.org']);
+      expect(net.asked, ['solo.local']);
     });
   });
 }

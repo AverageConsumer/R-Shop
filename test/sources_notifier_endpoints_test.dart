@@ -175,6 +175,99 @@ void main() {
 
       expect(notifier.state.sources.single.pinnedEndpointId, 'ep-lan');
     });
+
+    test('switching to ordered clears the pin too', () async {
+      // A pin outranks the order — it is the one mode with no failover — so a
+      // source left pinned while claiming to follow the list would sit on a
+      // dead route and look as if the order were being honoured.
+      final (notifier, _) = await _seeded();
+      await notifier.switchEndpoint('s1', 'ep-remote'); // pins by default
+
+      await notifier.setEndpointSelection('s1', EndpointSelection.ordered);
+
+      final src = notifier.state.sources.single;
+      expect(src.endpointSelection, EndpointSelection.ordered);
+      expect(src.pinnedEndpointId, isNull);
+      expect(src.liveEndpoint?.id, 'ep-remote',
+          reason: 'releasing the pin does not itself move the route');
+    });
+  });
+
+  group('order as a setting', () {
+    test('ordered takes the first route that answers, not the fastest',
+        () async {
+      final (notifier, _) = await _seeded();
+
+      await notifier.useOrderedSelection(
+        's1',
+        probe: _probe(fast: _remoteAddress, slow: _lanAddress),
+      );
+
+      // The LAN route is listed first and it did answer, so it wins even
+      // though the remote one answered quicker.
+      final src = notifier.state.sources.single;
+      expect(src.endpointSelection, EndpointSelection.ordered);
+      expect(src.liveEndpoint?.id, 'ep-lan');
+    });
+
+    test('ordered walks past a route that is down', () async {
+      final (notifier, _) = await _seeded();
+
+      await notifier.useOrderedSelection(
+        's1',
+        probe: _probe(fast: _remoteAddress, down: {_lanAddress}),
+      );
+
+      expect(notifier.state.sources.single.liveEndpoint?.id, 'ep-remote');
+    });
+
+    test('reordering re-resolves, because the order is the setting', () async {
+      final (notifier, _) = await _seeded();
+      await notifier.useOrderedSelection(
+        's1',
+        probe: _probe(fast: _lanAddress, slow: _remoteAddress),
+      );
+      expect(notifier.state.sources.single.liveEndpoint?.id, 'ep-lan');
+
+      await notifier.reorderEndpoints(
+        's1',
+        ['ep-remote', 'ep-lan'],
+        probe: _probe(fast: _lanAddress, slow: _remoteAddress),
+      );
+
+      final src = notifier.state.sources.single;
+      expect(src.endpoints.map((e) => e.id), ['ep-remote', 'ep-lan']);
+      expect(src.liveEndpoint?.id, 'ep-remote');
+    });
+
+    test('reordering in auto mode moves nothing on its own', () async {
+      final (notifier, _) = await _seeded();
+
+      await notifier.reorderEndpoints(
+        's1',
+        ['ep-remote', 'ep-lan'],
+        probe: _probe(fast: _lanAddress, slow: _remoteAddress),
+      );
+
+      final src = notifier.state.sources.single;
+      expect(src.endpoints.map((e) => e.id), ['ep-remote', 'ep-lan']);
+      expect(src.liveEndpoint?.id, 'ep-lan');
+    });
+
+    test('moveEndpointTo is the button form and keeps the cache', () async {
+      final (notifier, db) = await _seeded();
+
+      await notifier.moveEndpointTo(
+        's1',
+        'ep-remote',
+        0,
+        probe: _probe(fast: _lanAddress, slow: _remoteAddress),
+      );
+
+      expect(notifier.state.sources.single.endpoints.map((e) => e.id),
+          ['ep-remote', 'ep-lan']);
+      expect(db.purged, isEmpty);
+    });
   });
 
   group('addEndpoint', () {

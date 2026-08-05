@@ -410,7 +410,7 @@ class AppConfig {
       // field is deliberately left in place for older builds to read.
       final rawGroups = json['source_groups'] as List<dynamic>?;
       final groups = rawGroups != null
-          ? _sanitizeGroups(
+          ? sanitizeGroups(
               rawGroups
                   .map((e) => SourceGroup.fromJson(e as Map<String, dynamic>))
                   .toList(),
@@ -629,12 +629,17 @@ class AppConfig {
 /// name a source, a source claimed by two groups, and groups left with fewer
 /// than two members.
 ///
+/// Public because `SourcesNotifier` runs it on every write as well as
+/// [AppConfig.fromJson] running it on every read: the rules are the same ones
+/// either way, and a second copy in the notifier would drift the first time
+/// one of them changed.
+///
 /// A group of one is not a group — it says nothing the plain source does not
 /// already say — and leaving one behind would put a "group" badge on a single
 /// server. Overlap is dropped rather than merged because "which group is this
 /// source in" has to have one answer; the earlier group wins so the result does
 /// not depend on set iteration order.
-List<SourceGroup> _sanitizeGroups(
+List<SourceGroup> sanitizeGroups(
   List<SourceGroup> groups,
   List<Source> sources,
 ) {

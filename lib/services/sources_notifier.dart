@@ -319,9 +319,31 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
   /// system grids stop showing stale entries.
   Future<void> removeSource(String id) async {
     if (!state.sources.any((s) => s.id == id)) return;
+    // Deleting a member is also leaving its group, and the cache has to be
+    // settled while the group still exists: once the write below runs,
+    // sanitizeGroups has dropped the member and there is nothing left to say
+    // where its rows belong.
+    final group = state.groupContaining(id);
+    String? survivingOwner;
+    if (group != null) {
+      final after = group.withoutMember(id);
+      survivingOwner = after.memberIds.isEmpty ? null : after.cacheOwnerId;
+      await _handOverCache(
+        leaving: id,
+        oldOwnerId: group.cacheOwnerId,
+        newOwnerId: survivingOwner,
+      );
+    }
     final next = state.sources.where((s) => s.id != id).toList();
     await _writeAndPublish(next);
-    await _purgeCachedGamesFor(id);
+    // The shared rows stay with whoever is left, even the ones this source
+    // fetched: purge matches on the provider_config blob, which still names
+    // it. That holds for a pair too — the group dissolves, but the survivor
+    // keeps the library it was sharing rather than re-syncing it.
+    await _purgeCachedGamesFor(
+      id,
+      protectedOwnerIds: {if (survivingOwner != null) survivingOwner},
+    );
   }
 
   /// Toggle helper for the on/off switch in the Sources screen.
@@ -458,6 +480,242 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
   /// Picking a route by hand is the override — there is no separate "and now
   /// keep it" step, because a user who just chose the remote address and then
   /// watched it jump back to the LAN would rightly call that broken.
+  // --- Groups ---------------------------------------------------------------
+  //
+  // A group is the user declaring that several sources are **one server**
+  // reached different ways ("我想指定兩個來源 其實是指向同一台伺服器"). It
+  // replaces the old one-way fallback pairing rather than sitting beside it.
+  //
+  // Two rules run through everything below:
+  //   * one group is one cached library — joining merges, leaving does not
+  //     split ([DatabaseService.adoptCacheInto] and friends);
+  //   * which member is in use right now is decided at runtime and never
+  //     written to disk (invariant 3), which is why nothing here touches it.
+
+  /// Creates a group over [memberIds], **in the order given** — first is
+  /// preferred — and folds their cached libraries into one.
+  ///
+  /// Returns the new group, or null when the request does not describe one:
+  /// fewer than two known members, a member already in another group, or
+  /// members of different [SourceType]s. Mixed types are refused because the
+  /// user's own condition was "走同一個來源類型", and because two servers
+  /// speaking different protocols cannot be the one server the group claims
+  /// they are. (Legacy cross-type *fallback* pairings still migrate in — see
+  /// [sourceGroupsFromFallbacks] — since refusing those would leave an install
+  /// with a fallback that no longer fires and no group to explain why.)
+  ///
+  /// [name] defaults to the first member's name, which is what the source list
+  /// already shows for it.
+  Future<SourceGroup?> createGroup({
+    required List<String> memberIds,
+    String? name,
+    SourceGroupMode mode = SourceGroupMode.ordered,
+  }) async {
+    final byId = {for (final s in state.sources) s.id: s};
+    final seen = <String>{};
+    final members = [
+      for (final id in memberIds)
+        if (byId.containsKey(id) && seen.add(id)) id,
+    ];
+    if (members.length < 2) return null;
+    if (members.any((id) => state.groupContaining(id) != null)) return null;
+    final type = byId[members.first]!.type;
+    if (members.any((id) => byId[id]!.type != type)) return null;
+
+    final group = SourceGroup(
+      id: _newGroupId(members.first),
+      name: (name?.trim().isNotEmpty ?? false)
+          ? name!.trim()
+          : byId[members.first]!.name,
+      mode: mode,
+      memberIds: List<String>.unmodifiable(members),
+      // The first member keeps its rows under its own id, so creating the
+      // group costs the preferred server no re-sync.
+      cacheOwnerId: members.first,
+    );
+
+    await _mergeCaches(ownerId: group.cacheOwnerId, memberIds: members);
+    await _writeAndPublish(
+      state.sources,
+      groups: [...state.groups, group],
+    );
+    return state.groupById(group.id);
+  }
+
+  /// Renames a group. Blank names fall back to the current name rather than
+  /// leaving an unlabelled row on screen.
+  Future<void> renameGroup(String groupId, String name) async {
+    final group = state.groupById(groupId);
+    if (group == null) return;
+    final next = name.trim();
+    if (next.isEmpty || next == group.name) return;
+    await _replaceGroup(group.copyWith(name: next));
+  }
+
+  /// Switches a group between "whoever answers first" and "my order".
+  ///
+  /// The member order is kept either way, so flipping to `auto` and back does
+  /// not lose what the user arranged.
+  Future<void> setGroupMode(String groupId, SourceGroupMode mode) async {
+    final group = state.groupById(groupId);
+    if (group == null || group.mode == mode) return;
+    await _replaceGroup(group.copyWith(mode: mode));
+  }
+
+  /// Adds [sourceId] to a group and folds its cached library in.
+  ///
+  /// Returns false when the source is unknown, already in a group, or of
+  /// another type — the same conditions [createGroup] refuses, for the same
+  /// reasons. New members are appended: the newest one is the one the user
+  /// knows least about, so it must not displace a preference already stated.
+  Future<bool> addToGroup(String groupId, String sourceId) async {
+    final group = state.groupById(groupId);
+    if (group == null || group.contains(sourceId)) return false;
+    if (state.groupContaining(sourceId) != null) return false;
+    final src = state.sources.where((s) => s.id == sourceId).firstOrNull;
+    if (src == null) return false;
+    final head = state.sources.where((s) => s.id == group.memberIds.first);
+    if (head.isNotEmpty && head.first.type != src.type) return false;
+
+    await _mergeCaches(ownerId: group.cacheOwnerId, memberIds: [sourceId]);
+    await _replaceGroup(group.withMember(sourceId));
+    return true;
+  }
+
+  /// Takes [sourceId] out of a group.
+  ///
+  /// **The leaver keeps no games.** The list belongs to the group and nothing
+  /// records which member first saw a given title — that the answer did not
+  /// matter is the whole point of a group — so the source leaves empty and
+  /// re-syncs. Confirm with the user before calling this.
+  ///
+  /// When the leaver is the one holding the rows, they move to the next
+  /// remaining member instead, so the group does not look freshly empty.
+  ///
+  /// A group left with one member is dissolved by [sanitizeGroups]: a group of
+  /// one says nothing a plain source does not already say.
+  Future<void> removeFromGroup(String groupId, String sourceId) async {
+    final group = state.groupById(groupId);
+    if (group == null || !group.contains(sourceId)) return;
+    final next = group.withoutMember(sourceId);
+    await _handOverCache(
+      leaving: sourceId,
+      oldOwnerId: group.cacheOwnerId,
+      newOwnerId: next.memberIds.isEmpty ? null : next.cacheOwnerId,
+    );
+    await _replaceGroup(next);
+  }
+
+  /// Disbands a group. Every member becomes a plain source again.
+  ///
+  /// The cache owner keeps the shared library — it was already stored under
+  /// its id — and the others leave with nothing, exactly as
+  /// [removeFromGroup] describes.
+  Future<void> dissolveGroup(String groupId) async {
+    final group = state.groupById(groupId);
+    if (group == null) return;
+    for (final id in group.memberIds) {
+      if (id == group.cacheOwnerId) continue;
+      await _handOverCache(
+        leaving: id,
+        oldOwnerId: group.cacheOwnerId,
+        newOwnerId: group.cacheOwnerId,
+      );
+    }
+    await _writeAndPublish(
+      state.sources,
+      groups: [
+        for (final g in state.groups)
+          if (g.id != groupId) g,
+      ],
+    );
+  }
+
+  /// Rearranges a group's members into [orderedIds] — first is preferred.
+  ///
+  /// The cache owner deliberately does **not** move with the order: reordering
+  /// says which server to talk to first, not where to keep the library, and an
+  /// owner that moved would strand the rows under the old id.
+  Future<void> reorderGroupMembers(
+      String groupId, List<String> orderedIds) async {
+    final group = state.groupById(groupId);
+    if (group == null) return;
+    final next = group.withMembersReordered(orderedIds);
+    if (identical(next, group)) return;
+    await _replaceGroup(next);
+  }
+
+  /// Moves one member to [newIndex] — the up/down button form of
+  /// [reorderGroupMembers].
+  Future<void> moveGroupMember(
+      String groupId, String sourceId, int newIndex) async {
+    final group = state.groupById(groupId);
+    if (group == null) return;
+    final next = group.withMemberMoved(sourceId, newIndex);
+    if (identical(next, group)) return;
+    await _replaceGroup(next);
+  }
+
+  /// Ids are derived from the first member and disambiguated only if that
+  /// collides, so a group created out of the same pairing the legacy migration
+  /// would have produced lands on the same id.
+  String _newGroupId(String firstMemberId) {
+    var id = 'grp-$firstMemberId';
+    var n = 2;
+    while (state.groups.any((g) => g.id == id)) {
+      id = 'grp-$firstMemberId-${n++}';
+    }
+    return id;
+  }
+
+  Future<void> _replaceGroup(SourceGroup group) => _writeAndPublish(
+        state.sources,
+        groups: [
+          for (final g in state.groups)
+            if (g.id == group.id) group else g,
+        ],
+      );
+
+  /// Folds [memberIds]' cached games into [ownerId]'s list.
+  ///
+  /// Failures are logged, not thrown: a merge that could not run leaves the
+  /// members' rows where they were, and the next sync writes into the group's
+  /// list anyway. Losing the group over it would be the worse outcome.
+  Future<void> _mergeCaches({
+    required String ownerId,
+    required List<String> memberIds,
+  }) async {
+    try {
+      await _db.adoptCacheInto(ownerId: ownerId, memberIds: memberIds);
+    } catch (e) {
+      debugPrint('SourcesNotifier: cache merge into $ownerId failed: $e');
+    }
+  }
+
+  /// Settles the cache when [leaving] walks out of a group whose rows sit under
+  /// [oldOwnerId]. [newOwnerId] is where they should sit afterwards — the same
+  /// id when a non-owner leaves, the next member when the owner does, null when
+  /// nobody is left.
+  Future<void> _handOverCache({
+    required String leaving,
+    required String oldOwnerId,
+    required String? newOwnerId,
+  }) async {
+    try {
+      if (newOwnerId == null) return;
+      if (leaving == oldOwnerId) {
+        await _db.moveCacheOwnership(
+          fromOwnerId: oldOwnerId,
+          toOwnerId: newOwnerId,
+        );
+      } else {
+        await _db.releaseCacheFrom(sourceId: leaving, ownerId: oldOwnerId);
+      }
+    } catch (e) {
+      debugPrint('SourcesNotifier: cache hand-over for $leaving failed: $e');
+    }
+  }
+
   Future<void> switchEndpoint(
     String sourceId,
     String endpointId, {
@@ -494,14 +752,7 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       orElse: () => throw StateError('Unknown source: $sourceId'),
     );
     if (src.endpointSelection == selection) return;
-    if (selection == EndpointSelection.auto) {
-      await updateSource(
-        src.copyWith(
-          endpointSelection: selection,
-          clearPinnedEndpoint: true,
-        ),
-      );
-    } else {
+    if (selection == EndpointSelection.pinned) {
       // Overriding without naming a route means "the one I am looking at",
       // which is whatever is live right now.
       await updateSource(
@@ -510,11 +761,84 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
           pinnedEndpointId: src.pinnedEndpointId ?? src.liveEndpoint?.id,
         ),
       );
+    } else {
+      // `auto` and `ordered` are both "no override": one lets the network
+      // decide, the other lets the user's *order* decide, and neither may
+      // leave a pin behind. A stale pin outranks both — it is the one mode
+      // with no failover — so a source switched to `ordered` with a pin still
+      // on it would sit on a dead route while looking as if it were following
+      // the list.
+      await updateSource(
+        src.copyWith(
+          endpointSelection: selection,
+          clearPinnedEndpoint: true,
+        ),
+      );
     }
   }
 
-  /// Probes [sourceId]'s routes and makes the fastest live one, without
-  /// recording an override.
+  /// Puts [sourceId] on [EndpointSelection.ordered] and immediately re-resolves
+  /// — the "照我的順序" row of the route picker, in one call.
+  ///
+  /// Mirrors [clearEndpointOverride]: changing the mode is a config write, and
+  /// acting on the new mode costs a probe, so the two are separate underneath
+  /// and joined here for the caller.
+  Future<String?> useOrderedSelection(
+    String sourceId, {
+    EndpointProbeService? probe,
+  }) async {
+    await setEndpointSelection(sourceId, EndpointSelection.ordered);
+    return autoSelectEndpoint(sourceId, probe: probe);
+  }
+
+  /// Rearranges [sourceId]'s routes into [orderedIds].
+  ///
+  /// In [EndpointSelection.ordered] the order **is** the setting, so the source
+  /// is re-resolved afterwards: leaving it on the old route until something
+  /// else happened to probe would make the reorder look ignored. In the other
+  /// modes the order is only a preference for later and nothing moves.
+  ///
+  /// Goes through [updateSource]: **no cached game is touched** (invariant 1).
+  Future<void> reorderEndpoints(
+    String sourceId,
+    List<String> orderedIds, {
+    EndpointProbeService? probe,
+  }) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == sourceId,
+      orElse: () => throw StateError('Unknown source: $sourceId'),
+    );
+    final next = src.withEndpointsReordered(orderedIds);
+    if (identical(next, src)) return;
+    await updateSource(next);
+    if (next.endpointSelection == EndpointSelection.ordered) {
+      await autoSelectEndpoint(sourceId, probe: probe);
+    }
+  }
+
+  /// Moves one route to [newIndex] — the up/down button form of
+  /// [reorderEndpoints], with the same re-resolve rule.
+  Future<void> moveEndpointTo(
+    String sourceId,
+    String endpointId,
+    int newIndex, {
+    EndpointProbeService? probe,
+  }) async {
+    final src = state.sources.firstWhere(
+      (s) => s.id == sourceId,
+      orElse: () => throw StateError('Unknown source: $sourceId'),
+    );
+    final next = src.moveEndpoint(endpointId, newIndex);
+    if (identical(next, src)) return;
+    await updateSource(next);
+    if (next.endpointSelection == EndpointSelection.ordered) {
+      await autoSelectEndpoint(sourceId, probe: probe);
+    }
+  }
+
+  /// Probes [sourceId]'s routes and moves it to the one its mode picks —
+  /// fastest to answer in `auto`, first in the user's order in `ordered` —
+  /// without recording an override.
   ///
   /// Returns the id of the route now live, or null when the source has none,
   /// so a caller can tell whether anything moved.
@@ -547,9 +871,12 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       return src.liveEndpoint?.id ?? src.endpoints.firstOrNull?.id;
     }
 
+    // resolve() is what knows the difference between the modes: `auto` takes
+    // whoever answers first, `ordered` walks the user's list. Probing here and
+    // picking a winner locally would give both of them the same answer — the
+    // fastest route — and silently throw the order away.
     final svc = probe ?? EndpointProbeService();
-    final results = await svc.probeFor(src);
-    final best = src.resolveEndpoint(reachable: results.rankedIds);
+    final best = await svc.resolve(src);
     if (best == null) return null;
     // Re-read: probing is the one thing here that takes real time, and the
     // user may have edited or pinned this source while it ran.
@@ -705,7 +1032,10 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     return true;
   }
 
-  Future<void> _purgeCachedGamesFor(String sourceId) async {
+  Future<void> _purgeCachedGamesFor(
+    String sourceId, {
+    Set<String> protectedOwnerIds = const {},
+  }) async {
     try {
       final folders = <String, String>{
         for (final s in _cachedConfig.systems) s.id: s.targetFolder,
@@ -713,6 +1043,7 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       await _db.purgeOrDetachSource(
         sourceId,
         systemTargetFolders: folders,
+        protectedOwnerIds: protectedOwnerIds,
       );
     } catch (e) {
       debugPrint('SourcesNotifier: cache purge failed for $sourceId: $e');
@@ -876,8 +1207,10 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
 
     // Groups only survive while every member still exists and no member is in
     // two of them; pruning here rather than at each call site means a source
-    // removal cannot leave a group pointing at a deleted id.
-    final nextGroups = _prunedGroups(groups ?? latest.sourceGroups, next);
+    // removal cannot leave a group pointing at a deleted id. Same function
+    // AppConfig.fromJson runs on the way in, so a group cannot be legal on
+    // disk and illegal in memory.
+    final nextGroups = sanitizeGroups(groups ?? latest.sourceGroups, next);
 
     final updated = latest.copyWith(
       version: AppConfig.currentVersion,

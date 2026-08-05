@@ -25,7 +25,7 @@
 
 **第 4 項**：`rshop-build-deploy`（建置的三個陷阱，含 `scripts/deploy.ps1`）·
 `rshop-touch-and-gamepad`（**動 UI 之前一定先讀**）·
-`rshop-source-routing`（來源／路由／備援的不變式）· `rshop-l10n`。
+`rshop-source-routing`（來源／路由／**群組**的不變式）· `rshop-l10n`。
 
 **第 5 項**：長期記憶在
 `C:\Users\Guset\.claude\projects\D--ThorAPK-StudioProjects\memory\`。
@@ -82,10 +82,9 @@ UI 的東西 `analyze` 與單元測試都驗不到——見 `.agents/skills/rsho
 > 這一項未完成的程式全部 commit 在 **`wip/source-groups`**（已推遠端）。
 > 要接手就 `git checkout wip/source-groups`。**這份交接的最新版在那個分支上**。
 >
-> **那個分支還是不能整體編譯**，但少了一個原因：`lib/` 只剩
-> `sources_notifier.dart` 的 `_prunedGroups` 未定義（就是下面第 2 項）。
-> 資料庫那一層已經好了、測試綠了——`cedce1e` 當時是連 `_collapseDuplicates`
-> 都只有呼叫沒有本體，所以**每一個 import 資料庫服務的測試檔都載入失敗**。
+> **那個分支現在編得起來了**（2026-08-05）：`flutter analyze` 全專案零問題，
+> `flutter test` **1907 通過 / 6 失敗**，6 個就是 §3.1 那份既有清單。
+> 資料層與邏輯層（第 1～5 項）已完成，**剩下的是畫面、字串與實機**。
 
 #### 使用者要什麼（原話，不要再自行對映）
 
@@ -115,7 +114,10 @@ UI 的東西 `analyze` 與單元測試都驗不到——見 `.agents/skills/rsho
     firstResponder      先回應就回傳但不中斷整輪，其餘毫秒數照樣進 TTL 快取；同來源的探測併成一輪
     順序 API            Source.withEndpointsReordered / moveEndpoint（純函式，重排不會自己換路）
     資料庫 v16          快取擁有者改成群組（原第 1 項，2026-08-05 做完，見下）
-    測試                source_endpoint／endpoint_probe_service／database_service 四檔全綠
+    notifier 群組       建立／改名／刪除、加入／移出、排順序、切模式；擋跨類型；接上快取三入口
+    選路三種模式        setEndpointSelection 的 ordered 分支、autoSelectEndpoint 走 resolve()、
+                        reorderEndpoints／moveEndpointTo／useOrderedSelection
+    測試                上述各檔全綠，另新增 database_service_v16 與 sources_notifier_groups 兩檔
 
 **資料庫那一項做了什麼**（細節在 `.agents/skills/rshop-source-routing` 的資料庫那節）：
 
@@ -130,26 +132,20 @@ UI 的東西 `analyze` 與單元測試都驗不到——見 `.agents/skills/rsho
 
 #### 還沒做（**下次從這裡開始**）
 
-1. ~~`database_service.dart` 的 v16 遷移~~ **已完成（2026-08-05）**。
-   接手的人要知道的只有兩件：讀寫都改吃 `cacheOwnerId`，而**呼叫端還沒傳**——
-   `saveGamesByRoute` / `getGamesForRoutes` 的 `cacheOwnerOf` 參數不傳就等於「沒有群組」，
-   所以第 2 項接上 `AppConfig.cacheOwnerIdFor` 之前，群組在畫面上不會生效。
-   要接的呼叫端有三處：`library_sync_service.dart`、`game_list_controller.dart`、
-   `sources_notifier.dart` 的 `purgeOrDetachSource`（要帶 `protectedOwnerIds`）。
-2. **`sources_notifier.dart` 的群組 CRUD 只做了一半** —— 建立／改名／刪除、加入／移出、
-   調順序、切模式；加入成員要擋不同類型。加入／移出要呼叫上面那個資料庫方法。
-3. **`setEndpointSelection` 要補 `ordered` 分支** —— 現在的 `else` 會把 `pinnedEndpointId` 種進去，
-   那只對 `pinned` 是對的；`auto` 與 `ordered` 都該 `clearPinnedEndpoint: true`。
-4. **`autoSelectEndpoint` 改呼叫 `probeService.resolve(src)`**，不要自己 `probeFor` 再挑——
-   否則 `auto` 拿不到先回應語意、`ordered` 拿不到順序。
-5. **notifier 補三個方法**：`reorderEndpoints`、`moveEndpointTo`、`useOrderedSelection`。
-   前兩個在模式是 `ordered` 時要順便重新解析一次（順序本身就是設定）。**都不准清快取**（不變式 1）。
-6. **UI 全部還沒動** —— 來源清單要有建立群組／加入／移出／排順序／切模式的入口，
+> 第 1～5 項（資料層＋選路邏輯）**2026-08-05 全部做完**，程式在 `wip/source-groups`。
+> 做了什麼看下面「已完成」那兩張表，以及 `.agents/skills/rshop-source-routing`。
+> 一併做掉的還有：`chooseSource` 不再讀 `fallbackSourceId`（配對一律先遷成群組），
+> 呼叫端 `library_sync_service` / `game_list_controller` / `game_list_screen`
+> 都已改傳 `cacheOwnerOf: config.cacheOwnerIdFor`，
+> `removeSource` 會先把群組的快取交接出去再清。
+
+1. **UI 全部還沒動** —— 來源清單要有建立群組／加入／移出／排順序／切模式的入口，
    浮層要能選 `ordered`（**現在點某一列一律是釘選＝覆寫**，`ordered` 需要自己的入口）。
    ⚠️ **兩套入口都要**（觸控＋手把），先讀 `.agents/skills/rshop-touch-and-gamepad`。
-7. **七語系字串**，與功能同一次補齊。
-8. **`rshop-source-routing` 的不變式要改寫** —— 不變式 3 講的「備援」整段語彙要換成群組。
-9. 全部做完才實機驗證。**v16 遷移會改使用者的資料庫**，裝上去之前先問他（部署政策，見 `AGENTS.md §5`）。
+2. **七語系字串**，與功能同一次補齊。
+3. **`rshop-source-routing` 剩畫面那半的語彙** —— 不變式 3、資料庫那節、
+   「使用者要的到底是什麼」都已改成群組；UI 那一面等畫面做完再補。
+4. 全部做完才實機驗證。**v16 遷移會改使用者的資料庫**，裝上去之前先問他（部署政策，見 `AGENTS.md §5`）。
    > **不要為了這件事去查實機的資料。** 使用者 2026-08-05 明講「實機上資料的不管，只管你 app 開發就好」。
    > 遷移的安全性靠**設計本身**保證：整件事在一個交易裡、去重判準照抄 v15 的 `_v15OnDeviceRank`，
    > 而不是靠先去看他機器上有什麼。
@@ -181,7 +177,8 @@ en/zh 是「Locked／已鎖定」，de/es/ja/pt 仍是「固定」（`Fixiert`�
 
 ### 3.1 測試基準：6 個失敗是既有的
 
-`flutter test` 完整跑 **1825 通過 / 6 失敗**（2026-08-05 實測）。**6 個都不是回歸**：
+`flutter test` 完整跑 **1907 通過 / 6 失敗**（`wip/source-groups`，2026-08-05 實測；
+`main-zh` 是 1825 通過，差在群組那批新測試）。**6 個都不是回歸**：
 
     network_discovery: mDNS                 Windows socket errno 10042
     rom_folder_service ×3                   Windows 路徑行為
