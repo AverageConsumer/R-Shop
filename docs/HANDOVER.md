@@ -126,13 +126,6 @@ UI 的東西 `analyze` 與單元測試都驗不到——見 `.agents/skills/rsho
    群組成員多的時候**看有沒有黃黑斜紋**。
 3. 都確認之後：把 `wip/source-groups` 併回 `main-zh`。
 
-### 2.1 同步的可達性判定還停在來源層級
-
-`resolveForSync` 判定一個來源「可達」的條件是**任一條路線通**，但它同步時走的是
-`liveEndpoint`——所以會出現「來源算通、實際走的那條是死的」而不觸發換路的情況。
-自動選路目前只作用在使用者開浮層與明確呼叫 `autoSelectEndpoint` 的時候，**同步路徑沒接上**。
-群組那一項做完後要一起看，兩者都在 `source_failover.dart`。
-
 ### 2.2 五語系的「已鎖定」用詞不一致
 
 en/zh 是「Locked／已鎖定」，de/es/ja/pt 仍是「固定」（`Fixiert`／`Fijada`／`固定`／`Fixada`），

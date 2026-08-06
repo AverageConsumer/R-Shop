@@ -208,5 +208,56 @@ void main() {
 
       expect(net.asked, ['solo.local']);
     });
+
+    test('resolves liveEndpoint of selected source when multi-route endpoint is used', () async {
+      const epLan = SourceEndpoint(
+        id: 'ep_lan',
+        label: 'LAN',
+        url: 'http://lan.local:9080',
+      );
+      const epWan = SourceEndpoint(
+        id: 'ep_wan',
+        label: 'WAN',
+        url: 'http://wan.example.org:9080',
+      );
+      final source = Source(
+        id: 'multi_route_source',
+        name: 'Multi Route Server',
+        type: SourceType.romm,
+        url: epLan.url, // Default live endpoint points to LAN
+        endpoints: const [epLan, epWan],
+        autoMap: true,
+        knownPlatforms: const {'snes': 4},
+      );
+      final cfg = AppConfig(
+        systems: const [
+          SystemConfig(
+            id: 'snes',
+            name: 'SNES',
+            targetFolder: '/roms/snes',
+            providers: [],
+          ),
+        ],
+        sources: [source],
+        activeSourceId: 'multi_route_source',
+      );
+
+      // LAN is down, WAN is up
+      final net = _FakeNet({'wan.example.org'});
+      final r = await resolveForSync(
+        config: cfg,
+        probe: EndpointProbeService(connect: net.connect),
+      );
+
+      expect(r.choice.source?.liveEndpoint?.id, 'ep_wan');
+      expect(
+        r.config.systems.single.providers.single.url,
+        'http://wan.example.org:9080',
+      );
+      expect(
+        r.config.systems.single.providers.single.endpointId,
+        'ep_wan',
+      );
+    });
   });
 }

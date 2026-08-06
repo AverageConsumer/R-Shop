@@ -521,3 +521,11 @@ v15 的遷移**知道**要建這個臨時索引（那段還寫了註解說明為
 **索引偏移這次改成不寫死**。上一輪才因為 `i + 1` 對不上 `_firstRouteIndex` 而出事，這輪列數又變了一次——同一個地方兩天內漏改兩次，所以 `_initialIndex` 改成一律走 `_firstRouteIndex`，測試也留著 `_firstRoutePinnedSource` 這個 fixture 盯著「開在鎖定的那條，不是開在打勾那列」。**下次再加一列，這裡不用跟著改。**
 
 **沒用到的字串留著沒刪**：`sources_routeOrdered`、`sources_groupModeOrdered`、`sources_routeUse` 三個現在沒有呼叫點，七個語系都還在。刪掉要動 21 個地方而且對行為沒有影響，等哪次順手再說。
+
+## [R-Shop 同步路線解算] resolveForSync 未解算 selected/winner source 的 liveEndpoint 導致多路線來源同步時走預設死路線
+
+- **問題**：當來源具有多條連線路線（例如 LAN IP 與 DDNS）時，`resolveForSync` 雖然能判定該來源「有任意路線通」，但產出的 AppConfig/ProviderConfig 仍維持 `source.liveEndpoint` 的預設位址（例如處於外網時的 LAN IP）。導致 `LibrarySyncService` 在同步時仍連向已死的首選位址而失敗。
+- **根因**：`resolveForSync` 僅透過 `svc.reachableFor(source)` 檢查整體可達性，並未將 `svc.resolve(source)` 算出的最新可達 `SourceEndpoint` 套用到內存中的 `Source` 物件。
+- **修復**：在 `resolveForSync` 中，於確定選定/備援來源（`choice.source`）後，呼叫 `svc.resolve(choice.source)` 取得最佳可達 endpoint，並透過 `choice.source.withLiveEndpoint(resolvedEp)` 產生更新後的 `Source` 物件，隨後將其替換回 `AppConfig.sources`，使產出的 `ProviderConfig` 具有正確的 URL 與 endpointId。
+- **檔案**：`lib/services/source_failover.dart:354-378`（在 resolveForSync 中新增選定來源之 liveEndpoint 解算與 config 替換） · `test/source_failover_sync_test.dart:212-261`（新增多路線來源同步測試）
+- **驗證**：新增與執行 `test/source_failover_sync_test.dart` 單元測試（全數通過），並執行全專案單元測試無回歸。

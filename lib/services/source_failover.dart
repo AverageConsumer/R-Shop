@@ -354,5 +354,29 @@ Future<({AppConfig config, SourceChoice choice})> resolveForSync({
     reachable: reachable,
   );
   final effective = choice.source?.id ?? activeId;
-  return (config: withEffectiveSource(config, effective), choice: choice);
+
+  var currentConfig = config;
+  var currentChoice = choice;
+  if (choice.source != null) {
+    final resolvedEp = await svc.resolve(choice.source!);
+    if (resolvedEp != null) {
+      final updatedSource = choice.source!.withLiveEndpoint(resolvedEp);
+      final updatedSources = config.sources
+          .map((s) => s.id == updatedSource.id ? updatedSource : s)
+          .toList(growable: false);
+      currentConfig = config.copyWith(sources: updatedSources);
+      currentChoice = SourceChoice(
+        source: updatedSource,
+        preferred: choice.preferred?.id == updatedSource.id
+            ? updatedSource
+            : choice.preferred,
+        group: choice.group,
+      );
+    }
+  }
+
+  return (
+    config: withEffectiveSource(currentConfig, effective),
+    choice: currentChoice,
+  );
 }
