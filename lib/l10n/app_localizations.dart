@@ -3344,7 +3344,7 @@ abstract class L {
   /// No description provided for @sources_groupModeAuto.
   ///
   /// In en, this message translates to:
-  /// **'Whoever answers first'**
+  /// **'Automatic'**
   String get sources_groupModeAuto;
 
   /// No description provided for @sources_groupModeAutoHint.

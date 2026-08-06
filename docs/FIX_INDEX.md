@@ -67,6 +67,7 @@
 | **R-Shop 群組浮層焦點** ⚠️ | 建立群組後手把失效：來源清單的搶焦點邏輯只認得動作選單，寫入時把焦點從浮層搶走 | `lib/features/settings/sources_screen.dart`（`_anyOverlayOpen`） · `lib/features/sources/group_picker_overlay.dart`（`_reclaimFocus`） |
 | **R-Shop 浮層操作形狀** | 游標捲不到／模式列會關掉／排序看不出來／按鍵位置。含 `ensureVisible` 要涵蓋最後一列、模式選了不關閉、量測後滑動的動畫 | `lib/features/sources/endpoint_picker_overlay.dart` · `lib/features/sources/group_picker_overlay.dart` |
 | **R-Shop 連線方式對齊群組** ✨ | 開浮層時游標差一列（路線從索引 2 起算卻用 `i + 1`），不動就按 `[A]` 會把來源改成 ordered；且 `[A]` 只是不鎖定的切換，下次探測就跳回去 | `lib/features/sources/endpoint_picker_overlay.dart`（`_initialIndex`／`_activate`／`_toggleSorting`） · `lib/l10n/app_*.arb`（`sources_routeRowHint`） · `test/widgets/endpoint_picker_overlay_test.dart` |
+| **R-Shop 模式收成打勾** ✨ | 只有兩種狀態的設定卻用兩列互斥表示；連線方式與群組都收成一列打勾，「照我排的順序」那一列拿掉（不勾的時候清單本身就是順序） | `lib/features/sources/endpoint_picker_overlay.dart` · `lib/features/sources/group_picker_overlay.dart` · `lib/l10n/app_*.arb`（`sources_groupModeAuto`） · `test/widgets/{endpoint_picker_overlay,group_picker_overlay}_test.dart` |
 
 ---
 

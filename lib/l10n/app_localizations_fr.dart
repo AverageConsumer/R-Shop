@@ -1800,7 +1800,7 @@ class LFr extends L {
   String get sources_groupModeTitle => 'Quel membre utiliser';
 
   @override
-  String get sources_groupModeAuto => 'Le premier qui répond';
+  String get sources_groupModeAuto => 'Automatique';
 
   @override
   String get sources_groupModeAutoHint =>

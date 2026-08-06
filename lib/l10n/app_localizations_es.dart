@@ -1798,7 +1798,7 @@ class LEs extends L {
   String get sources_groupModeTitle => 'Qué miembro se usa';
 
   @override
-  String get sources_groupModeAuto => 'Quien responda primero';
+  String get sources_groupModeAuto => 'Automático';
 
   @override
   String get sources_groupModeAutoHint =>

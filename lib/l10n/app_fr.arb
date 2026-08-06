@@ -539,7 +539,7 @@
   "sources_groupRename": "Renommer le groupe",
   "sources_groupNameLabel": "Nom du groupe",
   "sources_groupModeTitle": "Quel membre utiliser",
-  "sources_groupModeAuto": "Le premier qui répond",
+  "sources_groupModeAuto": "Automatique",
   "sources_groupModeAutoHint": "Aucun ordre à tenir : l'adresse qui répond en premier est la première utilisable",
   "sources_groupModeOrdered": "Mon ordre",
   "sources_groupModeOrderedHint": "Prend le premier de votre ordre qui répond",

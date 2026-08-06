@@ -47,8 +47,8 @@ const _source = Source(
   endpoints: [_lan, _remote],
 );
 
-/// Locked to the **first** route, which is where the off-by-one bit: the row
-/// above it is "my order", so a cursor counted from one landed on a mode.
+/// Locked to the **first** route — the case that catches a cursor which was
+/// counted from the top of the list rather than from the first route row.
 const _firstRoutePinnedSource = Source(
   id: 'src',
   name: 'My RomM',
@@ -217,9 +217,9 @@ void main() {
 
   testWidgets('opens on the locked route, not on the row above it',
       (tester) async {
-    // The cursor was counted from one while the routes start at two, so a
-    // source locked to its first route opened with "my order" highlighted —
-    // and [A] straight away turned the whole source over to that mode.
+    // A hardcoded offset here has already gone stale once, when a row was
+    // added above the routes: the cursor landed on a setting the user was not
+    // looking at, and [A] changed it.
     final overrides = await _overrides(const [_firstRoutePinnedSource]);
     await tester.pumpWidget(createTestAppWithProviders(
       EndpointPickerOverlay(
@@ -240,10 +240,11 @@ void main() {
     await _teardown(tester, overrides);
   });
 
-  testWidgets('the order row is offered next to automatic, and is tappable',
+  testWidgets('automatic is a tickbox, and the order is just the list',
       (tester) async {
-    // A route row is where the order is edited, so "follow this order" cannot
-    // share that press — it needs a row of its own.
+    // Two mutually exclusive rows meant turning automatic off was done by
+    // picking the other one. There are only two states, so it is a tickbox —
+    // and unticked, the order is the list of routes itself.
     final overrides = await _overrides([_source]);
 
     await tester.pumpWidget(createTestAppWithProviders(
@@ -257,10 +258,13 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('My order'), findsOneWidget);
+    expect(find.text('My order'), findsNothing);
+    expect(find.text('Automatic'), findsOneWidget);
+    // `_source` leaves the selection on automatic, so it is ticked.
+    expect(find.byIcon(Icons.check_box), findsOneWidget);
     expect(
       find.ancestor(
-        of: find.text('My order'),
+        of: find.text('Automatic'),
         matching: find.byType(GestureDetector),
       ),
       findsAtLeastNWidgets(1),

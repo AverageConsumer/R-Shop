@@ -68,6 +68,7 @@
 - [R-Shop 來源群組](FIX_LOGS.md)
 - [R-Shop 浮層操作形狀](FIX_LOGS.md)
 - [R-Shop 連線方式對齊群組](FIX_LOGS.md)
+- [R-Shop 模式收成打勾](FIX_LOGS.md)
 
 ### `lib/features/sources/fallback_picker_overlay.dart`
 - [R-Shop 來源備援](FIX_LOGS.md)
@@ -78,6 +79,7 @@
 - [R-Shop 群組合併卡住](FIX_LOGS.md)
 - [R-Shop 群組浮層焦點](FIX_LOGS.md)
 - [R-Shop 浮層操作形狀](FIX_LOGS.md)
+- [R-Shop 模式收成打勾](FIX_LOGS.md)
 
 ### `lib/features/sources/manual_source_add_screen.dart`
 - [R-Shop analyze 六項](FIX_LOGS.md)
@@ -88,6 +90,7 @@
 - [來源清單快捷鍵](FIX_LOGS.md)
 - [R-Shop 自動選最優路線](FIX_LOGS.md)
 - [R-Shop 連線方式對齊群組](FIX_LOGS.md)
+- [R-Shop 模式收成打勾](FIX_LOGS.md)
 
 ### `lib/l10n/app_{de,en,es,fr,ja,pt,zh}.arb`
 - [R-Shop 來源群組](FIX_LOGS.md)
@@ -216,6 +219,7 @@
 
 ### `test/widgets/{endpoint_picker_overlay,group_picker_overlay}_test.dart`
 - [R-Shop 浮層操作形狀](FIX_LOGS.md)
+- [R-Shop 模式收成打勾](FIX_LOGS.md)
 
 ### `test/{database_service_v16_migration,sources_notifier_groups,widgets/group_picker_overlay}_test.dart`
 - [R-Shop 來源群組](FIX_LOGS.md)

@@ -1786,7 +1786,7 @@ class LEn extends L {
   String get sources_groupModeTitle => 'Which member to use';
 
   @override
-  String get sources_groupModeAuto => 'Whoever answers first';
+  String get sources_groupModeAuto => 'Automatic';
 
   @override
   String get sources_groupModeAutoHint =>

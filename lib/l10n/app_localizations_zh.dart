@@ -1731,7 +1731,7 @@ class LZh extends L {
   String get sources_groupModeTitle => '要用哪一台';
 
   @override
-  String get sources_groupModeAuto => '誰先回應就用誰';
+  String get sources_groupModeAuto => '自動選擇';
 
   @override
   String get sources_groupModeAutoHint => '不用維護順序——先回應的那台就是你最快能用的那台';

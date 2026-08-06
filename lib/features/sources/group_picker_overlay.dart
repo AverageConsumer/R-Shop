@@ -179,19 +179,22 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay>
     final members = _membersOf(group);
 
     return [
+      // One tickbox, not two mutually exclusive rows: there are only two
+      // states, and turning the first off was done by picking the second —
+      // a tickbox written the long way. Unticked, the list below **is** the
+      // order, so it needs no row to describe it.
       _GroupRow(
-        icon: Icons.bolt,
+        icon: group.mode == SourceGroupMode.auto
+            ? Icons.check_box
+            : Icons.check_box_outline_blank,
         title: l.sources_groupModeAuto,
-        subtitle: l.sources_groupModeAutoHint,
+        subtitle: group.mode == SourceGroupMode.auto
+            ? l.sources_groupModeAutoHint
+            : l.sources_groupModeOrderedHint,
         active: group.mode == SourceGroupMode.auto,
-        onActivate: () => _setMode(SourceGroupMode.auto),
-      ),
-      _GroupRow(
-        icon: Icons.format_list_numbered,
-        title: l.sources_groupModeOrdered,
-        subtitle: l.sources_groupModeOrderedHint,
-        active: group.mode == SourceGroupMode.ordered,
-        onActivate: () => _setMode(SourceGroupMode.ordered),
+        onActivate: () => _setMode(group.mode == SourceGroupMode.auto
+            ? SourceGroupMode.ordered
+            : SourceGroupMode.auto),
       ),
       for (var i = 0; i < members.length; i++)
         _GroupRow(
@@ -199,7 +202,8 @@ class _GroupPickerOverlayState extends ConsumerState<GroupPickerOverlay>
           title: members[i].name,
           subtitle: i == 0 ? l.sources_groupPreferred : members[i].hostLabel,
           member: members[i].id,
-          hint: _sorting && _selectedIndex == i + 2
+          // One tickbox above the members now, so they start at index one.
+          hint: _sorting && _selectedIndex == i + 1
               ? l.sources_reorderHint
               : l.sources_groupMemberHint,
           canMoveUp: i > 0,

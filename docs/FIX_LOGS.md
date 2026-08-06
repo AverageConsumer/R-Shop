@@ -511,3 +511,13 @@ v15 的遷移**知道**要建這個臨時索引（那段還寫了註解說明為
 **那個差一列的 bug 是加「照我排的順序」那一列時漏改的**，`_initialIndex` 的註解還寫著「開在生效中的那條，所以不動就按 `[A]` 是 no-op」——註解描述的正是它做不到的事。加了 `_firstRoutePinnedSource` 這個 fixture 盯著：鎖在**第一條**路線才踩得到，鎖在第二條只是差一列、看起來像選錯，不會改到模式。
 
 **兩支浮層現在是同一套手勢**：`[A]` 移動、`[X]`／`[Y]` 是各自的第二第三動作、肩鍵是破壞性動作、▶ 走到列尾圖示、≡ 是觸控版的移動、✓ 結束。列底下那行說明改成不寫按鍵字母（`sources_groupMemberHint` 裡寫死的 `[A]` 在 PlayStation 配置下就是錯的，那條先留著沒動）。
+
+## [R-Shop 模式收成打勾] 兩列互斥的模式，其實是一個打勾寫成長的
+
+- **問題**：連線方式與群組兩個浮層都用**兩列互斥**表示只有兩種狀態的設定（自動／照我排的順序）。要關掉「自動」得去點另一列，而「照我排的順序」那一列講的東西底下的清單已經在講了。使用者指示：「移掉照我排序，把自動選擇改成選填、打勾之類，群組跟連線有這個情況都改一下」。
+- **修復**：兩個浮層各收成**一列打勾**。勾了＝自動（最快的／先回應的那台），沒勾＝照清單順序。副標依勾選狀態換成原本兩列各自的說明，`Icons.check_box` / `check_box_outline_blank` 當列首圖示，「使用中」徽章拿掉——打勾本身就是徽章。模型層的 `EndpointSelection.ordered` 與 `SourceGroupMode.ordered` **原封不動**，改的只有 UI。
+- **檔案**：`lib/features/sources/endpoint_picker_overlay.dart`（`_rowCount`／`_firstRouteIndex` 改 1／刪 `_orderedIndex`／`_activate` 的第 0 列改成切換） · `lib/features/sources/group_picker_overlay.dart`（模式兩列合一、成員索引 `i + 2` → `i + 1`） · `lib/l10n/app_*.arb`（`sources_groupModeAuto` 改成「自動選擇」） · `test/widgets/{endpoint_picker_overlay,group_picker_overlay}_test.dart`
+
+**索引偏移這次改成不寫死**。上一輪才因為 `i + 1` 對不上 `_firstRouteIndex` 而出事，這輪列數又變了一次——同一個地方兩天內漏改兩次，所以 `_initialIndex` 改成一律走 `_firstRouteIndex`，測試也留著 `_firstRoutePinnedSource` 這個 fixture 盯著「開在鎖定的那條，不是開在打勾那列」。**下次再加一列，這裡不用跟著改。**
+
+**沒用到的字串留著沒刪**：`sources_routeOrdered`、`sources_groupModeOrdered`、`sources_routeUse` 三個現在沒有呼叫點，七個語系都還在。刪掉要動 21 個地方而且對行為沒有影響，等哪次順手再說。

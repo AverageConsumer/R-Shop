@@ -578,7 +578,7 @@
   "sources_groupRename": "グループ名を変更",
   "sources_groupNameLabel": "グループ名",
   "sources_groupModeTitle": "どれを使うか",
-  "sources_groupModeAuto": "先に応答したもの",
+  "sources_groupModeAuto": "自動選択",
   "sources_groupModeAutoHint": "順序を管理する必要はありません。先に応答したアドレスが最も早く使えます",
   "sources_groupModeOrdered": "自分の順序",
   "sources_groupModeOrderedHint": "順序どおりに、最初に応答したものを使用",

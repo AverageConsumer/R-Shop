@@ -618,7 +618,7 @@
   "sources_groupRename": "重新命名群組",
   "sources_groupNameLabel": "群組名稱",
   "sources_groupModeTitle": "要用哪一台",
-  "sources_groupModeAuto": "誰先回應就用誰",
+  "sources_groupModeAuto": "自動選擇",
   "sources_groupModeAutoHint": "不用維護順序——先回應的那台就是你最快能用的那台",
   "sources_groupModeOrdered": "照我排的順序",
   "sources_groupModeOrderedHint": "照你排的順序，用第一個通的",

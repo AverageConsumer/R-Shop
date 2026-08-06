@@ -110,8 +110,12 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('Whoever answers first'), findsOneWidget);
-    expect(find.text('My order'), findsOneWidget);
+    // One tickbox, not a pair of rows: a group starts on `ordered`, so it is
+    // unticked and the members below are the order.
+    expect(find.text('Automatic'), findsOneWidget);
+    expect(find.byIcon(Icons.check_box_outline_blank), findsOneWidget);
+    expect(find.byIcon(Icons.check_box), findsNothing);
+    expect(find.text('My order'), findsNothing);
     expect(find.text('LAN RomM'), findsOneWidget);
     expect(find.text('WAN RomM'), findsOneWidget);
     // The group's own label and size, so it is clear what is being edited.
@@ -142,8 +146,7 @@ void main() {
     await tester.pump();
 
     for (final label in const [
-      'Whoever answers first',
-      'My order',
+      'Automatic',
       'LAN RomM',
       'WAN RomM',
       'Dissolve the group',

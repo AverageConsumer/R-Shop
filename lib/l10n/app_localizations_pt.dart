@@ -1797,7 +1797,7 @@ class LPt extends L {
   String get sources_groupModeTitle => 'Qual membro usar';
 
   @override
-  String get sources_groupModeAuto => 'Quem responder primeiro';
+  String get sources_groupModeAuto => 'Automático';
 
   @override
   String get sources_groupModeAutoHint =>

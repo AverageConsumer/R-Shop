@@ -620,7 +620,7 @@
   "sources_groupRename": "Rename group",
   "sources_groupNameLabel": "Group name",
   "sources_groupModeTitle": "Which member to use",
-  "sources_groupModeAuto": "Whoever answers first",
+  "sources_groupModeAuto": "Automatic",
   "sources_groupModeAutoHint": "No order to keep — the address that replies first is the one you can use first",
   "sources_groupModeOrdered": "My order",
   "sources_groupModeOrderedHint": "Takes the first one in your order that answers",

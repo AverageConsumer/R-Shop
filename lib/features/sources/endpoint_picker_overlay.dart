@@ -81,14 +81,13 @@ class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
   /// Start on whatever is in effect, so the first press lands on the thing the
   /// user is already using rather than on a neighbour.
   ///
-  /// The route rows are offset by [_firstRouteIndex], **not by one**: the "my
-  /// order" row sits between them and automatic. Counting from one put the
-  /// cursor a row too high, so opening the overlay on a locked route and
-  /// pressing [A] straight away switched the whole source to `ordered`.
+  /// The route rows are offset by [_firstRouteIndex] rather than counted from
+  /// the top of the list — a hardcoded offset here went stale the moment a row
+  /// was added above the routes, and the symptom was [A] operating a row the
+  /// user was not looking at.
   int _initialIndex() {
     final src = widget.source;
-    if (src.endpointSelection == EndpointSelection.auto) return 0;
-    if (src.endpointSelection == EndpointSelection.ordered) return _orderedIndex;
+    if (src.endpointSelection != EndpointSelection.pinned) return 0;
     final liveId = src.liveEndpoint?.id;
     final i = src.endpoints.indexWhere((e) => e.id == liveId);
     return i < 0 ? 0 : i + _firstRouteIndex;
@@ -185,17 +184,16 @@ class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
     });
   }
 
-  /// Row 0 is "Automatic", row 1 is "my order"; rows 2..n+1 are the routes;
-  /// then "add"; then cancel.
+  /// Row 0 is the "automatic" tickbox; rows 1..n are the routes; then "add";
+  /// then cancel.
   ///
-  /// `ordered` needs a row of its own because a route row is where the order is
-  /// *edited* — putting "follow this order" on the same press as "move this
-  /// route" would mean the user could not rearrange the list without also
-  /// changing what the list is for.
-  int get _rowCount => widget.source.endpoints.length + 4;
-  int get _orderedIndex => 1;
-  int get _firstRouteIndex => 2;
-  int get _addIndex => widget.source.endpoints.length + 2;
+  /// There is no row for "my order" because there is nothing for it to say:
+  /// untick automatic and the list below **is** the order. Two mutually
+  /// exclusive rows meant turning one off was done by picking the other, which
+  /// is a tickbox written the long way.
+  int get _rowCount => widget.source.endpoints.length + 3;
+  int get _firstRouteIndex => 1;
+  int get _addIndex => widget.source.endpoints.length + 1;
   int get _cancelIndex => _rowCount - 1;
 
   /// Which control on the selected row has the cursor: 0 is the row itself,
@@ -481,21 +479,20 @@ class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
       return;
     }
 
-    // The two mode rows **stay open**. They are a setting, not a destination:
-    // closing on the press hides the very thing the press was for — which
-    // route went live, and which badge moved onto it. Picking a route is the
-    // opposite: it is an override, the question is answered, so it closes.
+    // The tickbox **stays open**. It is a setting, not a destination: closing
+    // on the press hides the very thing the press was for — which route went
+    // live under the new setting, and which badge moved onto it.
     if (_sel == 0) {
-      // Hand the choice back *and* act on it in one press: dropping the pin
-      // alone would leave the source sitting on the route the user just
-      // stopped asking for, which reads as the button having done nothing.
-      // The probe behind this hits the cache filled when the overlay opened.
-      await notifier.clearEndpointOverride(id, probe: _probeService);
-      if (mounted) setState(() {});
-      return;
-    }
-    if (_sel == _orderedIndex) {
-      await notifier.useOrderedSelection(id, probe: _probeService);
+      if (widget.source.endpointSelection == EndpointSelection.auto) {
+        // Unticking means "use my order", which is the list as it stands.
+        await notifier.useOrderedSelection(id, probe: _probeService);
+      } else {
+        // Hand the choice back *and* act on it in one press: dropping the lock
+        // alone would leave the source sitting on the route the user just
+        // stopped asking for, which reads as the button having done nothing.
+        // The probe behind this hits the cache filled when the overlay opened.
+        await notifier.clearEndpointOverride(id, probe: _probeService);
+      }
       if (mounted) setState(() {});
       return;
     }
@@ -714,33 +711,22 @@ class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
         ],
       ),
       const SizedBox(height: 14),
+      // Ticked, the machine picks the fastest; unticked, the list below is the
+      // order and the top live route wins. No "in use" badge: the tick is the
+      // badge, and a row carrying both said the same thing twice.
       _RouteRow(
         key: _keyFor(0),
-        icon: Icons.auto_mode,
+        icon: isAuto ? Icons.check_box : Icons.check_box_outline_blank,
         title: l.sources_routeAuto,
-        subtitle: l.sources_routeAutoHint,
+        subtitle: isAuto ? l.sources_routeAutoHint : l.sources_routeOrderedHint,
         notes: [
-          _autoOutcome(l),
-          if (!isAuto) l.sources_routeReleasePin,
+          if (isAuto) _autoOutcome(l),
+          if (src.endpointSelection == EndpointSelection.pinned)
+            l.sources_routeReleasePin,
         ],
-        badges: [if (isAuto) l.sources_routeInUse],
         selected: _sel == 0,
         onTap: () => _tapRow(0),
         active: isAuto,
-      ),
-      const SizedBox(height: 8),
-      _RouteRow(
-        key: _keyFor(_orderedIndex),
-        icon: Icons.format_list_numbered,
-        title: l.sources_routeOrdered,
-        subtitle: l.sources_routeOrderedHint,
-        badges: [
-          if (src.endpointSelection == EndpointSelection.ordered)
-            l.sources_routeInUse
-        ],
-        selected: _sel == _orderedIndex,
-        onTap: () => _tapRow(_orderedIndex),
-        active: src.endpointSelection == EndpointSelection.ordered,
       ),
       for (int i = 0; i < src.endpoints.length; i++) ...[
         const SizedBox(height: 8),

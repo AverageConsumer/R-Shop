@@ -1797,7 +1797,7 @@ class LDe extends L {
   String get sources_groupModeTitle => 'Welches Mitglied genutzt wird';
 
   @override
-  String get sources_groupModeAuto => 'Wer zuerst antwortet';
+  String get sources_groupModeAuto => 'Automatisch';
 
   @override
   String get sources_groupModeAutoHint =>

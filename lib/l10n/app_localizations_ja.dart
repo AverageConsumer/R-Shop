@@ -1737,7 +1737,7 @@ class LJa extends L {
   String get sources_groupModeTitle => 'どれを使うか';
 
   @override
-  String get sources_groupModeAuto => '先に応答したもの';
+  String get sources_groupModeAuto => '自動選択';
 
   @override
   String get sources_groupModeAutoHint => '順序を管理する必要はありません。先に応答したアドレスが最も早く使えます';

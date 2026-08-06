@@ -578,7 +578,7 @@
   "sources_groupRename": "Gruppe umbenennen",
   "sources_groupNameLabel": "Gruppenname",
   "sources_groupModeTitle": "Welches Mitglied genutzt wird",
-  "sources_groupModeAuto": "Wer zuerst antwortet",
+  "sources_groupModeAuto": "Automatisch",
   "sources_groupModeAutoHint": "Keine Reihenfolge zu pflegen – die Adresse, die zuerst antwortet, ist die zuerst nutzbare",
   "sources_groupModeOrdered": "Meine Reihenfolge",
   "sources_groupModeOrderedHint": "Nimmt die erste in deiner Reihenfolge, die antwortet",
