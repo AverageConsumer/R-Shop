@@ -21,9 +21,13 @@ import 'endpoint_edit_screen.dart';
 /// row, so leaving the choice to it is an informed decision rather than a
 /// leap.
 ///
-/// Picking a route pins it — an explicit choice must not be moved by the next
-/// probe. The automatic row hands the choice back ([clearEndpointOverride]),
-/// which drops the pin *and* immediately moves to the fastest live route.
+/// Which route goes live is decided by the two rows at the top — automatic, or
+/// the order the user put the routes in — and by the lock on [X], which is the
+/// one setting a probe may not move. The route rows themselves are edited, not
+/// chosen: [A] on one starts moving it, the same gesture the group editor uses
+/// on its members. The automatic row hands the choice back
+/// ([clearEndpointOverride]), which drops the lock *and* immediately moves to
+/// the fastest live route.
 /// **Switching never touches cached games** — see [SourcesNotifier].
 ///
 /// Reachability is probed fresh every time this opens rather than read from
@@ -74,13 +78,20 @@ class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
     _probe();
   }
 
-  /// Start on whatever is in effect, so [A] with no navigation is a no-op
-  /// rather than a surprise switch.
+  /// Start on whatever is in effect, so the first press lands on the thing the
+  /// user is already using rather than on a neighbour.
+  ///
+  /// The route rows are offset by [_firstRouteIndex], **not by one**: the "my
+  /// order" row sits between them and automatic. Counting from one put the
+  /// cursor a row too high, so opening the overlay on a locked route and
+  /// pressing [A] straight away switched the whole source to `ordered`.
   int _initialIndex() {
-    if (widget.source.endpointSelection == EndpointSelection.auto) return 0;
-    final liveId = widget.source.liveEndpoint?.id;
-    final i = widget.source.endpoints.indexWhere((e) => e.id == liveId);
-    return i < 0 ? 0 : i + 1;
+    final src = widget.source;
+    if (src.endpointSelection == EndpointSelection.auto) return 0;
+    if (src.endpointSelection == EndpointSelection.ordered) return _orderedIndex;
+    final liveId = src.liveEndpoint?.id;
+    final i = src.endpoints.indexWhere((e) => e.id == liveId);
+    return i < 0 ? 0 : i + _firstRouteIndex;
   }
 
   Future<void> _probe() async {
@@ -131,10 +142,7 @@ class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
       _RowActionSpec(
         icon: Icons.drag_handle,
         label: l.sources_moveUp,
-        run: () => setState(() {
-          _sorting = true;
-          _actionIndex = 0;
-        }),
+        run: _toggleSorting,
       ),
       _RowActionSpec(
         icon: Icons.edit_outlined,
@@ -180,8 +188,10 @@ class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
   /// Row 0 is "Automatic", row 1 is "my order"; rows 2..n+1 are the routes;
   /// then "add"; then cancel.
   ///
-  /// `ordered` needs a row of its own because tapping a route means "pin this
-  /// one" — an override — and following the list is the opposite of that.
+  /// `ordered` needs a row of its own because a route row is where the order is
+  /// *edited* — putting "follow this order" on the same press as "move this
+  /// route" would mean the user could not rearrange the list without also
+  /// changing what the list is for.
   int get _rowCount => widget.source.endpoints.length + 4;
   int get _orderedIndex => 1;
   int get _firstRouteIndex => 2;
@@ -212,8 +222,8 @@ class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
     return box?.localToGlobal(Offset.zero).dy;
   }
 
-  /// True while ↑↓ moves the selected route instead of the cursor. [A] enters
-  /// and leaves it — reordering is repetitive, so it gets the whole d-pad.
+  /// True while ↑↓ moves the selected route instead of the cursor.
+  /// See [_toggleSorting] for who turns it on.
   bool _sorting = false;
 
   /// One key per row so the cursor can be scrolled into view: with four
@@ -302,10 +312,8 @@ class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
       _close();
       return KeyEventResult.handled;
     }
-    // [X] removes and [Y] edits the highlighted route. Kept off [A] so that
-    // switching — the thing you do constantly — stays a single press. Both go
-    // through the same methods the per-row icons call, so the two inputs can
-    // never drift apart.
+    // [X] locks and [Y] edits the highlighted route. Both go through the same
+    // methods the per-row icons call, so the two inputs can never drift apart.
     // ▶ ◀ walk the cursor along the icons at the end of the row. Same gesture
     // as the group editor, so one habit covers both.
     final actions = _currentActions;
@@ -491,13 +499,27 @@ class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
       if (mounted) setState(() {});
       return;
     }
-    // [A] is "use this one" — a switch, not a promise. Locking is a separate
-    // press because it means something stronger: never move off this route,
-    // not even when it stops answering.
-    final ep = widget.source.endpoints[_sel - _firstRouteIndex];
-    await notifier.switchEndpoint(id, ep.id, pin: false);
-    if (!mounted) return;
-    widget.onClose();
+    // [A] on a route starts moving it, exactly as it does on a group member:
+    // one habit edits both lists. It is deliberately **not** "use this one".
+    // Switching without a lock never stuck — the next probe was free to move
+    // off it again, and the user read that as the press having been undone.
+    // The three things a route can be put through are: the order (here),
+    // the lock ([X]), and edit/remove on the icons at its end.
+    _toggleSorting();
+  }
+
+  /// Enters the mode where ↑↓ move the highlighted route, and leaves it again.
+  ///
+  /// Reordering is repetitive, so it gets the whole d-pad rather than a press
+  /// per step. Shared by [A] and by the ≡ handle, so the pad and a finger can
+  /// never end up in different states.
+  void _toggleSorting() {
+    setState(() {
+      _sorting = !_sorting;
+      // The icons swap to arrows, so the cursor must not stay in whichever
+      // slot it happened to be in.
+      _actionIndex = 0;
+    });
   }
 
   /// What one route's probe said: a latency, an explicit "no answer", or
@@ -620,7 +642,7 @@ class _EndpointPickerOverlayState extends ConsumerState<EndpointPickerOverlay>
                         child: ConsoleHud(
                           embedded: true,
                           a: HudAction(
-                            onRoute ? l.sources_routeUse : l.common_select,
+                            _sorting ? l.common_done : l.common_select,
                             onTap: _activate,
                           ),
                           b: HudAction(l.common_back, onTap: _close),

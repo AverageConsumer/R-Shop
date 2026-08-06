@@ -644,7 +644,7 @@
   "sources_routeOrderedHint": "Use the first route in your order that answers",
   "sources_reorderHint": "Move it with up and down, then press again to finish",
   "sources_groupMemberHint": "Press ▶ to send it out of the group; [A] reorders",
-  "sources_routeRowHint": "Press ▶ for the icons: reorder, edit or remove",
+  "sources_routeRowHint": "Select the row to reorder it; press ▶ for the icons: edit or remove",
   "sources_routeUse": "Use this route",
   "sources_routeLock": "Lock to this route",
   "sources_routeUnlock": "Unlock",

@@ -3464,7 +3464,7 @@ abstract class L {
   /// No description provided for @sources_routeRowHint.
   ///
   /// In en, this message translates to:
-  /// **'Press ▶ for the icons: reorder, edit or remove'**
+  /// **'Select the row to reorder it; press ▶ for the icons: edit or remove'**
   String get sources_routeRowHint;
 
   /// No description provided for @sources_routeUse.

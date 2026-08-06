@@ -1870,7 +1870,7 @@ class LPt extends L {
 
   @override
   String get sources_routeRowHint =>
-      'Carrega ▶ para os ícones: reordenar, editar ou remover';
+      'Seleciona a linha para reordenar; ▶ para os ícones: editar ou remover';
 
   @override
   String get sources_routeUse => 'Usar esta rota';

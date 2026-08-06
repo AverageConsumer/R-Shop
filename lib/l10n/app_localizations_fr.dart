@@ -1873,7 +1873,7 @@ class LFr extends L {
 
   @override
   String get sources_routeRowHint =>
-      '▶ pour les icônes : réordonner, modifier ou supprimer';
+      'Sélectionnez la ligne pour la déplacer ; ▶ pour les icônes : modifier ou supprimer';
 
   @override
   String get sources_routeUse => 'Utiliser cette route';

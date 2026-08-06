@@ -559,7 +559,7 @@
   "sources_routeOrderedHint": "Usar la primera ruta de tu orden que responda",
   "sources_reorderHint": "Muévelo con arriba y abajo, y pulsa otra vez para terminar",
   "sources_groupMemberHint": "▶ la saca del grupo; [A] reordena",
-  "sources_routeRowHint": "Pulsa ▶ para los iconos: reordenar, editar o quitar",
+  "sources_routeRowHint": "Selecciona la fila para reordenarla; pulsa ▶ para los iconos: editar o quitar",
   "sources_routeUse": "Usar esta ruta",
   "sources_routeLock": "Bloquear en esta ruta",
   "sources_routeUnlock": "Desbloquear",

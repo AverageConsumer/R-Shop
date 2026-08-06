@@ -1805,7 +1805,7 @@ class LJa extends L {
   String get sources_groupMemberHint => '▶ でグループから除外、[A] で並べ替え';
 
   @override
-  String get sources_routeRowHint => '▶ で右のアイコンへ：並べ替え・編集・削除';
+  String get sources_routeRowHint => 'この行を選ぶと並べ替え。▶ で右のアイコン：編集・削除';
 
   @override
   String get sources_routeUse => 'この経路を使用';

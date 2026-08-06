@@ -1860,7 +1860,7 @@ class LEn extends L {
 
   @override
   String get sources_routeRowHint =>
-      'Press ▶ for the icons: reorder, edit or remove';
+      'Select the row to reorder it; press ▶ for the icons: edit or remove';
 
   @override
   String get sources_routeUse => 'Use this route';

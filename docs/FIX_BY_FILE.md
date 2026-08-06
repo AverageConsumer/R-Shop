@@ -67,6 +67,7 @@
 - [R-Shop 自動選最優路線](FIX_LOGS.md)
 - [R-Shop 來源群組](FIX_LOGS.md)
 - [R-Shop 浮層操作形狀](FIX_LOGS.md)
+- [R-Shop 連線方式對齊群組](FIX_LOGS.md)
 
 ### `lib/features/sources/fallback_picker_overlay.dart`
 - [R-Shop 來源備援](FIX_LOGS.md)
@@ -86,6 +87,7 @@
 - [同步不知道是哪一台](FIX_LOGS.md)
 - [來源清單快捷鍵](FIX_LOGS.md)
 - [R-Shop 自動選最優路線](FIX_LOGS.md)
+- [R-Shop 連線方式對齊群組](FIX_LOGS.md)
 
 ### `lib/l10n/app_{de,en,es,fr,ja,pt,zh}.arb`
 - [R-Shop 來源群組](FIX_LOGS.md)
@@ -207,6 +209,7 @@
 
 ### `test/widgets/endpoint_picker_overlay_test.dart`
 - [R-Shop 自動選最優路線](FIX_LOGS.md)
+- [R-Shop 連線方式對齊群組](FIX_LOGS.md)
 
 ### `test/widgets/sources_screen_test.dart`
 - [來源清單快捷鍵](FIX_LOGS.md)

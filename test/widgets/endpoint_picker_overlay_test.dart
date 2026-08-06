@@ -47,6 +47,18 @@ const _source = Source(
   endpoints: [_lan, _remote],
 );
 
+/// Locked to the **first** route, which is where the off-by-one bit: the row
+/// above it is "my order", so a cursor counted from one landed on a mode.
+const _firstRoutePinnedSource = Source(
+  id: 'src',
+  name: 'My RomM',
+  type: SourceType.romm,
+  url: 'http://192.168.1.50:8090',
+  endpoints: [_lan, _remote],
+  endpointSelection: EndpointSelection.pinned,
+  pinnedEndpointId: 'lan',
+);
+
 const _pinnedSource = Source(
   id: 'src',
   name: 'My RomM',
@@ -149,7 +161,7 @@ void main() {
     await _teardown(tester, overrides);
   });
 
-  testWidgets('tapping a row runs the same path the [A] button does',
+  testWidgets('tapping a route starts moving it, as [A] does on a group member',
       (tester) async {
     final overrides = await _overrides(const [_source]);
     var closed = 0;
@@ -166,9 +178,13 @@ void main() {
 
     await _tapForReal(tester, find.text('Remote'));
 
-    // The switch completed and the overlay closed itself — the row is not a
-    // decoration that only the gamepad can operate.
-    expect(closed, 1);
+    // The row is not a decoration only the gamepad can operate: a finger puts
+    // it into the same move mode, which is why the arrows are now on it. And
+    // the overlay stays open — the press did not answer a question, it started
+    // an edit.
+    expect(find.byIcon(Icons.keyboard_arrow_up), findsOneWidget);
+    expect(find.byIcon(Icons.check), findsOneWidget);
+    expect(closed, 0);
     expect(tester.takeException(), isNull);
 
     await _teardown(tester, overrides);
@@ -177,7 +193,6 @@ void main() {
   testWidgets('tapping automatic applies it and stays open', (tester) async {
     // A mode is a setting, not a destination: closing on the press would hide
     // the thing the press was for — which route went live under the new mode.
-    // Picking a route is the opposite, and that one still closes (above).
     final overrides = await _overrides(const [_pinnedSource]);
     var closed = 0;
     await tester.pumpWidget(createTestAppWithProviders(
@@ -200,11 +215,35 @@ void main() {
     await _teardown(tester, overrides);
   });
 
+  testWidgets('opens on the locked route, not on the row above it',
+      (tester) async {
+    // The cursor was counted from one while the routes start at two, so a
+    // source locked to its first route opened with "my order" highlighted —
+    // and [A] straight away turned the whole source over to that mode.
+    final overrides = await _overrides(const [_firstRoutePinnedSource]);
+    await tester.pumpWidget(createTestAppWithProviders(
+      EndpointPickerOverlay(
+        source: _firstRoutePinnedSource,
+        onClose: () {},
+        probeService: _probe(),
+      ),
+      size: const Size(640, 480),
+      overrides: overrides,
+    ));
+    await tester.pumpAndSettle();
+
+    // Only a route row offers the lock, and only the locked one offers to
+    // release it — so this names the row the cursor is on.
+    expect(find.text('Unlock'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await _teardown(tester, overrides);
+  });
+
   testWidgets('the order row is offered next to automatic, and is tappable',
       (tester) async {
-    // Tapping a route means "pin this one" — an override. Following the list
-    // is the opposite of that, so it needs a row of its own rather than being
-    // hidden behind the same gesture.
+    // A route row is where the order is edited, so "follow this order" cannot
+    // share that press — it needs a row of its own.
     final overrides = await _overrides([_source]);
 
     await tester.pumpWidget(createTestAppWithProviders(

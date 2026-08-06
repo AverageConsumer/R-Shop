@@ -1871,7 +1871,7 @@ class LEs extends L {
 
   @override
   String get sources_routeRowHint =>
-      'Pulsa ▶ para los iconos: reordenar, editar o quitar';
+      'Selecciona la fila para reordenarla; pulsa ▶ para los iconos: editar o quitar';
 
   @override
   String get sources_routeUse => 'Usar esta ruta';

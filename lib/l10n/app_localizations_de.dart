@@ -1871,7 +1871,7 @@ class LDe extends L {
 
   @override
   String get sources_routeRowHint =>
-      '▶ für die Symbole rechts: umsortieren, bearbeiten oder entfernen';
+      'Zeile auswählen zum Umsortieren; ▶ für die Symbole: bearbeiten oder entfernen';
 
   @override
   String get sources_routeUse => 'Diesen Weg nutzen';

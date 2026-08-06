@@ -1799,7 +1799,7 @@ class LZh extends L {
   String get sources_groupMemberHint => '按 ▶ 可以讓它退出群組；按 [A] 調整順序';
 
   @override
-  String get sources_routeRowHint => '按 ▶ 移到右邊的圖示：調整順序、修改或移除';
+  String get sources_routeRowHint => '選這一列排順序；按 ▶ 移到右邊的圖示：修改或移除';
 
   @override
   String get sources_routeUse => '使用這條路線';
