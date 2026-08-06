@@ -78,174 +78,6 @@ class SystemSourceMapping {
   }
 }
 
-/// How R-Shop decides which [SourceEndpoint] of a source to talk to.
-enum EndpointSelection {
-  /// Nobody overrode anything: **whichever route answers first wins**, and the
-  /// decision is remade whenever the network changes. Falls back to the first
-  /// endpoint when nothing answers, so a sync still produces a real error
-  /// instead of silently doing nothing.
-  ///
-  /// First-to-answer, not fastest-of-all: waiting for every route so they can
-  /// be ranked spends the slowest route's timeout on every switch, and by then
-  /// the answer is stale anyway. The route that got back to us first is the one
-  /// that is *usable* first, which is what "auto" was always meant to mean.
-  ///
-  /// This is not a preference the user has to maintain. Being at home or away
-  /// is not a setting, and asking them to flip one every time they walk out of
-  /// the door is asking them to do the probe's job by hand.
-  auto,
-
-  /// Follow the user's **own order**: take the first route in
-  /// [Source.endpoints] that answers, however slow it is, and only move down
-  /// the list when a route above it is down.
-  ///
-  /// This is the "I have a preference, but I still want failover" mode. A
-  /// metered mobile route can be last and never get picked while the LAN is up,
-  /// even on a day when the mobile route happens to answer quicker. The order
-  /// *is* the setting — see [Source.withEndpointsReordered].
-  ordered,
-
-  /// The user overrode selection entirely: always use
-  /// [Source.pinnedEndpointId]. They asked for this exact route, so we do not
-  /// silently switch away from it even if it is down, and not even if another
-  /// route is faster — a failed sync is more honest than a route that moves
-  /// behind their back. This is the one mode with **no** failover.
-  pinned,
-}
-
-/// One way to reach a [Source].
-///
-/// The same RomM server is typically reachable both over the LAN
-/// (`http://192.168.1.50:8090`, fast, only at home) and over the internet
-/// (`https://roms.example.org`, slower, works anywhere). Those are not two
-/// sources — same server, same library — they are two routes to one source.
-/// The credentials are *not* necessarily shared: a route may carry its own
-/// [auth] because the two front doors can want different logins.
-///
-/// **Exactly one endpoint is live at a time.** The live endpoint's connection
-/// fields are mirrored onto the parent [Source] (`url` / `host` / `port` /
-/// `share`), and its credentials surface through [Source.auth], which is what
-/// every downstream consumer — [SourceResolver], [Source.connectionKey], the
-/// providers — actually reads. Switching routes is therefore a config-only
-/// change: no re-sync is required and no cached game is touched.
-class SourceEndpoint {
-  /// Stable identifier, unique within the parent source.
-  final String id;
-
-  /// User-facing label, e.g. "區網" or "遠端". Never empty in practice; the
-  /// editor falls back to the host when the user leaves it blank.
-  final String label;
-
-  // --- Connection (same shape as the parent Source) ---
-  final String? url; // romm/web
-  final String? host; // smb/ftp
-  final int? port; // smb/ftp
-  final String? share; // smb
-
-  /// Credentials for *this route only*, or null to use the source's own
-  /// [Source.auth].
-  ///
-  /// One server can insist on a different login per way in — the LAN address
-  /// answers straight from the box while the DDNS name comes through a
-  /// reverse proxy with its own gate. Same server, same library, two front
-  /// doors, two sets of credentials.
-  ///
-  /// Null is the normal case and the reason no config migration is needed: a
-  /// route written before per-route credentials existed simply keeps using the
-  /// source's login.
-  final AuthConfig? auth;
-
-  const SourceEndpoint({
-    required this.id,
-    required this.label,
-    this.url,
-    this.host,
-    this.port,
-    this.share,
-    this.auth,
-  });
-
-  factory SourceEndpoint.fromJson(Map<String, dynamic> json) {
-    return SourceEndpoint(
-      id: json['id'] as String,
-      label: json['label'] as String? ?? '',
-      url: json['url'] as String?,
-      host: json['host'] as String?,
-      port: json['port'] as int?,
-      share: json['share'] as String?,
-      auth: json['auth'] != null
-          ? AuthConfig.fromJson(json['auth'] as Map<String, dynamic>)
-          : null,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'label': label,
-      if (url != null) 'url': url,
-      if (host != null) 'host': host,
-      if (port != null) 'port': port,
-      if (share != null) 'share': share,
-      if (auth != null) 'auth': auth!.toJson(),
-    };
-  }
-
-  /// True when this route logs in with its own credentials rather than the
-  /// source's.
-  bool get hasOwnAuth => auth != null;
-
-  /// [copyWith] cannot express "remove this route's credentials" — a null
-  /// argument means "leave it alone" — so removing them has its own flag.
-  SourceEndpoint copyWith({
-    String? id,
-    String? label,
-    String? url,
-    String? host,
-    int? port,
-    String? share,
-    AuthConfig? auth,
-    bool clearAuth = false,
-  }) {
-    return SourceEndpoint(
-      id: id ?? this.id,
-      label: label ?? this.label,
-      url: url ?? this.url,
-      host: host ?? this.host,
-      port: port ?? this.port,
-      share: share ?? this.share,
-      auth: clearAuth ? null : (auth ?? this.auth),
-    );
-  }
-
-  /// True when [other] points at the same place as this endpoint, ignoring
-  /// the label and the credentials. Used to avoid creating a duplicate route
-  /// for an address the source already knows.
-  ///
-  /// Credentials are deliberately not part of this: a route *is* its address.
-  /// Two entries for one address would make [Source.liveEndpoint] — and
-  /// therefore which token gets sent — depend on list order.
-  bool sameAddressAs(SourceEndpoint other) =>
-      Source._normalizeUrl(url) == Source._normalizeUrl(other.url) &&
-      host?.toLowerCase() == other.host?.toLowerCase() &&
-      port == other.port &&
-      share?.toLowerCase() == other.share?.toLowerCase();
-
-  /// Short address label for the switcher, e.g. "192.168.1.50:8090".
-  /// Falls back to [label] when there is no address to show.
-  String get addressLabel {
-    if (url != null && url!.isNotEmpty) {
-      final uri = Uri.tryParse(url!);
-      if (uri == null || uri.host.isEmpty) return url!;
-      return uri.hasPort ? '${uri.host}:${uri.port}' : uri.host;
-    }
-    if (host != null && host!.isNotEmpty) {
-      return port != null ? '$host:$port' : host!;
-    }
-    return label;
-  }
-}
-
 /// A top-level content source — a server (RomM/SMB/FTP/Web) or the local
 /// filesystem.
 ///
@@ -265,71 +97,16 @@ class Source {
 
   final SourceType type;
 
-  // --- Connection (the live route) ---
-  //
-  // These fields are the single source of truth for "where do we connect
-  // right now". When [endpoints] is non-empty they mirror whichever endpoint
-  // is currently live — see [withLiveEndpoint]. Everything downstream
-  // (SourceResolver, connectionKey, hostLabel, the providers) reads only
-  // these, which is why switching routes needs no changes outside this file.
+  // --- Connection ---
   final String? url; // romm/web
   final String? host; // smb/ftp
   final int? port; // smb/ftp
   final String? share; // smb
   final String? path; // local
 
-  /// Credentials of the **live route** — the single thing every downstream
-  /// consumer reads, exactly like [url]/[host]/[port]/[share].
-  ///
-  /// Derived rather than stored so it can never fall out of step with the
-  /// address: it is the live route's own [SourceEndpoint.auth] when that route
-  /// has one, and the source-level [defaultAuth] otherwise. Storing a copy
-  /// would also destroy the default the moment a route with its own login went
-  /// live, and switching back would then send that route's token.
-  AuthConfig? get auth => liveEndpoint?.auth ?? _defaultAuth;
-
-  /// The source's own login — used by every route that does not carry one.
-  ///
-  /// This is what `auth` means in the config file, so a config written before
-  /// per-route credentials existed keeps working untouched.
-  AuthConfig? get defaultAuth => _defaultAuth;
-
-  final AuthConfig? _defaultAuth;
-
-  // --- Routes ---
-
-  /// Alternative ways to reach this same source, e.g. LAN vs internet.
-  ///
-  /// **Same server, but not necessarily the same front door.** The LAN address
-  /// may answer straight from the box while the DDNS name arrives through a
-  /// reverse proxy that wants its own login, so a route may carry its own
-  /// [SourceEndpoint.auth]; routes that do not fall back to [defaultAuth].
-  /// Whichever applies is mirrored onto [auth] for the live route.
-  ///
-  /// Routes are still *one* source: one library, one cache, one id. Two
-  /// genuinely different servers are two [Source]s, optionally paired through
-  /// [fallbackSourceId] — that path switches the whole source, cached games
-  /// and all.
-  ///
-  /// Empty for sources created before routes existed and for sources that
-  /// only ever had one address; in that case the connection fields above
-  /// stand alone. [Source.fromJson] backfills a single endpoint from the
-  /// legacy fields so the rest of the app can assume a list.
-  final List<SourceEndpoint> endpoints;
-
-  /// Whether to take the first route that answers (`auto`), walk this source's
-  /// own [endpoints] order and take the first one that answers (`ordered`), or
-  /// stick to [pinnedEndpointId] come what may (`pinned`).
-  ///
-  /// `auto` is the unattended default and the value a config written before
-  /// this field existed reads back as; an unrecognised value degrades to it
-  /// too, so a config touched by a newer build never strands an older one.
-  final EndpointSelection endpointSelection;
-
-  /// The route the user overrode auto-selection with. Only meaningful when
-  /// [endpointSelection] is [EndpointSelection.pinned]; a pin that no longer
-  /// names an existing endpoint is not an override and gets cleared.
-  final String? pinnedEndpointId;
+  /// Credentials for this source.
+  AuthConfig? get auth => _auth;
+  final AuthConfig? _auth;
 
   // --- Behaviour ---
 
@@ -347,31 +124,29 @@ class Source {
   /// or losing its credentials.
   final bool enabled;
 
-  /// Another source to fall back on when this one does not answer — the
-  /// typical pair being an internal-network server and its external address.
-  ///
-  /// Falling back is a temporary substitution, not a change of preference:
-  /// whichever source the user selected stays selected, so once this one is
-  /// reachable again it is used without anyone having to switch back.
-  final String? fallbackSourceId;
+  // --- Multi-entry Fallback Chain ---
+
+  /// Other sources to fall back on when this one does not answer, in order of
+  /// preference.
+  final List<String> fallbackSourceIds;
+
+  /// Optional: whether to automatically probe all fallback sources concurrently
+  /// and pick whichever answers first (`true`), or follow [fallbackSourceIds] list
+  /// order (`false`, default).
+  final bool fallbackAutoSelect;
+
+  /// Backwards compatibility getter returning the first fallback source ID.
+  String? get fallbackSourceId => fallbackSourceIds.isNotEmpty ? fallbackSourceIds.first : null;
 
   // --- Borrow / sharing ---
 
-  /// True when this source was paired from somebody else's RomM (the
-  /// token role/scopes determine that). Surfaced as a "borrowed" badge
-  /// in the Sources screen.
+  /// True when this source was paired from somebody else's RomM.
   final bool borrowed;
 
-  /// RomM Client API Token expiry, mirrored from `auth.clientTokenExpiresAt`
-  /// for convenience so the Sources screen doesn't have to dive into auth.
+  /// RomM Client API Token expiry.
   final DateTime? tokenExpiresAt;
 
   /// Cached map of system slug → RomM numeric platform id (RomM only).
-  ///
-  /// Populated on the first successful sync; used by the resolver to
-  /// answer "does this source even know about NDS, and if so what is its
-  /// numeric id?" without a network round-trip. For non-RomM sources
-  /// this is always empty.
   final Map<String, int> knownPlatforms;
 
   const Source({
@@ -384,17 +159,15 @@ class Source {
     this.share,
     this.path,
     AuthConfig? auth,
-    this.endpoints = const [],
-    this.endpointSelection = EndpointSelection.auto,
-    this.pinnedEndpointId,
     this.autoMap = false,
     this.priority = 100,
     this.enabled = true,
-    this.fallbackSourceId,
+    this.fallbackSourceIds = const [],
+    this.fallbackAutoSelect = false,
     this.borrowed = false,
     this.tokenExpiresAt,
     this.knownPlatforms = const {},
-  }) : _defaultAuth = auth;
+  }) : _auth = auth;
 
   factory Source.fromJson(Map<String, dynamic> json) {
     DateTime? exp;
@@ -405,53 +178,32 @@ class Source {
     final type = SourceType.values
             .asNameMap()[json['type'] as String? ?? 'romm'] ??
         SourceType.romm;
-    final url = json['url'] as String?;
-    final host = json['host'] as String?;
-    final port = json['port'] as int?;
-    final share = json['share'] as String?;
 
-    // Routes are additive: a config written before they existed has no
-    // `endpoints` key, so synthesize one from the connection fields. That
-    // keeps "every source has at least one route" true everywhere else and
-    // means no config migration step is needed.
-    var endpoints = (json['endpoints'] as List<dynamic>?)
-            ?.map((e) => SourceEndpoint.fromJson(e as Map<String, dynamic>))
-            .toList() ??
-        const <SourceEndpoint>[];
-    if (endpoints.isEmpty && type != SourceType.local) {
-      endpoints = [
-        SourceEndpoint(
-          id: _primaryEndpointId,
-          label: json['name'] as String,
-          url: url,
-          host: host,
-          port: port,
-          share: share,
-        ),
-      ];
+    // Parse fallback source IDs, maintaining backwards compatibility with `fallback_source_id`
+    var fallbacks = <String>[];
+    if (json['fallback_source_ids'] is List) {
+      fallbacks = (json['fallback_source_ids'] as List).cast<String>();
+    } else if (json['fallback_source_id'] is String && (json['fallback_source_id'] as String).isNotEmpty) {
+      fallbacks = [json['fallback_source_id'] as String];
     }
 
     return Source(
       id: json['id'] as String,
       name: json['name'] as String,
       type: type,
-      url: url,
-      host: host,
-      port: port,
-      share: share,
+      url: json['url'] as String?,
+      host: json['host'] as String?,
+      port: json['port'] as int?,
+      share: json['share'] as String?,
       path: json['path'] as String?,
       auth: json['auth'] != null
           ? AuthConfig.fromJson(json['auth'] as Map<String, dynamic>)
           : null,
-      endpoints: endpoints,
-      endpointSelection: EndpointSelection.values
-              .asNameMap()[json['endpoint_selection'] as String? ?? 'auto'] ??
-          EndpointSelection.auto,
-      pinnedEndpointId: json['pinned_endpoint_id'] as String?,
       autoMap: json['auto_map'] as bool? ?? false,
       priority: json['priority'] as int? ?? 100,
       enabled: json['enabled'] as bool? ?? true,
-      fallbackSourceId: json['fallback_source_id'] as String?,
+      fallbackSourceIds: fallbacks,
+      fallbackAutoSelect: json['fallback_auto_select'] as bool? ?? false,
       borrowed: json['borrowed'] as bool? ?? false,
       tokenExpiresAt: exp,
       knownPlatforms: (json['known_platforms'] as Map<String, dynamic>?)
@@ -470,182 +222,17 @@ class Source {
       if (port != null) 'port': port,
       if (share != null) 'share': share,
       if (path != null) 'path': path,
-      // The source-level login, not the live route's — a route's own
-      // credentials belong to the route and are written inside `endpoints`.
-      if (_defaultAuth != null) 'auth': _defaultAuth!.toJson(),
-      if (endpoints.isNotEmpty)
-        'endpoints': endpoints.map((e) => e.toJson()).toList(),
-      'endpoint_selection': endpointSelection.name,
-      if (pinnedEndpointId != null) 'pinned_endpoint_id': pinnedEndpointId,
+      if (_auth != null) 'auth': _auth!.toJson(),
       'auto_map': autoMap,
       'priority': priority,
       'enabled': enabled,
-      if (fallbackSourceId != null) 'fallback_source_id': fallbackSourceId,
+      if (fallbackSourceIds.isNotEmpty) 'fallback_source_ids': fallbackSourceIds,
+      if (fallbackAutoSelect) 'fallback_auto_select': fallbackAutoSelect,
       'borrowed': borrowed,
       if (tokenExpiresAt != null)
         'token_expires_at': tokenExpiresAt!.toIso8601String(),
       if (knownPlatforms.isNotEmpty) 'known_platforms': knownPlatforms,
     };
-  }
-
-  /// Id given to the endpoint backfilled from a pre-routes config.
-  static const String _primaryEndpointId = 'primary';
-
-  /// The route whose address is currently mirrored onto the connection
-  /// fields, or null when this source has no routes (local sources).
-  ///
-  /// This is derived by matching addresses rather than stored, so it stays
-  /// correct even if something edits the connection fields directly.
-  SourceEndpoint? get liveEndpoint {
-    if (endpoints.isEmpty) return null;
-    final probe = SourceEndpoint(
-      id: '',
-      label: '',
-      url: url,
-      host: host,
-      port: port,
-      share: share,
-    );
-    for (final ep in endpoints) {
-      if (ep.sameAddressAs(probe)) return ep;
-    }
-    return null;
-  }
-
-  SourceEndpoint? endpointById(String endpointId) {
-    for (final ep in endpoints) {
-      if (ep.id == endpointId) return ep;
-    }
-    return null;
-  }
-
-  /// Which route *should* be live, given what answered a probe just now.
-  ///
-  /// [reachable] is a list of endpoint ids **in the caller's order of
-  /// preference**: `EndpointProbeService.firstResponder` hands back the single
-  /// route that answered first, and `probeFor` hands back every route that
-  /// answered, fastest first.
-  ///
-  /// - `pinned`: the user's override wins outright, reachable or not. If it is
-  ///   down they get a failed sync, not a silent reroute — a route that moves
-  ///   on its own is exactly what pinning exists to prevent.
-  /// - `auto`: the first id in [reachable] that this source still has. Nothing
-  ///   was overridden, so "works here, works there" is measured rather than
-  ///   configured.
-  /// - `ordered`: **this source's own** [endpoints] order decides, and
-  ///   [reachable] only says which of them are usable. The order the user
-  ///   arranged is a preference, so a lower route never wins just by being
-  ///   quicker — it wins when everything above it is down.
-  /// - nothing reachable: the first endpoint, so the sync runs and surfaces a
-  ///   real connection error instead of doing nothing.
-  ///
-  /// A *list* rather than a set of ids plus a "winner" argument keeps this pure
-  /// and keeps the model free of the probe's types — and if the winning route
-  /// was deleted between the probe and this call, the runner-up takes over
-  /// instead of the list-order default.
-  SourceEndpoint? resolveEndpoint({List<String> reachable = const []}) {
-    if (endpoints.isEmpty) return null;
-    if (endpointSelection == EndpointSelection.pinned &&
-        pinnedEndpointId != null) {
-      final pinned = endpointById(pinnedEndpointId!);
-      if (pinned != null) return pinned;
-      // Pinned route was deleted — fall through to auto rather than stall.
-    }
-    if (endpointSelection == EndpointSelection.ordered) {
-      final answered = reachable.toSet();
-      for (final ep in endpoints) {
-        if (answered.contains(ep.id)) return ep;
-      }
-      return endpoints.first;
-    }
-    for (final id in reachable) {
-      final ep = endpointById(id);
-      if (ep != null) return ep;
-    }
-    return endpoints.first;
-  }
-
-  /// Returns a copy whose routes are arranged in [orderedIds] order.
-  ///
-  /// In [EndpointSelection.ordered] the list order *is* the setting, so this is
-  /// how the user states a preference: put the LAN first and it is used
-  /// whenever it answers, whatever the mobile route's latency says.
-  ///
-  /// Ids that this source does not have are ignored, and routes [orderedIds]
-  /// does not mention keep their relative order at the end — a stale list from
-  /// a screen opened before a route was added reorders what it knew about
-  /// rather than dropping the rest.
-  ///
-  /// Nothing else moves: the live route is derived from the address fields
-  /// ([liveEndpoint]), so reordering never reroutes traffic by itself and never
-  /// touches a cached game. Re-resolving afterwards is the caller's decision.
-  Source withEndpointsReordered(List<String> orderedIds) {
-    if (endpoints.length < 2) return this;
-    final remaining = [...endpoints];
-    final reordered = <SourceEndpoint>[];
-    for (final id in orderedIds) {
-      final at = remaining.indexWhere((e) => e.id == id);
-      if (at >= 0) reordered.add(remaining.removeAt(at));
-    }
-    reordered.addAll(remaining);
-    return copyWith(endpoints: List<SourceEndpoint>.unmodifiable(reordered));
-  }
-
-  /// Returns a copy with [endpointId] moved to [newIndex] — the single-step
-  /// form of [withEndpointsReordered] for an up/down button or a drag handle.
-  ///
-  /// [newIndex] is clamped, so "move the top one up" is a no-op rather than an
-  /// error, and an unknown id leaves the source untouched.
-  Source moveEndpoint(String endpointId, int newIndex) {
-    final from = endpoints.indexWhere((e) => e.id == endpointId);
-    if (from < 0) return this;
-    final to = newIndex.clamp(0, endpoints.length - 1);
-    if (from == to) return this;
-    final moved = [...endpoints];
-    moved.insert(to, moved.removeAt(from));
-    return copyWith(endpoints: List<SourceEndpoint>.unmodifiable(moved));
-  }
-
-  /// Returns a copy with [endpoint]'s address mirrored onto the connection
-  /// fields, making it the live route.
-  ///
-  /// [pin] records it as the user's **override** of auto-selection: from then
-  /// on this route is used even when a faster one answers. Leave it false when
-  /// the switch came from a probe, so the next one can still move.
-  ///
-  /// The credentials move with the address: [auth] now reports
-  /// `endpoint.auth`, or this source's [defaultAuth] when the route does not
-  /// carry its own. The stored default is passed through unchanged so that
-  /// switching *back* to a route without its own login does not send it the
-  /// other route's token.
-  ///
-  /// Cached games are untouched — the source id does not change, so nothing in
-  /// the database is orphaned by a switch.
-  Source withLiveEndpoint(SourceEndpoint endpoint, {bool pin = false}) {
-    return Source(
-      id: id,
-      name: name,
-      type: type,
-      url: endpoint.url,
-      host: endpoint.host,
-      port: endpoint.port,
-      share: endpoint.share,
-      path: path,
-      auth: _defaultAuth,
-      endpoints: endpoints,
-      endpointSelection:
-          pin ? EndpointSelection.pinned : endpointSelection,
-      pinnedEndpointId: pin ? endpoint.id : pinnedEndpointId,
-      autoMap: autoMap,
-      priority: priority,
-      enabled: enabled,
-      // Switching routes must not unpair the source from its stand-in:
-      // dropping this made the fallback silently disappear on every switch.
-      fallbackSourceId: fallbackSourceId,
-      borrowed: borrowed,
-      tokenExpiresAt: tokenExpiresAt,
-      knownPlatforms: knownPlatforms,
-    );
   }
 
   /// Convenience: returns true if this source advertises [systemId].
@@ -656,35 +243,13 @@ class Source {
   int? rommPlatformIdFor(String systemId) => knownPlatforms[systemId];
 
   /// Like [toJson] but strips credentials. Used by config export.
-  ///
-  /// Routes can carry their own login, so stripping the source's is not
-  /// enough — an exported config must not leak a per-route token either.
   Map<String, dynamic> toJsonWithoutAuth() {
     final map = toJson();
     map.remove('auth');
-    final routes = map['endpoints'];
-    if (routes is List) {
-      for (final route in routes) {
-        if (route is Map) route.remove('auth');
-      }
-    }
     return map;
   }
 
   /// Stable identity used for deduplication during legacy migration.
-  ///
-  /// Two providers from the old `SystemConfig.providers` list that share
-  /// the same connection details should collapse into a single [Source]
-  /// even if they were attached to different systems. This identity is
-  /// per-type so that an SMB and a Web source with the same hostname stay
-  /// separate.
-  ///
-  /// **Credentials are deliberately not part of it.** Two legacy providers at
-  /// one address are one server whichever login they were saved with, so
-  /// folding auth in would split them back apart. It still changes on every
-  /// route switch — a route *is* its address ([SourceEndpoint.sameAddressAs]
-  /// refuses a second route to an address the source already has), so no two
-  /// routes can share a key and quietly reuse each other's connection.
   String get connectionKey {
     switch (type) {
       case SourceType.romm:
@@ -711,8 +276,7 @@ class Source {
         '${uri.hasPort ? ':${uri.port}' : ''}$path';
   }
 
-  /// Short label suitable for the Sources screen (e.g. "tim.duckdns.org"
-  /// or "192.168.1.50:8090"). Falls back to [name] if no host is known.
+  /// Short label suitable for the Sources screen.
   String get hostLabel {
     switch (type) {
       case SourceType.romm:
@@ -739,15 +303,12 @@ class Source {
     String? share,
     String? path,
     AuthConfig? auth,
-    List<SourceEndpoint>? endpoints,
-    EndpointSelection? endpointSelection,
-    String? pinnedEndpointId,
-    bool clearPinnedEndpoint = false,
     bool? autoMap,
     int? priority,
     bool? enabled,
-    String? fallbackSourceId,
-    bool clearFallback = false,
+    List<String>? fallbackSourceIds,
+    bool? fallbackAutoSelect,
+    bool clearFallbacks = false,
     bool? borrowed,
     DateTime? tokenExpiresAt,
     Map<String, int>? knownPlatforms,
@@ -761,19 +322,14 @@ class Source {
       port: port ?? this.port,
       share: share ?? this.share,
       path: path ?? this.path,
-      // The source-level default, never the live route's credentials —
-      // copying those in would freeze one route's token onto the source.
-      auth: auth ?? _defaultAuth,
-      endpoints: endpoints ?? this.endpoints,
-      endpointSelection: endpointSelection ?? this.endpointSelection,
-      pinnedEndpointId: clearPinnedEndpoint
-          ? null
-          : (pinnedEndpointId ?? this.pinnedEndpointId),
+      auth: auth ?? _auth,
       autoMap: autoMap ?? this.autoMap,
       priority: priority ?? this.priority,
       enabled: enabled ?? this.enabled,
-      fallbackSourceId:
-          clearFallback ? null : (fallbackSourceId ?? this.fallbackSourceId),
+      fallbackSourceIds: clearFallbacks
+          ? const []
+          : (fallbackSourceIds ?? this.fallbackSourceIds),
+      fallbackAutoSelect: fallbackAutoSelect ?? this.fallbackAutoSelect,
       borrowed: borrowed ?? this.borrowed,
       tokenExpiresAt: tokenExpiresAt ?? this.tokenExpiresAt,
       knownPlatforms: knownPlatforms ?? this.knownPlatforms,

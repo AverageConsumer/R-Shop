@@ -199,21 +199,21 @@ class ConsoleHud extends ConsumerWidget {
             color: Colors.white.withValues(alpha: 0.12),
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: _buildWithSpacing(rs, buttons),
+        // Wraps rather than a single row: five hints with localised labels are
+        // wider than a modal panel on a 3.92" screen. The callers used to fix
+        // that by scaling the whole HUD down, which left one screen's hints
+        // visibly smaller than every other screen's — and the same overflow
+        // paints the yellow stripe when nothing catches it. With one run this
+        // lays out identically to the row it replaces.
+        child: Wrap(
+          spacing: rs.isSmall ? rs.spacing.sm : rs.spacing.md,
+          runSpacing: rs.spacing.sm,
+          alignment:
+              rs.isPortrait ? WrapAlignment.center : WrapAlignment.end,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: buttons,
         ),
       ),
     );
-  }
-
-  List<Widget> _buildWithSpacing(Responsive rs, List<Widget> buttons) {
-    final spacing = rs.isSmall ? rs.spacing.sm : rs.spacing.md;
-    final result = <Widget>[];
-    for (var i = 0; i < buttons.length; i++) {
-      if (i > 0) result.add(SizedBox(width: spacing));
-      result.add(buttons[i]);
-    }
-    return result;
   }
 }

@@ -338,7 +338,7 @@ class _ManualSourceAddScreenState
     try {
       await ref
           .read(sourcesProvider.notifier)
-          .addSourceWithMappings(source, const {});
+          .addSource(source, manualMappings: const {});
       if (!mounted) return;
       Navigator.of(context).pop<Source?>(source);
     } catch (e) {

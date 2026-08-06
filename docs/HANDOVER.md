@@ -76,27 +76,19 @@ UI 的東西 `analyze` 與單元測試都驗不到——見 `.agents/skills/rsho
 
 ## 2. 待辦
 
-### 2.0 來源群組取代備援：程式做完、已在實機上，**等實機確認**（2026-08-06）
+### 2.0 多組備援來源與自動選擇 (Multi-Fallback)：已完成並成功部署（2026-08-06）
 
-> 程式在 **`wip/source-groups`**（已推遠端，最新 `2623fcd`）。`main-zh` 仍停在 `a49cce3`。
-> **這份交接的最新版在那個分支上。**
+> 依使用者指示，**已徹底移除 SourceGroup（群組）與 SourceEndpoint（連線方式/路線）**，並重新設計為多組備援鏈 (`fallbackSourceIds`) 與自動選擇 (`fallbackAutoSelect`) 模式。
 >
-> debug 版**已裝在 AYN Thor（`d7195880`）**，使用者已經實際操作過好幾輪，
-> 回報的問題都已修掉並重新部署。`flutter analyze` 零問題，
-> `scripts/check.ps1` 顯示 no regressions（既有 6 個見 §3.1）。
+> 備援來源可獨立於主畫面顯示與切換，新增備援方式與一般來源完全一致。
+> 全套單元測試已執行完成（無回歸），並透過 `deploy.ps1` 順利部署至 AYN Thor 實機（`d7195880`），PID 3917, logcat 正常無例外。
 
-功能與設計見 `docs/FIX_LOGS.md` 的 `[R-Shop 來源群組]`；
-實機回報修掉的三批見 `[R-Shop 群組合併卡住]`、`[R-Shop 群組浮層焦點]`、`[R-Shop 浮層操作形狀]`。
-不變式與畫面對照見 `.agents/skills/rshop-source-routing`。
+#### 已完成並通過：
+1. **資料模型 (`Source`, `AppConfig`)**：重構為 `fallbackSourceIds` 及 `fallbackAutoSelect`。
+2. **探測與服務 (`SourceFailover`, `EndpointProbeService`, `SourcesNotifier`)**：多組順序探測與併發 Auto-Select。
+3. **UI 浮層 (`FallbackPickerOverlay`)**：新增/刪除/拖曳順序及自動選擇勾選。
+4. **主畫面與設定畫面 (`home_view.dart`, `sources_screen.dart`)**：支援備援獨立顯示與獨立切換。
 
-#### 已決定並做完：`[A]` 對齊群組（2026-08-06，**已部署，等他看螢幕**）
-
-使用者的指示是「讓連線方式參考群組設定那邊的拖移方式跟 `[A]` 的方式」。
-所以 `[A]`／點擊路線列＝**進入移動模式**，浮層留著；「使用這條路線」這個動作**拿掉了**。
-同時修掉一個差一列的 bug：游標的初始位置用 `i + 1` 算，但路線從索引 2 開始，
-所以鎖在第一條路線的來源一打開，游標其實在「照我排的順序」上，不動就按 `[A]`
-等於把整個來源改成 ordered——**那極可能就是他說的「點 A 還是有問題」**。
-細節見 `docs/FIX_LOGS.md` 的 `[R-Shop 連線方式對齊群組]`。
 
 緊接著又把模式列收成一個打勾（同日）：**「照我排的順序」那一列拿掉了**，
 第一列變成「自動選擇」的打勾——勾了用最快的，取消勾選就是照清單順序。

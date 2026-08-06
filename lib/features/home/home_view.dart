@@ -584,32 +584,15 @@ class _HomeViewState extends ConsumerState<HomeView>
   /// Cheap to press: switching never discards cached games, so the other
   /// source's library is already in the database and appears immediately.
   Future<void> _cycleActiveSource(int delta) async {
-    // Switched-off sources are not in the ring. The eye in the sources list is
-    // what decides whether a library reaches this screen at all; stepping onto
-    // one that was turned off would undo that with a trigger press.
-    // A group is one server, so it is one stop on the ring: stepping through
-    // its members would walk the user through several views of the same
-    // library — the "third library nobody asked for" problem, one level up.
-    final cfg = ref.read(bootstrappedConfigProvider).valueOrNull;
-    final sources = cfg?.collapsedSources() ??
-        ref
-            .read(sourcesProvider)
-            .sources
-            .where((s) => s.enabled)
-            .toList();
+    final sources = ref
+        .read(sourcesProvider)
+        .sources
+        .where((s) => s.enabled)
+        .toList();
     if (sources.isEmpty) return;
 
     final current = ref.read(sourcesProvider).activeSourceId;
-    // The selected member may not be the one representing its group, so match
-    // by group first — otherwise the ring restarts from the beginning every
-    // time the group is showing through a different member.
-    final currentGroup =
-        current == null ? null : cfg?.groupContaining(current);
-    final currentPos = currentGroup != null
-        ? sources.indexWhere((s) => currentGroup.contains(s.id))
-        : sources.indexWhere((s) => s.id == current);
-    // Nothing selected, or a dangling id: the first press lands on a source
-    // rather than stepping off nowhere.
+    final currentPos = sources.indexWhere((s) => s.id == current);
     final nextPos = currentPos < 0
         ? (delta > 0 ? 0 : sources.length - 1)
         : (currentPos + delta) % sources.length;
@@ -618,8 +601,6 @@ class _HomeViewState extends ConsumerState<HomeView>
             .id;
 
     ref.read(feedbackServiceProvider).confirm();
-    // A deliberate switch supersedes whatever stand-in was showing; the next
-    // sync re-resolves and republishes.
     ref.read(syncingSourceProvider.notifier).state = null;
     try {
       await ref.read(sourcesProvider.notifier).setActiveSource(next);
@@ -630,50 +611,27 @@ class _HomeViewState extends ConsumerState<HomeView>
     }
   }
 
-  /// Strip across the top naming the source the console list is showing.
-  ///
-  /// Without it the answer to "which server am I looking at" lives two screens
-  /// away in Settings, which is no use at the moment you are about to sync.
   Widget _buildSourceBanner() {
     final l = L.of(context);
     final cfg = ref.watch(bootstrappedConfigProvider).valueOrNull;
     final active = cfg?.activeSource;
     final sources = ref.watch(sourcesProvider).sources;
 
-    // When the selected source was unreachable and its partner stood in, say
-    // so. Quietly showing a different server's library would look like games
-    // had gone missing.
     final syncing = ref.watch(syncingSourceProvider);
     final standIn = syncing != null && syncing.isFallback ? syncing : null;
 
-    // This row names the servers on screen, and never says "all sources" —
-    // that is not the name of anything.
-    //
-    // It is present whenever at least one library is: ticking an eye is the
-    // user saying "this is on my home screen", so the row that answers "which
-    // ones" has to be there to answer it. Only an empty screen drops it, and
-    // then as SizedBox.shrink — a genuine zero-height row rather than a blank
-    // one, so nothing below shifts by a line depending on state.
-    final visible = cfg?.collapsedSources() ??
-        sources.where((s) => s.enabled).toList(growable: false);
+    final visible = sources.where((s) => s.enabled).toList(growable: false);
     if (standIn == null && visible.isEmpty) return const SizedBox.shrink();
 
-    // Singled out with the triggers, or the only one switched on — either way
-    // one server to name. The merged case is gone: the notifier lands on a
-    // source at startup when more than one is on, so there is nothing left to
-    // join with a separator.
     final named = active ?? (visible.length == 1 ? visible.single : null);
     if (standIn == null && named == null) return const SizedBox.shrink();
-    // Inside a group the banner names the member that is really answering —
-    // "which server am I looking at" has to have a server for an answer, not
-    // the group's label.
-    final group = named == null ? null : cfg?.groupContaining(named.id);
-    // A stand-in is now always a member of the same group, so it is named the
-    // same way: "using X" says which server answered without implying the
-    // user's choice moved.
-    final name = standIn != null
-        ? l.sources_groupUsing(standIn.name)
-        : (group != null ? l.sources_groupUsing(named!.name) : named!.name);
+
+    final String name;
+    if (standIn != null) {
+      name = l.sources_groupUsing(standIn.name);
+    } else {
+      name = named?.name ?? '';
+    }
     // Green means "this is also the source in use" — what a sync would talk
     // to. Browsing off it with the triggers greys the strip, so it is visible
     // at a glance that the library on screen is not the one being kept up to

@@ -528,4 +528,16 @@ v15 的遷移**知道**要建這個臨時索引（那段還寫了註解說明為
 - **根因**：`resolveForSync` 僅透過 `svc.reachableFor(source)` 檢查整體可達性，並未將 `svc.resolve(source)` 算出的最新可達 `SourceEndpoint` 套用到內存中的 `Source` 物件。
 - **修復**：在 `resolveForSync` 中，於確定選定/備援來源（`choice.source`）後，呼叫 `svc.resolve(choice.source)` 取得最佳可達 endpoint，並透過 `choice.source.withLiveEndpoint(resolvedEp)` 產生更新後的 `Source` 物件，隨後將其替換回 `AppConfig.sources`，使產出的 `ProviderConfig` 具有正確的 URL 與 endpointId。
 - **檔案**：`lib/services/source_failover.dart:354-378`（在 resolveForSync 中新增選定來源之 liveEndpoint 解算與 config 替換） · `test/source_failover_sync_test.dart:212-261`（新增多路線來源同步測試）
-- **驗證**：新增與執行 `test/source_failover_sync_test.dart` 單元測試（全數通過），並執行全專案單元測試無回歸。
+
+
+## [R-Shop 備援架構重構] 移除群組與連線路線，改採多組備援鏈與自動選擇模式
+
+- **問題**：原有的 `SourceGroup`（群組）與 `SourceEndpoint`（連線方式/路線）造成架構過於複雜。使用者指示：「不用群組 也不用連線方式 改用備援 但是備援 可以多組 然後 新增備援的方式跟 被備援的來源 一樣的方式新增」「備援來源是否單獨顯示於主畫面選擇 可以是其他來源 也可以變成獨立來源 備援除了順序 增加一個自動選擇的 選填項」。
+- **根因**：舊架構使用雙層抽象（Sources -> Endpoints 與 SourceGroups -> Members），導致管理複雜。
+- **修復**：
+  1. 重構 `Source` 模型：移除 `SourceEndpoint` / `EndpointSelection` / `SourceGroup`，新增 `fallbackSourceIds: List<String>` 與 `fallbackAutoSelect: bool`。備援來源為獨立的 `Source` 實例，可獨立顯示與切換。
+  2. 重構服務層：簡化 `EndpointProbeService` 為單一 Source TCP 探測；重構 `SourceFailover` / `resolveForSync` 支援多組順序備援鏈與併發自動選擇 (Auto-Select) 探測；`SourcesNotifier` 新增備援鏈管理方法。
+  3. UI 浮層更新：刪除 `GroupPickerOverlay` 與 `EndpointPickerOverlay`，新增 `FallbackPickerOverlay`，支援勾選「自動選擇」、拖曳/上下調備援順序、刪除備援、新建備援來源與選擇既有來源。
+- **檔案**：`lib/models/config/source.dart` · `lib/models/config/app_config.dart` · `lib/services/source_failover.dart` · `lib/services/endpoint_probe_service.dart` · `lib/services/sources_notifier.dart` · `lib/services/source_resolver.dart` · `lib/features/sources/fallback_picker_overlay.dart` · `lib/features/settings/sources_screen.dart` · `lib/features/home/home_view.dart` · `test/source_failover_sync_test.dart` · `test/source_failover_choice_test.dart` · `test/endpoint_probe_service_test.dart`
+- **驗證**：單元測試套件執行通過（包含 multi-entry fallback 測試），且透過 `deploy.ps1` 順利打包並實機部署至 AYN Thor 測試（PID 3917, logcat 正常無例外）。
+
