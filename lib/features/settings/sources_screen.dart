@@ -1600,7 +1600,7 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF1C1C1C),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
+                    border: Border.all(color: Colors.white, width: 1.5),
                   ),
                   // Scrollable so the menu can outgrow a 3.92" screen without
                   // painting Flutter's yellow overflow stripe, which looks
@@ -1751,52 +1751,45 @@ class _OverlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive
-        ? Colors.redAccent
-        : subdued
-            ? Colors.white70
-            : AppTheme.primaryColor;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: _body(color),
-    );
-  }
-
-  Widget _body(Color color) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: selected ? 0.25 : 0.10),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: selected ? color : color.withValues(alpha: 0.3),
-          width: selected ? 2 : 1,
-        ),
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.35),
-                  blurRadius: 12,
-                ),
-              ]
-            : null,
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFFE50914).withValues(alpha: 0.35)
+              : const Color(0xFF242424),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected
+                ? Colors.white
+                : (destructive
+                    ? Colors.redAccent.withValues(alpha: 0.5)
+                    : Colors.white38),
+            width: selected ? 2.0 : 1.5,
           ),
-        ],
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: destructive ? Colors.redAccent : Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: TextStyle(
+                color: destructive ? Colors.redAccent : Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1932,7 +1925,7 @@ class _SourceTypePickerOverlayState
                   decoration: BoxDecoration(
                     color: const Color(0xFF1C1C1C),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
+                    border: Border.all(color: Colors.white, width: 1.5),
                   ),
                   child: SingleChildScrollView(
                     child: Column(
@@ -2020,58 +2013,52 @@ class _TypeOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = AppTheme.primaryColor;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: _body(color),
-    );
-  }
-
-  Widget _body(Color color) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: selected ? 0.22 : 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: selected ? color : color.withValues(alpha: 0.3),
-          width: selected ? 2 : 1,
-        ),
-        boxShadow: selected
-            ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12)]
-            : null,
-      ),
-      child: Row(
-        children: [
-          Icon(option.icon, color: color, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  option.label,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  option.hint,
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFFE50914).withValues(alpha: 0.35)
+              : const Color(0xFF242424),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? Colors.white : Colors.white38,
+            width: selected ? 2.0 : 1.5,
           ),
-        ],
+        ),
+        child: Row(
+          children: [
+            Icon(option.icon, color: Colors.white, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    option.label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    option.hint,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
