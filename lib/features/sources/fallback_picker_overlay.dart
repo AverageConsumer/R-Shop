@@ -201,7 +201,7 @@ class _FallbackPickerOverlayState
                   decoration: BoxDecoration(
                     color: const Color(0xFF1C1C1C),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
+                    border: Border.all(color: Colors.white, width: 1.5),
                   ),
                   child: SingleChildScrollView(
                     child: Column(
@@ -379,11 +379,11 @@ class _FallbackPickerOverlayState
         decoration: BoxDecoration(
           color: isSelected
               ? const Color(0xFFE50914).withValues(alpha: 0.35)
-              : const Color(0xFF1C1C1C),
+              : const Color(0xFF242424),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? Colors.white : Colors.white24,
-            width: 1.5,
+            color: isSelected ? Colors.white : Colors.white38,
+            width: isSelected ? 2.0 : 1.5,
           ),
         ),
         child: child,
@@ -403,7 +403,7 @@ class _FallbackPickerOverlayState
         ? Colors.amber[900]!.withValues(alpha: 0.7)
         : (isSelected
             ? const Color(0xFFE50914).withValues(alpha: 0.35)
-            : const Color(0xFF1C1C1C));
+            : const Color(0xFF242424));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -415,8 +415,8 @@ class _FallbackPickerOverlayState
             color: bgColor,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected ? Colors.white : Colors.white24,
-              width: 1.5,
+              color: isSelected ? Colors.white : Colors.white38,
+              width: isSelected ? 2.0 : 1.5,
             ),
           ),
           child: Row(
@@ -488,39 +488,96 @@ class _FallbackPickerOverlayState
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1C),
-        title: const Text('選擇既有來源作為備援',
-            style: TextStyle(color: Colors.white, fontSize: 16)),
-        content: SizedBox(
-          width: 300,
-          height: 220,
-          child: ListView.builder(
-            itemCount: candidates.length,
-            itemBuilder: (context, index) {
-              final cand = candidates[index];
-              return ListTile(
-                title: Text(cand.name,
-                    style: const TextStyle(color: Colors.white, fontSize: 14)),
-                subtitle: Text('${cand.type.shortLabel} - ${cand.hostLabel}',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  ref.read(sourcesProvider.notifier).addFallbackSource(
-                        source.id,
-                        cand.id,
-                      );
-                },
-              );
-            },
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 340,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1C1C1C),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white, width: 1.5),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '選擇既有來源作為備援',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 240),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: candidates.length,
+                  itemBuilder: (context, index) {
+                    final cand = candidates[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(ctx).pop();
+                          ref.read(sourcesProvider.notifier).addFallbackSource(
+                                source.id,
+                                cand.id,
+                              );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF242424),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.white38,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                cand.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                '${cand.type.shortLabel} - ${cand.hostLabel}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('關閉',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('關閉', style: TextStyle(color: Colors.grey)),
-          ),
-        ],
       ),
     );
   }
