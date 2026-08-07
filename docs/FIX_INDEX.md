@@ -52,6 +52,7 @@
 | **標頭高度與誤讀的按鍵字** | 圖示旁的裸字母 `X` 被讀成關閉鈕；沉浸模式在 `initState` 才切，**第一幀還有狀態列 inset**，包了 `SafeArea` 的標題列會進場高一列再縮回去 | `lib/features/settings/sources_screen.dart` · `lib/features/home/home_view.dart`（`_buildSourceBanner` 拿掉 `SafeArea`） |
 | **R-Shop QR碼手把導覽** ✨ | `QrPairingScreen` 掃碼頁加入搖桿/D-pad 焦點切換邏輯與初始化 Focus，支援手把切換至返回按鈕與手動輸入按鈕及底部 ConsoleHud | `lib/features/pairing/qr_pairing_screen.dart` · `test/widgets/qr_pairing_screen_test.dart` |
 | **R-Shop 主頁面移除來源切換** ✨ | 主頁面移除頂部來源條與 L2/R2 來源切換快捷鍵及 HUD 提示，改由來源清單統一管理主要與備援來源 | `lib/features/home/home_view.dart` |
+| **R-Shop 來源與備援邊框與高對比風格** ✨ | 來源設置與備援設定浮層統一採用清晰全列白邊框 (Colors.white24 / Colors.white) 與純白高對比文字 | `lib/features/settings/sources_screen.dart` · `lib/features/sources/fallback_picker_overlay.dart` |
 
 ## 🛠️ 建置與環境
 

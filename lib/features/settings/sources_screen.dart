@@ -1173,10 +1173,8 @@ class _SourceCard extends ConsumerWidget {
           color: const Color(0xFF1C1C1C),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: source.enabled
-                ? _accent.withValues(alpha: 0.4)
-                : Colors.white12,
-            width: 2,
+            color: Colors.white24,
+            width: 1.5,
           ),
         ),
         child: Row(
@@ -1347,8 +1345,8 @@ class _SourceCard extends ConsumerWidget {
                     '${source.type.name.toUpperCase()} · ${source.hostLabel}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.grey.shade500,
+                    style: const TextStyle(
+                      color: Colors.white70,
                       fontSize: 11,
                       fontFamily: 'monospace',
                     ),
@@ -1356,8 +1354,8 @@ class _SourceCard extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.games,
-                          size: 11, color: Colors.grey.shade500),
+                      const Icon(Icons.games,
+                          size: 11, color: Colors.white70),
                       const SizedBox(width: 3),
                       Text(
                         entryCount == 0
@@ -1366,8 +1364,8 @@ class _SourceCard extends ConsumerWidget {
                                 : 'No mappings — [A] to add')
                             : '$entryCount '
                                 '${entryCount == 1 ? entryNoun : "${entryNoun}s"}',
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
+                        style: const TextStyle(
+                          color: Colors.white70,
                           fontSize: 11,
                         ),
                       ),

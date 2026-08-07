@@ -261,7 +261,7 @@ class _FallbackPickerOverlayState
                                           ? '自動探測並優先使用回應最快的備援'
                                           : '未勾選：依下方順序依次嘗試備援',
                                       style: const TextStyle(
-                                          color: Colors.grey, fontSize: 12),
+                                          color: Colors.white70, fontSize: 12),
                                     ),
                                   ],
                                 ),
@@ -275,7 +275,7 @@ class _FallbackPickerOverlayState
                         const Text(
                           '備援來源清單（優先順序）',
                           style: TextStyle(
-                            color: Colors.grey,
+                            color: Colors.white,
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
                           ),
@@ -288,7 +288,7 @@ class _FallbackPickerOverlayState
                             alignment: Alignment.center,
                             child: const Text(
                               '尚未設定任何備援來源',
-                              style: TextStyle(color: Colors.grey, fontSize: 14),
+                              style: TextStyle(color: Colors.white70, fontSize: 14),
                             ),
                           )
                         else
@@ -378,11 +378,11 @@ class _FallbackPickerOverlayState
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFFE50914).withAlpha(90)
-              : Colors.white10,
-          borderRadius: BorderRadius.circular(8),
+              ? const Color(0xFFE50914).withValues(alpha: 0.35)
+              : const Color(0xFF1C1C1C),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? Colors.white : Colors.transparent,
+            color: isSelected ? Colors.white : Colors.white24,
             width: 1.5,
           ),
         ),
@@ -400,10 +400,10 @@ class _FallbackPickerOverlayState
     required bool isSorting,
   }) {
     final bgColor = isSorting
-        ? Colors.amber[900]!.withAlpha(180)
+        ? Colors.amber[900]!.withValues(alpha: 0.7)
         : (isSelected
-            ? const Color(0xFFE50914).withAlpha(90)
-            : Colors.white10);
+            ? const Color(0xFFE50914).withValues(alpha: 0.35)
+            : const Color(0xFF1C1C1C));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -413,9 +413,9 @@ class _FallbackPickerOverlayState
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected ? Colors.white : Colors.transparent,
+              color: isSelected ? Colors.white : Colors.white24,
               width: 1.5,
             ),
           ),
@@ -443,7 +443,7 @@ class _FallbackPickerOverlayState
                     ),
                     Text(
                       '${fallback.type.shortLabel} - ${fallback.hostLabel}',
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                   ],
                 ),

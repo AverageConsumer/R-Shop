@@ -56,6 +56,7 @@
 - [R-Shop 來源群組](FIX_LOGS.md)
 - [R-Shop 群組浮層焦點](FIX_LOGS.md)
 - [R-Shop 備援架構重構](FIX_LOGS.md)
+- [R-Shop 來源與備援邊框與高對比風格](FIX_LOGS.md)
 
 ### `lib/features/sources/endpoint_edit_screen.dart`
 - [R-Shop 連線路由](FIX_LOGS.md)
@@ -76,6 +77,7 @@
 - [R-Shop 來源備援](FIX_LOGS.md)
 - [浮層只做了手把](FIX_LOGS.md)
 - [R-Shop 備援架構重構](FIX_LOGS.md)
+- [R-Shop 來源與備援邊框與高對比風格](FIX_LOGS.md)
 
 ### `lib/features/sources/group_picker_overlay.dart`
 - [R-Shop 來源群組](FIX_LOGS.md)
