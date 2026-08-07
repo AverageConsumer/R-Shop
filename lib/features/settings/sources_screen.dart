@@ -1751,6 +1751,11 @@ class _OverlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = destructive
+        ? Colors.redAccent
+        : subdued
+            ? Colors.white70
+            : AppTheme.primaryColor;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -1759,26 +1764,24 @@ class _OverlayButton extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected
-              ? const Color(0xFFE50914).withValues(alpha: 0.35)
-              : const Color(0xFF242424),
+          color: color.withValues(alpha: selected ? 0.25 : 0.10),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: selected
-                ? Colors.white
-                : (destructive
-                    ? Colors.redAccent.withValues(alpha: 0.5)
-                    : Colors.white38),
-            width: selected ? 2.0 : 1.5,
+            color: selected ? color : color.withValues(alpha: 0.3),
+            width: selected ? 2 : 1,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.35),
+                    blurRadius: 12,
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: destructive ? Colors.redAccent : Colors.white,
-              size: 18,
-            ),
+            Icon(icon, color: color, size: 18),
             const SizedBox(width: 10),
             Text(
               label,
@@ -2013,6 +2016,7 @@ class _TypeOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = AppTheme.primaryColor;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -2021,18 +2025,19 @@ class _TypeOptionTile extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: selected
-              ? const Color(0xFFE50914).withValues(alpha: 0.35)
-              : const Color(0xFF242424),
+          color: color.withValues(alpha: selected ? 0.22 : 0.08),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected ? Colors.white : Colors.white38,
-            width: selected ? 2.0 : 1.5,
+            color: selected ? color : color.withValues(alpha: 0.3),
+            width: selected ? 2 : 1,
           ),
+          boxShadow: selected
+              ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12)]
+              : null,
         ),
         child: Row(
           children: [
-            Icon(option.icon, color: Colors.white, size: 22),
+            Icon(option.icon, color: color, size: 22),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -2042,7 +2047,7 @@ class _TypeOptionTile extends StatelessWidget {
                     option.label,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
                   ),
