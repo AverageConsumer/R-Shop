@@ -1763,4 +1763,126 @@ class LPt extends L {
   String sources_removeConfirmMessage(String name) {
     return 'Remover \"$name\"? A lista dela desaparece da biblioteca, mas os jogos já baixados neste aparelho são mantidos.';
   }
+
+  @override
+  String get sources_groupBadge => 'Grupo';
+
+  @override
+  String get sources_groupCreate => 'Agrupar com outra fonte…';
+
+  @override
+  String get sources_groupCreateHint =>
+      'Para dois endereços que são, na verdade, o mesmo servidor';
+
+  @override
+  String get sources_groupPickMember => 'Escolha a fonte para agrupar';
+
+  @override
+  String get sources_groupSameTypeOnly =>
+      'Só é possível agrupar fontes do mesmo tipo';
+
+  @override
+  String get sources_groupNoCandidates => 'Não há outra fonte deste tipo';
+
+  @override
+  String get sources_groupManage => 'Definições do grupo';
+
+  @override
+  String get sources_groupRename => 'Mudar o nome do grupo';
+
+  @override
+  String get sources_groupNameLabel => 'Nome do grupo';
+
+  @override
+  String get sources_groupModeTitle => 'Qual membro usar';
+
+  @override
+  String get sources_groupModeAuto => 'Automático';
+
+  @override
+  String get sources_groupModeAutoHint =>
+      'Sem ordem a manter — o endereço que responde primeiro é o que dá para usar primeiro';
+
+  @override
+  String get sources_groupModeOrdered => 'A minha ordem';
+
+  @override
+  String get sources_groupModeOrderedHint =>
+      'Usa o primeiro da tua ordem que responder';
+
+  @override
+  String get sources_groupPreferred => 'Primeira escolha';
+
+  @override
+  String get sources_groupAddMember => 'Adicionar uma fonte';
+
+  @override
+  String get sources_groupLeave => 'Sair do grupo';
+
+  @override
+  String sources_groupLeaveConfirm(String name) {
+    return '«$name» não fica com jogos nenhuns e terá de sincronizar de novo. A lista partilhada fica com o grupo.';
+  }
+
+  @override
+  String get sources_groupLeaveTitle => 'Sair do grupo?';
+
+  @override
+  String get sources_groupDissolve => 'Dissolver o grupo';
+
+  @override
+  String sources_groupDissolveConfirm(String name) {
+    return 'A lista partilhada fica com «$name»; as outras terão de sincronizar de novo.';
+  }
+
+  @override
+  String get sources_groupDissolveTitle => 'Dissolver o grupo?';
+
+  @override
+  String sources_groupMembersCount(int count) {
+    return '$count fontes';
+  }
+
+  @override
+  String sources_groupUsing(String name) {
+    return 'A usar «$name»';
+  }
+
+  @override
+  String get sources_moveUp => 'Mover para cima';
+
+  @override
+  String get sources_moveDown => 'Mover para baixo';
+
+  @override
+  String get sources_routeOrdered => 'A minha ordem';
+
+  @override
+  String get sources_routeOrderedHint =>
+      'Usar a primeira rota da tua ordem que responder';
+
+  @override
+  String get sources_reorderHint =>
+      'Move com cima e baixo e carrega outra vez para terminar';
+
+  @override
+  String get sources_groupMemberHint => '▶ tira-a do grupo; [A] reordena';
+
+  @override
+  String get sources_routeRowHint =>
+      'Seleciona a linha para reordenar; ▶ para os ícones: editar ou remover';
+
+  @override
+  String get sources_routeUse => 'Usar esta rota';
+
+  @override
+  String get sources_routeLock => 'Bloquear nesta rota';
+
+  @override
+  String get sources_routeUnlock => 'Desbloquear';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return 'Remover «$name»? A lista guardada desta fonte fica; só desaparece o endereço.';
+  }
 }

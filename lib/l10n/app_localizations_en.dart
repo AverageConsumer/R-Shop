@@ -1752,4 +1752,127 @@ class LEn extends L {
   String sources_removeConfirmMessage(String name) {
     return 'Remove \"$name\"? Its list disappears from the library, but games already downloaded to this device are kept.';
   }
+
+  @override
+  String get sources_groupBadge => 'Group';
+
+  @override
+  String get sources_groupCreate => 'Group with another source…';
+
+  @override
+  String get sources_groupCreateHint =>
+      'For two addresses that are really the same server';
+
+  @override
+  String get sources_groupPickMember => 'Pick the source to group with';
+
+  @override
+  String get sources_groupSameTypeOnly =>
+      'Only sources of the same type can be grouped';
+
+  @override
+  String get sources_groupNoCandidates => 'No other source of this type';
+
+  @override
+  String get sources_groupManage => 'Group settings';
+
+  @override
+  String get sources_groupRename => 'Rename group';
+
+  @override
+  String get sources_groupNameLabel => 'Group name';
+
+  @override
+  String get sources_groupModeTitle => 'Which member to use';
+
+  @override
+  String get sources_groupModeAuto => 'Automatic';
+
+  @override
+  String get sources_groupModeAutoHint =>
+      'No order to keep — the address that replies first is the one you can use first';
+
+  @override
+  String get sources_groupModeOrdered => 'My order';
+
+  @override
+  String get sources_groupModeOrderedHint =>
+      'Takes the first one in your order that answers';
+
+  @override
+  String get sources_groupPreferred => 'First choice';
+
+  @override
+  String get sources_groupAddMember => 'Add a source';
+
+  @override
+  String get sources_groupLeave => 'Leave the group';
+
+  @override
+  String sources_groupLeaveConfirm(String name) {
+    return '$name keeps no games and has to sync again. The shared list stays with the group.';
+  }
+
+  @override
+  String get sources_groupLeaveTitle => 'Leave the group?';
+
+  @override
+  String get sources_groupDissolve => 'Dissolve the group';
+
+  @override
+  String sources_groupDissolveConfirm(String name) {
+    return '$name keeps the shared list; the others have to sync again.';
+  }
+
+  @override
+  String get sources_groupDissolveTitle => 'Dissolve the group?';
+
+  @override
+  String sources_groupMembersCount(int count) {
+    return '$count sources';
+  }
+
+  @override
+  String sources_groupUsing(String name) {
+    return 'Using $name';
+  }
+
+  @override
+  String get sources_moveUp => 'Move up';
+
+  @override
+  String get sources_moveDown => 'Move down';
+
+  @override
+  String get sources_routeOrdered => 'My order';
+
+  @override
+  String get sources_routeOrderedHint =>
+      'Use the first route in your order that answers';
+
+  @override
+  String get sources_reorderHint =>
+      'Move it with up and down, then press again to finish';
+
+  @override
+  String get sources_groupMemberHint =>
+      'Press ▶ to send it out of the group; [A] reorders';
+
+  @override
+  String get sources_routeRowHint =>
+      'Select the row to reorder it; press ▶ for the icons: edit or remove';
+
+  @override
+  String get sources_routeUse => 'Use this route';
+
+  @override
+  String get sources_routeLock => 'Lock to this route';
+
+  @override
+  String get sources_routeUnlock => 'Unlock';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return 'Remove “$name”? The games cached for this source stay; only the address goes.';
+  }
 }

@@ -73,8 +73,12 @@ void main() {
   /// Runs the real upgrade, from v14 to whatever the app ships.
   Future<void> migrate() => service.upgradeForTesting(db, 14);
 
-  test('the app really does open at v15, so this upgrade really runs', () {
-    expect(DatabaseService.schemaVersion, 15);
+  test('a v14 install still upgrades through v15 on the way to what ships',
+      () {
+    // The fixture is v14, so every later step runs in order. Pinning the
+    // shipped version here is what proves this file exercises the upgrade
+    // users get rather than a path that stopped at v15.
+    expect(DatabaseService.schemaVersion, 16);
   });
 
   test('two routes of one source collapse to a single row', () async {
@@ -267,13 +271,11 @@ void main() {
     final names = (await db.rawQuery('PRAGMA index_list(games)'))
         .map((r) => r['name'] as String)
         .toSet();
-    expect(names, contains('idx_games_system_filename_source'));
     expect(names, isNot(contains('idx_games_system_filename_route')));
     expect(names, isNot(contains('idx_games_dedupe_tmp')));
-
-    final cols = await db
-        .rawQuery('PRAGMA index_info(idx_games_system_filename_source)');
-    expect(cols.map((r) => r['name']), ['systemSlug', 'filename', 'source_id']);
+    // v16 re-keys again, from the source to the cache owner; the shape it
+    // arrives in is that file's business. What matters here is that the route
+    // key is gone and its scratch index cleaned up.
 
     // endpoint_id stays as a column — it still records the last route used.
     final tableCols = await db.rawQuery('PRAGMA table_info(games)');

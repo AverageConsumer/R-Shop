@@ -177,7 +177,7 @@ class _SourceMappingsScreenState
     try {
       await ref
           .read(sourcesProvider.notifier)
-          .setMappingsForSource(widget.source.id, mappings);
+          .setManualMappings(widget.source.id, mappings);
       ref.invalidate(bootstrappedConfigProvider);
       ref.invalidate(gamesProvider);
       if (!mounted) return;

@@ -1699,4 +1699,119 @@ class LZh extends L {
   String sources_removeConfirmMessage(String name) {
     return '確定要移除「$name」嗎？這個來源的清單會從圖書館消失，但已經下載到裝置上的遊戲會保留。';
   }
+
+  @override
+  String get sources_groupBadge => '群組';
+
+  @override
+  String get sources_groupCreate => '與其他來源設成群組…';
+
+  @override
+  String get sources_groupCreateHint => '適用於實際上是同一台伺服器的兩個位址';
+
+  @override
+  String get sources_groupPickMember => '選擇要一起設成群組的來源';
+
+  @override
+  String get sources_groupSameTypeOnly => '只能和同類型的來源設成群組';
+
+  @override
+  String get sources_groupNoCandidates => '沒有其他同類型的來源';
+
+  @override
+  String get sources_groupManage => '群組設定';
+
+  @override
+  String get sources_groupRename => '重新命名群組';
+
+  @override
+  String get sources_groupNameLabel => '群組名稱';
+
+  @override
+  String get sources_groupModeTitle => '要用哪一台';
+
+  @override
+  String get sources_groupModeAuto => '自動選擇';
+
+  @override
+  String get sources_groupModeAutoHint => '不用維護順序——先回應的那台就是你最快能用的那台';
+
+  @override
+  String get sources_groupModeOrdered => '照我排的順序';
+
+  @override
+  String get sources_groupModeOrderedHint => '照你排的順序，用第一個通的';
+
+  @override
+  String get sources_groupPreferred => '第一順位';
+
+  @override
+  String get sources_groupAddMember => '加入來源';
+
+  @override
+  String get sources_groupLeave => '退出群組';
+
+  @override
+  String sources_groupLeaveConfirm(String name) {
+    return '「$name」不會留下任何遊戲清單，要重新同步。共用的清單留在群組裡。';
+  }
+
+  @override
+  String get sources_groupLeaveTitle => '要退出群組嗎？';
+
+  @override
+  String get sources_groupDissolve => '解散群組';
+
+  @override
+  String sources_groupDissolveConfirm(String name) {
+    return '共用的清單留給「$name」，其他來源要重新同步。';
+  }
+
+  @override
+  String get sources_groupDissolveTitle => '要解散群組嗎？';
+
+  @override
+  String sources_groupMembersCount(int count) {
+    return '$count 個來源';
+  }
+
+  @override
+  String sources_groupUsing(String name) {
+    return '目前使用「$name」';
+  }
+
+  @override
+  String get sources_moveUp => '往上移';
+
+  @override
+  String get sources_moveDown => '往下移';
+
+  @override
+  String get sources_routeOrdered => '照我排的順序';
+
+  @override
+  String get sources_routeOrderedHint => '照你排的順序，用第一條通的';
+
+  @override
+  String get sources_reorderHint => '用上下鍵移動位置，再按一次完成';
+
+  @override
+  String get sources_groupMemberHint => '按 ▶ 可以讓它退出群組；按 [A] 調整順序';
+
+  @override
+  String get sources_routeRowHint => '選這一列排順序；按 ▶ 移到右邊的圖示：修改或移除';
+
+  @override
+  String get sources_routeUse => '使用這條路線';
+
+  @override
+  String get sources_routeLock => '鎖定這條路線';
+
+  @override
+  String get sources_routeUnlock => '解除鎖定';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return '確定要移除「$name」嗎？這個來源的遊戲清單會留著，消失的只有這個位址。';
+  }
 }

@@ -584,9 +584,6 @@ class _HomeViewState extends ConsumerState<HomeView>
   /// Cheap to press: switching never discards cached games, so the other
   /// source's library is already in the database and appears immediately.
   Future<void> _cycleActiveSource(int delta) async {
-    // Switched-off sources are not in the ring. The eye in the sources list is
-    // what decides whether a library reaches this screen at all; stepping onto
-    // one that was turned off would undo that with a trigger press.
     final sources = ref
         .read(sourcesProvider)
         .sources
@@ -596,8 +593,6 @@ class _HomeViewState extends ConsumerState<HomeView>
 
     final current = ref.read(sourcesProvider).activeSourceId;
     final currentPos = sources.indexWhere((s) => s.id == current);
-    // Nothing selected, or a dangling id: the first press lands on a source
-    // rather than stepping off nowhere.
     final nextPos = currentPos < 0
         ? (delta > 0 ? 0 : sources.length - 1)
         : (currentPos + delta) % sources.length;
@@ -606,8 +601,6 @@ class _HomeViewState extends ConsumerState<HomeView>
             .id;
 
     ref.read(feedbackServiceProvider).confirm();
-    // A deliberate switch supersedes whatever stand-in was showing; the next
-    // sync re-resolves and republishes.
     ref.read(syncingSourceProvider.notifier).state = null;
     try {
       await ref.read(sourcesProvider.notifier).setActiveSource(next);
@@ -618,43 +611,27 @@ class _HomeViewState extends ConsumerState<HomeView>
     }
   }
 
-  /// Strip across the top naming the source the console list is showing.
-  ///
-  /// Without it the answer to "which server am I looking at" lives two screens
-  /// away in Settings, which is no use at the moment you are about to sync.
   Widget _buildSourceBanner() {
     final l = L.of(context);
     final cfg = ref.watch(bootstrappedConfigProvider).valueOrNull;
     final active = cfg?.activeSource;
     final sources = ref.watch(sourcesProvider).sources;
 
-    // When the selected source was unreachable and its partner stood in, say
-    // so. Quietly showing a different server's library would look like games
-    // had gone missing.
     final syncing = ref.watch(syncingSourceProvider);
     final standIn = syncing != null && syncing.isFallback ? syncing : null;
 
-    // This row names the servers on screen, and never says "all sources" —
-    // that is not the name of anything.
-    //
-    // It is present whenever at least one library is: ticking an eye is the
-    // user saying "this is on my home screen", so the row that answers "which
-    // ones" has to be there to answer it. Only an empty screen drops it, and
-    // then as SizedBox.shrink — a genuine zero-height row rather than a blank
-    // one, so nothing below shifts by a line depending on state.
-    final visible =
-        sources.where((s) => s.enabled).toList(growable: false);
+    final visible = sources.where((s) => s.enabled).toList(growable: false);
     if (standIn == null && visible.isEmpty) return const SizedBox.shrink();
 
-    // Singled out with the triggers, or the only one switched on — either way
-    // one server to name. The merged case is gone: the notifier lands on a
-    // source at startup when more than one is on, so there is nothing left to
-    // join with a separator.
     final named = active ?? (visible.length == 1 ? visible.single : null);
     if (standIn == null && named == null) return const SizedBox.shrink();
-    final name = standIn != null
-        ? '${standIn.name}（${l.sources_fallbackShort}）'
-        : named!.name;
+
+    final String name;
+    if (standIn != null) {
+      name = l.sources_groupUsing(standIn.name);
+    } else {
+      name = named?.name ?? '';
+    }
     // Green means "this is also the source in use" — what a sync would talk
     // to. Browsing off it with the triggers greys the strip, so it is visible
     // at a glance that the library on screen is not the one being kept up to

@@ -453,3 +453,91 @@
 **`.pixels()` 不是 `.viewport()`，這個選擇有理由。** Flutter 3.41 起 `cacheExtent`（double，邏輯像素）換成 `ScrollCacheExtent`，兩個 factory 的**單位不同**：`.pixels(double)` 與舊的完全等價，`.viewport(double)` 是 viewport 主軸長度的倍數。這兩處的值來自 `device_info_service.dart` 依記憶體分級算出的像素值（格線 200/400/600、圖書館 300/600/800），**本來就是以像素為單位設計的**，換成 `.viewport()` 會把分級意圖整個破壞掉。SDK 自己的相容轉接也是 `ScrollCacheExtent.pixels(cacheExtent!)`。
 
 **`console_dialog.dart` 刪掉未使用的 `rs` 之後，`responsive.dart` 的 import 跟著變成未使用**——只清一半會換來一個新 warning。焦點白框的樣式完全沒動：那份樣式同時存在於這個檔與 `core/widgets/console_focusable.dart`，**動一邊就會兩邊不同步**（`AGENTS.md` §3）。
+
+## [R-Shop 來源群組] 「備援」換成群組：幾個來源是同一台，就只有一份清單
+
+- **問題**：使用者要的不是備援。他的話是「應該不是備援 而是 我想指定兩個來源 其實是指向同一台伺服器，那它們可以選擇誰優先 或著自動」「應該是設成群組」「因為同一群組 應該實際是同一台之類 所以清單也只需要一份」。舊的 `fallbackSourceId` 是單向配對，他上一輪就抱怨過功能重複（「不覺得功能重複了嗎?」）。
+- **修復**：`SourceGroup`（成員有序、模式 `auto`／`ordered`）取代備援；`games` 表加 `cache_owner_id`，唯一鍵從來源改成擁有者，一個群組只存一份清單；notifier 補齊群組 CRUD，每個動作都同時把快取安置好；畫面上「備援」整個消失，換成群組編輯浮層與連線方式浮層的「照我排的順序」。
+- **檔案**：`lib/models/config/app_config.dart`（`SourceGroup`／`sourceGroupsFromFallbacks`／`sanitizeGroups`／`cacheOwnerIdFor`／`collapsedSources`） · `lib/services/database_service.dart`（schema v16、`_collapseDuplicates`、`adoptCacheInto`／`moveCacheOwnership`／`releaseCacheFrom`、`purgeOrDetachSource` 的 `protectedOwnerIds`） · `lib/services/sources_notifier.dart`（群組 CRUD、`ordered` 分支、`reorderEndpoints`／`moveEndpointTo`／`useOrderedSelection`） · `lib/services/source_failover.dart`（`chooseSource`／`resolveForSync` 走群組） · `lib/services/endpoint_probe_service.dart`（`resolve()`） · `lib/features/sources/group_picker_overlay.dart`（新增，取代刪掉的 `fallback_picker_overlay.dart`） · `lib/features/sources/endpoint_picker_overlay.dart` · `lib/features/settings/sources_screen.dart` · `lib/features/home/home_view.dart` · `lib/widgets/sync_badge.dart` · `lib/features/game_list/{game_list_screen.dart,logic/game_list_controller.dart}` · `lib/services/library_sync_service.dart` · `lib/l10n/app_{de,en,es,fr,ja,pt,zh}.arb` · `test/{database_service_v16_migration,sources_notifier_groups,widgets/group_picker_overlay}_test.dart`
+
+**遷移為什麼一列都不刪。** v16 只加欄位、把 `cache_owner_id` 從 `source_id` 一對一補上、換索引。合併留給 `adoptCacheInto`，因為群組住在設定檔裡、資料庫層讀不到——在遷移裡猜使用者分了哪些群組，就是憑猜測刪列。舊的配對照樣自動變成群組，但那發生在 `AppConfig.fromJson`（`sourceGroupsFromFallbacks`），而且群組的擁有者就是配對的排頭，所以既有安裝**一次也不用重新同步**。
+
+**去重判準沒有另發明。** `_v15OnDeviceRank` 改名 `_onDeviceRank`（現在不只 v15 用），規則照舊：已經下載到機器上的那一列贏，因為那是使用者真的擁有的東西，遠端的重抓就有。合併時會**暫時 drop 唯一索引**再重建——重建就是驗證，還有殘留就整筆 rollback，不會留下半合併的圖書館。
+
+**移出群組什麼都拿不到，是刻意的。** 合併之後沒有任何欄位記得哪一筆是哪個成員先看到的，而「這個問題不重要」正是群組的前提。所以要嘛騙人地平分，要嘛老實讓它重新同步——選後者，並且 UI 一定要先問。
+
+**刪掉群組成員時的連坐。** `purgeOrDetachSource` 是用 `provider_config` 的 JSON 比對的，刪掉的成員名字還印在那些列上，即使 `source_id` 已經改蓋成擁有者。所以多了 `protectedOwnerIds`：屬於還活著的群組的列不准動。順便修掉一個舊的過度殺傷——那兩個 UPDATE／DELETE 只比對 `(systemSlug, filename)`，會連別的來源同名遊戲一起清掉。
+
+**群組是對稱的，舊配對是單向的。** 這讓兩個舊測試的前提失效：以前「wan 沒有備援所以原地不動」，現在 wan 和 lan 同在一個群組，選誰都是選那個群組，偏好一律是群組的排頭。測試改成「不在群組裡的來源才原地不動」，另外補一條把新語意釘住。
+
+**兩套入口都做了。** 群組浮層每一列都能點，成員順序有角落的上下箭頭（觸控）也綁 `[X]`／`[Y]`（手把）；連線方式浮層的「照我排的順序」是自己一列（點某條路線一律是釘選＝覆寫，兩件事不能共用同一個手勢），路線順序用 ◀ ▶ 與角落箭頭。這一塊的四個浮層每一個都曾經是觸控死的，所以新的那個一開始就補了 widget 測試盯著。
+
+## [R-Shop 群組合併卡住] 加入群組按下去像當掉——去重的自連結沒有索引
+
+- **問題**：實機上點「與其他來源設成群組…」再選另一個來源，畫面完全沒反應。沒有例外、沒有崩潰，logcat 只有 `database has been locked for 0:00:10`。
+- **修復**：`_rekeyOwnership` 為了改寫 `cache_owner_id` 會先 drop 唯一索引，而那個索引正是去重自連結唯一的支撐；補上臨時索引 `idx_games_dedupe_tmp (cache_owner_id, systemSlug, filename)`，結束時 drop 再重建唯一索引。**65k 列從十分鐘以上變成 411 毫秒。**
+- **檔案**：`lib/services/database_service.dart`（`_rekeyOwnership` 的臨時索引） · `test/database_service_merge_perf_test.dart`（新增，65k 列的計時守衛） · `lib/features/sources/group_picker_overlay.dart`（`_busy` 擋重入）
+
+v15 的遷移**知道**要建這個臨時索引（那段還寫了註解說明為什麼），v16 的執行期路徑是另外寫的，就漏了。**同一個道理散在兩處實作，第二處一定會忘記**——這也是為什麼去重本身收在 `_collapseDuplicates` 一支裡。
+
+抓到它的方法值得記：實機沒有任何錯誤訊息可查，改用**本機測試重現規模**（seed 65k 列再計時），一次就現形。那個測試留下來了，門檻設 30 秒——有索引是毫秒級、沒索引是分鐘級，中間沒有灰色地帶。順帶：跑失控的效能測試要先設 timeout，砍掉 dart 程序會留下 `build/native_assets/windows/sqlite3.dll` 的鎖擋住下一次測試。
+
+## [R-Shop 群組浮層焦點] 建立群組之後手把不動了
+
+- **問題**：群組建好，浮層還在畫面上，但手把完全沒反應。
+- **修復**：來源清單的 `_ensureInteractiveFocus` 會在「沒有卡片持有焦點」時把焦點搶回第一張卡，而它的例外只認得動作選單。寫入群組會重建整個清單，於是焦點被搶走。改成任何浮層開著都不搶（`_anyOverlayOpen`），浮層每次寫入後也自己把焦點要回來。
+- **檔案**：`lib/features/settings/sources_screen.dart`（`_anyOverlayOpen`） · `lib/features/sources/group_picker_overlay.dart`（`_reclaimFocus`）
+
+**「焦點不能鎖死」的另一面**：那段搶焦點的程式本身是為了修「刪光來源之後手把失效」而寫的，方向相反但同一個節點。加浮層的人要記得去更新它的例外清單，否則新浮層一律中槍。
+
+## [R-Shop 浮層操作形狀] 游標看不見、模式列會關掉、排序看不出來
+
+- **問題**：實機回報四件——① 群組設定往下走，畫面不跟著捲，看不到下面的項目；② 連線方式選「自動選擇」或「照我排的順序」會直接關掉浮層；③ 從最上面往上繞回「取消」時游標消失，而且取消那列被底下的提示遮住；④ 排序按了看不出有沒有動。
+- **修復**：①③ 每一列給 `GlobalKey` 並在移動後 `Scrollable.ensureVisible`（**包含最後兩列**，漏掉就是游標消失的原因），捲動區加下方 padding 讓提示不遮住最後一列；② 模式是設定不是目的地，選了留在原地就地更新，只有選某條路線（＝覆寫）才關閉；④ 移動前後量測該列的 y 座標，用 180 毫秒把它從舊位置滑到新位置。
+- **檔案**：`lib/features/sources/endpoint_picker_overlay.dart` · `lib/features/sources/group_picker_overlay.dart` · `test/widgets/{endpoint_picker_overlay,group_picker_overlay}_test.dart`
+
+**按鍵重排也是他要的**：`[A]` 從「切換並鎖定」改成單純「使用這條路線」，鎖定移到 `[X]`，移除移到肩鍵 `[R1]`／`[L1]` 並補確認框；群組的退出同樣移到肩鍵。理由一致：**天天按的動作放最順的鍵，破壞性的動作放遠一點並且先問**。
+
+**排序的互動形狀繞了三圈**：先做成兩個小箭頭（他問「那個箭頭是幹嘛用? 不是應該移除嗎??」）→ 改成點一下跳出動作選單（「我要的移動 不是開視窗 是那邊會有小圖示 我焦點移到小圖示上面」）→ 最後定案：圖示留在列上，▶ 把焦點移上去，按下移動鍵之後上下鍵直接連續排序。**每一列底下加一行說明，並且把 ▶ 這個動作寫進去**——圖示不寫出來就等於藏起來。
+
+## [R-Shop 連線方式對齊群組] 按 A 沒有停在你選的那條，而且游標開在錯的一列
+
+- **問題**：實機回報「連線方式點 `[A]` 還是有問題」。兩件事疊在一起：① 開啟浮層時游標算錯一列——路線列從索引 2 開始（上面多了「照我排的順序」），`_initialIndex()` 卻回 `i + 1`，所以鎖在第一條路線的來源一打開，游標其實停在「照我排的順序」那列，不動就按 `[A]` 等於把整個來源改成 ordered 模式；② `[A]` 在路線列是 `switchEndpoint(pin: false)`，下一次探測可以自己換走，使用者看到的是「我選的那條又跳回去了」。
+- **修復**：使用者指定「連線方式參考群組設定那邊的拖移方式跟 `[A]` 的方式」。`[A]`／點擊路線列改成進入移動模式（與群組成員完全相同的手勢），浮層留在原地；`_initialIndex()` 改用 `_firstRouteIndex`，並讓 ordered 模式直接開在 ordered 那列。
+- **檔案**：`lib/features/sources/endpoint_picker_overlay.dart`（`_initialIndex`／`_activate`／新增 `_toggleSorting`／HUD 的 `[A]` 標籤／`_actionsForRoute` 的 ≡ 改共用） · `lib/l10n/app_*.arb`（`sources_routeRowHint` 七語系） · `test/widgets/endpoint_picker_overlay_test.dart`
+
+**「使用這條路線」這個動作被拿掉了，不是搬家。** 拿掉是對的：它本來就留不住——不鎖定就等下一次探測，鎖定的話那是 `[X]`。現在三條路各自有明確的入口：要最快的走「自動」，要自己的順序走「照我排的順序」加 `[A]` 排序，要死釘一條走 `[X]` 鎖定。`sources_routeUse` 這個字串因此沒人用了，七個語系都還留著，沒有刪。
+
+**那個差一列的 bug 是加「照我排的順序」那一列時漏改的**，`_initialIndex` 的註解還寫著「開在生效中的那條，所以不動就按 `[A]` 是 no-op」——註解描述的正是它做不到的事。加了 `_firstRoutePinnedSource` 這個 fixture 盯著：鎖在**第一條**路線才踩得到，鎖在第二條只是差一列、看起來像選錯，不會改到模式。
+
+**兩支浮層現在是同一套手勢**：`[A]` 移動、`[X]`／`[Y]` 是各自的第二第三動作、肩鍵是破壞性動作、▶ 走到列尾圖示、≡ 是觸控版的移動、✓ 結束。列底下那行說明改成不寫按鍵字母（`sources_groupMemberHint` 裡寫死的 `[A]` 在 PlayStation 配置下就是錯的，那條先留著沒動）。
+
+## [R-Shop 模式收成打勾] 兩列互斥的模式，其實是一個打勾寫成長的
+
+- **問題**：連線方式與群組兩個浮層都用**兩列互斥**表示只有兩種狀態的設定（自動／照我排的順序）。要關掉「自動」得去點另一列，而「照我排的順序」那一列講的東西底下的清單已經在講了。使用者指示：「移掉照我排序，把自動選擇改成選填、打勾之類，群組跟連線有這個情況都改一下」。
+- **修復**：兩個浮層各收成**一列打勾**。勾了＝自動（最快的／先回應的那台），沒勾＝照清單順序。副標依勾選狀態換成原本兩列各自的說明，`Icons.check_box` / `check_box_outline_blank` 當列首圖示，「使用中」徽章拿掉——打勾本身就是徽章。模型層的 `EndpointSelection.ordered` 與 `SourceGroupMode.ordered` **原封不動**，改的只有 UI。
+- **檔案**：`lib/features/sources/endpoint_picker_overlay.dart`（`_rowCount`／`_firstRouteIndex` 改 1／刪 `_orderedIndex`／`_activate` 的第 0 列改成切換） · `lib/features/sources/group_picker_overlay.dart`（模式兩列合一、成員索引 `i + 2` → `i + 1`） · `lib/l10n/app_*.arb`（`sources_groupModeAuto` 改成「自動選擇」） · `test/widgets/{endpoint_picker_overlay,group_picker_overlay}_test.dart`
+
+**索引偏移這次改成不寫死**。上一輪才因為 `i + 1` 對不上 `_firstRouteIndex` 而出事，這輪列數又變了一次——同一個地方兩天內漏改兩次，所以 `_initialIndex` 改成一律走 `_firstRouteIndex`，測試也留著 `_firstRoutePinnedSource` 這個 fixture 盯著「開在鎖定的那條，不是開在打勾那列」。**下次再加一列，這裡不用跟著改。**
+
+**沒用到的字串留著沒刪**：`sources_routeOrdered`、`sources_groupModeOrdered`、`sources_routeUse` 三個現在沒有呼叫點，七個語系都還在。刪掉要動 21 個地方而且對行為沒有影響，等哪次順手再說。
+
+## [R-Shop 同步路線解算] resolveForSync 未解算 selected/winner source 的 liveEndpoint 導致多路線來源同步時走預設死路線
+
+- **問題**：當來源具有多條連線路線（例如 LAN IP 與 DDNS）時，`resolveForSync` 雖然能判定該來源「有任意路線通」，但產出的 AppConfig/ProviderConfig 仍維持 `source.liveEndpoint` 的預設位址（例如處於外網時的 LAN IP）。導致 `LibrarySyncService` 在同步時仍連向已死的首選位址而失敗。
+- **根因**：`resolveForSync` 僅透過 `svc.reachableFor(source)` 檢查整體可達性，並未將 `svc.resolve(source)` 算出的最新可達 `SourceEndpoint` 套用到內存中的 `Source` 物件。
+- **修復**：在 `resolveForSync` 中，於確定選定/備援來源（`choice.source`）後，呼叫 `svc.resolve(choice.source)` 取得最佳可達 endpoint，並透過 `choice.source.withLiveEndpoint(resolvedEp)` 產生更新後的 `Source` 物件，隨後將其替換回 `AppConfig.sources`，使產出的 `ProviderConfig` 具有正確的 URL 與 endpointId。
+- **檔案**：`lib/services/source_failover.dart:354-378`（在 resolveForSync 中新增選定來源之 liveEndpoint 解算與 config 替換） · `test/source_failover_sync_test.dart:212-261`（新增多路線來源同步測試）
+
+
+## [R-Shop 備援架構重構] 移除群組與連線路線，改採多組備援鏈與自動選擇模式
+
+- **問題**：原有的 `SourceGroup`（群組）與 `SourceEndpoint`（連線方式/路線）造成架構過於複雜。使用者指示：「不用群組 也不用連線方式 改用備援 但是備援 可以多組 然後 新增備援的方式跟 被備援的來源 一樣的方式新增」「備援來源是否單獨顯示於主畫面選擇 可以是其他來源 也可以變成獨立來源 備援除了順序 增加一個自動選擇的 選填項」。
+- **根因**：舊架構使用雙層抽象（Sources -> Endpoints 與 SourceGroups -> Members），導致管理複雜。
+- **修復**：
+  1. 重構 `Source` 模型：移除 `SourceEndpoint` / `EndpointSelection` / `SourceGroup`，新增 `fallbackSourceIds: List<String>` 與 `fallbackAutoSelect: bool`。備援來源為獨立的 `Source` 實例，可獨立顯示與切換。
+  2. 重構服務層：簡化 `EndpointProbeService` 為單一 Source TCP 探測；重構 `SourceFailover` / `resolveForSync` 支援多組順序備援鏈與併發自動選擇 (Auto-Select) 探測；`SourcesNotifier` 新增備援鏈管理方法。
+  3. UI 浮層更新：刪除 `GroupPickerOverlay` 與 `EndpointPickerOverlay`，新增 `FallbackPickerOverlay`，支援勾選「自動選擇」、拖曳/上下調備援順序、刪除備援、新建備援來源與選擇既有來源。
+- **檔案**：`lib/models/config/source.dart` · `lib/models/config/app_config.dart` · `lib/services/source_failover.dart` · `lib/services/endpoint_probe_service.dart` · `lib/services/sources_notifier.dart` · `lib/services/source_resolver.dart` · `lib/features/sources/fallback_picker_overlay.dart` · `lib/features/settings/sources_screen.dart` · `lib/features/home/home_view.dart` · `test/source_failover_sync_test.dart` · `test/source_failover_choice_test.dart` · `test/endpoint_probe_service_test.dart`
+- **驗證**：單元測試套件執行通過（包含 multi-entry fallback 測試），且透過 `deploy.ps1` 順利打包並實機部署至 AYN Thor 測試（PID 3917, logcat 正常無例外）。
+

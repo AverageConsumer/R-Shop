@@ -197,7 +197,6 @@ class _RShopAppState extends ConsumerState<RShopApp> with WidgetsBindingObserver
           );
           if (result.names.isNotEmpty) {
             totalNew += result.names.length;
-            allNewIds.addAll(result.ids);
             allNewNames.addAll(result.names);
           }
         }

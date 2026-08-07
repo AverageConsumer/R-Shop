@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:retro_eshop/features/settings/sources_screen.dart';
+import 'package:retro_eshop/widgets/console_hud.dart';
 import 'package:retro_eshop/models/config/source.dart';
 import 'package:retro_eshop/providers/app_providers.dart';
 import 'package:retro_eshop/services/config_storage_service.dart';
@@ -240,6 +241,52 @@ void main() {
 
       expect(find.text('Enable'), findsOneWidget);
       expect(find.text('Disable'), findsNothing);
+    });
+
+    testWidgets('the actions menu ends in real buttons, not a typed-out line',
+        (tester) async {
+      // It used to end in a hardcoded Chinese string naming [A]/[X]/[B]:
+      // untranslated in six languages, wrong on two of the three controller
+      // layouts, and doing nothing under a finger.
+      final storage = await _initMockStorage();
+      await tester.pumpWidget(_wrap(
+        storage,
+        const SourcesScreen(),
+        seed: const [
+          Source(
+            id: 'mine',
+            name: 'Mein RomM',
+            type: SourceType.romm,
+            url: 'http://192.168.1.50:8090',
+            autoMap: true,
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // All of it outside the fake async zone: opening the menu plays a
+      // navigation sound, and the audio plugin's timers never complete inside
+      // that zone — the test then fails on teardown rather than on an
+      // expectation.
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Mein RomM'));
+        await tester.pump();
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        await tester.pump();
+
+        expect(find.text('Remove'), findsWidgets);
+        expect(find.textContaining('[A]'), findsNothing);
+        // The screen's own HUD plus the menu's.
+        expect(find.byType(ConsoleHud), findsNWidgets(2));
+        expect(find.text('Select'), findsOneWidget);
+      });
+
+      // Swap the screen out while the scope is still alive: the overlay
+      // releases its dialog-priority claim from a zero-duration timer in
+      // dispose, and a test that ends on top of it fails the teardown rather
+      // than any expectation.
+      await tester.pumpWidget(_wrap(storage, const SizedBox.shrink()));
+      await tester.pump(const Duration(milliseconds: 50));
     });
 
     testWidgets('no card focused means no per-source hints', (tester) async {

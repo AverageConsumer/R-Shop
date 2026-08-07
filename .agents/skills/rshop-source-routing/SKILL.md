@@ -18,10 +18,19 @@ description: "Touch anything about sources, connection routes, which source is i
 > 「**就算是同一台，我也要當不同台**」
 > 「至少要能指派一個備援就好」「timeout 後切換另一個來源」
 
-翻成規格：**多個來源，一次看／同步一個，可以指派備援；連不上時備援自動代打。**
+翻成規格：**多個來源，一次看／同步一個；使用者可以把幾個來源宣告成一個群組，
+連不上時群組裡的另一台自動代打。**
 
-**不要**把兩個來源的清單合併起來當同一份看 —— 這是被明確否決過的。
-即使兩個位址其實是同一台伺服器，**也一律當作獨立的來源**。
+**不要**自作主張把兩個來源的清單合併起來當同一份看 —— 這是被明確否決過的。
+**程式不准推論**兩個位址是不是同一台。
+
+**但使用者可以宣告**（2026-08-05 補）：
+
+> 「應該不是備援 而是 我想指定兩個來源 其實是指向同一台伺服器」「應該是設成群組」
+> 「因為同一群組 應該實際是同一台之類 所以清單也只需要一份」
+
+宣告成群組之後，那幾個來源就**共用一份清單**。這不牴觸「同一台也當不同台」——
+那條管的是**推論**，群組是**宣告**。沒有東西會自己變成群組。
 
 ---
 
@@ -68,13 +77,25 @@ description: "Touch anything about sources, connection routes, which source is i
 
 ---
 
-## 不變式 3：備援是暫時代打，不改變偏好
+## 不變式 3：代打是暫時的，不改變偏好（2026-08-05 改寫為群組）
 
-`chooseSource()` 選到備援時，**`activeSourceId` 不會被改寫**。
+**「備援」這個機制已經被群組取代。** `Source.fallbackSourceId` 還在設定檔裡讓舊版讀，
+但**選路徑不再讀它**：載入時 `sourceGroupsFromFallbacks` 會把每一組配對遷成一個
+兩人群組（偏好在前、模式 `ordered`），那正是舊備援的行為。兩邊都讀就是兩套機制搶同一個決定。
+
+`chooseSource()` 選到群組裡的別人時，**`activeSourceId` 不會被改寫**。
 `withEffectiveSource()` 重建的是**記憶體中的 config，磁碟完全不動**。
 
 所以偏好的那台一旦醒過來，下一次自己就回去了 —— 不需要使用者再設定一次。
 **如果哪天有人為了「讓它記住」而把 `activeSourceId` 寫回磁碟，這個自癒就死了。**
+
+群組是**對稱的**，舊的配對是單向的——這是行為上真的差一截的地方：
+選了群組裡的任何一個成員，偏好都是**群組自己的排頭**（同一台伺服器，選誰都一樣）。
+舊測試裡「wan 沒有備援所以原地不動」那種前提因此不再成立。
+
+模式兩種：`auto`＝**先回應的那台**（賽跑），`ordered`＝照使用者排的順序挑第一個通的。
+兩者都在 `chooseGroupMember` / `resolveGroupMember` 裡，**成員之間**的賽跑，
+與 `EndpointProbeService.firstResponder` 那層**同一台的多條路線**是巢狀的兩件事。
 
 ---
 
@@ -114,29 +135,58 @@ description: "Touch anything about sources, connection routes, which source is i
 
 ---
 
-## 資料庫：一個來源存一份
+## 資料庫：一份清單屬於「快取擁有者」（schema v16，2026-08-05 改寫）
 
-schema **v15**（v14 曾經是每條路線各一份，已收掉）。`games` 表有
+演進：v14 每條路線一份 → v15 收成每個來源一份 → **v16 收成每個「擁有者」一份**。
+擁有者＝**有群組就是群組，沒有就是來源自己**（`AppConfig.cacheOwnerIdFor(sourceId)`）。
+同一個道理往上搬一層：使用者宣告「這幾個來源是同一台」，跟宣告「這幾條路線是同一台」
+一樣，結論都是**只該有一份清單**。
+
+`games` 表有
 
 ```sql
-source_id  TEXT NOT NULL DEFAULT '',
-endpoint_id TEXT NOT NULL DEFAULT ''
+source_id       TEXT NOT NULL DEFAULT '',   -- 誰抓的
+endpoint_id     TEXT NOT NULL DEFAULT '',   -- 從哪條路抓的
+cache_owner_id  TEXT NOT NULL DEFAULT ''    -- 這份清單屬於誰 ← 唯一鍵在這
 ```
 
 **`NOT NULL DEFAULT ''` 不是隨便寫的** —— SQLite 的 UNIQUE 索引把 NULL 視為互不相同，
-用得到 NULL 的話唯一鍵形同虛設，同一筆遊戲會無限重複。
+用得到 NULL 的話唯一鍵形同虛設，同一筆遊戲會無限重複。`''` 是本機掃描的桶子。
 
-唯一索引：**`(systemSlug, filename, source_id)`**。`endpoint_id` **留著但不進唯一鍵**，
-只記「上次從哪條路抓的」。孤兒清除帶那三個欄位；
-串連刪 `game_metadata` / `ra_matches` 前要先檢查 `stillReferenced`。
+唯一索引：**`(systemSlug, filename, cache_owner_id)`**。
+`source_id` 與 `endpoint_id` **都留著但都不進唯一鍵**，只做歸屬記錄。
+
+**v16 遷移一列都不刪**：只加欄位、把 `cache_owner_id` 從 `source_id` 一對一補進去、換索引。
+**合併與去重不在遷移裡**，在 `adoptCacheInto()` —— 群組存在設定檔裡，資料庫層讀不到，
+在遷移裡用猜的去合併就是「憑猜測刪列」。
+
+去重判準只有一條：`_onDeviceRank`（原 `_v15OnDeviceRank`）——
+**已經下載到機器上的那一列一定活下來**（`purgeOrDetachSource` 會把它的
+`provider_config`／`url` 清空，那就是識別記號），還有遠端 url 的可以重抓。
+`_collapseDuplicates` 是唯一的實作，v15 與群組合併共用它。
+
+群組的三個入口，**都在一個交易裡**：
+
+    adoptCacheInto(ownerId:, memberIds:)    加入群組＝把成員的清單併進擁有者的，順便去重
+    moveCacheOwnership(from:, to:)          擁有者自己退出＝整份清單交給下一個成員
+    releaseCacheFrom(sourceId:, ownerId:)   一般成員退出＝**什麼都拿不到**，要重新同步
+
+合併時會**暫時 drop 唯一索引**再重建——重建本身就是驗證，還有殘留就直接拋例外整筆 rollback。
+`releaseCacheFrom` 會把離開者的 `source_id` 改蓋成擁有者，
+而 `purgeOrDetachSource` 要帶 **`protectedOwnerIds`**（那個來源當時所在的群組），
+否則刪掉一個成員會連群組的列一起帶走——它是用 `provider_config` 的 JSON 比對的，
+欄位改了它也還是認得出那些列是誰抓的。
 
 **這是自動換路之所以無感的原因**：換路不會換到另一份清單，所以沒有空清單、
-沒有重抓、也沒有「合併兩份」的邏輯要寫。想寫合併就表示分裂本身是錯的。
+沒有重抓。**換群組成員同理**。
 
-相關 API：`saveGamesByRoute()`（依來源分組，順便記下路線）、`getGamesForRoutes()`、
-`getGameCountsPerSource()`、`getGameCountForSource()`、`deleteSourceCache()`。
-**後三個是 v15 改的名**，因為語意真的變了——`deleteRoute` 這個名字會讓人以為
-刪一條路線要順手刪快取，而那正是現在不准做的事。
+相關 API：`saveGamesByRoute(cacheOwnerOf:)`、`getGamesForRoutes(cacheOwnerOf:)`、
+`getGames(cacheOwnerId:)`、`saveGames(cacheOwnerId:)`、
+`getGameCountsPerCacheOwner()`、`getGameCountForOwner()`、`deleteCacheOwnedBy()`。
+**後三個是 v16 改的名**（v15 時叫 `…PerSource`／`ForSource`／`deleteSourceCache`），
+因為語意真的變了——名字裡寫 source 會讓人以為刪一個群組成員要順手刪快取，
+而那正是現在不准做的事。`cacheOwnerOf` 不傳就等於「每個來源各自擁有」，
+也就是沒有群組的安裝看到的行為。
 
 ---
 
@@ -177,6 +227,25 @@ endpoint_id TEXT NOT NULL DEFAULT ''
 **R-Shop 來源備援**、**備援接進同步**、**連線方式共用憑證** 五條 —— 檔案清單在那裡，
 不要重新搜尋。
 
-UI 那一面另見 `rshop-touch-and-gamepad`：這個功能的四個浮層
-（endpoint picker、fallback picker、actions overlay、type picker）
-**每一個都曾經是觸控死的**。
+## 畫面（2026-08-05 群組完成後）
+
+    群組編輯          lib/features/sources/group_picker_overlay.dart
+                      未分組＝可選的同類型來源；已分組＝一個「自動選擇」打勾
+                      ＋成員（可排序、可退出）＋解散。**模式沒有兩列**，同上
+    連線方式浮層      第一列是「自動選擇」**打勾**：勾了用最快的，沒勾就照清單順序。
+                      **沒有「照我排的順序」那一列**——不勾的時候清單本身就是順序。
+                      **點某條路線＝進入移動模式**（與群組成員同一個手勢），
+                      不是「使用這條」——那個動作已經拿掉了，因為不鎖定就留不住。
+                      要哪一條只由兩件事決定：打不打勾，以及 `[X]` 鎖定。
+                      游標初始位置一律用 `_firstRouteIndex` 算，**不要寫死數字**
+    來源卡片          顯示「群組 · 名字」；「備援 → X」已經不存在
+    主畫面            collapsedSources()：一個群組只佔 L2/R2 的一格；
+                      橫幅寫「目前使用「某台」」，講的是實際在答的那一台
+
+`fallback_picker_overlay.dart` **已刪除**。「備援」這個詞在畫面上不該再出現，
+`sources_setFallback` / `sources_fallbackNone` 兩個字串已無人使用。
+
+UI 那一面另見 `rshop-touch-and-gamepad`：這個功能的浮層
+（endpoint picker、group picker、actions overlay、type picker）
+**每一個都曾經是觸控死的**。群組浮層一開始就配了 widget 測試盯著每一列可點，
+成員排序是「角落小圖示（觸控）＋ `[X]`／`[Y]`（手把）」，路線排序是 ◀ ▶ ＋角落箭頭。

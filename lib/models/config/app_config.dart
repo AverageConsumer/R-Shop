@@ -6,15 +6,8 @@ import 'system_config.dart';
 ///
 /// Schema versions:
 /// - **v1/v2**: each [SystemConfig] embedded its own list of
-///   [ProviderConfig]. Sources were duplicated across systems and there
-///   was no way to share a single RomM instance between consoles cleanly.
-/// - **v3**: top-level [sources] list. Each [SystemConfig] still carries
-///   its legacy `providers` list during the transition, plus optional
-///   per-system overrides via `enabledSourceIds` / `manualMappings`. The
-///   migration from v2 → v3 happens transparently inside [fromJson] and
-///   yields a config that is byte-for-byte equivalent at the resolver
-///   level — old code paths keep reading `providers`, new code paths read
-///   `sources`.
+///   [ProviderConfig].
+/// - **v3**: top-level [sources] list with multi-entry fallback chains.
 class AppConfig {
   static const int currentVersion = 3;
 
@@ -23,26 +16,10 @@ class AppConfig {
   final List<Source> sources;
 
   /// The one source the library is currently **showing**, or null to show
-  /// every enabled source at once (the historical behaviour, and what a
-  /// single-source setup gets).
-  ///
-  /// This is the cheap, reversible one: the home screen flips it with the
-  /// triggers to look at another library. It is not what syncs — see
-  /// [primarySourceId].
-  ///
-  /// Sources are always treated as independent libraries — **even when two of
-  /// them happen to point at the same server**. Switching only changes which
-  /// one is in view; it never touches cached games, so switching back is
-  /// instant rather than a re-sync.
+  /// every enabled source at once.
   final String? activeSourceId;
 
   /// The source in use: what syncs, and what the home screen shows by default.
-  ///
-  /// Separate from [activeSourceId] because looking at another library and
-  /// changing which server you actually work with are different decisions.
-  /// Browsing over to a borrowed library should not silently redirect the next
-  /// sync at it. Set from the sources list; null means no source has been
-  /// designated and sync falls back to whatever is in view.
   final String? primarySourceId;
 
   const AppConfig({
@@ -77,25 +54,26 @@ class AppConfig {
 
     final rawSources = json['sources'] as List<dynamic>?;
     if (rawSources != null) {
-      // Already v3+. Trust the persisted sources list verbatim.
-      final sources = rawSources
+      var sources = rawSources
           .map((e) => Source.fromJson(e as Map<String, dynamic>))
           .toList();
+
+      // Migrate legacy `source_groups` into `fallbackSourceIds` if present
+      final rawGroups = json['source_groups'] as List<dynamic>?;
+      if (rawGroups != null && rawGroups.isNotEmpty) {
+        sources = _migrateGroupsToFallbacks(sources, rawGroups);
+      }
+
       return AppConfig(
         version: rawVersion,
         systems: systems,
         sources: sources,
         activeSourceId: json['active_source_id'] as String?,
-        // Absent in configs written before the two were separated. Falling
-        // back to the shown source keeps those installs syncing exactly what
-        // they synced before, with no migration step.
         primarySourceId: json['primary_source_id'] as String? ??
             json['active_source_id'] as String?,
       );
     }
 
-    // v2 (or older) → derive sources from per-system providers and rewrite
-    // both halves so callers see a consistent v3 shape going forward.
     return _migrateLegacyToV3(systems);
   }
 
@@ -109,8 +87,6 @@ class AppConfig {
     };
   }
 
-  /// Like [toJson] but strips all auth credentials (passwords, API keys).
-  /// Used for config export to prevent accidental credential sharing.
   Map<String, dynamic> toJsonWithoutAuth() {
     return {
       'version': version,
@@ -142,10 +118,6 @@ class AppConfig {
   }
 
   /// The source currently in view, or null when every enabled source is used.
-  ///
-  /// Returns null when [activeSourceId] names a source that no longer exists
-  /// (deleted while selected), which degrades to "show everything" rather than
-  /// to an empty library.
   Source? get activeSource {
     final id = activeSourceId;
     if (id == null) return null;
@@ -155,8 +127,7 @@ class AppConfig {
     return null;
   }
 
-  /// The source in use, or null when none is designated or the designated one
-  /// has been deleted. Same degrade-to-everything rule as [activeSource].
+  /// The source in use, or null when none is designated.
   Source? get primarySource {
     final id = primarySourceId;
     if (id == null) return null;
@@ -165,22 +136,53 @@ class AppConfig {
     }
     return null;
   }
+
+  /// Which id owns the cached games for [sourceId].
+  /// Each source owns its own library cache.
+  String cacheOwnerIdFor(String sourceId) => sourceId;
+
+  /// Returns the sources available for display on the home screen.
+  List<Source> collapsedSources({
+    Map<String, String> effectiveMemberByGroupId = const {},
+    bool enabledOnly = true,
+  }) {
+    return sources.where((s) => !enabledOnly || s.enabled).toList();
+  }
+
+  static List<Source> _migrateGroupsToFallbacks(
+    List<Source> sources,
+    List<dynamic> rawGroups,
+  ) {
+    final map = {for (final s in sources) s.id: s};
+    for (final raw in rawGroups) {
+      if (raw is! Map<String, dynamic>) continue;
+      final members = (raw['member_ids'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const <String>[];
+      final mode = raw['mode'] as String? ?? 'ordered';
+      final isAuto = mode == 'auto';
+      if (members.length >= 2) {
+        final headId = members.first;
+        final fallbacks = members.sublist(1);
+        final head = map[headId];
+        if (head != null) {
+          final mergedFallbacks = [
+            ...head.fallbackSourceIds,
+            for (final f in fallbacks)
+              if (!head.fallbackSourceIds.contains(f)) f,
+          ];
+          map[headId] = head.copyWith(
+            fallbackSourceIds: mergedFallbacks,
+            fallbackAutoSelect: isAuto || head.fallbackAutoSelect,
+          );
+        }
+      }
+    }
+    return map.values.toList();
+  }
 }
 
-/// Walks every legacy [ProviderConfig] and folds them into a deduplicated
-/// [Source] list.
-///
-/// Behaviour:
-/// - Two providers with the same connection identity (URL/host+share)
-///   collapse into a single [Source]; the first one's metadata wins.
-/// - RomM providers become `autoMap: true` sources and contribute their
-///   system slug to the source's `knownPlatforms` cache so the resolver
-///   doesn't have to round-trip on the next launch.
-/// - SMB/FTP/Web providers become `autoMap: false` sources and a
-///   [SystemSourceMapping] is added to the owning system carrying the
-///   remote path that the legacy provider used.
-/// - The original `providers` lists are kept intact on each system so
-///   nothing in the read path breaks during the transition window.
 AppConfig _migrateLegacyToV3(List<SystemConfig> legacySystems) {
   final sourcesByKey = <String, Source>{};
   final migratedSystems = <SystemConfig>[];
@@ -239,8 +241,6 @@ AppConfig _migrateLegacyToV3(List<SystemConfig> legacySystems) {
         );
       }
 
-      // Manual sources need a per-system path mapping; auto-map sources
-      // (RomM today) advertise their own platforms so they don't.
       if (!probe.type.supportsAutoMap) {
         final remotePath = _legacyRemotePath(provider);
         if (remotePath.isNotEmpty) {
@@ -254,10 +254,6 @@ AppConfig _migrateLegacyToV3(List<SystemConfig> legacySystems) {
         }
       }
 
-      // Tag the legacy provider so the SourcesNotifier rebuild recognises
-      // it as belonging to a source. Without this the provider would be
-      // treated as unmanaged forever and survive a source disable/remove,
-      // which is exactly the "sync still hits the disabled RomM" bug.
       taggedProviders.add(
         provider.copyWith(
           managedBySource: true,

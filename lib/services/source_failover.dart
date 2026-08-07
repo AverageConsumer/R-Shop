@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../models/config/app_config.dart';
@@ -6,43 +8,32 @@ import 'endpoint_probe_service.dart';
 import 'source_resolver.dart';
 
 /// Which source is actually going to be used, and whether that is the one the
-/// user picked or a stand-in.
+/// user picked or a fallback stand-in.
 @immutable
 class SourceChoice {
   /// The source to sync from and show. Null when there is nothing usable.
   final Source? source;
 
-  /// The source the user actually selected. Differs from [source] only when
-  /// the preferred one did not answer and its fallback took over.
+  /// The primary source the user selected.
   final Source? preferred;
 
   const SourceChoice({this.source, this.preferred});
 
-  /// True when a fallback is standing in for an unreachable preference. The
-  /// banner says so, because silently showing a different server's library
-  /// would look like games had gone missing.
+  /// True when a fallback stand-in is covering for a preferred source that did not answer.
   bool get isFallback =>
-      source != null && preferred != null && source!.id != preferred!.id;
+      source != null &&
+      preferred != null &&
+      source!.id != preferred!.id &&
+      !(preferred!.fallbackAutoSelect);
 
   static const none = SourceChoice();
 }
 
-/// Picks the source to use, substituting the fallback when the preferred one
-/// is unreachable.
-///
-/// **A fallback is a temporary stand-in, not a change of preference.** The
-/// user chose "the one on my LAN"; being out of the house does not change
-/// that. Keeping the preference untouched is what lets the LAN source come
-/// back on its own when they walk in the door, instead of leaving them on the
-/// external address until they remember to switch back.
-///
-/// Pure — [reachable] holds the ids the caller has already probed. Callers
-/// that have not probed anything should pass every id, which reduces this to
-/// "use the preferred source".
+/// Picks the source to use, substituting a fallback source when the preferred one is unreachable.
 SourceChoice chooseSource({
   required List<Source> sources,
   required String? activeSourceId,
-  required Set<String> reachable,
+  required List<String> reachable,
 }) {
   Source? byId(String? id) {
     if (id == null) return null;
@@ -52,46 +43,126 @@ SourceChoice chooseSource({
     return null;
   }
 
-  final preferred = byId(activeSourceId);
-  // No selection, or a selection that has since been deleted: the caller is
-  // showing every source, and failover has nothing to act on.
-  if (preferred == null) return SourceChoice.none;
+  final selected = byId(activeSourceId);
+  if (selected == null || !selected.enabled) return SourceChoice.none;
 
-  // A disabled preference is a deliberate off-switch, not an outage.
-  if (!preferred.enabled) return SourceChoice.none;
+  final reachableSet = reachable.toSet();
 
-  if (reachable.contains(preferred.id)) {
-    return SourceChoice(source: preferred, preferred: preferred);
+  // Primary source answered
+  if (reachableSet.contains(selected.id)) {
+    return SourceChoice(source: selected, preferred: selected);
   }
 
-  final fallback = byId(preferred.fallbackSourceId);
-  final usable = fallback != null &&
-      fallback.enabled &&
-      fallback.id != preferred.id &&
-      reachable.contains(fallback.id);
-  if (usable) {
-    return SourceChoice(source: fallback, preferred: preferred);
+  // Primary source did not answer -> check fallback chain
+  if (selected.fallbackAutoSelect) {
+    for (final respondedId in reachable) {
+      if (selected.fallbackSourceIds.contains(respondedId)) {
+        final winner = byId(respondedId);
+        if (winner != null && winner.enabled) {
+          return SourceChoice(source: winner, preferred: selected);
+        }
+      }
+    }
+  } else {
+    for (final fbId in selected.fallbackSourceIds) {
+      if (reachableSet.contains(fbId)) {
+        final winner = byId(fbId);
+        if (winner != null && winner.enabled) {
+          return SourceChoice(source: winner, preferred: selected);
+        }
+      }
+    }
   }
 
-  // Neither answered. Stay on the preference so the sync reports a real
-  // connection error against the server the user actually asked for —
-  // reporting the fallback's error instead would send them debugging the
-  // wrong machine.
-  return SourceChoice(source: preferred, preferred: preferred);
+  // Nothing answered: stay on preference so sync reports error against preferred server.
+  return SourceChoice(source: selected, preferred: selected);
+}
+
+/// The member of [sources] whose server answers **first**.
+Future<String?> firstRespondingSource(
+  List<Source> sources, {
+  required EndpointProbeService probe,
+}) async {
+  final entrants = sources.where((s) => s.enabled).toList(growable: false);
+  if (entrants.isEmpty) return null;
+  if (entrants.length == 1) {
+    final ok = (await probe.reachableFor(entrants.first)).isNotEmpty;
+    return ok ? entrants.first.id : null;
+  }
+
+  final winner = Completer<String?>();
+  var pending = entrants.length;
+  for (final source in entrants) {
+    unawaited(
+      probe.reachableFor(source).then(
+        (answer) {
+          if (answer.isNotEmpty && !winner.isCompleted) {
+            winner.complete(source.id);
+          }
+          if (--pending == 0 && !winner.isCompleted) winner.complete(null);
+        },
+        onError: (Object e) {
+          debugPrint('SourceFailover: probe failed for ${source.id}: $e');
+          if (--pending == 0 && !winner.isCompleted) winner.complete(null);
+        },
+      ),
+    );
+  }
+  return winner.future;
+}
+
+/// Probes the selected source and its fallback chain, returning the config to sync with.
+Future<({AppConfig config, SourceChoice choice})> resolveForSync({
+  required AppConfig config,
+  EndpointProbeService? probe,
+}) async {
+  final activeId = config.primarySourceId ?? config.activeSourceId;
+  if (activeId == null) {
+    return (config: config, choice: SourceChoice.none);
+  }
+
+  final svc = probe ?? EndpointProbeService();
+  final selected = config.sourceById(activeId);
+  if (selected == null || !selected.enabled) {
+    return (config: config, choice: SourceChoice.none);
+  }
+
+  final reachable = <String>[];
+  if ((await svc.reachableFor(selected)).isNotEmpty) {
+    reachable.add(selected.id);
+  } else if (selected.fallbackSourceIds.isNotEmpty) {
+    final fallbackSources = [
+      for (final id in selected.fallbackSourceIds)
+        ...config.sources.where((s) => s.id == id && s.enabled),
+    ];
+    if (selected.fallbackAutoSelect) {
+      final winnerId = await firstRespondingSource(fallbackSources, probe: svc);
+      if (winnerId != null) reachable.add(winnerId);
+    } else {
+      for (final fb in fallbackSources) {
+        if ((await svc.reachableFor(fb)).isNotEmpty) {
+          reachable.add(fb.id);
+          break;
+        }
+      }
+    }
+  }
+
+  final choice = chooseSource(
+    sources: config.sources,
+    activeSourceId: activeId,
+    reachable: reachable,
+  );
+  final effective = choice.source?.id ?? activeId;
+
+  return (
+    config: withEffectiveSource(config, effective),
+    choice: choice,
+  );
 }
 
 /// Rebuilds every system's provider list as if [effectiveSourceId] were the
 /// selected source, without persisting anything.
-///
-/// This is how failover reaches the sync: the config handed to
-/// [LibrarySyncService] is rewritten in memory, so the sync talks to the
-/// stand-in while the user's stored preference is left alone. Nothing on disk
-/// changes, which is exactly what makes the preferred source resume by itself
-/// once it answers again.
-///
-/// Providers the notifier did not create (`managedBySource == false`) survive
-/// untouched — legacy onboarding entries and hand-configured providers were
-/// not ours to remove.
 AppConfig withEffectiveSource(AppConfig config, String? effectiveSourceId) {
   final systems = config.systems.map((s) {
     final unmanaged =
@@ -106,53 +177,4 @@ AppConfig withEffectiveSource(AppConfig config, String? effectiveSourceId) {
     return s.copyWith(providers: combined);
   }).toList(growable: false);
   return config.copyWith(systems: systems);
-}
-
-/// Probes the selected source and, only if needed, its stand-in — then returns
-/// the config to actually sync with.
-///
-/// Deliberately probes at most two servers rather than all of them: the
-/// question is "is my source up, and if not can its partner cover", not "which
-/// of everything is fastest". Two TCP connects with a short timeout, and none
-/// at all when the preference answers first.
-Future<({AppConfig config, SourceChoice choice})> resolveForSync({
-  required AppConfig config,
-  EndpointProbeService? probe,
-}) async {
-  // Syncs follow the source **in use**, not the one on screen. Browsing over
-  // to another library with the triggers is a look, not a decision to start
-  // working against that server — and a borrowed library is exactly the kind
-  // of thing you look at without wanting the next sync redirected at it.
-  // Falls back to the shown source when nothing has been designated, which is
-  // both the pre-split behaviour and what a single-source setup wants.
-  final activeId = config.primarySourceId ?? config.activeSourceId;
-  if (activeId == null) {
-    // Nothing designated and showing everything — nothing to fail over between.
-    return (config: config, choice: SourceChoice.none);
-  }
-
-  final svc = probe ?? EndpointProbeService();
-  final byId = {for (final s in config.sources) s.id: s};
-  final preferred = byId[activeId];
-  if (preferred == null) {
-    return (config: config, choice: SourceChoice.none);
-  }
-
-  final reachable = <String>{};
-  if ((await svc.reachableFor(preferred)).isNotEmpty) {
-    reachable.add(preferred.id);
-  } else {
-    final fb = byId[preferred.fallbackSourceId];
-    if (fb != null && (await svc.reachableFor(fb)).isNotEmpty) {
-      reachable.add(fb.id);
-    }
-  }
-
-  final choice = chooseSource(
-    sources: config.sources,
-    activeSourceId: activeId,
-    reachable: reachable,
-  );
-  final effective = choice.source?.id ?? activeId;
-  return (config: withEffectiveSource(config, effective), choice: choice);
 }

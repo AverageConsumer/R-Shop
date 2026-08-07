@@ -35,17 +35,21 @@ void main() {
               is_folder INTEGER NOT NULL DEFAULT 0,
               alternative_sources TEXT,
               source_id TEXT NOT NULL DEFAULT '',
-              endpoint_id TEXT NOT NULL DEFAULT ''
+              endpoint_id TEXT NOT NULL DEFAULT '',
+              cache_owner_id TEXT NOT NULL DEFAULT ''
             )
           ''');
           await db.execute('CREATE INDEX idx_systemSlug ON games (systemSlug)');
           await db.execute('CREATE INDEX idx_displayName ON games (displayName)');
           await db.execute('CREATE INDEX idx_filename ON games (filename)');
-          // Mirrors production v15: uniqueness is per source. endpoint_id is
-          // still stored (which route last fetched the row) but is not keyed
-          // on — the routes of one source are the same server.
+          // Mirrors production v16: uniqueness is per cache owner — the
+          // group when there is one, otherwise the source itself. source_id
+          // and endpoint_id are still stored (who fetched the row, over which
+          // route) but neither is keyed on.
           await db.execute(
-              'CREATE UNIQUE INDEX idx_games_system_filename_source ON games (systemSlug, filename, source_id)');
+              'CREATE UNIQUE INDEX idx_games_system_filename_owner ON games (systemSlug, filename, cache_owner_id)');
+          await db.execute(
+              'CREATE INDEX idx_games_owner ON games (cache_owner_id)');
           await db.execute(
               'CREATE INDEX idx_games_source ON games (source_id)');
           await db.execute('''
@@ -106,7 +110,8 @@ void main() {
             'idx_systemSlug',
             'idx_displayName',
             'idx_filename',
-            'idx_games_system_filename_source',
+            'idx_games_system_filename_owner',
+            'idx_games_owner',
             'idx_games_source',
           ]));
     });

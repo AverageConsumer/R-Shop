@@ -24,7 +24,6 @@ import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../onboarding/widgets/romm_legacy_login_screen.dart';
 import '../pairing/qr_pairing_screen.dart';
-import '../sources/endpoint_picker_overlay.dart';
 import '../sources/fallback_picker_overlay.dart';
 import '../sources/manual_source_add_screen.dart';
 import '../sources/source_mappings_screen.dart';
@@ -61,11 +60,6 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   Source? _activeActionsSource;
   bool _showTypePicker = false;
 
-  /// Set while the connection-route picker is open. Held by id rather than by
-  /// value so the overlay always renders the freshest source — switching a
-  /// route rewrites the Source object, and a stale copy would show the old
-  /// route as still live.
-  String? _routePickerSourceId;
 
   /// Which source is designated as in use, read straight from the notifier.
   ///
@@ -75,8 +69,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// and the toggle needed a second press to take. One source of truth.
   String? get _primarySourceId => ref.read(sourcesProvider).primarySourceId;
 
-  /// Set while the fallback picker is open, held by id so the overlay always
-  /// renders the freshest source.
+  /// Set while the fallback picker is open.
   String? _fallbackPickerSourceId;
 
   /// Which card the gamepad is sitting on. The list-level shortcuts act on
@@ -153,7 +146,12 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
         !_addEmptyFocus.hasFocus) {
       _initialFocusClaimed = false;
     }
-    if (_initialFocusClaimed || _activeActionsSource != null) return;
+    // ...and it must not run while an overlay owns the focus. Any overlay,
+    // not just the actions menu: the group editor stays open across a config
+    // write (creating a group rewrites the sources list), and the rebuild that
+    // followed used to yank focus onto the card behind it — the pad stopped
+    // driving the overlay mid-edit while it was still on screen.
+    if (_initialFocusClaimed || _anyOverlayOpen) return;
     if (state.loading) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _initialFocusClaimed) return;
@@ -170,6 +168,13 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
       }
     });
   }
+
+  /// True while anything is layered over the list. Each of these has its own
+  /// focus scope, so the list must not compete for focus with it.
+  bool get _anyOverlayOpen =>
+      _activeActionsSource != null ||
+      _fallbackPickerSourceId != null ||
+      _showTypePicker;
 
   /// Returns the focus node for [sourceId], creating it on first access.
   /// Stable across rebuilds so the visible focus indicator doesn't jump
@@ -352,7 +357,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
 
   Future<void> _addRommSource() async {
     final result = await Navigator.of(context).push<RommPairResult?>(
-      MaterialPageRoute(builder: (_) => const QrPairingScreen()),
+      MaterialPageRoute(builder: (_) => QrPairingScreen()),
     );
     if (!mounted || result == null) return;
 
@@ -461,23 +466,10 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _activeActionsSource = source);
   }
 
-  /// Hands off from the actions overlay to the route picker. The actions
-  /// overlay closes first so only one dialog-priority scope is ever live.
-  void _pickRoute(Source source) {
-    setState(() {
-      _activeActionsSource = null;
-      _routePickerSourceId = source.id;
-    });
-  }
+  Source? _sourceById(String id) =>
+      ref.read(sourcesProvider).sources.where((s) => s.id == id).firstOrNull;
 
-  void _closeRoutePicker() {
-    if (_routePickerSourceId == null) return;
-    setState(() => _routePickerSourceId = null);
-  }
-
-  /// Hands off from the actions overlay to the fallback picker, closing the
-  /// former first so only one dialog-priority scope is ever live.
-  void _pickFallback(Source source) {
+  void _openFallbackPicker(Source source) {
     setState(() {
       _activeActionsSource = null;
       _fallbackPickerSourceId = source.id;
@@ -486,7 +478,11 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
 
   void _closeFallbackPicker() {
     if (_fallbackPickerSourceId == null) return;
-    setState(() => _fallbackPickerSourceId = null);
+    final source = _sourceById(_fallbackPickerSourceId!);
+    setState(() {
+      _fallbackPickerSourceId = null;
+      _activeActionsSource = source;
+    });
   }
 
   /// Designates the source in use — what syncs, and what the home screen
@@ -541,7 +537,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _activeActionsSource = null);
 
     final result = await Navigator.of(context).push<RommPairResult?>(
-      MaterialPageRoute(builder: (_) => const QrPairingScreen()),
+      MaterialPageRoute(builder: (_) => QrPairingScreen()),
     );
     if (!mounted || result == null) return;
 
@@ -715,35 +711,17 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                 onRepair: () => _repairSource(_activeActionsSource!),
                 onEditMappings: () =>
                     _editMappings(_activeActionsSource!),
-                onPickRoute: () => _pickRoute(_activeActionsSource!),
+                onEditFallback: () =>
+                    _openFallbackPicker(_activeActionsSource!),
                 isActive: primary == _activeActionsSource!.id,
                 onToggleActive: () =>
                     _toggleActiveSource(_activeActionsSource!),
                 hasOtherSources: state.sources.length > 1,
-                onPickFallback: () =>
-                    _pickFallback(_activeActionsSource!),
               ),
             if (_showTypePicker)
               _SourceTypePickerOverlay(
                 onClose: _closeTypePicker,
                 onPick: _onTypePicked,
-              ),
-            if (_routePickerSourceId != null)
-              Builder(
-                builder: (context) {
-                  final src = ref
-                      .watch(sourcesProvider)
-                      .sources
-                      .where((s) => s.id == _routePickerSourceId)
-                      .firstOrNull;
-                  // The source can vanish underneath us (removed elsewhere);
-                  // dropping the overlay is better than rendering a ghost.
-                  if (src == null) return const SizedBox.shrink();
-                  return EndpointPickerOverlay(
-                    source: src,
-                    onClose: _closeRoutePicker,
-                  );
-                },
               ),
             if (_fallbackPickerSourceId != null)
               Builder(
@@ -755,8 +733,9 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                       .firstOrNull;
                   if (src == null) return const SizedBox.shrink();
                   return FallbackPickerOverlay(
-                    source: src,
+                    sourceId: src.id,
                     onClose: _closeFallbackPicker,
+                    onAddFreshSource: _addSource,
                   );
                 },
               ),
@@ -1208,35 +1187,23 @@ class _SourceCard extends ConsumerWidget {
                           ),
                         ),
                       ],
-                      // Naming the stand-in on the card is the only way to
-                      // tell a configured pairing from an unconfigured one.
-                      if (source.fallbackSourceId != null) ...[
+                      if (source.fallbackSourceIds.isNotEmpty) ...[
                         const SizedBox(width: 6),
-                        Builder(
-                          builder: (context) {
-                            final target = ref
-                                .watch(sourcesProvider)
-                                .sources
-                                .where((s) => s.id == source.fallbackSourceId)
-                                .firstOrNull;
-                            if (target == null) return const SizedBox.shrink();
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.white10,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '${L.of(context).sources_fallbackShort} → ${target.name}',
-                                style: const TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            );
-                          },
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white10,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '備援 · ${source.fallbackSourceIds.length}組',
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ],
                       if (source.borrowed) ...[
@@ -1390,10 +1357,9 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
     required this.onRemove,
     required this.onRepair,
     required this.onEditMappings,
-    required this.onPickRoute,
+    required this.onEditFallback,
     required this.onToggleActive,
     required this.isActive,
-    required this.onPickFallback,
     required this.hasOtherSources,
   });
 
@@ -1403,10 +1369,9 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
   final VoidCallback onRemove;
   final VoidCallback onRepair;
   final VoidCallback onEditMappings;
-  final VoidCallback onPickRoute;
+  final VoidCallback onEditFallback;
   final VoidCallback onToggleActive;
   final bool isActive;
-  final VoidCallback onPickFallback;
   final bool hasOtherSources;
 
   @override
@@ -1437,25 +1402,11 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
           label: l.sources_editMappings,
           onActivate: widget.onEditMappings,
         ),
-      // Choosing which source is in view is not here: it is an eye button on
-      // each row of the list itself, one tap with nothing to open first. This
-      // menu is for things that need a screen of their own.
-      //
-      // Only meaningful once there is another source to stand in.
-      if (widget.hasOtherSources)
-        _OverlayAction(
-          icon: Icons.swap_horiz,
-          label: l.sources_setFallback,
-          onActivate: widget.onPickFallback,
-        ),
-      // Offered whenever the source has an address at all — with a single
-      // route the picker still shows which one is live and why.
-      if (src.endpoints.isNotEmpty)
-        _OverlayAction(
-          icon: Icons.alt_route,
-          label: l.sources_connectionRoute,
-          onActivate: widget.onPickRoute,
-        ),
+      _OverlayAction(
+        icon: Icons.alt_route,
+        label: '備援設定',
+        onActivate: widget.onEditFallback,
+      ),
       _OverlayAction(
         icon: src.enabled ? Icons.toggle_off : Icons.toggle_on,
         label: src.enabled ? l.sources_disable : l.sources_enable,
@@ -1539,6 +1490,7 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
   @override
   Widget build(BuildContext context) {
     final src = widget.source;
+    final l = L.of(context);
     final actions = _actions(context);
     return OverlayFocusScope(
       priority: OverlayPriority.dialog,
@@ -1643,14 +1595,20 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                         ),
                       ],
                       const SizedBox(height: 12),
-                      const Center(
-                        child: Text(
-                          '↑↓ · [A] 選擇 · [X] 顯示切換 · [B] 返回',
-                          style: TextStyle(
-                            color: Colors.white30,
-                            fontSize: 10,
-                            letterSpacing: 0.5,
-                          ),
+                      // Real buttons, not a typed-out line. The old one was a
+                      // hardcoded Chinese string that named [A]/[X]/[B] — wrong
+                      // on two of the three controller layouts, untranslated in
+                      // the other six languages, and dead under a finger.
+                      ConsoleHud(
+                        embedded: true,
+                        dpad: (label: '↑↓', action: l.common_navigate),
+                        a: HudAction(l.common_select, onTap: _activate),
+                        b: HudAction(l.common_back, onTap: widget.onClose),
+                        x: HudAction(
+                          widget.isActive
+                              ? l.sources_stopUsingShort
+                              : l.sources_useThisShort,
+                          onTap: widget.onToggleActive,
                         ),
                       ),
                     ],
@@ -1922,15 +1880,13 @@ class _SourceTypePickerOverlayState
                         ),
                       ],
                       const SizedBox(height: 14),
-                      const Center(
-                        child: Text(
-                          '↑↓ · [A] 選擇 · [X] 顯示切換 · [B] 返回',
-                          style: TextStyle(
-                            color: Colors.white30,
-                            fontSize: 10,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                      // Same line was pasted here, and here it also promised
+                      // an [X] this overlay does not answer.
+                      ConsoleHud(
+                        embedded: true,
+                        dpad: (label: '↑↓', action: l.common_navigate),
+                        a: HudAction(l.common_select, onTap: _pickSelected),
+                        b: HudAction(l.common_back, onTap: widget.onClose),
                       ),
                     ],
                   ),

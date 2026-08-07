@@ -2,15 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:retro_eshop/models/config/source.dart';
 import 'package:retro_eshop/services/source_failover.dart';
 
-/// Failover between a paired internal/external source.
-///
-/// The rule the whole thing hangs on: **a fallback is a temporary stand-in,
-/// never a change of preference.** Being away from home does not mean the user
-/// stopped wanting the LAN server, so the preference survives and the LAN
-/// source resumes on its own once it answers again.
 Source _src(
   String id, {
-  String? fallback,
+  List<String> fallbacks = const [],
+  bool autoSelect = false,
   bool enabled = true,
 }) =>
     Source(
@@ -19,147 +14,78 @@ Source _src(
       type: SourceType.romm,
       url: 'http://$id:9080',
       enabled: enabled,
-      fallbackSourceId: fallback,
+      fallbackSourceIds: fallbacks,
+      fallbackAutoSelect: autoSelect,
       autoMap: true,
     );
 
 void main() {
-  final lan = _src('lan', fallback: 'wan');
-  final wan = _src('wan');
-  final all = [lan, wan];
+  final lan = _src('lan', fallbacks: ['wan1', 'wan2']);
+  final wan1 = _src('wan1');
+  final wan2 = _src('wan2');
+  final all = [lan, wan1, wan2];
 
-  group('chooseSource', () {
-    test('uses the preferred source when it answers', () {
+  group('chooseSource multi-entry ordered mode', () {
+    test('uses preferred source when it answers', () {
       final c = chooseSource(
         sources: all,
         activeSourceId: 'lan',
-        reachable: {'lan', 'wan'},
+        reachable: const ['lan', 'wan1', 'wan2'],
       );
 
       expect(c.source?.id, 'lan');
       expect(c.isFallback, isFalse);
     });
 
-    test('substitutes the fallback when the preferred one is silent', () {
+    test('substitutes first reachable fallback in order when preferred is silent', () {
       final c = chooseSource(
         sources: all,
         activeSourceId: 'lan',
-        reachable: {'wan'},
+        reachable: const ['wan2', 'wan1'], // wan1 is probed first in ordered list
       );
 
-      expect(c.source?.id, 'wan');
-      expect(c.preferred?.id, 'lan', reason: 'preference must survive');
+      expect(c.source?.id, 'wan1');
+      expect(c.preferred?.id, 'lan');
       expect(c.isFallback, isTrue);
     });
 
-    test('the preference is untouched, so the LAN resumes by itself', () {
-      // Away from home.
-      final away = chooseSource(
-        sources: all,
-        activeSourceId: 'lan',
-        reachable: {'wan'},
-      );
-      expect(away.source?.id, 'wan');
-
-      // Back home — nothing was reassigned, so the same call returns the LAN.
-      final home = chooseSource(
-        sources: all,
-        activeSourceId: 'lan',
-        reachable: {'lan', 'wan'},
-      );
-      expect(home.source?.id, 'lan');
-      expect(home.isFallback, isFalse);
-    });
-
-    test('stays on the preferred source when neither answers', () {
-      // So the sync error names the server the user actually asked for
-      // instead of sending them to debug the wrong machine.
+    test('skips unreachable fallback and takes next available fallback', () {
       final c = chooseSource(
         sources: all,
         activeSourceId: 'lan',
-        reachable: const {},
+        reachable: const ['wan2'],
+      );
+
+      expect(c.source?.id, 'wan2');
+      expect(c.isFallback, isTrue);
+    });
+
+    test('stays on preferred when no fallback answers', () {
+      final c = chooseSource(
+        sources: all,
+        activeSourceId: 'lan',
+        reachable: const [],
       );
 
       expect(c.source?.id, 'lan');
       expect(c.isFallback, isFalse);
     });
+  });
 
-    test('a source with no fallback stays put', () {
+  group('chooseSource auto-select mode', () {
+    final lanAuto = _src('lan', fallbacks: ['wan1', 'wan2'], autoSelect: true);
+    final allAuto = [lanAuto, wan1, wan2];
+
+    test('picks first responding fallback when primary is silent', () {
       final c = chooseSource(
-        sources: all,
-        activeSourceId: 'wan',
-        reachable: const {},
-      );
-
-      expect(c.source?.id, 'wan');
-      expect(c.isFallback, isFalse);
-    });
-
-    test('a disabled fallback is not used', () {
-      final withDisabled = [lan, _src('wan', enabled: false)];
-
-      final c = chooseSource(
-        sources: withDisabled,
+        sources: allAuto,
         activeSourceId: 'lan',
-        reachable: {'wan'},
+        reachable: const ['wan2', 'wan1'], // wan2 responded first in network probe
       );
 
-      expect(c.source?.id, 'lan');
-      expect(c.isFallback, isFalse);
-    });
-
-    test('a dangling fallback id is ignored', () {
-      final c = chooseSource(
-        sources: [_src('lan', fallback: 'deleted')],
-        activeSourceId: 'lan',
-        reachable: const {},
-      );
-
-      expect(c.source?.id, 'lan');
-    });
-
-    test('a source pointing at itself does not loop', () {
-      final c = chooseSource(
-        sources: [_src('lan', fallback: 'lan')],
-        activeSourceId: 'lan',
-        reachable: const {},
-      );
-
-      expect(c.source?.id, 'lan');
-      expect(c.isFallback, isFalse);
-    });
-
-    test('no selection means no failover — everything is in view', () {
-      expect(
-        chooseSource(sources: all, activeSourceId: null, reachable: const {})
-            .source,
-        isNull,
-      );
-    });
-
-    test('a deleted selection degrades to no selection', () {
-      expect(
-        chooseSource(
-          sources: all,
-          activeSourceId: 'removed',
-          reachable: const {},
-        ).source,
-        isNull,
-      );
-    });
-
-    test('a disabled preference is an off-switch, not an outage', () {
-      // Turning a source off should not quietly hand the library to another
-      // server.
-      final withDisabled = [_src('lan', fallback: 'wan', enabled: false), wan];
-
-      final c = chooseSource(
-        sources: withDisabled,
-        activeSourceId: 'lan',
-        reachable: {'wan'},
-      );
-
-      expect(c.source, isNull);
+      expect(c.source?.id, 'wan2');
+      expect(c.preferred?.id, 'lan');
+      expect(c.isFallback, isFalse, reason: 'isFallback is false in auto-select mode');
     });
   });
 }

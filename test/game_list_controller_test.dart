@@ -33,6 +33,7 @@ class FakeDatabaseService extends DatabaseService {
     String? sourceId,
     String? endpointId,
     bool includeLocal = false,
+    String? cacheOwnerId,
   }) async =>
       cachedGames;
 
@@ -49,6 +50,7 @@ class FakeDatabaseService extends DatabaseService {
     bool forceDeleteOrphans = false,
     String sourceId = '',
     String endpointId = '',
+    String? cacheOwnerId,
   }) async {
     savedSystemSlug = systemSlug;
     savedGames = games;

@@ -67,6 +67,9 @@ class LibrarySyncState {
 ///
 /// This service uses static [_lastSyncTimes] state and is designed for
 /// single-isolate use only. Do not instantiate across multiple isolates.
+/// The identity resolver: a source owns its own cached library.
+String _ownsItself(String sourceId) => sourceId;
+
 class LibrarySyncService extends StateNotifier<LibrarySyncState> {
   bool _isCancelled = false;
   Completer<void>? _syncCompleter;
@@ -144,7 +147,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           if (systemModel != null) {
             final games = await RomManager.scanLocalGamesIsolate(
               systemModel, systemConfig.targetFolder);
-            await db.saveGamesByRoute(systemConfig.id, games, forceDeleteOrphans: true);
+            await db.saveGamesByRoute(systemConfig.id, games,
+            forceDeleteOrphans: true, cacheOwnerOf: config.cacheOwnerIdFor);
             perSystem[systemConfig.id] = games.length;
             totalGames += games.length;
           }
@@ -161,7 +165,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
             games = remoteGames;
           }
           await db.saveGamesByRoute(systemConfig.id, games,
-              deleteOrphans: true, forceDeleteOrphans: true);
+              deleteOrphans: true, forceDeleteOrphans: true,
+              cacheOwnerOf: config.cacheOwnerIdFor);
           perSystem[systemConfig.id] = games.length;
           totalGames += games.length;
         }
@@ -176,7 +181,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
             final localGames = await RomManager.scanLocalGamesIsolate(
               systemModel, systemConfig.targetFolder);
             if (localGames.isNotEmpty) {
-              await db.saveGamesByRoute(systemConfig.id, localGames);
+              await db.saveGamesByRoute(systemConfig.id, localGames,
+                cacheOwnerOf: config.cacheOwnerIdFor);
               perSystem[systemConfig.id] = localGames.length;
               totalGames += localGames.length;
               debugPrint('LibrarySync: saved ${localGames.length} local fallback games for ${systemConfig.id}');
@@ -273,7 +279,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           if (systemModel != null) {
             final games = await RomManager.scanLocalGamesIsolate(
               systemModel, systemConfig.targetFolder);
-            await db.saveGamesByRoute(systemConfig.id, games, forceDeleteOrphans: true);
+            await db.saveGamesByRoute(systemConfig.id, games,
+            forceDeleteOrphans: true, cacheOwnerOf: config.cacheOwnerIdFor);
             perSystem[systemConfig.id] = games.length;
             totalGames += games.length;
           }
@@ -288,7 +295,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           } else {
             games = remoteGames;
           }
-          await db.saveGamesByRoute(systemConfig.id, games, deleteOrphans: true);
+          await db.saveGamesByRoute(systemConfig.id, games, deleteOrphans: true,
+              cacheOwnerOf: config.cacheOwnerIdFor);
           perSystem[systemConfig.id] = games.length;
           totalGames += games.length;
         }
@@ -302,7 +310,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
             final localGames = await RomManager.scanLocalGamesIsolate(
               systemModel, systemConfig.targetFolder);
             if (localGames.isNotEmpty) {
-              await db.saveGamesByRoute(systemConfig.id, localGames);
+              await db.saveGamesByRoute(systemConfig.id, localGames,
+                cacheOwnerOf: config.cacheOwnerIdFor);
               perSystem[systemConfig.id] = localGames.length;
               totalGames += localGames.length;
               debugPrint('LibrarySync: saved ${localGames.length} local fallback games for ${systemConfig.id}');
@@ -383,7 +392,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
             systemModel,
             systemConfig.targetFolder,
           );
-          await db.saveGamesByRoute(systemConfig.id, games, forceDeleteOrphans: true);
+          await db.saveGamesByRoute(systemConfig.id, games,
+            forceDeleteOrphans: true, cacheOwnerOf: config.cacheOwnerIdFor);
         } else {
           // Remote + local merge
           final remoteGames = await gameService.fetchGamesForSystem(
@@ -394,7 +404,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
             systemConfig.targetFolder,
           );
           games = GameMergeHelper.merge(remoteGames, localGames, systemModel);
-          await db.saveGamesByRoute(systemConfig.id, games, deleteOrphans: true);
+          await db.saveGamesByRoute(systemConfig.id, games, deleteOrphans: true,
+              cacheOwnerOf: config.cacheOwnerIdFor);
         }
 
         perSystem[systemConfig.id] = games.length;
@@ -408,7 +419,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
             final localGames = await RomManager.scanLocalGamesIsolate(
               systemModel, systemConfig.targetFolder);
             if (localGames.isNotEmpty) {
-              await db.saveGamesByRoute(systemConfig.id, localGames);
+              await db.saveGamesByRoute(systemConfig.id, localGames,
+                cacheOwnerOf: config.cacheOwnerIdFor);
               perSystem[systemConfig.id] = localGames.length;
               totalGames += localGames.length;
               debugPrint('LibrarySync: saved ${localGames.length} local fallback games for ${systemConfig.id}');
@@ -486,7 +498,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     final db = DatabaseService();
     final gameService = UnifiedGameService(syncTimeout: syncTimeout);
 
-    await _syncOneSystem(systemConfig, systemId, db, gameService);
+    await _syncOneSystem(systemConfig, systemId, db, gameService,
+        cacheOwnerOf: config.cacheOwnerIdFor);
 
     // Process any systems that were queued while the first was syncing
     await _processQueue(config, db, gameService,
@@ -527,6 +540,7 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         currentSystem: _displayName(nextId, systemConfig),
       );
       await _syncOneSystem(systemConfig, nextId, db, gameService,
+          cacheOwnerOf: config.cacheOwnerIdFor,
           storageService: storageService);
     }
   }
@@ -538,6 +552,10 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     DatabaseService db,
     UnifiedGameService gameService, {
     StorageService? storageService,
+    // Sources the user grouped write into one shared library. Defaulting to
+    // "every source owns its own" keeps a caller that has no config working
+    // the way it always did.
+    String Function(String sourceId) cacheOwnerOf = _ownsItself,
   }) async {
     final systemModel = SystemModel.supportedSystems
         .where((s) => s.id == systemId)
@@ -554,7 +572,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
         } else {
           games = [];
         }
-        await db.saveGamesByRoute(systemConfig.id, games, forceDeleteOrphans: true);
+        await db.saveGamesByRoute(systemConfig.id, games,
+            forceDeleteOrphans: true, cacheOwnerOf: cacheOwnerOf);
       } else {
         final remoteGames = await gameService.fetchGamesForSystem(
           systemConfig);
@@ -566,7 +585,9 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           games = remoteGames;
         }
         await db.saveGamesByRoute(systemConfig.id, games,
-            deleteOrphans: true, forceDeleteOrphans: true);
+            deleteOrphans: true,
+            forceDeleteOrphans: true,
+            cacheOwnerOf: cacheOwnerOf);
       }
 
       final perSystem = Map<String, int>.of(state.gamesPerSystem);
@@ -587,7 +608,8 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
           final localGames = await RomManager.scanLocalGamesIsolate(
             systemModel, systemConfig.targetFolder);
           if (localGames.isNotEmpty) {
-            await db.saveGamesByRoute(systemConfig.id, localGames);
+            await db.saveGamesByRoute(systemConfig.id, localGames,
+                cacheOwnerOf: cacheOwnerOf);
             final perSystem = Map<String, int>.of(state.gamesPerSystem);
             perSystem[systemConfig.id] = localGames.length;
             state = state.copyWith(
