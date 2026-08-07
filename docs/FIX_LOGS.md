@@ -557,3 +557,23 @@ v15 的遷移**知道**要建這個臨時索引（那段還寫了註解說明為
 emoveSource 才需清除）。
 - **修復**：從 setEnabled 中移除 _purgeCachedGamesFor 的呼叫。停用來源切換變為 0ms 即時反應，重新啟用來源時亦可即時從快取載入。
 - **檔案**：lib/services/sources_notifier.dart（setEnabled 移除快取清理） · 	est/sources_notifier_test.dart
+
+## [R-Shop QR碼手把導覽] QrPairingScreen 掃碼頁不支援手把搖桿切換焦點與按鈕選擇
+
+- **問題**：開啟 QR code 掃瞄頁面（QrPairingScreen）時，手把搖桿/D-pad 無法在「左上角返回按鈕」與「底部手動輸入配對碼按鈕」之間切換焦點；且全域鍵盤監聽強制攔截了 [A] 鍵，導致游標就算停在返回按鈕上按下 [A] 仍會強制跳轉至手動輸入頁面。
+- **根因**：_handleScreenKey 寫死了全域 [A] 鍵觸發 _openManual()，且 initState 未指派初始焦點至可聚焦按鈕；畫面缺乏上下方向鍵切換邏輯與 ConsoleHud 手把提示。
+- **修復**：
+  1. initState 中加入 ddPostFrameCallback 預設聚焦至「手動輸入配對碼」按鈕（_manualFocus），畫面開啟即顯示白色手把焦點框。
+  2. _handleScreenKey 移除全域 [A] 攔截，交由 ConsoleFocusable 自身的焦點處理；新增搖桿/D-pad 上/下（rrowUp/rrowDown）方向鍵在 _manualFocus 與 _backFocus 之間的切換邏輯並播放按鍵音效。
+  3. 底部加入 ConsoleHud 顯示手把提示 ([B] 返回 · [A] 確定 / 選擇)。
+- **檔案**：lib/features/pairing/qr_pairing_screen.dart（手把焦點切換、ConsoleHud 與初始化焦點） · 	est/widgets/qr_pairing_screen_test.dart（新增手把導覽單元測試）
+
+## [R-Shop QR碼手把導覽] QrPairingScreen 掃碼頁不支援手把搖桿切換焦點與按鈕選擇
+
+- **問題**：開啟 QR code 掃瞄頁面（QrPairingScreen）時，手把搖桿/D-pad 無法在「左上角返回按鈕」與「底部手動輸入配對碼按鈕」之間切換焦點；且全域鍵盤監聽強制攔截了 [A] 鍵，導致游標就算停在返回按鈕上按下 [A] 仍會強制跳轉至手動輸入頁面。
+- **根因**：_handleScreenKey 寫死了全域 [A] 鍵觸發 _openManual()，且 initState 未指派初始焦點至可聚焦按鈕；畫面缺乏上下方向鍵切換邏輯與 ConsoleHud 手把提示。
+- **修復**：
+  1. initState 中加入 ddPostFrameCallback 預設聚焦至「手動輸入配對碼」按鈕（_manualFocus），畫面開啟即顯示白色手把焦點框。
+  2. _handleScreenKey 移除全域 [A] 攔截，交由 ConsoleFocusable 自身的焦點處理；新增搖桿/D-pad 上/下/左/右（rrowUp/rrowDown/rrowLeft/rrowRight）方向鍵在 _manualFocus 與 _backFocus 之間的切換邏輯並播放按鍵音效。
+  3. 底部加入 ConsoleHud 顯示手把提示 ([B] 返回 · [A] 確定 / 選擇)。
+- **檔案**：lib/features/pairing/qr_pairing_screen.dart（手把焦點切換、ConsoleHud 與初始化焦點） · 	est/widgets/qr_pairing_screen_test.dart（新增手把導覽單元測試）

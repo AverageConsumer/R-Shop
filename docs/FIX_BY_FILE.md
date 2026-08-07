@@ -253,3 +253,5 @@
 - R-Shop 自動選最快
 - R-Shop ƴsب^
 - R-Shop 來源停用快取
+- R-Shop QR碼手把導覽
+- R-Shop QR碼手把導覽
