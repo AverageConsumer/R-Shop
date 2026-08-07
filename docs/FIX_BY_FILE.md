@@ -256,3 +256,4 @@
 - R-Shop QR碼手把導覽
 - R-Shop QR碼手把導覽
 - R-Shop 語系鎖定詞彙統一
+- R-Shop 主頁面移除來源切換

@@ -586,3 +586,13 @@ emoveSource 才需清除）。
   1. 統一德語 (Gesperrt/Sperre aufheben)、西班牙語與葡萄牙語 (Bloqueada/Desbloquear)、日語 (ロック中/ロックを解除) 的「鎖定/Locked」系列翻譯詞彙。
   2. 重新執行 lutter gen-l10n 產生 pp_localizations_*.dart 檔案。
 - **檔案**：lib/l10n/app_{de,es,ja,pt}.arb · lib/l10n/app_localizations_{de,es,ja,pt}.dart
+
+## [R-Shop 主頁面移除來源切換] 主頁面移除頂部來源標籤條與 L2/R2 手把切換來源功能
+
+- **問題**：先前主頁面頂部設有來源標籤條（Source Banner），並允許手把 L2/R2 觸發切換作用來源；使用者明確需求為簡化介面，主頁面一次只顯示目前唯一作用來源，來源與備援來源的選擇與切換統一在「來源清單」頁面設定。
+- **根因**：舊設計在主頁面上提供了額外來源切換入口。
+- **修復**：
+  1. lib/features/home/home_view.dart 移除頂部來源條 _buildSourceBanner() 及其在 ody 版面中的 Column 擴展包覆。
+  2. 移除全域快捷鍵 TabLeftIntent (L2) / TabRightIntent (R2) 觸發來源切換的監聽綁定及 _cycleActiveSource() 輔助函式。
+  3. 移除底部 ConsoleHud 手把提示中的 L2: 前的提供元 與 R2: 次的提供元 按鈕圖示。
+- **檔案**：lib/features/home/home_view.dart（移除來源顯示條、L2/R2 Intents 與 HUD 提示）

@@ -51,6 +51,7 @@
 | **黃色條與雙入口** ⚠️ | 那條黃黑斜紋是 `RenderFlex` **版面溢位警示**不是功能；把功能從選單列搬到圖示上會**弄丟手把入口**（圖示預設只有觸控） | `lib/features/settings/sources_screen.dart`（選單改 `SingleChildScrollView`、卡片列與標頭各加一個眼睛） |
 | **標頭高度與誤讀的按鍵字** | 圖示旁的裸字母 `X` 被讀成關閉鈕；沉浸模式在 `initState` 才切，**第一幀還有狀態列 inset**，包了 `SafeArea` 的標題列會進場高一列再縮回去 | `lib/features/settings/sources_screen.dart` · `lib/features/home/home_view.dart`（`_buildSourceBanner` 拿掉 `SafeArea`） |
 | **R-Shop QR碼手把導覽** ✨ | `QrPairingScreen` 掃碼頁加入搖桿/D-pad 焦點切換邏輯與初始化 Focus，支援手把切換至返回按鈕與手動輸入按鈕及底部 ConsoleHud | `lib/features/pairing/qr_pairing_screen.dart` · `test/widgets/qr_pairing_screen_test.dart` |
+| **R-Shop 主頁面移除來源切換** ✨ | 主頁面移除頂部來源條與 L2/R2 來源切換快捷鍵及 HUD 提示，改由來源清單統一管理主要與備援來源 | `lib/features/home/home_view.dart` |
 
 ## 🛠️ 建置與環境
 
