@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/widgets/console_focusable.dart';
 import '../../models/config/source.dart';
 import '../../providers/app_providers.dart';
+import '../../widgets/console_dialog.dart';
 import '../../widgets/console_hud.dart';
 
-/// Overlay for managing a source's multi-entry fallback chain and auto-select toggle.
+/// Source screen architecture overlay for managing a source's multi-fallback chain.
 class FallbackPickerOverlay extends ConsumerStatefulWidget {
   const FallbackPickerOverlay({
     super.key,
@@ -20,17 +22,54 @@ class FallbackPickerOverlay extends ConsumerStatefulWidget {
   final VoidCallback? onAddFreshSource;
 
   @override
-  ConsumerState<FallbackPickerOverlay> createState() => _FallbackPickerOverlayState();
+  ConsumerState<FallbackPickerOverlay> createState() =>
+      _FallbackPickerOverlayState();
 }
 
-class _FallbackPickerOverlayState extends ConsumerState<FallbackPickerOverlay> {
-  int _focusedIndex = 0;
+class _FallbackPickerOverlayState
+    extends ConsumerState<FallbackPickerOverlay> {
+  final _screenFocus = FocusScopeNode(debugLabel: 'fallback_overlay_screen');
+  final _backFocus = FocusNode(debugLabel: 'fallback_overlay_back');
+  final _autoSelectFocus = FocusNode(debugLabel: 'fallback_overlay_autoselect');
+  final _addFreshFocus = FocusNode(debugLabel: 'fallback_overlay_add_fresh');
+  final _pickExistingFocus = FocusNode(debugLabel: 'fallback_overlay_pick_existing');
+
+  final Map<String, FocusNode> _fallbackFocusNodes = {};
   int? _sortingIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _autoSelectFocus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _screenFocus.dispose();
+    _backFocus.dispose();
+    _autoSelectFocus.dispose();
+    _addFreshFocus.dispose();
+    _pickExistingFocus.dispose();
+    for (final fn in _fallbackFocusNodes.values) {
+      fn.dispose();
+    }
+    super.dispose();
+  }
+
+  FocusNode _focusForFallback(String id) {
+    return _fallbackFocusNodes.putIfAbsent(
+      id,
+      () => FocusNode(debugLabel: 'fallback_item_$id'),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(sourcesProvider);
-    final source = state.sources.where((s) => s.id == widget.sourceId).firstOrNull;
+    final source =
+        state.sources.where((s) => s.id == widget.sourceId).firstOrNull;
 
     if (source == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => widget.onClose());
@@ -43,13 +82,9 @@ class _FallbackPickerOverlayState extends ConsumerState<FallbackPickerOverlay> {
     ];
 
     final isSorting = _sortingIndex != null;
-    // Row 0: Auto Select toggle
-    // Rows 1..N: Fallback items
-    // Row N+1: Add Fresh Source button
-    // Row N+2: Pick Existing Source button
-    final totalRows = 1 + fallbackSources.length + 2;
 
     return FocusScope(
+      node: _screenFocus,
       autofocus: true,
       onKeyEvent: (node, event) {
         if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
@@ -58,8 +93,7 @@ class _FallbackPickerOverlayState extends ConsumerState<FallbackPickerOverlay> {
         final key = event.logicalKey;
 
         if (key == LogicalKeyboardKey.gameButtonB ||
-            key == LogicalKeyboardKey.escape ||
-            key == LogicalKeyboardKey.backspace) {
+            key == LogicalKeyboardKey.escape) {
           if (isSorting) {
             setState(() => _sortingIndex = null);
             return KeyEventResult.handled;
@@ -68,68 +102,28 @@ class _FallbackPickerOverlayState extends ConsumerState<FallbackPickerOverlay> {
           return KeyEventResult.handled;
         }
 
-        if (key == LogicalKeyboardKey.arrowUp) {
-          if (isSorting) {
-            _moveFallback(source, fallbackSources, _focusedIndex - 1, -1);
-            return KeyEventResult.handled;
-          }
-          setState(() {
-            _focusedIndex = (_focusedIndex - 1 + totalRows) % totalRows;
-          });
-          return KeyEventResult.handled;
-        }
-
-        if (key == LogicalKeyboardKey.arrowDown) {
-          if (isSorting) {
-            _moveFallback(source, fallbackSources, _focusedIndex - 1, 1);
-            return KeyEventResult.handled;
-          }
-          setState(() {
-            _focusedIndex = (_focusedIndex + 1) % totalRows;
-          });
-          return KeyEventResult.handled;
-        }
-
-        if (key == LogicalKeyboardKey.gameButtonA ||
-            key == LogicalKeyboardKey.enter ||
-            key == LogicalKeyboardKey.space) {
-          if (isSorting) {
-            setState(() => _sortingIndex = null);
-            return KeyEventResult.handled;
-          }
-          _activateRow(source, fallbackSources, _focusedIndex);
-          return KeyEventResult.handled;
-        }
-
-        // [X] button removes fallback if focused on a fallback item
-        if ((key == LogicalKeyboardKey.gameButtonX || key == LogicalKeyboardKey.keyX) && !isSorting) {
-          if (_focusedIndex >= 1 && _focusedIndex <= fallbackSources.length) {
-            final targetFb = fallbackSources[_focusedIndex - 1];
-            ref.read(sourcesProvider.notifier).removeFallbackSource(
-                  source.id,
-                  targetFb.id,
-                );
-            return KeyEventResult.handled;
-          }
-        }
-
         return KeyEventResult.ignored;
       },
       child: Material(
-        color: Colors.black87,
+        color: const Color(0xFF141414),
         child: Column(
           children: [
-            // Header
+            // Top Header matching Source Screen Architecture
             Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.grey[900],
+              padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+              color: Colors.black26,
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: widget.onClose,
+                  ConsoleFocusable(
+                    focusNode: _backFocus,
+                    onSelect: widget.onClose,
+                    borderRadius: 20.0,
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(Icons.arrow_back, color: Colors.white, size: 26),
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   Text(
                     '${source.name} - 備援設定',
                     style: const TextStyle(
@@ -142,15 +136,66 @@ class _FallbackPickerOverlayState extends ConsumerState<FallbackPickerOverlay> {
               ),
             ),
 
-            // Content List
+            // Main Content List
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
                   // Row 0: Auto Select Toggle
-                  _buildAutoSelectRow(source, isFocused: _focusedIndex == 0),
+                  ConsoleFocusable(
+                    focusNode: _autoSelectFocus,
+                    onSelect: () {
+                      ref.read(sourcesProvider.notifier).setFallbackAutoSelect(
+                            source.id,
+                            !source.fallbackAutoSelect,
+                          );
+                    },
+                    borderRadius: 8.0,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: source.fallbackAutoSelect
+                            ? const Color(0xFFE50914).withAlpha(90)
+                            : Colors.grey[850],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            source.fallbackAutoSelect
+                                ? Icons.check_box
+                                : Icons.check_box_outline_blank,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '自動選擇',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  source.fallbackAutoSelect
+                                      ? '自動探測並優先使用回應最快的備援來源'
+                                      : '未勾選：依下方自訂順序依次嘗試備援來源',
+                                  style: const TextStyle(
+                                      color: Colors.grey, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   const Text(
                     '備援來源清單（優先順序）',
                     style: TextStyle(
@@ -176,96 +221,75 @@ class _FallbackPickerOverlayState extends ConsumerState<FallbackPickerOverlay> {
                         source: source,
                         fallback: fallbackSources[i],
                         index: i,
-                        isFocused: _focusedIndex == i + 1,
-                        isSorting: _sortingIndex == i + 1,
+                        fallbacks: fallbackSources,
+                        isSorting: _sortingIndex == i,
                       ),
 
                   const SizedBox(height: 24),
 
-                  // Bottom Action Row 1: Add Fresh Source
-                  _buildActionButton(
-                    label: '+ 新建全新備援來源',
-                    isFocused: _focusedIndex == fallbackSources.length + 1,
-                    onTap: () {
+                  // Bottom Action 1: Add Fresh Source
+                  ConsoleFocusable(
+                    focusNode: _addFreshFocus,
+                    onSelect: () {
                       widget.onClose();
                       widget.onAddFreshSource?.call();
                     },
+                    borderRadius: 8.0,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        '+ 新建全新備援來源',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 12),
 
-                  // Bottom Action Row 2: Pick Existing Source
-                  _buildActionButton(
-                    label: '+ 從既有來源選擇備援',
-                    isFocused: _focusedIndex == fallbackSources.length + 2,
-                    onTap: () => _showPickExistingDialog(source, state.sources),
+                  // Bottom Action 2: Pick Existing Source
+                  ConsoleFocusable(
+                    focusNode: _pickExistingFocus,
+                    onSelect: () =>
+                        _showPickExistingDialog(source, state.sources),
+                    borderRadius: 8.0,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        '+ 從既有來源選擇備援',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
 
-            // HUD
+            // Standard Console HUD
             ConsoleHud(
               embedded: true,
               b: const HudAction('返回'),
               a: HudAction(isSorting ? '完成排序' : '確定 / 排序'),
-              x: (_focusedIndex >= 1 && _focusedIndex <= fallbackSources.length && !isSorting)
+              x: (!isSorting && fallbackSources.isNotEmpty)
                   ? const HudAction('移除備援')
                   : null,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAutoSelectRow(Source source, {required bool isFocused}) {
-    return InkWell(
-      onTap: () {
-        ref.read(sourcesProvider.notifier).setFallbackAutoSelect(
-              source.id,
-              !source.fallbackAutoSelect,
-            );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isFocused ? Colors.red[900]!.withAlpha(90) : Colors.grey[850],
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isFocused ? Colors.white : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              source.fallbackAutoSelect
-                  ? Icons.check_box
-                  : Icons.check_box_outline_blank,
-              color: Colors.white,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '自動選擇',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    source.fallbackAutoSelect
-                        ? '自動連線並優先使用回應最快的備援來源'
-                        : '未勾選：依下方自訂順序依次嘗試備援來源',
-                    style: const TextStyle(color: Colors.grey, fontSize: 13),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
@@ -277,123 +301,107 @@ class _FallbackPickerOverlayState extends ConsumerState<FallbackPickerOverlay> {
     required Source source,
     required Source fallback,
     required int index,
-    required bool isFocused,
+    required List<Source> fallbacks,
     required bool isSorting,
   }) {
-    final bgColor = isSorting
-        ? Colors.amber[900]!.withAlpha(180)
-        : (isFocused ? Colors.red[900]!.withAlpha(90) : Colors.grey[850]);
+    final fn = _focusForFallback(fallback.id);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            _sortingIndex = isSorting ? null : index + 1;
-          });
+      child: FocusScope(
+        onKeyEvent: (node, event) {
+          if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+            return KeyEventResult.ignored;
+          }
+          final key = event.logicalKey;
+
+          if (isSorting) {
+            if (key == LogicalKeyboardKey.arrowUp) {
+              _moveFallback(source, fallbacks, index, -1);
+              return KeyEventResult.handled;
+            }
+            if (key == LogicalKeyboardKey.arrowDown) {
+              _moveFallback(source, fallbacks, index, 1);
+              return KeyEventResult.handled;
+            }
+          }
+
+          if ((key == LogicalKeyboardKey.gameButtonX ||
+                  key == LogicalKeyboardKey.keyX) &&
+              !isSorting) {
+            ref.read(sourcesProvider.notifier).removeFallbackSource(
+                  source.id,
+                  fallback.id,
+                );
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
         },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isFocused ? Colors.white : Colors.transparent,
-              width: 2,
+        child: ConsoleFocusable(
+          focusNode: fn,
+          onSelect: () {
+            setState(() {
+              _sortingIndex = isSorting ? null : index;
+            });
+          },
+          borderRadius: 8.0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isSorting
+                  ? Colors.amber[900]!.withAlpha(180)
+                  : Colors.grey[850],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  '#${index + 1}',
+                  style: const TextStyle(
+                    color: Colors.amber,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fallback.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '${fallback.type.shortLabel} - ${fallback.hostLabel}',
+                        style:
+                            const TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isSorting)
+                  const Icon(Icons.swap_vert, color: Colors.amber)
+                else
+                  IconButton(
+                    icon:
+                        const Icon(Icons.delete_outline, color: Colors.white70),
+                    onPressed: () {
+                      ref.read(sourcesProvider.notifier).removeFallbackSource(
+                            source.id,
+                            fallback.id,
+                          );
+                    },
+                  ),
+              ],
             ),
           ),
-          child: Row(
-            children: [
-              Text(
-                '#${index + 1}',
-                style: const TextStyle(
-                  color: Colors.amber,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      fallback.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      '${fallback.type.shortLabel} - ${fallback.hostLabel}',
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              if (isSorting)
-                const Icon(Icons.swap_vert, color: Colors.amber)
-              else
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.white70),
-                  onPressed: () {
-                    ref.read(sourcesProvider.notifier).removeFallbackSource(
-                          source.id,
-                          fallback.id,
-                        );
-                  },
-                ),
-            ],
-          ),
         ),
       ),
     );
-  }
-
-  Widget _buildActionButton({
-    required String label,
-    required bool isFocused,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isFocused ? Colors.red[900]!.withAlpha(90) : Colors.grey[800],
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isFocused ? Colors.white : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _activateRow(Source source, List<Source> fallbacks, int rowIndex) {
-    if (rowIndex == 0) {
-      ref.read(sourcesProvider.notifier).setFallbackAutoSelect(
-            source.id,
-            !source.fallbackAutoSelect,
-          );
-    } else if (rowIndex >= 1 && rowIndex <= fallbacks.length) {
-      setState(() => _sortingIndex = rowIndex);
-    } else if (rowIndex == fallbacks.length + 1) {
-      widget.onClose();
-      widget.onAddFreshSource?.call();
-    } else if (rowIndex == fallbacks.length + 2) {
-      _showPickExistingDialog(source, ref.read(sourcesProvider).sources);
-    }
   }
 
   void _moveFallback(
@@ -415,32 +423,23 @@ class _FallbackPickerOverlayState extends ConsumerState<FallbackPickerOverlay> {
           updatedIds,
         );
     setState(() {
-      _focusedIndex = toIndex + 1;
-      _sortingIndex = toIndex + 1;
+      _sortingIndex = toIndex;
     });
   }
 
   void _showPickExistingDialog(Source source, List<Source> allSources) {
     final candidates = allSources
-        .where((s) => s.id != source.id && !source.fallbackSourceIds.contains(s.id))
+        .where(
+            (s) => s.id != source.id && !source.fallbackSourceIds.contains(s.id))
         .toList();
 
     if (candidates.isEmpty) {
       showDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: Colors.grey[900],
-          title: const Text('沒有可用的來源', style: TextStyle(color: Colors.white)),
-          content: const Text(
-            '目前沒有其他未綁定的既有來源可供選擇。請選擇「新建全新備援來源」。',
-            style: TextStyle(color: Colors.grey),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('確定', style: TextStyle(color: Colors.redAccent)),
-            ),
-          ],
+        builder: (ctx) => const ConsoleDialog(
+          title: '沒有可用的來源',
+          message: '目前沒有其他未綁定的既有來源可供選擇。請選擇「新建全新備援來源」。',
+          primaryLabel: '確定',
         ),
       );
       return;
@@ -449,8 +448,9 @@ class _FallbackPickerOverlayState extends ConsumerState<FallbackPickerOverlay> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: const Text('選擇既有來源作為備援', style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF141414),
+        title: const Text('選擇既有來源作為備援',
+            style: TextStyle(color: Colors.white)),
         content: SizedBox(
           width: 300,
           height: 250,
@@ -459,7 +459,8 @@ class _FallbackPickerOverlayState extends ConsumerState<FallbackPickerOverlay> {
             itemBuilder: (context, index) {
               final cand = candidates[index];
               return ListTile(
-                title: Text(cand.name, style: const TextStyle(color: Colors.white)),
+                title: Text(cand.name,
+                    style: const TextStyle(color: Colors.white)),
                 subtitle: Text('${cand.type.shortLabel} - ${cand.hostLabel}',
                     style: const TextStyle(color: Colors.grey)),
                 onTap: () {
