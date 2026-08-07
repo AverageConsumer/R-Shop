@@ -1647,7 +1647,7 @@ class LDe extends L {
   String get sources_routeInUse => 'In Verwendung';
 
   @override
-  String get sources_routePinned => 'Fixiert';
+  String get sources_routePinned => 'Gesperrt';
 
   @override
   String get sources_routeReachable => 'Erreichbar';
@@ -1676,7 +1676,7 @@ class LDe extends L {
 
   @override
   String get sources_routeReleasePin =>
-      'Hebt die Fixierung auf und wählt wieder den schnellsten Weg';
+      'Hebt die Sperre auf und wählt wieder den schnellsten Weg';
 
   @override
   String get sources_routeOwnLogin => 'Eigene Anmeldung';
@@ -1877,10 +1877,10 @@ class LDe extends L {
   String get sources_routeUse => 'Diesen Weg nutzen';
 
   @override
-  String get sources_routeLock => 'Auf diesen Weg festlegen';
+  String get sources_routeLock => 'Auf diese Route sperren';
 
   @override
-  String get sources_routeUnlock => 'Festlegung aufheben';
+  String get sources_routeUnlock => 'Sperre aufheben';
 
   @override
   String sources_removeRouteConfirm(String name) {

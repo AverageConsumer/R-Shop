@@ -1647,7 +1647,7 @@ class LPt extends L {
   String get sources_routeInUse => 'Em uso';
 
   @override
-  String get sources_routePinned => 'Fixada';
+  String get sources_routePinned => 'Bloqueada';
 
   @override
   String get sources_routeReachable => 'Acessível';
@@ -1676,7 +1676,7 @@ class LPt extends L {
 
   @override
   String get sources_routeReleasePin =>
-      'Liberta a fixação e volta a escolher a mais rápida';
+      'Remove o bloqueio e volta a escolher a mais rápida';
 
   @override
   String get sources_routeOwnLogin => 'Início de sessão próprio';

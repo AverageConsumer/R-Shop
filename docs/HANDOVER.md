@@ -119,14 +119,9 @@ UI 的東西 `analyze` 與單元測試都驗不到——見 `.agents/skills/rsho
    群組成員多的時候**看有沒有黃黑斜紋**。
 3. 都確認之後：把 `wip/source-groups` 併回 `main-zh`。
 
-### 2.2 五語系的「已鎖定」用詞不一致
+### 2.2 多語系的「已鎖定」用詞不一致 (已完成 - 2026-08-08)
 
-en/zh 是「Locked／已鎖定」，de/es/ja/pt 仍是「固定」（`Fixiert`／`Fijada`／`固定`／`Fixada`），
-只有 fr 是 `Verrouillée`。翻譯時是照各檔既有用詞走的，**不算錯，但六種語言講的不是同一件事**。
-要統一就六個檔一起改 `sources_routePinned` 與相關句子。
-
-順帶：`app_ja.arb` 與 `app_pt.arb` 的 `sources_*` 區塊現在**跳脫方式混用**——
-檔案整體慣例是 `\uXXXX`，先前有人直接寫了原字。不影響行為，看得刺眼而已。
+已統一全語系 (de/en/es/fr/ja/pt/zh) 的「已鎖定 (Locked)」相關詞彙（如 `sources_routePinned`、`sources_routeLock`、`sources_routeUnlock`、`sources_routeReleasePin`），並修復 `app_ja.arb` 中的跳脫混用問題。
 
 ---
 

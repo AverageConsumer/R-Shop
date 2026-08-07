@@ -577,3 +577,12 @@ emoveSource 才需清除）。
   2. _handleScreenKey 移除全域 [A] 攔截，交由 ConsoleFocusable 自身的焦點處理；新增搖桿/D-pad 上/下/左/右（rrowUp/rrowDown/rrowLeft/rrowRight）方向鍵在 _manualFocus 與 _backFocus 之間的切換邏輯並播放按鍵音效。
   3. 底部加入 ConsoleHud 顯示手把提示 ([B] 返回 · [A] 確定 / 選擇)。
 - **檔案**：lib/features/pairing/qr_pairing_screen.dart（手把焦點切換、ConsoleHud 與初始化焦點） · 	est/widgets/qr_pairing_screen_test.dart（新增手把導覽單元測試）
+
+## [R-Shop 語系鎖定詞彙統一] 多語系「已鎖定/Pinned」詞彙統一與 Unicode 跳脫清理
+
+- **問題**：sources_routePinned、sources_routeLock、sources_routeUnlock、sources_routeReleasePin 等連線與鎖定相關詞彙在 de/es/pt/ja 語系之間用詞不一致（如 de 混用 Fixiert/festlegen、es/pt 混用 Fijada/Fixada、ja 混用 固定/ロック），且 pp_ja.arb 檔案後半段跳脫格式混用。
+- **根因**：過往多語系翻譯分散新增時使用了非標準同義詞。
+- **修復**：
+  1. 統一德語 (Gesperrt/Sperre aufheben)、西班牙語與葡萄牙語 (Bloqueada/Desbloquear)、日語 (ロック中/ロックを解除) 的「鎖定/Locked」系列翻譯詞彙。
+  2. 重新執行 lutter gen-l10n 產生 pp_localizations_*.dart 檔案。
+- **檔案**：lib/l10n/app_{de,es,ja,pt}.arb · lib/l10n/app_localizations_{de,es,ja,pt}.dart

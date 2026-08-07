@@ -1647,7 +1647,7 @@ class LEs extends L {
   String get sources_routeInUse => 'En uso';
 
   @override
-  String get sources_routePinned => 'Fijada';
+  String get sources_routePinned => 'Bloqueada';
 
   @override
   String get sources_routeReachable => 'Accesible';
@@ -1676,7 +1676,7 @@ class LEs extends L {
 
   @override
   String get sources_routeReleasePin =>
-      'Quita la fijación y vuelve a elegir la más rápida';
+      'Quita el bloqueo y vuelve a elegir la más rápida';
 
   @override
   String get sources_routeOwnLogin => 'Inicio de sesión propio';

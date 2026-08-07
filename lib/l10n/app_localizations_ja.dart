@@ -1598,7 +1598,7 @@ class LJa extends L {
   String get sources_routeInUse => '使用中';
 
   @override
-  String get sources_routePinned => '固定中';
+  String get sources_routePinned => 'ロック中';
 
   @override
   String get sources_routeReachable => '接続可能';
@@ -1626,7 +1626,7 @@ class LJa extends L {
   String get sources_routeFastest => '最速';
 
   @override
-  String get sources_routeReleasePin => '固定を解除して最速の経路を選び直します';
+  String get sources_routeReleasePin => 'ロックを解除して最速の経路を選び直します';
 
   @override
   String get sources_routeOwnLogin => '専用ログイン';
@@ -1811,10 +1811,10 @@ class LJa extends L {
   String get sources_routeUse => 'この経路を使用';
 
   @override
-  String get sources_routeLock => 'この経路に固定';
+  String get sources_routeLock => 'この経路にロック';
 
   @override
-  String get sources_routeUnlock => '固定を解除';
+  String get sources_routeUnlock => 'ロックを解除';
 
   @override
   String sources_removeRouteConfirm(String name) {

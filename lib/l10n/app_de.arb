@@ -535,7 +535,7 @@
   "sources_routeAuto": "Automatisch",
   "sources_routeAutoHint": "Den schnellsten Weg nutzen, der antwortet – wird bei Netzwechsel neu geprüft",
   "sources_routeInUse": "In Verwendung",
-  "sources_routePinned": "Fixiert",
+  "sources_routePinned": "Gesperrt",
   "sources_routeReachable": "Erreichbar",
   "sources_routeNoAnswer": "Keine Antwort",
   "sources_routeChecking": "Wird geprüft…",
@@ -543,7 +543,7 @@
   "sources_routeAutoPicks": "Würde {route} nutzen",
   "sources_routeAutoNoneReachable": "Nichts hat geantwortet",
   "sources_routeFastest": "Am schnellsten",
-  "sources_routeReleasePin": "Hebt die Fixierung auf und wählt wieder den schnellsten Weg",
+  "sources_routeReleasePin": "Hebt die Sperre auf und wählt wieder den schnellsten Weg",
   "sources_routeOwnLogin": "Eigene Anmeldung",
   "sources_routeAuthTitle": "Anmeldung für diesen Weg",
   "sources_routeAuthHint": "Leer lassen, um die Anmeldung der Quelle zu nutzen. Nur ausfüllen, wenn diese Adresse eine andere verlangt.",
@@ -600,7 +600,7 @@
   "sources_groupMemberHint": "▶ nimmt sie aus der Gruppe, [A] sortiert",
   "sources_routeRowHint": "Zeile auswählen zum Umsortieren; ▶ für die Symbole: bearbeiten oder entfernen",
   "sources_routeUse": "Diesen Weg nutzen",
-  "sources_routeLock": "Auf diesen Weg festlegen",
-  "sources_routeUnlock": "Festlegung aufheben",
+  "sources_routeLock": "Auf diese Route sperren",
+  "sources_routeUnlock": "Sperre aufheben",
   "sources_removeRouteConfirm": "„{name}“ entfernen? Die zwischengespeicherten Spiele bleiben, nur die Adresse verschwindet."
 }

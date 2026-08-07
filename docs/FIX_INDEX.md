@@ -61,6 +61,7 @@
 | **R-Shop 測試基準** | `flutter test` 的 7 個既有環境失敗**不是回歸** | 無程式碼變更。診斷方法紀錄 |
 | **R-Shop 實機重裝** | 裝置上是別台機器建的 **release** 版，debug 版覆蓋不上且資料備不出來 | 無程式碼變更。`run-as` 判斷法 |
 | **R-Shop onboarding 五語系缺字串** | `DE has all EN keys` 長期紅——**是真的缺三個 onboarding 字串**（de/es/fr/ja/pt），不是環境問題。缺字串不會讓建置失敗，會出貨成空白 | `lib/l10n/app_{de,es,fr,ja,pt}.arb` · `test/l10n_completeness_test.dart` |
+| **R-Shop 語系鎖定詞彙統一** ✨ | 多語系（de/es/ja/pt）「已鎖定/Locked」相關詞彙統一與 `app_ja.arb` 格式整理 | `lib/l10n/app_{de,es,ja,pt}.arb` · `lib/l10n/app_localizations_{de,es,ja,pt}.dart` |
 | **R-Shop analyze 六項** | 累積的 6 個 analyze 問題（未用 import／未用區域變數／`cacheExtent` 已棄用）。`cacheExtent` 要換 `ScrollCacheExtent.pixels()` 而非 `.viewport()`，**單位不同** | `lib/features/game_list/widgets/game_grid.dart` · `lib/features/library/library_screen.dart` · `lib/widgets/console_dialog.dart` · `lib/features/onboarding/widgets/{romm_legacy_login_screen,welcome_chooser_step}.dart` · `lib/features/sources/manual_source_add_screen.dart` |
 | **R-Shop 反查不到** | `build_fix_by_file.py` 報的 `entries without paths` **不是待辦**——沒動到檔的紀錄在反查表上無處可去，數字只會隨這類紀錄往上走 | `scripts/build_fix_by_file.py`（改掉誤導的說明字串） |
 
