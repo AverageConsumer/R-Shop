@@ -143,9 +143,7 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     Map<String, String> manualMappings = const {},
     List<SystemConfig> addSystems = const [],
   }) async {
-    if (state.sources.any((s) => s.id == source.id)) {
-      throw StateError('Source with id ${source.id} already exists');
-    }
+    if (state.sources.any((s) => s.id == source.id)) return;
     final next = [...state.sources, source];
     final addMap = manualMappings.isNotEmpty
         ? {
@@ -219,9 +217,6 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       orElse: () => throw StateError('Unknown source: $id'),
     );
     if (src.enabled == enabled) return;
-    if (!enabled) {
-      await _purgeCachedGamesFor(id);
-    }
     await updateSource(src.copyWith(enabled: enabled));
   }
 

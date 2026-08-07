@@ -252,3 +252,4 @@
 - R-Shop 實機重裝
 - R-Shop 自動選最快
 - R-Shop ƴsب^
+- R-Shop 來源停用快取

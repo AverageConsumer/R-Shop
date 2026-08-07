@@ -549,3 +549,11 @@ v15 的遷移**知道**要建這個臨時索引（那段還寫了註解說明為
 - **״_**Gb _SourcesScreenState sW _addingFallbackForSourceId lܵo_ƴsتӷ IDCsWAɡA۰ʫ_ _fallbackPickerSourceId ^ӳƴ]wBhF\sWɡA۰ʩIs ddFallbackSource jwsӷí}ƴ]wBhC
 - **ɮ**Glib/features/settings/sources_screen.dart]sW _addingFallbackForSourceId AP _addFreshFallbackSource / _closeTypePicker / _addManualSource / _addRommSource / _addRommLegacy _޿^ P 	est/widgets/sources_screen_test.dart]sW fresh fallback _ա^
 
+
+## [R-Shop 來源停用快取] 停用來源時執行整庫刪除與實體檔案檢查導致畫面卡死
+
+- **問題**：使用者在來源設定頁面停用來源（Toggle Disabled）時，畫面出現極大的 Lag 甚至當掉。
+- **根因**：setEnabled(id, false) 在停用時誤呼叫了 _purgeCachedGamesFor(id)。該方法會對資料庫中該來源的數千筆遊戲逐一進行 SD 卡/儲存空間 File.existsSync() 實體檔案檢查與單筆 SQL 刪除，在主執行緒上造成嚴重 UI 卡死與卡頓。且依據專案規範「停用不再清快取」，停用來源只需變更 nabled 狀態，不應清除快取（永久刪除來源 
+emoveSource 才需清除）。
+- **修復**：從 setEnabled 中移除 _purgeCachedGamesFor 的呼叫。停用來源切換變為 0ms 即時反應，重新啟用來源時亦可即時從快取載入。
+- **檔案**：lib/services/sources_notifier.dart（setEnabled 移除快取清理） · 	est/sources_notifier_test.dart
