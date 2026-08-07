@@ -251,3 +251,4 @@
 - R-Shop 測試基準
 - R-Shop 實機重裝
 - R-Shop 自動選最快
+- R-Shop ƴsب^

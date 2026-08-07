@@ -541,3 +541,11 @@ v15 的遷移**知道**要建這個臨時索引（那段還寫了註解說明為
 - **檔案**：`lib/models/config/source.dart` · `lib/models/config/app_config.dart` · `lib/services/source_failover.dart` · `lib/services/endpoint_probe_service.dart` · `lib/services/sources_notifier.dart` · `lib/services/source_resolver.dart` · `lib/features/sources/fallback_picker_overlay.dart` · `lib/features/settings/sources_screen.dart` · `lib/features/home/home_view.dart` · `test/source_failover_sync_test.dart` · `test/source_failover_choice_test.dart` · `test/endpoint_probe_service_test.dart`
 - **驗證**：單元測試套件執行通過（包含 multi-entry fallback 測試），且透過 `deploy.ps1` 順利打包並實機部署至 AYN Thor 測試（PID 3917, logcat 正常無例外）。
 
+
+
+## [R-Shop ƴsب^] sإsƴӷΧ^ӷ]w
+
+- **D**Gbƴ]wBh]FallbackPickerOverlay^Iu+ sإsƴӷvɡAF _fallbackPickerSourceIdC򤣽צbӷܾ [B] BbsWӷ^BΦ\إ߷sӷA|^ӷ]wDM]SourcesScreen^A^ƴ]wBhΦ۰ʸjwsƴC
+- **״_**Gb _SourcesScreenState sW _addingFallbackForSourceId lܵo_ƴsتӷ IDCsWAɡA۰ʫ_ _fallbackPickerSourceId ^ӳƴ]wBhF\sWɡA۰ʩIs ddFallbackSource jwsӷí}ƴ]wBhC
+- **ɮ**Glib/features/settings/sources_screen.dart]sW _addingFallbackForSourceId AP _addFreshFallbackSource / _closeTypePicker / _addManualSource / _addRommSource / _addRommLegacy _޿^ P 	est/widgets/sources_screen_test.dart]sW fresh fallback _ա^
+

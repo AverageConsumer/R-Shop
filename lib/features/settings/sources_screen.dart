@@ -72,6 +72,10 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// Set while the fallback picker is open.
   String? _fallbackPickerSourceId;
 
+  /// Set while creating a new source triggered from inside the fallback picker.
+  /// When source creation finishes or cancels, fallback picker re-opens for this source.
+  String? _addingFallbackForSourceId;
+
   /// Which card the gamepad is sitting on. The list-level shortcuts act on
   /// this source, and the HUD reads its state — the disable hint has to say
   /// which of the two things it is about to do.
@@ -320,9 +324,33 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _showTypePicker = true);
   }
 
+  void _addFreshFallbackSource(String parentId) {
+    _addingFallbackForSourceId = parentId;
+    ref.read(feedbackServiceProvider).tick();
+    setState(() {
+      _fallbackPickerSourceId = null;
+      _activeActionsSource = null;
+      _showTypePicker = true;
+    });
+  }
+
+  @visibleForTesting
+  void addFreshFallbackSourceForTest(String parentId) =>
+      _addFreshFallbackSource(parentId);
+
+  @visibleForTesting
+  void closeTypePickerForTest() => _closeTypePicker();
+
   void _closeTypePicker() {
     if (!_showTypePicker) return;
-    setState(() => _showTypePicker = false);
+    setState(() {
+      _showTypePicker = false;
+      if (_addingFallbackForSourceId != null) {
+        _fallbackPickerSourceId = _addingFallbackForSourceId;
+        _addingFallbackForSourceId = null;
+        _activeActionsSource = null;
+      }
+    });
   }
 
   Future<void> _onTypePicked(_TypeOption option) async {
@@ -340,9 +368,31 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final result = await Navigator.of(context).push<Source?>(
       MaterialPageRoute(builder: (_) => ManualSourceAddScreen(type: type)),
     );
-    if (!mounted || result == null) return;
+    if (!mounted) return;
+    if (result == null) {
+      if (_addingFallbackForSourceId != null) {
+        setState(() {
+          _fallbackPickerSourceId = _addingFallbackForSourceId;
+          _addingFallbackForSourceId = null;
+          _activeActionsSource = null;
+        });
+      }
+      return;
+    }
+
+    if (_addingFallbackForSourceId != null) {
+      final parentId = _addingFallbackForSourceId!;
+      _addingFallbackForSourceId = null;
+      await ref.read(sourcesProvider.notifier).addFallbackSource(parentId, result.id);
+      setState(() {
+        _fallbackPickerSourceId = parentId;
+        _activeActionsSource = null;
+      });
+    }
+
     ref.invalidate(bootstrappedConfigProvider);
     ref.invalidate(gamesProvider);
+    if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _focusFor(result.id).requestFocus();
@@ -359,7 +409,17 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final result = await Navigator.of(context).push<RommPairResult?>(
       MaterialPageRoute(builder: (_) => QrPairingScreen()),
     );
-    if (!mounted || result == null) return;
+    if (!mounted) return;
+    if (result == null) {
+      if (_addingFallbackForSourceId != null) {
+        setState(() {
+          _fallbackPickerSourceId = _addingFallbackForSourceId;
+          _addingFallbackForSourceId = null;
+          _activeActionsSource = null;
+        });
+      }
+      return;
+    }
 
     final source = buildSourceFromPairResult(result);
 
@@ -380,6 +440,16 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final notifier = ref.read(sourcesProvider.notifier);
     final addedSource = source.copyWith(knownPlatforms: knownPlatforms);
     await notifier.addSource(addedSource);
+
+    if (_addingFallbackForSourceId != null) {
+      final parentId = _addingFallbackForSourceId!;
+      _addingFallbackForSourceId = null;
+      await notifier.addFallbackSource(parentId, addedSource.id);
+      setState(() {
+        _fallbackPickerSourceId = parentId;
+        _activeActionsSource = null;
+      });
+    }
 
     // Auto-create SystemConfigs for platforms the user doesn't have yet.
     final basePath = ref.read(storageServiceProvider).getRomPath()
@@ -423,10 +493,30 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final source = await Navigator.of(context).push<Source?>(
       MaterialPageRoute(builder: (_) => const RommLegacyLoginScreen()),
     );
-    if (!mounted || source == null) return;
+    if (!mounted) return;
+    if (source == null) {
+      if (_addingFallbackForSourceId != null) {
+        setState(() {
+          _fallbackPickerSourceId = _addingFallbackForSourceId;
+          _addingFallbackForSourceId = null;
+          _activeActionsSource = null;
+        });
+      }
+      return;
+    }
 
     final notifier = ref.read(sourcesProvider.notifier);
     await notifier.addSource(source);
+
+    if (_addingFallbackForSourceId != null) {
+      final parentId = _addingFallbackForSourceId!;
+      _addingFallbackForSourceId = null;
+      await notifier.addFallbackSource(parentId, source.id);
+      setState(() {
+        _fallbackPickerSourceId = parentId;
+        _activeActionsSource = null;
+      });
+    }
 
     final basePath = ref.read(storageServiceProvider).getRomPath()
         ?? '/storage/emulated/0/ROMs';
@@ -735,7 +825,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                   return FallbackPickerOverlay(
                     sourceId: src.id,
                     onClose: _closeFallbackPicker,
-                    onAddFreshSource: _addSource,
+                    onAddFreshSource: () => _addFreshFallbackSource(src.id),
                   );
                 },
               ),

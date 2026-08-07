@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:retro_eshop/features/settings/sources_screen.dart';
+import 'package:retro_eshop/features/sources/fallback_picker_overlay.dart';
 import 'package:retro_eshop/widgets/console_hud.dart';
 import 'package:retro_eshop/models/config/source.dart';
 import 'package:retro_eshop/providers/app_providers.dart';
@@ -297,6 +298,44 @@ void main() {
       expect(find.text('Use this'), findsNothing);
       expect(find.text('Disable'), findsNothing);
       expect(find.text('Remove'), findsNothing);
+    });
+  });
+
+  group('SourcesScreen — fresh fallback source addition', () {
+    testWidgets('cancelling fresh fallback creation restores fallback overlay',
+        (tester) async {
+      final storage = await _initMockStorage();
+      await tester.pumpWidget(_wrap(
+        storage,
+        const SourcesScreen(),
+        seed: const [
+          Source(
+            id: 'parent',
+            name: 'Parent RomM',
+            type: SourceType.romm,
+            url: 'http://parent',
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // Directly pump FallbackPickerOverlay on SourcesScreen state
+      final state = tester.state(find.byType(SourcesScreen)) as dynamic;
+      // Trigger fresh fallback source addition
+      state.addFreshFallbackSourceForTest('parent');
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Windows / NAS network share'), findsOneWidget);
+
+      // Cancel type picker
+      state.closeTypePickerForTest();
+      await tester.pumpAndSettle();
+
+      // Verify FallbackPickerOverlay for parent is restored
+      expect(find.byType(FallbackPickerOverlay), findsOneWidget);
+
+      await tester.pumpWidget(_wrap(storage, const SizedBox.shrink()));
+      await tester.pump(const Duration(milliseconds: 50));
     });
   });
 }
