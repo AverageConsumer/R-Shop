@@ -749,3 +749,12 @@ emoveSource 才需清除）。
   1. `SourcesScreen`（`_SourceCard`）：邊框統一改為清晰白邊框（未聚焦時 `Colors.white24` 1.5px，聚焦時 `ConsoleFocusable` 純白 2px 邊框與深紅高亮背景）；副標題、類型、主機與遊戲計數統一採用純白/亮白（`Colors.white` / `Colors.white70`）高對比字體。
   2. `FallbackPickerOverlay`（備援設定）：全面對齊 `SourcesScreen` 風格，選項列均採用 `0xFF1C1C1C` 卡片底色、`Colors.white24` 未選邊框 / `Colors.white` 2px 選取白邊框、`Colors.white` 與 `Colors.white70` 高對比文字。
 - **檔案**：`lib/features/settings/sources_screen.dart`（_SourceCard 白邊框與高對比文字） · `lib/features/sources/fallback_picker_overlay.dart`（對齊來源設置視覺風格與邊框）
+
+## [R-Shop 來源與備援邊框與高對比風格] 來源設置與備援設定採用全列白邊框與純白高對比文字風格
+
+- **問題**：來源設置與備援設定浮層項目邊框不夠顯眼，副標題與說明文字顏色較暗（`Colors.grey.shade500`），手把焦點與視覺選取清晰度有待提升。
+- **根因**：過往卡片未統一設置清晰的白邊框與高對比白字。
+- **修復**：
+  1. `SourcesScreen`（`_SourceCard`）：邊框統一改為清晰白邊框（未聚焦時 `Colors.white24` 1.5px，聚焦時 `ConsoleFocusable` 純白 2px 邊框與深紅高亮背景）；副標題、類型、主機與遊戲計數統一採用純白/亮白（`Colors.white` / `Colors.white70`）高對比字體。
+  2. `FallbackPickerOverlay`（備援設定）：全面對齊 `SourcesScreen` 風格，選項列均採用 `0xFF1C1C1C` 卡片底色、`Colors.white24` 未選邊框 / `Colors.white` 2px 選取白邊框、`Colors.white` 與 `Colors.white70` 高對比文字。
+- **檔案**：`lib/features/settings/sources_screen.dart`（_SourceCard 白邊框與高對比文字） · `lib/features/sources/fallback_picker_overlay.dart`（對齊來源設置視覺風格與邊框）
