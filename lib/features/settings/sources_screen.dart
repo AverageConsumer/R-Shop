@@ -1192,8 +1192,9 @@ class _SourceCard extends ConsumerWidget {
     final healthError = healthState.errorFor(source.id);
 
     final failoverChoice = ref.watch(activeFailoverChoiceProvider);
-    final isFailoverActive =
-        failoverChoice != null && failoverChoice.isFallback;
+    final isFailoverActive = source.enabled &&
+        failoverChoice != null &&
+        failoverChoice.isFallback;
     final isPreferredFailed =
         isFailoverActive && source.id == failoverChoice.preferred?.id;
     final isFallbackInUse =

@@ -276,6 +276,36 @@ class _FallbackPickerOverlayState
                         ),
                         const SizedBox(height: 12),
 
+                        if (!source.enabled)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: Colors.redAccent.withValues(alpha: 0.6)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.block,
+                                    color: Colors.redAccent, size: 16),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '來源已停用，備援功能暫停',
+                                    style: TextStyle(
+                                      color: Colors.redAccent,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                         // Row 0: Auto Select Toggle
                         _buildRow(
                           index: 0,
@@ -393,12 +423,8 @@ class _FallbackPickerOverlayState
                         ConsoleHud(
                           embedded: true,
                           dpad: (
-                            label: '↑↓' +
-                                ((_selectedIndex >= 1 &&
-                                        _selectedIndex <= fallbacks.length &&
-                                        !isSorting)
-                                    ? ' / →'
-                                    : ''),
+                            label:
+                                '↑↓${(_selectedIndex >= 1 && _selectedIndex <= fallbacks.length && !isSorting) ? ' / →' : ''}',
                             action: isSorting
                                 ? '移動順序'
                                 : (_isDeleteFocused ? '移至垃圾桶' : '選擇項目')
@@ -561,13 +587,40 @@ class _FallbackPickerOverlayState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      fallback.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            fallback.name,
+                            style: TextStyle(
+                              color: fallback.enabled
+                                  ? Colors.white
+                                  : Colors.white54,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (!fallback.enabled) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white12,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              '已停用',
+                              style: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     Text(
                       '${fallback.type.shortLabel} - ${fallback.hostLabel}',
