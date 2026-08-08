@@ -779,8 +779,6 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     _gcFocusNodes(state.sources);
     _ensureInteractiveFocus(state);
 
-    final failoverChoice = ref.watch(activeFailoverChoiceProvider);
-
     return buildWithActions(
       ScreenLayout(
         body: Stack(
@@ -788,33 +786,6 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
             Column(
               children: [
                 _Header(rs: rs, count: state.sources.length),
-                if (failoverChoice != null && failoverChoice.isFallback)
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD97706).withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber, width: 1.5),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.warning_amber_rounded,
-                            color: Colors.amber, size: 20),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            '注意：原本的主要來源「${failoverChoice.preferred?.name}」無法連線，已自動切換至備援來源「${failoverChoice.source?.name}」。',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 Expanded(
                   child: state.loading
                       ? const Center(child: CircularProgressIndicator())
@@ -1368,7 +1339,7 @@ class _SourceCard extends ConsumerWidget {
                               Icon(Icons.bolt, size: 10, color: Colors.black),
                               SizedBox(width: 2),
                               Text(
-                                '正在使用此備援來源',
+                                '正在使用此備援',
                                 style: TextStyle(
                                   color: Colors.black,
                                   fontSize: 9,
