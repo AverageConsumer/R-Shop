@@ -52,28 +52,11 @@ class _LibrarySyncPill extends ConsumerStatefulWidget {
 class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
   Map<String, String> _failedSystems = const {};
 
-  /// Appends the source being synced to [systemName].
-  ///
-  /// Returns [systemName] unchanged when every source is in view — there is no
-  /// single server to name then, and inventing one would be worse than saying
-  /// nothing.
-  String? _withSource(BuildContext context, String? systemName) {
-    final src = ref.watch(syncingSourceProvider);
-    if (src == null) return systemName;
-    // A stand-in is a member of the same group as the one the user picked, so
-    // it is named the way the home banner names it: which server answered,
-    // without implying their choice moved.
-    final label = src.isFallback
-        ? L.of(context).sources_groupUsing(src.name)
-        : src.name;
-    return systemName == null || systemName.isEmpty
-        ? label
-        : '$systemName · $label';
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(librarySyncServiceProvider);
+    final failoverChoice = ref.watch(activeFailoverChoiceProvider);
+    final isFailoverActive = failoverChoice != null && failoverChoice.isFallback;
 
     ref.listen<LibrarySyncState>(librarySyncServiceProvider, (prev, next) {
       if (next.isSyncing) {
@@ -94,27 +77,41 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
     });
 
     final showSyncing = state.isSyncing;
-    if (!showSyncing && _failedSystems.isEmpty) return const SizedBox.shrink();
-
     final rs = context.rs;
     final iconSize = rs.isSmall ? 14.0 : 16.0;
 
     if (showSyncing) {
+      final accent = isFailoverActive ? Colors.amberAccent : Colors.cyanAccent;
+      final labelText = isFailoverActive
+          ? '⚡ 備援同步中 (${state.completedSystems}/${state.totalSystems})'
+          : L.of(context).sync_progress(state.completedSystems, state.totalSystems);
+
       return _SyncPillContent(
         key: const ValueKey('library-syncing'),
-        accentColor: Colors.cyanAccent,
+        accentColor: accent,
         leadingIcon: _SpinningIcon(
           size: iconSize,
           icon: Icons.sync,
-          color: Colors.cyanAccent,
+          color: accent,
         ),
-        label: L.of(context).sync_progress(state.completedSystems, state.totalSystems),
-        // Name the server alongside the console. With two sources configured,
-        // "3/8 · SNES" does not say whose library is being fetched — and when
-        // a stand-in is covering, that is exactly what you need to know.
-        systemName: _withSource(context, state.currentSystem),
+        label: labelText,
+        systemName: state.currentSystem,
       );
     }
+
+    if (isFailoverActive && _failedSystems.isEmpty) {
+      return _PulsingPill(
+        key: const ValueKey('library-failover-active'),
+        child: _SyncPillContent(
+          accentColor: Colors.amberAccent,
+          leadingIcon: Icon(Icons.bolt, size: iconSize, color: Colors.amberAccent),
+          label: '⚡ 備援連線中',
+          systemName: failoverChoice.source?.name,
+        ),
+      );
+    }
+
+    if (_failedSystems.isEmpty) return const SizedBox.shrink();
 
     final l = L.of(context);
     final label = _failedSystems.length == 1

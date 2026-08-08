@@ -689,8 +689,7 @@ class _HomeViewState extends ConsumerState<HomeView>
                   if (isGrid) _buildControls(rs),
                 ],
               ),
-              _buildFailoverBanner(),
-              // Modal overlays stay above everything, banner included.
+              // Modal overlays stay above everything.
               if (showQuickMenu)
                 QuickMenuOverlay(
                   items: _buildQuickMenuItems(),
@@ -1067,67 +1066,6 @@ class _HomeViewState extends ConsumerState<HomeView>
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFailoverBanner() {
-    final failoverChoice = ref.watch(activeFailoverChoiceProvider);
-    if (failoverChoice == null || !failoverChoice.isFallback) {
-      return const SizedBox.shrink();
-    }
-    final prefName = failoverChoice.preferred?.name ?? '原本來源';
-    final actName = failoverChoice.source?.name ?? '備援來源';
-
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Material(
-        type: MaterialType.transparency,
-        child: _PulsingWidget(
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-            decoration: BoxDecoration(
-              color: Colors.redAccent.withValues(alpha: 0.85),
-              border: const Border(
-                bottom: BorderSide(color: Colors.redAccent, width: 1.5),
-              ),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black54,
-                  blurRadius: 10,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.warning_amber_rounded,
-                      color: Colors.white, size: 16),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      '⚠️ 原本來源「$prefName」連線中斷，現已自動切換至備援來源「$actName」',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ),
       ),
     );
