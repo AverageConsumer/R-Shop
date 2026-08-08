@@ -259,7 +259,7 @@ class _FallbackPickerOverlayState
                           children: [
                             Expanded(
                               child: Text(
-                                '${source.name} - 備援設定',
+                                '${source.name} - 代理設定',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
@@ -294,7 +294,7 @@ class _FallbackPickerOverlayState
                                 SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    '來源已停用，備援功能暫停',
+                                    '來源已停用，代理功能暫停',
                                     style: TextStyle(
                                       color: Colors.redAccent,
                                       fontSize: 12,
@@ -334,8 +334,8 @@ class _FallbackPickerOverlayState
                                     ),
                                     Text(
                                       source.fallbackAutoSelect
-                                          ? '自動探測並優先使用回應最快的備援'
-                                          : '未勾選：依下方順序依次嘗試備援',
+                                          ? '自動探測並優先使用回應最快的代理'
+                                          : '未勾選：依下方順序依次嘗試代理',
                                       style: const TextStyle(
                                           color: Colors.white70, fontSize: 12),
                                     ),
@@ -349,7 +349,7 @@ class _FallbackPickerOverlayState
 
                         const SizedBox(height: 16),
                         const Text(
-                          '備援來源清單（優先順序）',
+                          '代理來源清單（優先順序）',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 13,
@@ -363,7 +363,7 @@ class _FallbackPickerOverlayState
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             alignment: Alignment.center,
                             child: const Text(
-                              '尚未設定任何備援來源',
+                              '尚未設定任何代理來源',
                               style: TextStyle(color: Colors.white70, fontSize: 14),
                             ),
                           )
@@ -386,7 +386,7 @@ class _FallbackPickerOverlayState
                           isSelected: _selectedIndex == fallbacks.length + 1,
                           child: const Center(
                             child: Text(
-                              '+ 新建全新備援來源',
+                              '+ 新建全新代理來源',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 14,
@@ -405,7 +405,7 @@ class _FallbackPickerOverlayState
                           isSelected: _selectedIndex == fallbacks.length + 2,
                           child: const Center(
                             child: Text(
-                              '+ 從既有來源選擇備援',
+                              '+ 從既有來源選擇代理',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 14,
@@ -669,7 +669,7 @@ class _FallbackPickerOverlayState
         context: context,
         builder: (ctx) => const ConsoleDialog(
           title: '沒有可用的來源',
-          message: '目前沒有其他未綁定的既有來源可供選擇。請選擇「新建全新備援來源」。',
+          message: '目前沒有其他未綁定的既有來源可供選擇。請選擇「新建全新代理來源」。',
           primaryLabel: '確定',
         ),
       );
@@ -791,7 +791,7 @@ class _PickExistingDialogState extends ConsumerState<_PickExistingDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        '選擇既有來源作為備援',
+                        '選擇既有來源作為代理',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,

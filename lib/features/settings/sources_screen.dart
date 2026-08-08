@@ -770,14 +770,13 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   Widget build(BuildContext context) {
     final rs = context.rs;
     final state = ref.watch(sourcesProvider);
-    // Watched, not mirrored: the config is the only thing that knows which
-    // source is in use, and every label on this screen reads from it.
-    // From the notifier, not the config future. Invalidating that one means a
-    // disk read, and until it lands `valueOrNull` still hands back the old id
-    // — the press looked like it had not registered.
     final primary = state.primarySourceId;
     _gcFocusNodes(state.sources);
     _ensureInteractiveFocus(state);
+
+    ref.listen(sourcesProvider, (prev, next) {
+      _probeFailoverState();
+    });
 
     return buildWithActions(
       ScreenLayout(
@@ -1201,7 +1200,7 @@ class _SourceCard extends ConsumerWidget {
 
     final fallbackName = failoverChoice?.source?.name ??
         firstEnabledFallback?.name ??
-        '備援來源';
+        '代理來源';
 
     final isFallbackInUse = source.enabled &&
         isFailoverActive &&
@@ -1369,7 +1368,7 @@ class _SourceCard extends ConsumerWidget {
                             ),
                           ),
                           child: Text(
-                            hasEnabledFallback ? '🛡️ 已設備援' : '🚫 備援已停用',
+                            hasEnabledFallback ? '🛡️ 已設代理' : '🚫 代理已停用',
                             style: TextStyle(
                               color: hasEnabledFallback
                                   ? Colors.amberAccent
@@ -1578,7 +1577,7 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
         ),
       _OverlayAction(
         icon: Icons.alt_route,
-        label: '備援設定',
+        label: '代理設定',
         onActivate: widget.onEditFallback,
       ),
       _OverlayAction(

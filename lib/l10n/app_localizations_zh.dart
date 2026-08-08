@@ -1666,13 +1666,13 @@ class LZh extends L {
   String get sources_nextSource => '下一個來源';
 
   @override
-  String get sources_setFallback => '備援來源';
+  String get sources_setFallback => '代理來源';
 
   @override
   String get sources_fallbackNone => '不設定';
 
   @override
-  String get sources_fallbackShort => '備援';
+  String get sources_fallbackShort => '代理';
 
   @override
   String get sources_routeSameServerHint =>

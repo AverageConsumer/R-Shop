@@ -1034,7 +1034,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     if (failoverChoice == null || !failoverChoice.isFallback) {
       return const SizedBox.shrink();
     }
-    final actName = failoverChoice.source?.name ?? '備援';
+    final actName = failoverChoice.source?.name ?? '代理';
     return _PulsingWidget(
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
@@ -1057,7 +1057,7 @@ class _HomeViewState extends ConsumerState<HomeView>
             const Icon(Icons.bolt, size: 12, color: Colors.black),
             const SizedBox(width: 4),
             Text(
-              '⚡ 備援使用中: $actName',
+              '⚡ 代理使用中: $actName',
               style: const TextStyle(
                 color: Colors.black,
                 fontSize: 10,

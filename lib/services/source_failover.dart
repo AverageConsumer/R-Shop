@@ -23,7 +23,9 @@ class SourceChoice {
   bool get isFallback =>
       source != null &&
       preferred != null &&
-      source!.id != preferred!.id;
+      source!.id != preferred!.id &&
+      source!.enabled &&
+      preferred!.fallbackSourceIds.contains(source!.id);
 
   static const none = SourceChoice();
 }
