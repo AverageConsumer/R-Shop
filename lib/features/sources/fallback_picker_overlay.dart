@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/input/overlay_scope.dart';
 import '../../models/config/source.dart';
 import '../../providers/app_providers.dart';
+import '../../core/theme/app_theme.dart';
 import '../../widgets/console_dialog.dart';
 import '../../widgets/console_hud.dart';
 
@@ -111,6 +112,17 @@ class _FallbackPickerOverlayState
         ref.read(feedbackServiceProvider).confirm();
         return KeyEventResult.handled;
       }
+    }
+
+    if ((key == LogicalKeyboardKey.gameButtonY ||
+            key == LogicalKeyboardKey.keyY) &&
+        _selectedIndex >= 1 &&
+        _selectedIndex <= fallbacks.length) {
+      setState(() {
+        _sortingIndex = isSorting ? null : _selectedIndex - 1;
+      });
+      ref.read(feedbackServiceProvider).tick();
+      return KeyEventResult.handled;
     }
 
     return KeyEventResult.ignored;
@@ -346,12 +358,51 @@ class _FallbackPickerOverlayState
                         // HUD Hints embedded
                         ConsoleHud(
                           embedded: true,
-                          b: const HudAction('關閉'),
-                          a: HudAction(isSorting ? '完成排序' : '確定 / 排序'),
+                          dpad: (label: '↑↓', action: isSorting ? '移動順序' : '選擇項目'),
+                          a: HudAction(
+                            isSorting
+                                ? '完成排序'
+                                : (_selectedIndex == 0
+                                    ? '切換自動選擇'
+                                    : (_selectedIndex >= 1 &&
+                                            _selectedIndex <= fallbacks.length
+                                        ? '排序備援'
+                                        : '確定')),
+                            onTap: () =>
+                                _activateRow(source, fallbacks, _selectedIndex),
+                          ),
+                          b: HudAction(
+                            isSorting ? '取消排序' : '關閉',
+                            onTap: () {
+                              if (isSorting) {
+                                setState(() => _sortingIndex = null);
+                              } else {
+                                widget.onClose();
+                              }
+                            },
+                          ),
                           x: (!isSorting &&
                                   _selectedIndex >= 1 &&
                                   _selectedIndex <= fallbacks.length)
-                              ? const HudAction('移除備援')
+                              ? HudAction('移除備援', onTap: () {
+                                  final targetFb = fallbacks[_selectedIndex - 1];
+                                  ref.read(sourcesProvider.notifier)
+                                      .removeFallbackSource(
+                                        source.id,
+                                        targetFb.id,
+                                      );
+                                  ref.read(feedbackServiceProvider).confirm();
+                                })
+                              : null,
+                          y: (_selectedIndex >= 1 &&
+                                  _selectedIndex <= fallbacks.length)
+                              ? HudAction(isSorting ? '完成排序' : '開始排序', onTap: () {
+                                  setState(() {
+                                    _sortingIndex =
+                                        isSorting ? null : _selectedIndex - 1;
+                                  });
+                                  ref.read(feedbackServiceProvider).tick();
+                                })
                               : null,
                         ),
                       ],
@@ -372,19 +423,22 @@ class _FallbackPickerOverlayState
     required Widget child,
     required VoidCallback onTap,
   }) {
+    final color = AppTheme.primaryColor;
     return InkWell(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFFE50914).withValues(alpha: 0.35)
-              : const Color(0xFF242424),
+          color: color.withValues(alpha: isSelected ? 0.25 : 0.08),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? Colors.white : Colors.white38,
-            width: isSelected ? 2.0 : 1.5,
+            color: isSelected ? color : color.withValues(alpha: 0.3),
+            width: isSelected ? 2 : 1,
           ),
+          boxShadow: isSelected
+              ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12)]
+              : null,
         ),
         child: child,
       ),
@@ -399,25 +453,36 @@ class _FallbackPickerOverlayState
     required bool isSelected,
     required bool isSorting,
   }) {
+    final color = AppTheme.primaryColor;
     final bgColor = isSorting
         ? Colors.amber[900]!.withValues(alpha: 0.7)
-        : (isSelected
-            ? const Color(0xFFE50914).withValues(alpha: 0.35)
-            : const Color(0xFF242424));
+        : color.withValues(alpha: isSelected ? 0.25 : 0.08);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       child: InkWell(
         onTap: () => _activateRow(source, fallbacks, index + 1),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isSelected ? Colors.white : Colors.white38,
-              width: isSelected ? 2.0 : 1.5,
+              color: isSorting
+                  ? Colors.amber
+                  : (isSelected ? color : color.withValues(alpha: 0.3)),
+              width: isSelected || isSorting ? 2 : 1,
             ),
+            boxShadow: (isSelected || isSorting)
+                ? [
+                    BoxShadow(
+                      color: (isSorting ? Colors.amber : color)
+                          .withValues(alpha: 0.35),
+                      blurRadius: 12,
+                    )
+                  ]
+                : null,
           ),
           child: Row(
             children: [
