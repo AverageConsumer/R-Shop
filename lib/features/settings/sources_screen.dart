@@ -1199,6 +1199,12 @@ class _SourceCard extends ConsumerWidget {
         isFailoverActive && source.id == failoverChoice.preferred?.id;
     final isFallbackInUse =
         isFailoverActive && source.id == failoverChoice.source?.id;
+    final allSources = ref.watch(sourcesProvider).sources;
+    final fallbackSources = [
+      for (final fbId in source.fallbackSourceIds)
+        ...allSources.where((s) => s.id == fbId),
+    ];
+    final hasEnabledFallback = fallbackSources.any((s) => s.enabled);
 
     return ConsoleFocusable(
       focusNode: focusNode,
@@ -1343,21 +1349,32 @@ class _SourceCard extends ConsumerWidget {
                           ),
                         ),
                       ],
-                      if (source.fallbackSourceIds.isNotEmpty) ...[
+                      if (source.enabled &&
+                          source.fallbackSourceIds.isNotEmpty &&
+                          !isPreferredFailed) ...[
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.white10,
+                            color: hasEnabledFallback
+                                ? Colors.amber.withValues(alpha: 0.18)
+                                : Colors.redAccent.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: hasEnabledFallback
+                                  ? Colors.amber.withValues(alpha: 0.5)
+                                  : Colors.redAccent.withValues(alpha: 0.5),
+                            ),
                           ),
                           child: Text(
-                            '備援 · ${source.fallbackSourceIds.length}組',
-                            style: const TextStyle(
-                              color: Colors.white54,
+                            hasEnabledFallback ? '⚡ 備援啟用中' : '🚫 備援已停用',
+                            style: TextStyle(
+                              color: hasEnabledFallback
+                                  ? Colors.amberAccent
+                                  : Colors.redAccent,
                               fontSize: 9,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -1393,18 +1410,13 @@ class _SourceCard extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.redAccent.withValues(alpha: 0.18),
+                            color: Colors.white12,
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: Colors.redAccent.withValues(alpha: 0.4),
-                            ),
                           ),
                           child: Text(
-                            source.fallbackSourceIds.isNotEmpty
-                                ? '🚫 備援已暫停 (來源已停用)'
-                                : L.of(context).sources_off,
-                            style: const TextStyle(
-                              color: Colors.redAccent,
+                            L.of(context).sources_off,
+                            style: TextStyle(
+                              color: Colors.white54,
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
                             ),
