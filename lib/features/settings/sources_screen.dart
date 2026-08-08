@@ -19,6 +19,7 @@ import '../../services/romm_api_service.dart';
 import '../../services/romm_pairing_service.dart';
 import '../../services/romm_platform_matcher.dart';
 import '../../services/sources_notifier.dart';
+import '../../services/source_failover.dart';
 import '../../widgets/console_dialog.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
@@ -89,6 +90,24 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// that happens, the gamepad input bypasses our cards entirely (the
   /// stub eats the key event before it reaches ConsoleFocusable).
   bool _initialFocusClaimed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _probeFailoverState();
+    });
+  }
+
+  Future<void> _probeFailoverState() async {
+    final config = ref.read(bootstrappedConfigProvider).valueOrNull;
+    if (config != null) {
+      final resolved = await resolveForSync(config: config);
+      if (mounted) {
+        ref.read(activeFailoverChoiceProvider.notifier).state = resolved.choice;
+      }
+    }
+  }
 
   @override
   String get routeId => 'sources_screen';
@@ -1195,16 +1214,27 @@ class _SourceCard extends ConsumerWidget {
     final isFailoverActive = source.enabled &&
         failoverChoice != null &&
         failoverChoice.isFallback;
-    final isPreferredFailed =
-        isFailoverActive && source.id == failoverChoice.preferred?.id;
-    final isFallbackInUse =
-        isFailoverActive && source.id == failoverChoice.source?.id;
     final allSources = ref.watch(sourcesProvider).sources;
     final fallbackSources = [
       for (final fbId in source.fallbackSourceIds)
         ...allSources.where((s) => s.id == fbId),
     ];
-    final hasEnabledFallback = fallbackSources.any((s) => s.enabled);
+    final firstEnabledFallback =
+        fallbackSources.where((s) => s.enabled).firstOrNull;
+    final hasEnabledFallback = firstEnabledFallback != null;
+
+    final isPreferredFailed = source.enabled &&
+        hasEnabledFallback &&
+        ((isFailoverActive && source.id == failoverChoice.preferred?.id) ||
+            (isActive && health == SourceHealth.invalid));
+
+    final fallbackName = failoverChoice?.source?.name ??
+        firstEnabledFallback?.name ??
+        '備援來源';
+
+    final isFallbackInUse = source.enabled &&
+        isFailoverActive &&
+        source.id == failoverChoice.source?.id;
 
     return ConsoleFocusable(
       focusNode: focusNode,
@@ -1314,7 +1344,7 @@ class _SourceCard extends ConsumerWidget {
                             ),
                           ),
                           child: Text(
-                            '⚠️ 無法連線 (已切換至備援: ${failoverChoice.source?.name})',
+                            '⚠️ 無法連線 (已切換至備援: $fallbackName)',
                             style: const TextStyle(
                               color: Colors.amberAccent,
                               fontSize: 9,
