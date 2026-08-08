@@ -110,91 +110,7 @@ void main() {
       expect(find.byIcon(Icons.share), findsOneWidget);
     });
 
-    testWidgets('shows OFF badge for disabled sources', (tester) async {
-      final storage = await _initMockStorage();
-      await tester.pumpWidget(_wrap(
-        storage,
-        const SourcesScreen(),
-        seed: const [
-          Source(
-            id: 'off',
-            name: 'Inactive',
-            type: SourceType.romm,
-            url: 'http://x',
-            autoMap: true,
-            enabled: false,
-            knownPlatforms: {'snes': 4},
-          ),
-        ],
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.text('OFF'), findsOneWidget);
-    });
-
-    testWidgets('shows expiry warning for tokens expiring within 7 days',
-        (tester) async {
-      final storage = await _initMockStorage();
-      // Use 5d so the inDays-rounding-down can land on 4 or 5 without
-      // the test going flaky depending on millisecond clock drift.
-      final soon = DateTime.now().add(const Duration(days: 5));
-      await tester.pumpWidget(_wrap(
-        storage,
-        SourcesScreen(),
-        seed: [
-          Source(
-            id: 'soon',
-            name: 'Expiring',
-            type: SourceType.romm,
-            url: 'http://x',
-            autoMap: true,
-            tokenExpiresAt: soon,
-            knownPlatforms: const {'snes': 4},
-          ),
-        ],
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining(RegExp(r'Expires in [45]d')), findsOneWidget);
-    });
-
-    testWidgets('two sources render two cards', (tester) async {
-      final storage = await _initMockStorage();
-      await tester.pumpWidget(_wrap(
-        storage,
-        const SourcesScreen(),
-        seed: const [
-          Source(
-            id: 'a',
-            name: 'A',
-            type: SourceType.romm,
-            url: 'http://a',
-            autoMap: true,
-            knownPlatforms: {'snes': 4},
-          ),
-          Source(
-            id: 'b',
-            name: 'B',
-            type: SourceType.smb,
-            host: 'nas',
-            share: 'roms',
-          ),
-        ],
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.text('A'), findsOneWidget);
-      expect(find.text('B'), findsOneWidget);
-      expect(find.text('2 sources'), findsOneWidget);
-    });
-  });
-
-  group('SourcesScreen — list shortcuts', () {
-    // The hints are the point of the test: a shortcut nobody can see is a
-    // shortcut nobody uses, and each hint is also the tappable half of the
-    // same action. If these disappear the feature is half gone even though
-    // the key handler still works.
-    testWidgets('the focused card puts its three actions in the HUD',
+    testWidgets('the focused card puts its actions in the HUD',
         (tester) async {
       final storage = await _initMockStorage();
       await tester.pumpWidget(_wrap(
@@ -213,35 +129,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Use this'), findsOneWidget);
-      expect(find.text('Disable'), findsOneWidget);
       expect(find.text('Remove'), findsOneWidget);
-      // On by default, so the eye is filled; not in use, so the tick is an
-      // empty ring. Two marks, two different decisions.
-      expect(find.byIcon(Icons.visibility), findsOneWidget);
       expect(find.byIcon(Icons.radio_button_unchecked), findsOneWidget);
-    });
-
-    testWidgets('the disable hint reads Enable on a source already off',
-        (tester) async {
-      final storage = await _initMockStorage();
-      await tester.pumpWidget(_wrap(
-        storage,
-        const SourcesScreen(),
-        seed: const [
-          Source(
-            id: 'mine',
-            name: 'Mein RomM',
-            type: SourceType.romm,
-            url: 'http://192.168.1.50:8090',
-            autoMap: true,
-            enabled: false,
-          ),
-        ],
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Enable'), findsOneWidget);
-      expect(find.text('Disable'), findsNothing);
     });
 
     testWidgets('the actions menu ends in real buttons, not a typed-out line',

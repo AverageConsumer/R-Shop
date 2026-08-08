@@ -732,12 +732,6 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                   : l.sources_useThisShort,
               onTap: () => _toggleActiveSource(source),
             ),
-      lb: source == null
-          ? null
-          : HudAction(
-              source.enabled ? l.sources_disable : l.sources_enable,
-              onTap: () => _toggleSourceEnabled(source),
-            ),
       rb: source == null
           ? null
           : HudAction(
@@ -1181,26 +1175,7 @@ class _SourceCard extends ConsumerWidget {
           children: [
             // Two separate decisions, two separate marks. Both are one tap on
             // the row, with no menu to open first — they are what this screen
-            // is for, so they do not belong three presses deep.
-            //
-            // The eye is on/off: switched on, the library is on the home
-            // screen. The tick is single and names the one the app works
-            // against. Same shape for both would put the user back where the
-            // one conflated setting had them.
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onToggleShown,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Icon(
-                  isShown ? Icons.visibility : Icons.visibility_outlined,
-                  size: 21,
-                  color: isShown
-                      ? const Color(0xFF7BC67B)
-                      : Colors.white24,
-                ),
-              ),
-            ),
+            // The tick is single and names the one the app works against.
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onToggleActive,
@@ -1213,7 +1188,7 @@ class _SourceCard extends ConsumerWidget {
                   size: 21,
                   color: isActive
                       ? const Color(0xFF7BC67B)
-                      : Colors.white24,
+                      : Colors.white38,
                 ),
               ),
             ),
@@ -1315,25 +1290,6 @@ class _SourceCard extends ConsumerWidget {
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.8,
-                            ),
-                          ),
-                        ),
-                      ],
-                      if (!source.enabled) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.white12,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            L.of(context).sources_off,
-                            style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -1494,11 +1450,6 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
         icon: Icons.alt_route,
         label: '備援設定',
         onActivate: widget.onEditFallback,
-      ),
-      _OverlayAction(
-        icon: src.enabled ? Icons.toggle_off : Icons.toggle_on,
-        label: src.enabled ? l.sources_disable : l.sources_enable,
-        onActivate: widget.onToggleEnabled,
       ),
       _OverlayAction(
         icon: Icons.delete_outline,
