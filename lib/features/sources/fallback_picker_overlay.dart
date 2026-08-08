@@ -423,23 +423,24 @@ class _FallbackPickerOverlayState
                         ConsoleHud(
                           embedded: true,
                           dpad: (
-                            label:
-                                '↑↓${(_selectedIndex >= 1 && _selectedIndex <= fallbacks.length && !isSorting) ? ' / →' : ''}',
-                            action: isSorting
-                                ? '移動順序'
-                                : (_isDeleteFocused ? '移至垃圾桶' : '選擇項目')
+                            label: (_selectedIndex >= 1 &&
+                                    _selectedIndex <= fallbacks.length &&
+                                    !isSorting)
+                                ? '↑↓/→'
+                                : '↑↓',
+                            action: '導覽',
                           ),
                           a: HudAction(
                             isSorting
-                                ? '完成排序'
+                                ? '完成'
                                 : (_isDeleteFocused
-                                    ? '刪除備援'
+                                    ? '刪除'
                                     : (_selectedIndex == 0
-                                        ? '切換自動選擇'
+                                        ? '切換'
                                         : (_selectedIndex >= 1 &&
                                                 _selectedIndex <=
                                                     fallbacks.length
-                                            ? '排序備援'
+                                            ? '排序'
                                             : '確定'))),
                             onTap: () {
                               if (_isDeleteFocused &&
@@ -460,7 +461,7 @@ class _FallbackPickerOverlayState
                             },
                           ),
                           b: HudAction(
-                            isSorting ? '取消排序' : '關閉',
+                            isSorting ? '取消' : '關閉',
                             onTap: () {
                               if (isSorting) {
                                 setState(() => _sortingIndex = null);
@@ -472,24 +473,15 @@ class _FallbackPickerOverlayState
                           x: (!isSorting &&
                                   _selectedIndex >= 1 &&
                                   _selectedIndex <= fallbacks.length)
-                              ? HudAction('移除備援', onTap: () {
+                              ? HudAction('刪除', onTap: () {
                                   final targetFb = fallbacks[_selectedIndex - 1];
-                                  ref.read(sourcesProvider.notifier)
+                                  ref
+                                      .read(sourcesProvider.notifier)
                                       .removeFallbackSource(
                                         source.id,
                                         targetFb.id,
                                       );
                                   ref.read(feedbackServiceProvider).confirm();
-                                })
-                              : null,
-                          y: (_selectedIndex >= 1 &&
-                                  _selectedIndex <= fallbacks.length)
-                              ? HudAction(isSorting ? '完成排序' : '開始排序', onTap: () {
-                                  setState(() {
-                                    _sortingIndex =
-                                        isSorting ? null : _selectedIndex - 1;
-                                  });
-                                  ref.read(feedbackServiceProvider).tick();
                                 })
                               : null,
                         ),
