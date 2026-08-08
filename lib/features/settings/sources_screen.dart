@@ -104,7 +104,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     if (config != null) {
       final resolved = await resolveForSync(config: config);
       if (mounted) {
-        ref.read(activeFailoverChoiceProvider.notifier).state = resolved.choice;
+        ref.read(activeFailoverChoiceProvider.notifier).choice = resolved.choice;
       }
     }
   }

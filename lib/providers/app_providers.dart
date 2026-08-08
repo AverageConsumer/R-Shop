@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/storage_service.dart';
@@ -14,6 +15,7 @@ import '../services/native_smb_service.dart';
 import '../services/romm_pairing_service.dart';
 import '../services/sources_notifier.dart';
 import '../services/source_failover.dart';
+import '../services/endpoint_probe_service.dart';
 import '../models/game_item.dart';
 import '../models/sound_settings.dart';
 
@@ -42,6 +44,10 @@ final rommPairingServiceProvider = Provider<RommPairingService>((ref) {
 final sourcesProvider =
     StateNotifierProvider<SourcesNotifier, SourcesState>((ref) {
   return SourcesNotifier(ref.read(configStorageServiceProvider));
+});
+
+final endpointProbeServiceProvider = Provider<EndpointProbeService>((ref) {
+  return EndpointProbeService();
 });
 
 final configStorageServiceProvider = Provider<ConfigStorageService>((ref) {
@@ -472,8 +478,39 @@ final storageInfoProvider =
 final syncingSourceProvider =
     StateProvider<({String name, bool isFallback})?>((ref) => null);
 
+class ActiveFailoverChoiceNotifier extends StateNotifier<SourceChoice?> {
+  final Ref _ref;
+
+  ActiveFailoverChoiceNotifier(this._ref) : super(null) {
+    _ref.listen<SourcesState>(sourcesProvider, (previous, next) async {
+      if (previous != null && !next.loading) {
+        await refresh();
+      }
+    });
+  }
+
+  set choice(SourceChoice? value) => state = value;
+
+  Future<void> refresh() async {
+    try {
+      final probe = _ref.read(endpointProbeServiceProvider);
+      probe.invalidate();
+      final configStorage = _ref.read(configStorageServiceProvider);
+      final config = await configStorage.loadConfig();
+      if (config != null) {
+        final resolved = await resolveForSync(config: config, probe: probe);
+        state = resolved.choice;
+      }
+    } catch (e) {
+      debugPrint('Auto failover sync failed: $e');
+    }
+  }
+}
+
 /// Represents current failover choice state across the app.
 /// When non-null and choice.isFallback is true, primary source failed to connect
 /// and a fallback source is in active use.
 final activeFailoverChoiceProvider =
-    StateProvider<SourceChoice?>((ref) => null);
+    StateNotifierProvider<ActiveFailoverChoiceNotifier, SourceChoice?>((ref) {
+  return ActiveFailoverChoiceNotifier(ref);
+});

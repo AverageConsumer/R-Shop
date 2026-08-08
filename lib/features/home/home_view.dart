@@ -549,7 +549,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     ref.read(syncingSourceProvider.notifier).state = chosen == null
         ? null
         : (name: chosen.name, isFallback: resolved.choice.isFallback);
-    ref.read(activeFailoverChoiceProvider.notifier).state = resolved.choice;
+    ref.read(activeFailoverChoiceProvider.notifier).choice = resolved.choice;
     return resolved.config;
   }
 
