@@ -1036,36 +1036,38 @@ class _HomeViewState extends ConsumerState<HomeView>
       return const SizedBox.shrink();
     }
     final actName = failoverChoice.source?.name ?? '備援';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.amberAccent,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white, width: 1),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black54,
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.bolt, size: 12, color: Colors.black),
-          const SizedBox(width: 4),
-          Text(
-            '⚡ 備援代打中: $actName',
-            style: const TextStyle(
-              color: Colors.black,
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 0.5,
+    return _PulsingWidget(
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.amberAccent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white, width: 1),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black54,
+              blurRadius: 6,
+              offset: Offset(0, 2),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.bolt, size: 12, color: Colors.black),
+            const SizedBox(width: 4),
+            Text(
+              '⚡ 備援使用中: $actName',
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1084,44 +1086,46 @@ class _HomeViewState extends ConsumerState<HomeView>
       right: 0,
       child: Material(
         type: MaterialType.transparency,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          decoration: const BoxDecoration(
-            color: Color(0xFFD97706),
-            border: Border(
-              bottom: BorderSide(color: Colors.amberAccent, width: 2),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black87,
-                blurRadius: 16,
-                offset: Offset(0, 4),
+        child: _PulsingWidget(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.redAccent.withValues(alpha: 0.85),
+              border: const Border(
+                bottom: BorderSide(color: Colors.redAccent, width: 1.5),
               ),
-            ],
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.warning_amber_rounded,
-                    color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Text(
-                    '⚠️ 注意：原本來源「$prefName」連線中斷，目前正由備援來源「$actName」自動接管代打中',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
                 ),
               ],
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Colors.white, size: 16),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      '⚠️ 原本來源「$prefName」連線中斷，現已自動切換至備援來源「$actName」',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1194,6 +1198,46 @@ class _GameCountPill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PulsingWidget extends StatefulWidget {
+  final Widget child;
+  const _PulsingWidget({required this.child});
+
+  @override
+  State<_PulsingWidget> createState() => _PulsingWidgetState();
+}
+
+class _PulsingWidgetState extends State<_PulsingWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _animation,
+      child: widget.child,
     );
   }
 }

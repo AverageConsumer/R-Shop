@@ -804,7 +804,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            '注意：原本的主要來源「${failoverChoice.preferred?.name}」無法連線，目前正自動使用備援來源「${failoverChoice.source?.name}」代打中。',
+                            '注意：原本的主要來源「${failoverChoice.preferred?.name}」無法連線，已自動切換至備援來源「${failoverChoice.source?.name}」。',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -1368,7 +1368,7 @@ class _SourceCard extends ConsumerWidget {
                               Icon(Icons.bolt, size: 10, color: Colors.black),
                               SizedBox(width: 2),
                               Text(
-                                '正在使用此備援來源 (代打中)',
+                                '正在使用此備援來源',
                                 style: TextStyle(
                                   color: Colors.black,
                                   fontSize: 9,
