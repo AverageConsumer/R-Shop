@@ -34,6 +34,7 @@ class _FallbackPickerOverlayState
   final _scopeFocus = FocusNode(debugLabel: 'fallback_picker_overlay_scope');
   int _selectedIndex = 0;
   int? _sortingIndex;
+  bool _isDeleteFocused = false;
 
   @override
   void dispose() {
@@ -65,7 +66,26 @@ class _FallbackPickerOverlayState
         setState(() => _sortingIndex = null);
         return KeyEventResult.handled;
       }
+      if (_isDeleteFocused) {
+        setState(() => _isDeleteFocused = false);
+        return KeyEventResult.handled;
+      }
       widget.onClose();
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.arrowRight &&
+        !isSorting &&
+        _selectedIndex >= 1 &&
+        _selectedIndex <= fallbacks.length) {
+      setState(() => _isDeleteFocused = true);
+      ref.read(feedbackServiceProvider).tick();
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.arrowLeft && _isDeleteFocused) {
+      setState(() => _isDeleteFocused = false);
+      ref.read(feedbackServiceProvider).tick();
       return KeyEventResult.handled;
     }
 
@@ -75,6 +95,7 @@ class _FallbackPickerOverlayState
         return KeyEventResult.handled;
       }
       setState(() {
+        _isDeleteFocused = false;
         _selectedIndex = (_selectedIndex - 1 + totalRows) % totalRows;
       });
       ref.read(feedbackServiceProvider).tick();
@@ -87,6 +108,7 @@ class _FallbackPickerOverlayState
         return KeyEventResult.handled;
       }
       setState(() {
+        _isDeleteFocused = false;
         _selectedIndex = (_selectedIndex + 1) % totalRows;
       });
       ref.read(feedbackServiceProvider).tick();
@@ -96,6 +118,18 @@ class _FallbackPickerOverlayState
     if (key == LogicalKeyboardKey.gameButtonA ||
         key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.space) {
+      if (_isDeleteFocused &&
+          _selectedIndex >= 1 &&
+          _selectedIndex <= fallbacks.length) {
+        final targetFb = fallbacks[_selectedIndex - 1];
+        ref.read(sourcesProvider.notifier).removeFallbackSource(
+              source.id,
+              targetFb.id,
+            );
+        ref.read(feedbackServiceProvider).confirm();
+        setState(() => _isDeleteFocused = false);
+        return KeyEventResult.handled;
+      }
       _activateRow(source, fallbacks, _selectedIndex);
       return KeyEventResult.handled;
     }
@@ -358,18 +392,46 @@ class _FallbackPickerOverlayState
                         // HUD Hints embedded
                         ConsoleHud(
                           embedded: true,
-                          dpad: (label: '↑↓', action: isSorting ? '移動順序' : '選擇項目'),
+                          dpad: (
+                            label: '↑↓' +
+                                ((_selectedIndex >= 1 &&
+                                        _selectedIndex <= fallbacks.length &&
+                                        !isSorting)
+                                    ? ' / →'
+                                    : ''),
+                            action: isSorting
+                                ? '移動順序'
+                                : (_isDeleteFocused ? '移至垃圾桶' : '選擇項目')
+                          ),
                           a: HudAction(
                             isSorting
                                 ? '完成排序'
-                                : (_selectedIndex == 0
-                                    ? '切換自動選擇'
-                                    : (_selectedIndex >= 1 &&
-                                            _selectedIndex <= fallbacks.length
-                                        ? '排序備援'
-                                        : '確定')),
-                            onTap: () =>
-                                _activateRow(source, fallbacks, _selectedIndex),
+                                : (_isDeleteFocused
+                                    ? '刪除備援'
+                                    : (_selectedIndex == 0
+                                        ? '切換自動選擇'
+                                        : (_selectedIndex >= 1 &&
+                                                _selectedIndex <=
+                                                    fallbacks.length
+                                            ? '排序備援'
+                                            : '確定'))),
+                            onTap: () {
+                              if (_isDeleteFocused &&
+                                  _selectedIndex >= 1 &&
+                                  _selectedIndex <= fallbacks.length) {
+                                final targetFb = fallbacks[_selectedIndex - 1];
+                                ref
+                                    .read(sourcesProvider.notifier)
+                                    .removeFallbackSource(
+                                      source.id,
+                                      targetFb.id,
+                                    );
+                                ref.read(feedbackServiceProvider).confirm();
+                                setState(() => _isDeleteFocused = false);
+                                return;
+                              }
+                              _activateRow(source, fallbacks, _selectedIndex);
+                            },
                           ),
                           b: HudAction(
                             isSorting ? '取消排序' : '關閉',
@@ -454,6 +516,7 @@ class _FallbackPickerOverlayState
     required bool isSorting,
   }) {
     final color = AppTheme.primaryColor;
+    final isDeleteActive = isSelected && _isDeleteFocused;
     final bgColor = isSorting
         ? Colors.amber[900]!.withValues(alpha: 0.7)
         : color.withValues(alpha: isSelected ? 0.25 : 0.08);
@@ -516,15 +579,32 @@ class _FallbackPickerOverlayState
               if (isSorting)
                 const Icon(Icons.swap_vert, color: Colors.amber)
               else
-                IconButton(
-                  icon: const Icon(Icons.delete_outline,
-                      color: Colors.white70, size: 20),
-                  onPressed: () {
-                    ref.read(sourcesProvider.notifier).removeFallbackSource(
-                          source.id,
-                          fallback.id,
-                        );
-                  },
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  decoration: BoxDecoration(
+                    color: isDeleteActive
+                        ? const Color(0xFFE50914)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                    border: isDeleteActive
+                        ? Border.all(color: Colors.white, width: 2)
+                        : null,
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: isDeleteActive ? Colors.white : Colors.white70,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      ref
+                          .read(sourcesProvider.notifier)
+                          .removeFallbackSource(
+                            source.id,
+                            fallback.id,
+                          );
+                    },
+                  ),
                 ),
             ],
           ),
@@ -553,94 +633,206 @@ class _FallbackPickerOverlayState
 
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
+      builder: (ctx) => _PickExistingDialog(
+        source: source,
+        candidates: candidates,
+      ),
+    );
+  }
+}
+
+class _PickExistingDialog extends ConsumerStatefulWidget {
+  const _PickExistingDialog({
+    required this.source,
+    required this.candidates,
+  });
+
+  final Source source;
+  final List<Source> candidates;
+
+  @override
+  ConsumerState<_PickExistingDialog> createState() =>
+      _PickExistingDialogState();
+}
+
+class _PickExistingDialogState extends ConsumerState<_PickExistingDialog> {
+  final FocusNode _scopeFocus = FocusNode(debugLabel: 'pick_existing_dialog');
+  int _selectedIndex = 0;
+
+  @override
+  void dispose() {
+    _scopeFocus.dispose();
+    super.dispose();
+  }
+
+  void _confirmSelection() {
+    if (widget.candidates.isEmpty) return;
+    final cand = widget.candidates[_selectedIndex];
+    Navigator.of(context).pop();
+    ref.read(sourcesProvider.notifier).addFallbackSource(
+          widget.source.id,
+          cand.id,
+        );
+    ref.read(feedbackServiceProvider).confirm();
+  }
+
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    final count = widget.candidates.length;
+
+    if (key == LogicalKeyboardKey.arrowUp) {
+      setState(() {
+        _selectedIndex = (_selectedIndex - 1 + count) % count;
+      });
+      ref.read(feedbackServiceProvider).tick();
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.arrowDown) {
+      setState(() {
+        _selectedIndex = (_selectedIndex + 1) % count;
+      });
+      ref.read(feedbackServiceProvider).tick();
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.gameButtonA ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.space) {
+      _confirmSelection();
+      return KeyEventResult.handled;
+    }
+
+    if (key == LogicalKeyboardKey.gameButtonB ||
+        key == LogicalKeyboardKey.escape) {
+      ref.read(feedbackServiceProvider).cancel();
+      Navigator.of(context).pop();
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppTheme.primaryColor;
+    return OverlayFocusScope(
+      priority: OverlayPriority.dialog,
+      isVisible: true,
+      onClose: () => Navigator.of(context).pop(),
+      child: Focus(
+        focusNode: _scopeFocus,
+        autofocus: true,
+        onKeyEvent: _onKeyEvent,
         child: Container(
-          width: 340,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1C1C1C),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white, width: 1.5),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '選擇既有來源作為備援',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 240),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: candidates.length,
-                  itemBuilder: (context, index) {
-                    final cand = candidates[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.of(ctx).pop();
-                          ref.read(sourcesProvider.notifier).addFallbackSource(
-                                source.id,
-                                cand.id,
-                              );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF242424),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.white38,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                cand.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                '${cand.type.shortLabel} - ${cand.hostLabel}',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
+          color: Colors.black.withValues(alpha: 0.75),
+          child: Center(
+            child: Material(
+              type: MaterialType.transparency,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1C1C1C),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '選擇既有來源作為備援',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    );
-                  },
+                      const SizedBox(height: 14),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 240),
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: widget.candidates.length,
+                          itemBuilder: (context, index) {
+                            final cand = widget.candidates[index];
+                            final isSelected = _selectedIndex == index;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 6),
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() => _selectedIndex = index);
+                                  _confirmSelection();
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 120),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(
+                                        alpha: isSelected ? 0.35 : 0.08),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? color
+                                          : color.withValues(alpha: 0.3),
+                                      width: isSelected ? 2.0 : 1.0,
+                                    ),
+                                    boxShadow: isSelected
+                                        ? [
+                                            BoxShadow(
+                                              color: color.withValues(
+                                                  alpha: 0.35),
+                                              blurRadius: 12,
+                                            )
+                                          ]
+                                        : null,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        cand.name,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${cand.type.shortLabel} - ${cand.hostLabel}',
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      ConsoleHud(
+                        embedded: true,
+                        dpad: (label: '↑↓', action: '選擇'),
+                        a: HudAction('確定', onTap: _confirmSelection),
+                        b: HudAction('關閉',
+                            onTap: () => Navigator.of(context).pop()),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('關閉',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

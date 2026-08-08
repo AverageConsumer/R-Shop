@@ -732,6 +732,12 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                   : l.sources_useThisShort,
               onTap: () => _toggleActiveSource(source),
             ),
+      lb: source == null
+          ? null
+          : HudAction(
+              source.enabled ? l.sources_disable : l.sources_enable,
+              onTap: () => _toggleSourceEnabled(source),
+            ),
       rb: source == null
           ? null
           : HudAction(
@@ -1294,6 +1300,25 @@ class _SourceCard extends ConsumerWidget {
                           ),
                         ),
                       ],
+                      if (!source.enabled) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.white12,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            L.of(context).sources_off,
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 2),
@@ -1450,6 +1475,11 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
         icon: Icons.alt_route,
         label: '備援設定',
         onActivate: widget.onEditFallback,
+      ),
+      _OverlayAction(
+        icon: src.enabled ? Icons.toggle_off : Icons.toggle_on,
+        label: src.enabled ? l.sources_disable : l.sources_enable,
+        onActivate: widget.onToggleEnabled,
       ),
       _OverlayAction(
         icon: Icons.delete_outline,
