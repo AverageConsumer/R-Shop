@@ -83,7 +83,7 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
     if (showSyncing) {
       final accent = isFailoverActive ? Colors.amberAccent : Colors.cyanAccent;
       final labelText = isFailoverActive
-          ? '⚡ 備援同步中 (${state.completedSystems}/${state.totalSystems})'
+          ? '⚡ 同步中 (備援) ${state.completedSystems}/${state.totalSystems}'
           : L.of(context).sync_progress(state.completedSystems, state.totalSystems);
 
       return _SyncPillContent(
