@@ -748,6 +748,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        _buildFailoverBadgePill(),
         _buildGameCountBadges(system),
         Text(
           '${system.manufacturer} · ${system.releaseYear}',
@@ -836,6 +837,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        _buildFailoverBadgePill(),
         _buildLibraryCountBadges(),
         Text(
           L.of(context).home_allGames,
@@ -1028,6 +1030,46 @@ class _HomeViewState extends ConsumerState<HomeView>
     );
   }
 
+  Widget _buildFailoverBadgePill() {
+    final failoverChoice = ref.watch(activeFailoverChoiceProvider);
+    if (failoverChoice == null || !failoverChoice.isFallback) {
+      return const SizedBox.shrink();
+    }
+    final actName = failoverChoice.source?.name ?? '備援';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.amberAccent,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white, width: 1),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black54,
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.bolt, size: 12, color: Colors.black),
+          const SizedBox(width: 4),
+          Text(
+            '⚡ 備援代打中: $actName',
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFailoverBanner() {
     final failoverChoice = ref.watch(activeFailoverChoiceProvider);
     if (failoverChoice == null || !failoverChoice.isFallback) {
@@ -1037,39 +1079,50 @@ class _HomeViewState extends ConsumerState<HomeView>
     final actName = failoverChoice.source?.name ?? '備援來源';
 
     return Positioned(
-      top: 14,
-      left: 16,
-      right: 16,
-      child: SafeArea(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Material(
+        type: MaterialType.transparency,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFD97706).withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.amberAccent, width: 1.5),
-            boxShadow: const [
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: const BoxDecoration(
+            color: Color(0xFFD97706),
+            border: Border(
+              bottom: BorderSide(color: Colors.amberAccent, width: 2),
+            ),
+            boxShadow: [
               BoxShadow(
                 color: Colors.black87,
-                blurRadius: 10,
-                offset: Offset(0, 3),
+                blurRadius: 16,
+                offset: Offset(0, 4),
               ),
             ],
           ),
-          child: Row(
-            children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '⚠️ 原本來源「$prefName」無法連線，目前正使用備援來源「$actName」代打中',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
+          child: SafeArea(
+            bottom: false,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    '⚠️ 注意：原本來源「$prefName」連線中斷，目前正由備援來源「$actName」自動接管代打中',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
