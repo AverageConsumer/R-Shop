@@ -23,8 +23,7 @@ class SourceChoice {
   bool get isFallback =>
       source != null &&
       preferred != null &&
-      source!.id != preferred!.id &&
-      !(preferred!.fallbackAutoSelect);
+      source!.id != preferred!.id;
 
   static const none = SourceChoice();
 }
@@ -122,6 +121,7 @@ Future<({AppConfig config, SourceChoice choice})> resolveForSync({
   }
 
   final svc = probe ?? EndpointProbeService();
+  svc.invalidate();
   final selected = config.sourceById(activeId);
   if (selected == null || !selected.enabled) {
     return (config: config, choice: SourceChoice.none);

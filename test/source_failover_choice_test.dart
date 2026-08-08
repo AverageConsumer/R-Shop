@@ -85,7 +85,7 @@ void main() {
 
       expect(c.source?.id, 'wan2');
       expect(c.preferred?.id, 'lan');
-      expect(c.isFallback, isFalse, reason: 'isFallback is false in auto-select mode');
+      expect(c.isFallback, isTrue);
     });
   });
 }
