@@ -1393,13 +1393,18 @@ class _SourceCard extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Colors.white12,
+                            color: Colors.redAccent.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: Colors.redAccent.withValues(alpha: 0.4),
+                            ),
                           ),
                           child: Text(
-                            L.of(context).sources_off,
-                            style: TextStyle(
-                              color: Colors.white54,
+                            source.fallbackSourceIds.isNotEmpty
+                                ? '🚫 備援已暫停 (來源已停用)'
+                                : L.of(context).sources_off,
+                            style: const TextStyle(
+                              color: Colors.redAccent,
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
                             ),
