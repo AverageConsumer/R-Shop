@@ -549,6 +549,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     ref.read(syncingSourceProvider.notifier).state = chosen == null
         ? null
         : (name: chosen.name, isFallback: resolved.choice.isFallback);
+    ref.read(activeFailoverChoiceProvider.notifier).state = resolved.choice;
     return resolved.config;
   }
 
@@ -688,6 +689,7 @@ class _HomeViewState extends ConsumerState<HomeView>
                   if (isGrid) _buildControls(rs),
                 ],
               ),
+              _buildFailoverBanner(),
               // Modal overlays stay above everything, banner included.
               if (showQuickMenu)
                 QuickMenuOverlay(
@@ -1021,6 +1023,54 @@ class _HomeViewState extends ConsumerState<HomeView>
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFailoverBanner() {
+    final failoverChoice = ref.watch(activeFailoverChoiceProvider);
+    if (failoverChoice == null || !failoverChoice.isFallback) {
+      return const SizedBox.shrink();
+    }
+    final prefName = failoverChoice.preferred?.name ?? '原本來源';
+    final actName = failoverChoice.source?.name ?? '備援來源';
+
+    return Positioned(
+      top: 14,
+      left: 16,
+      right: 16,
+      child: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFD97706).withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.amberAccent, width: 1.5),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black87,
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '⚠️ 原本來源「$prefName」無法連線，目前正使用備援來源「$actName」代打中',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

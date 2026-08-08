@@ -13,6 +13,7 @@ import '../services/disk_space_service.dart';
 import '../services/native_smb_service.dart';
 import '../services/romm_pairing_service.dart';
 import '../services/sources_notifier.dart';
+import '../services/source_failover.dart';
 import '../models/game_item.dart';
 import '../models/sound_settings.dart';
 
@@ -470,3 +471,9 @@ final storageInfoProvider =
 /// view, or nothing has resolved yet.
 final syncingSourceProvider =
     StateProvider<({String name, bool isFallback})?>((ref) => null);
+
+/// Represents current failover choice state across the app.
+/// When non-null and choice.isFallback is true, primary source failed to connect
+/// and a fallback source is in active use.
+final activeFailoverChoiceProvider =
+    StateProvider<SourceChoice?>((ref) => null);
