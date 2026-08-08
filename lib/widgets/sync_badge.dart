@@ -83,7 +83,7 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
     if (showSyncing) {
       final accent = isFailoverActive ? Colors.amberAccent : Colors.cyanAccent;
       final labelText = isFailoverActive
-          ? '⚡ 同步中 (備援) ${state.completedSystems}/${state.totalSystems}'
+          ? '⚡ 同步中 (代理) ${state.completedSystems}/${state.totalSystems}'
           : L.of(context).sync_progress(state.completedSystems, state.totalSystems);
 
       return _SyncPillContent(
@@ -105,7 +105,7 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
         child: _SyncPillContent(
           accentColor: Colors.amberAccent,
           leadingIcon: Icon(Icons.bolt, size: iconSize, color: Colors.amberAccent),
-          label: '⚡ 備援連線中',
+          label: '⚡ 代理中',
           systemName: failoverChoice.source?.name,
         ),
       );

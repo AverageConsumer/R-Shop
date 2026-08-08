@@ -1315,7 +1315,7 @@ class _SourceCard extends ConsumerWidget {
                             ),
                           ),
                           child: Text(
-                            '⚠️ 無法連線 (已切換至備援: $fallbackName)',
+                            '⚠️ 斷線 (已切換至: $fallbackName)',
                             style: const TextStyle(
                               color: Colors.amberAccent,
                               fontSize: 9,
@@ -1339,7 +1339,7 @@ class _SourceCard extends ConsumerWidget {
                               Icon(Icons.bolt, size: 10, color: Colors.black),
                               SizedBox(width: 2),
                               Text(
-                                '正在使用此備援',
+                                '代理中',
                                 style: TextStyle(
                                   color: Colors.black,
                                   fontSize: 9,
@@ -1369,7 +1369,7 @@ class _SourceCard extends ConsumerWidget {
                             ),
                           ),
                           child: Text(
-                            hasEnabledFallback ? '⚡ 備援啟用中' : '🚫 備援已停用',
+                            hasEnabledFallback ? '🛡️ 已設備援' : '🚫 備援已停用',
                             style: TextStyle(
                               color: hasEnabledFallback
                                   ? Colors.amberAccent
