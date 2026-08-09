@@ -36,6 +36,7 @@
 - [使用中與顯示分家](FIX_LOGS.md)
 - [R-Shop 來源群組](FIX_LOGS.md)
 - [R-Shop 備援架構重構](FIX_LOGS.md)
+- [R-Shop 代理全域無縫同步與PR15提交](FIX_LOGS.md)
 
 ### `lib/features/library/library_screen.dart`
 - [R-Shop analyze 六項](FIX_LOGS.md)
@@ -57,6 +58,7 @@
 - [R-Shop 群組浮層焦點](FIX_LOGS.md)
 - [R-Shop 備援架構重構](FIX_LOGS.md)
 - [R-Shop 來源與備援邊框與高對比風格](FIX_LOGS.md)
+- [R-Shop 代理全域無縫同步與PR15提交](FIX_LOGS.md)
 
 ### `lib/features/sources/endpoint_edit_screen.dart`
 - [R-Shop 連線路由](FIX_LOGS.md)
@@ -78,6 +80,7 @@
 - [浮層只做了手把](FIX_LOGS.md)
 - [R-Shop 備援架構重構](FIX_LOGS.md)
 - [R-Shop 來源與備援邊框與高對比風格](FIX_LOGS.md)
+- [R-Shop 代理全域無縫同步與PR15提交](FIX_LOGS.md)
 
 ### `lib/features/sources/group_picker_overlay.dart`
 - [R-Shop 來源群組](FIX_LOGS.md)
@@ -96,6 +99,9 @@
 - [R-Shop 自動選最優路線](FIX_LOGS.md)
 - [R-Shop 連線方式對齊群組](FIX_LOGS.md)
 - [R-Shop 模式收成打勾](FIX_LOGS.md)
+
+### `lib/l10n/app_zh.arb`
+- [R-Shop 代理全域無縫同步與PR15提交](FIX_LOGS.md)
 
 ### `lib/l10n/app_{de,en,es,fr,ja,pt,zh}.arb`
 - [R-Shop 來源群組](FIX_LOGS.md)
@@ -122,6 +128,7 @@
 
 ### `lib/providers/app_providers.dart`
 - [同步不知道是哪一台](FIX_LOGS.md)
+- [R-Shop 代理全域無縫同步與PR15提交](FIX_LOGS.md)
 
 ### `lib/services/database_service.dart`
 - [R-Shop 連線路由](FIX_LOGS.md)
@@ -164,6 +171,7 @@
 - [R-Shop 來源群組](FIX_LOGS.md)
 - [R-Shop 同步路線解算](FIX_LOGS.md)
 - [R-Shop 備援架構重構](FIX_LOGS.md)
+- [R-Shop 代理全域無縫同步與PR15提交](FIX_LOGS.md)
 
 ### `lib/services/source_resolver.dart`
 - [R-Shop 連線路由](FIX_LOGS.md)
@@ -186,6 +194,7 @@
 ### `lib/widgets/sync_badge.dart`
 - [同步不知道是哪一台](FIX_LOGS.md)
 - [R-Shop 來源群組](FIX_LOGS.md)
+- [R-Shop 代理全域無縫同步與PR15提交](FIX_LOGS.md)
 
 ### `scripts/build_fix_by_file.py`
 - [R-Shop 反查不到](FIX_LOGS.md)

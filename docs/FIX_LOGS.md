@@ -803,3 +803,14 @@ emoveSource 才需清除）。
   1. `SourcesScreen`（`_SourceCard`）：邊框統一改為清晰白邊框（未聚焦時 `Colors.white24` 1.5px，聚焦時 `ConsoleFocusable` 純白 2px 邊框與深紅高亮背景）；副標題、類型、主機與遊戲計數統一採用純白/亮白（`Colors.white` / `Colors.white70`）高對比字體。
   2. `FallbackPickerOverlay`（備援設定）：全面對齊 `SourcesScreen` 風格，選項列均採用 `0xFF1C1C1C` 卡片底色、`Colors.white24` 未選邊框 / `Colors.white` 2px 選取白邊框、`Colors.white` 與 `Colors.white70` 高對比文字。
 - **檔案**：`lib/features/settings/sources_screen.dart`（_SourceCard 白邊框與高對比文字） · `lib/features/sources/fallback_picker_overlay.dart`（對齊來源設置視覺風格與邊框）
+
+## [R-Shop 代理全域無縫同步與PR15提交] 代理設定異動全域無縫同步、字串統一更名為代理並成功提交 PR #15
+
+- **現象**：編輯/移除代理伺服器時其他頁面殘留舊代理狀態，且界面詞彙需精準區隔。
+- **根因**：`activeFailoverChoiceProvider` 過去未全域監聽 `sourcesProvider` 異動，導致快取與狀態未實時刷新。
+- **解法**：
+  1. `activeFailoverChoiceProvider` 升級為全域 `StateNotifierProvider` 並監聽 `sourcesProvider`，任何代理設定異動（新增/移除/排序/開關）一秒內自動清空快取、重測並全域動態連動同步。
+  2. 強化 `SourceChoice.isFallback` 嚴格校驗（移出代理清單或停用時即刻無效化）。
+  3. 全系統詞彙統一更名為「代理」（`🛡️ 已設代理` / `⚡ 代理中` / `⚠️ 斷線 (已切換至: XXX)`）。
+  4. 完成與官方原作者 GitHub `upstream/main` (`AverageConsumer/R-Shop`) 100% 同步，並成功提交 PR #15。
+- **檔案**：`lib/providers/app_providers.dart` · `lib/services/source_failover.dart` · `lib/features/settings/sources_screen.dart` · `lib/widgets/sync_badge.dart` · `lib/features/home/home_view.dart` · `lib/features/sources/fallback_picker_overlay.dart` · `lib/l10n/app_zh.arb`
