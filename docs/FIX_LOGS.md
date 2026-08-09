@@ -814,3 +814,8 @@ emoveSource 才需清除）。
   3. 全系統詞彙統一更名為「代理」（`🛡️ 已設代理` / `⚡ 代理中` / `⚠️ 斷線 (已切換至: XXX)`）。
   4. 完成與官方原作者 GitHub `upstream/main` (`AverageConsumer/R-Shop`) 100% 同步，並成功提交 PR #15。
 - **檔案**：`lib/providers/app_providers.dart` · `lib/services/source_failover.dart` · `lib/features/settings/sources_screen.dart` · `lib/widgets/sync_badge.dart` · `lib/features/home/home_view.dart` · `lib/features/sources/fallback_picker_overlay.dart` · `lib/l10n/app_zh.arb`
+
+## [R-Shop Multi-Fallback實機驗證完成] 多組備援與連線方式 UI 實機驗證全數通過
+- **問題**：多組備援鏈 (fallbackSourceIds / fallbackAutoSelect) 及路線浮層觸控+手把雙入口改動需於 AYN Thor 實機操作驗證。
+- **修復**：使用者完成實機測試，確認開關眼睛、打勾使用中、自動選擇探測、徽章高對比白邊框、手把與觸控雙入口功能均運作正常無誤。
+- **檔案**：`lib/features/settings/sources_screen.dart` · `lib/features/sources/fallback_picker_overlay.dart` · `docs/HANDOVER.md`

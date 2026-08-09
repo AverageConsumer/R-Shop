@@ -22,6 +22,9 @@
 - [AppID 衝突](FIX_LOGS.md)
 - [R-Shop Channel 名稱硬編](FIX_LOGS.md)
 
+### `docs/HANDOVER.md`
+- [R-Shop Multi-Fallback實機驗證完成](FIX_LOGS.md)
+
 ### `lib/features/game_list/widgets/game_grid.dart`
 - [R-Shop analyze 六項](FIX_LOGS.md)
 
@@ -59,6 +62,7 @@
 - [R-Shop 備援架構重構](FIX_LOGS.md)
 - [R-Shop 來源與備援邊框與高對比風格](FIX_LOGS.md)
 - [R-Shop 代理全域無縫同步與PR15提交](FIX_LOGS.md)
+- [R-Shop Multi-Fallback實機驗證完成](FIX_LOGS.md)
 
 ### `lib/features/sources/endpoint_edit_screen.dart`
 - [R-Shop 連線路由](FIX_LOGS.md)
@@ -81,6 +85,7 @@
 - [R-Shop 備援架構重構](FIX_LOGS.md)
 - [R-Shop 來源與備援邊框與高對比風格](FIX_LOGS.md)
 - [R-Shop 代理全域無縫同步與PR15提交](FIX_LOGS.md)
+- [R-Shop Multi-Fallback實機驗證完成](FIX_LOGS.md)
 
 ### `lib/features/sources/group_picker_overlay.dart`
 - [R-Shop 來源群組](FIX_LOGS.md)
