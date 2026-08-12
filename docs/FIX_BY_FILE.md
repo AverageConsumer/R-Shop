@@ -41,6 +41,9 @@
 - [R-Shop 備援架構重構](FIX_LOGS.md)
 - [R-Shop 代理全域無縫同步與PR15提交](FIX_LOGS.md)
 
+### `lib/features/home/widgets/home_grid_view.dart`
+- [R-Shop 網格卡片版面溢位修復](FIX_LOGS.md)
+
 ### `lib/features/library/library_screen.dart`
 - [R-Shop analyze 六項](FIX_LOGS.md)
 

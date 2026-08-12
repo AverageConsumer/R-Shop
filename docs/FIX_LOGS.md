@@ -819,3 +819,11 @@ emoveSource 才需清除）。
 - **問題**：多組備援鏈 (fallbackSourceIds / fallbackAutoSelect) 及路線浮層觸控+手把雙入口改動需於 AYN Thor 實機操作驗證。
 - **修復**：使用者完成實機測試，確認開關眼睛、打勾使用中、自動選擇探測、徽章高對比白邊框、手把與觸控雙入口功能均運作正常無誤。
 - **檔案**：`lib/features/settings/sources_screen.dart` · `lib/features/sources/fallback_picker_overlay.dart` · `docs/HANDOVER.md`
+
+## [R-Shop 網格卡片版面溢位修復] 主畫面縮小網格時數量膠囊標籤觸發 OVERFLOWED BY 5.4 PIXELS 溢位條
+
+- **問題**：主畫面網格縮小（欄數變多，卡片變窄）且遊戲數量達到數萬~十多萬個時，卡片右上/右側出現白底紅字 `OVERFLOWED BY 5.4 PIXELS` 警示條。
+- **根因**：`HomeGridView` 底部的遊戲數量膠囊標籤 `Row` 未限制與卡片寬度同寬，當位數變長或雙標籤併排時，在窄卡片上超出 5.4 像素觸發 Flutter RenderFlex 溢位警告。
+- **修復**：將 `_buildLibraryItem` 與 `_buildGridItem` 中的數量標籤 `Row` 包裹 `FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft)`，確保卡片在任何寬度下均可自動微縮適應。實機截圖驗證溢位完全消除。
+- **檔案**：`lib/features/home/widgets/home_grid_view.dart:205,380`（包裹 FittedBox scaleDown 適應寬度）
+

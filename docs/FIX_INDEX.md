@@ -55,6 +55,7 @@
 | **R-Shop QR碼手把導覽** ✨ | `QrPairingScreen` 掃碼頁加入搖桿/D-pad 焦點切換邏輯與初始化 Focus，支援手把切換至返回按鈕與手動輸入按鈕及底部 ConsoleHud | `lib/features/pairing/qr_pairing_screen.dart` · `test/widgets/qr_pairing_screen_test.dart` |
 | **R-Shop 主頁面移除來源切換** ✨ | 主頁面移除頂部來源條與 L2/R2 來源切換快捷鍵及 HUD 提示，改由來源清單統一管理主要與備援來源 | `lib/features/home/home_view.dart` |
 | **R-Shop 來源與備援邊框與高對比風格** ✨ | 來源設置與備援設定浮層統一採用清晰全列白邊框 (Colors.white24 / Colors.white) 與純白高對比文字 | `lib/features/settings/sources_screen.dart` · `lib/features/sources/fallback_picker_overlay.dart` |
+| **R-Shop 網格卡片版面溢位修復** ✨ | 主畫面縮小網格（欄數增加，卡片變窄）且遊戲數量達到數萬個時，卡片標籤 Row 未限制寬度觸發 OVERFLOWED BY 5.4 PIXELS 溢位警示條。修復：包裹 FittedBox(fit: BoxFit.scaleDown) 自動適應寬度 | `lib/features/home/widgets/home_grid_view.dart` |
 
 ## 🛠️ 建置與環境
 
