@@ -329,4 +329,55 @@ void main() {
       expect(result.map((s) => s.id), ['b', 'a']);
     });
   });
+
+  group('SourceResolver — the live route decides the credentials', () {
+    // Invariant 4: the resolver reads the source's top-level fields and knows
+    // nothing about routes. Per-route credentials must therefore arrive the
+    // same way the address does.
+    const system = SystemConfig(
+      id: 'snes',
+      name: 'SNES',
+      targetFolder: '/roms/snes',
+      providers: [],
+    );
+    const lan = SourceEndpoint(
+      id: 'ep-lan',
+      label: '區網',
+      url: 'http://192.168.1.50:8090',
+    );
+    const gated = SourceEndpoint(
+      id: 'ep-remote',
+      label: '遠端',
+      url: 'https://roms.example.org',
+      auth: AuthConfig(clientToken: 'proxy-token'),
+    );
+    const source = Source(
+      id: 's1',
+      name: 'My RomM',
+      type: SourceType.romm,
+      url: 'http://192.168.1.50:8090',
+      auth: AuthConfig(clientToken: 'tok'),
+      endpoints: [lan, gated],
+      autoMap: true,
+      knownPlatforms: {'snes': 4},
+    );
+
+    test('a route without its own login gets the source\'s', () {
+      final providers = SourceResolver.providersFor(system, const [source]);
+
+      expect(providers.single.auth?.clientToken, 'tok');
+      expect(providers.single.endpointId, 'ep-lan');
+    });
+
+    test('a gated route gets its own', () {
+      final providers = SourceResolver.providersFor(
+        system,
+        [source.withLiveEndpoint(gated)],
+      );
+
+      expect(providers.single.url, 'https://roms.example.org');
+      expect(providers.single.auth?.clientToken, 'proxy-token');
+      expect(providers.single.endpointId, 'ep-remote');
+    });
+  });
 }

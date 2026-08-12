@@ -1277,6 +1277,16 @@ class LEn extends L {
   String get onboarding_serverType => 'Server type';
 
   @override
+  String get onboarding_folderExplanationTitle => 'Setup your Library Path';
+
+  @override
+  String get onboarding_folderExplanationMessage =>
+      'R-Shop needs a base folder to store your downloaded games. This helps organize your files and is required for Android folder permissions.\n\nWe recommend creating a folder named \'ROMs\' and selecting it.';
+
+  @override
+  String get onboarding_continueToPicker => 'Select Folder';
+
+  @override
   String get onboarding_hangOn => 'Hang on, testing the connection...';
 
   @override
@@ -1610,5 +1620,259 @@ class LEn extends L {
   @override
   String service_queuedCount(int count) {
     return '$count queued';
+  }
+
+  @override
+  String get sources_connectionRoute => 'Connection route';
+
+  @override
+  String get sources_routeAuto => 'Automatic';
+
+  @override
+  String get sources_routeAutoHint =>
+      'Use the fastest route that answers, re-checked as the network changes';
+
+  @override
+  String get sources_routeInUse => 'In use';
+
+  @override
+  String get sources_routePinned => 'Locked';
+
+  @override
+  String get sources_routeReachable => 'Reachable';
+
+  @override
+  String get sources_routeNoAnswer => 'No answer';
+
+  @override
+  String get sources_routeChecking => 'Checking…';
+
+  @override
+  String sources_routeLatencyMs(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String sources_routeAutoPicks(String route) {
+    return 'Would use $route';
+  }
+
+  @override
+  String get sources_routeAutoNoneReachable => 'Nothing answered';
+
+  @override
+  String get sources_routeFastest => 'Fastest';
+
+  @override
+  String get sources_routeReleasePin =>
+      'Drops the lock and re-picks the fastest';
+
+  @override
+  String get sources_routeOwnLogin => 'Own login';
+
+  @override
+  String get sources_routeAuthTitle => 'Login for this route';
+
+  @override
+  String get sources_routeAuthHint =>
+      'Leave blank to use the source\'s login. Fill it in only when this address asks for a different one.';
+
+  @override
+  String get sources_routeAuthInherited => 'Using the source\'s login';
+
+  @override
+  String get sources_routeAuthOwn => 'This route logs in on its own';
+
+  @override
+  String get sources_routeOnlyOne => 'This source has only one route';
+
+  @override
+  String get sources_addRoute => 'Add route';
+
+  @override
+  String get sources_editRoute => 'Edit route';
+
+  @override
+  String get sources_removeRoute => 'Remove route';
+
+  @override
+  String get sources_routeDuplicate =>
+      'This source already has a route to that address';
+
+  @override
+  String get sources_activeSource => 'In use';
+
+  @override
+  String get sources_switchSource => 'Switch source';
+
+  @override
+  String get sources_prevSource => 'Prev source';
+
+  @override
+  String get sources_nextSource => 'Next source';
+
+  @override
+  String get sources_setFallback => 'Backup source';
+
+  @override
+  String get sources_fallbackNone => 'None';
+
+  @override
+  String get sources_fallbackShort => 'Backup';
+
+  @override
+  String get sources_routeSameServerHint =>
+      'All routes reach the same server. A route can carry its own login when that address asks for a different one.';
+
+  @override
+  String get sources_routeCannotRemoveLast =>
+      'The last route cannot be removed';
+
+  @override
+  String sources_countLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sources',
+      one: '1 source',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sources_useThisShort => 'Use this';
+
+  @override
+  String get sources_stopUsingShort => 'Stop using';
+
+  @override
+  String get sources_removeConfirmTitle => 'Remove source?';
+
+  @override
+  String sources_removeConfirmMessage(String name) {
+    return 'Remove \"$name\"? Its list disappears from the library, but games already downloaded to this device are kept.';
+  }
+
+  @override
+  String get sources_groupBadge => 'Group';
+
+  @override
+  String get sources_groupCreate => 'Group with another source…';
+
+  @override
+  String get sources_groupCreateHint =>
+      'For two addresses that are really the same server';
+
+  @override
+  String get sources_groupPickMember => 'Pick the source to group with';
+
+  @override
+  String get sources_groupSameTypeOnly =>
+      'Only sources of the same type can be grouped';
+
+  @override
+  String get sources_groupNoCandidates => 'No other source of this type';
+
+  @override
+  String get sources_groupManage => 'Group settings';
+
+  @override
+  String get sources_groupRename => 'Rename group';
+
+  @override
+  String get sources_groupNameLabel => 'Group name';
+
+  @override
+  String get sources_groupModeTitle => 'Which member to use';
+
+  @override
+  String get sources_groupModeAuto => 'Automatic';
+
+  @override
+  String get sources_groupModeAutoHint =>
+      'No order to keep — the address that replies first is the one you can use first';
+
+  @override
+  String get sources_groupModeOrdered => 'My order';
+
+  @override
+  String get sources_groupModeOrderedHint =>
+      'Takes the first one in your order that answers';
+
+  @override
+  String get sources_groupPreferred => 'First choice';
+
+  @override
+  String get sources_groupAddMember => 'Add a source';
+
+  @override
+  String get sources_groupLeave => 'Leave the group';
+
+  @override
+  String sources_groupLeaveConfirm(String name) {
+    return '$name keeps no games and has to sync again. The shared list stays with the group.';
+  }
+
+  @override
+  String get sources_groupLeaveTitle => 'Leave the group?';
+
+  @override
+  String get sources_groupDissolve => 'Dissolve the group';
+
+  @override
+  String sources_groupDissolveConfirm(String name) {
+    return '$name keeps the shared list; the others have to sync again.';
+  }
+
+  @override
+  String get sources_groupDissolveTitle => 'Dissolve the group?';
+
+  @override
+  String sources_groupMembersCount(int count) {
+    return '$count sources';
+  }
+
+  @override
+  String sources_groupUsing(String name) {
+    return 'Using $name';
+  }
+
+  @override
+  String get sources_moveUp => 'Move up';
+
+  @override
+  String get sources_moveDown => 'Move down';
+
+  @override
+  String get sources_routeOrdered => 'My order';
+
+  @override
+  String get sources_routeOrderedHint =>
+      'Use the first route in your order that answers';
+
+  @override
+  String get sources_reorderHint =>
+      'Move it with up and down, then press again to finish';
+
+  @override
+  String get sources_groupMemberHint =>
+      'Press ▶ to send it out of the group; [A] reorders';
+
+  @override
+  String get sources_routeRowHint =>
+      'Select the row to reorder it; press ▶ for the icons: edit or remove';
+
+  @override
+  String get sources_routeUse => 'Use this route';
+
+  @override
+  String get sources_routeLock => 'Lock to this route';
+
+  @override
+  String get sources_routeUnlock => 'Unlock';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return 'Remove “$name”? The games cached for this source stay; only the address goes.';
   }
 }

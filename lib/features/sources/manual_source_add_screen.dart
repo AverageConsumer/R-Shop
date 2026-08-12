@@ -11,7 +11,6 @@ import '../../models/config/provider_config.dart';
 import '../../models/config/source.dart';
 import '../../providers/app_providers.dart';
 import '../../services/network_discovery_service.dart';
-import '../../widgets/console_hud.dart';
 
 /// Form to add a manual (non-RomM) [Source]: SMB, FTP, or Web.
 ///
@@ -47,6 +46,7 @@ class _ManualSourceAddScreenState
 
   // --- Wrapper focus nodes (controller traverses these) ---
   late List<_Field> _fields;
+  final _backFocus = FocusNode(debugLabel: 'manual_add_back');
   final _saveFocus = FocusNode(debugLabel: 'manual_add_save');
   final _screenFocus = FocusNode(debugLabel: 'manual_add_screen');
 
@@ -183,6 +183,7 @@ class _ManualSourceAddScreenState
     for (final n in _discoveredFocusNodes) {
       n.dispose();
     }
+    _backFocus.dispose();
     _saveFocus.dispose();
     _screenFocus.dispose();
     super.dispose();
@@ -232,7 +233,7 @@ class _ManualSourceAddScreenState
   }
 
   List<FocusNode> get _navOrder =>
-      [..._discoveredFocusNodes, ..._fields.map((f) => f.consoleFocus), _saveFocus];
+      [_backFocus, ..._discoveredFocusNodes, ..._fields.map((f) => f.consoleFocus), _saveFocus];
 
   void _moveFocus(int delta) {
     final order = _navOrder;
@@ -248,6 +249,10 @@ class _ManualSourceAddScreenState
   }
 
   void _activateFocused() {
+    if (_backFocus.hasFocus) {
+      Navigator.of(context).maybePop();
+      return;
+    }
     for (int i = 0; i < _discoveredFocusNodes.length; i++) {
       if (_discoveredFocusNodes[i].hasFocus) {
         _applyDiscovered(_discovered[i]);
@@ -333,7 +338,7 @@ class _ManualSourceAddScreenState
     try {
       await ref
           .read(sourcesProvider.notifier)
-          .addSourceWithMappings(source, const {});
+          .addSource(source, manualMappings: const {});
       if (!mounted) return;
       Navigator.of(context).pop<Source?>(source);
     } catch (e) {
@@ -349,109 +354,129 @@ class _ManualSourceAddScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.backgroundColor,
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Focus(
-              focusNode: _screenFocus,
-              autofocus: true,
-              onKeyEvent: _handleScreenKey,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Add ${_typeLabel(widget.type)} source',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Connection only — map systems to remote folders '
-                          'after saving from the source actions menu.',
-                          style: TextStyle(
-                              color: Colors.grey.shade500, fontSize: 12),
-                        ),
-                        const SizedBox(height: 20),
-                        Expanded(
-                          child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (widget.type != SourceType.web)
-                              _buildDiscoverySection(),
-                            for (final f in _fields) ...[
-                              _textBox(f),
-                              const SizedBox(height: 12),
-                            ],
-                            if (_error != null) ...[
-                              const SizedBox(height: 4),
-                              Text(_error!,
-                                  style: const TextStyle(
-                                      color: Colors.redAccent, fontSize: 13)),
-                            ],
-                            const SizedBox(height: 16),
-                            ConsoleFocusable(
-                              focusNode: _saveFocus,
-                              focusScale: 1.0,
-                              onSelect: _busy ? null : _save,
-                              child: Container(
-                                width: double.infinity,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryColor
-                                      .withValues(alpha: 0.18),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                      color: AppTheme.primaryColor, width: 2),
-                                ),
-                                child: _busy
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: AppTheme.primaryColor,
-                                        ),
-                                      )
-                                    : Text(
-                                        L.of(context).manualSource_saveSource,
-                                        style: const TextStyle(
-                                          color: AppTheme.primaryColor,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                          letterSpacing: 1,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                            // Extra bottom padding so content doesn't
-                            // hide behind the HUD.
-                            const SizedBox(height: 56),
-                          ],
-                        ),
+      body: SafeArea(
+        child: Focus(
+          focusNode: _screenFocus,
+          autofocus: true,
+          onKeyEvent: _handleScreenKey,
+          child: Column(
+            children: [
+              // Fixed Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+                child: Row(
+                  children: [
+                    ConsoleFocusable(
+                      focusNode: _backFocus,
+                      onSelect: () => Navigator.of(context).maybePop(),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(Icons.arrow_back,
+                            color: Colors.white, size: 26),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Add ${_typeLabel(widget.type)} source',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
+              // Scrollable Content
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          Text(
+                            'Connection only — map systems to remote folders '
+                            'after saving from the source actions menu.',
+                            style: TextStyle(
+                                color: Colors.grey.shade500, fontSize: 12),
+                          ),
+                          const SizedBox(height: 20),
+                          if (widget.type != SourceType.web)
+                            _buildDiscoverySection(),
+                          for (final f in _fields) ...[
+                            _textBox(f),
+                            const SizedBox(height: 12),
+                          ],
+                          if (_error != null) ...[
+                            const SizedBox(height: 4),
+                            Text(_error!,
+                                style: const TextStyle(
+                                    color: Colors.redAccent, fontSize: 13)),
+                          ],
+                          const SizedBox(height: 16),
+                          ListenableBuilder(
+                            listenable: _saveFocus,
+                            builder: (context, _) {
+                              final isFocused = _saveFocus.hasFocus;
+                              final color = isFocused
+                                  ? Colors.white
+                                  : AppTheme.primaryColor;
+                              final bgColor = isFocused
+                                  ? AppTheme.primaryColor.withValues(alpha: 0.3)
+                                  : AppTheme.primaryColor.withValues(alpha: 0.18);
+
+                              return ConsoleFocusable(
+                                focusNode: _saveFocus,
+                                focusScale: 1.02,
+                                onSelect: _busy ? null : _save,
+                                focusBorderColor: Colors.white,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 14),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: bgColor,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: _busy
+                                      ? SizedBox(
+                                          height: 18,
+                                          width: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: color,
+                                          ),
+                                        )
+                                      : Text(
+                                          L.of(context).manualSource_saveSource,
+                                          style: TextStyle(
+                                            color: color,
+                                            fontSize: 15,
+                                            fontWeight: isFocused
+                                                ? FontWeight.w700
+                                                : FontWeight.w600,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 60),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-      ),
-      ConsoleHud(
-        b: HudAction(L.of(context).common_back, onTap: () => Navigator.maybePop(context)),
-      ),
-        ],
       ),
     );
   }
@@ -625,7 +650,7 @@ class _ManualSourceAddScreenState
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: hasFocus
-                        ? AppTheme.primaryColor
+                        ? Colors.white
                         : AppTheme.primaryColor.withValues(alpha: 0.4),
                     width: 2,
                   ),

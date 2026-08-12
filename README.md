@@ -1,3 +1,5 @@
+> **English** | [繁體中文](README.zh-TW.md)
+
 # 🎮 R-Shop
 
 **The fastest way to turn your retro library into a console-like experience on Android.**

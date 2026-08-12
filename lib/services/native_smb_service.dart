@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'platform_channels.dart';
+
 class SmbFileEntry {
   final String name;
   final String path;
@@ -19,8 +21,8 @@ class SmbFileEntry {
 }
 
 class NativeSmbService {
-  static const _channel = MethodChannel('com.retro.rshop/smb');
-  static const _progressChannel = EventChannel('com.retro.rshop/smb_progress');
+  static const _channel = MethodChannel(kSmbChannel);
+  static const _progressChannel = EventChannel(kSmbProgressChannel);
 
   Stream<Map<String, dynamic>>? _progressStream;
 

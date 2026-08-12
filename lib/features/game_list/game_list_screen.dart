@@ -171,6 +171,9 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
       systemConfig: systemConfig ?? SystemConfig(id: widget.system.id, name: widget.system.name, targetFolder: widget.targetFolder, providers: []),
       installedFilenames: installedData?.bySystem[widget.system.id],
       storage: ref.read(storageServiceProvider),
+      // Sources the user grouped share one cached library; without this the
+      // grid would read the member's own (empty) list after a switch.
+      cacheOwnerOf: appConfig.cacheOwnerIdFor,
     )..addListener(_onControllerChanged);
 
     _controller.onGamesSaved = () {

@@ -1,3 +1,5 @@
+> **English** | [繁體中文](CONTRIBUTING.zh-TW.md)
+
 # Contributing to R-Shop
 
 First off — **thank you!** 🎮 Whether you're fixing a typo or building a whole new feature, every contribution helps make R-Shop better. This project is maintained by a solo developer who is learning as they go, so patience and kindness are appreciated.

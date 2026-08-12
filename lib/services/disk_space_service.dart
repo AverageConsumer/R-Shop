@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'platform_channels.dart';
+
 class StorageInfo {
   final int freeBytes;
   final int totalBytes;
@@ -38,7 +40,7 @@ class StorageInfo {
 }
 
 class DiskSpaceService {
-  static const _channel = MethodChannel('com.retro.rshop/storage');
+  static const _channel = MethodChannel(kStorageChannel);
 
   static Future<StorageInfo?> getFreeSpace(String path) async {
     if (!Platform.isAndroid) return null;

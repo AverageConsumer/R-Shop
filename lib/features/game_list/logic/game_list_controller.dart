@@ -98,6 +98,15 @@ class GameListController extends ChangeNotifier {
   final UnifiedGameService _unifiedService;
   final DatabaseService _databaseService;
   final StorageService? _storage;
+
+  /// Maps a source id to the id that owns its cached games — the group when
+  /// the user put it in one, otherwise the source itself.
+  ///
+  /// Injected rather than read from [AppConfig] here because this controller
+  /// only ever knew about one system's config; pass
+  /// `AppConfig.cacheOwnerIdFor`. Left null, every source owns its own list,
+  /// which is what an install with no groups looks like.
+  final String Function(String sourceId)? _cacheOwnerOf;
   bool _disposed = false;
   Timer? _thumbnailDebounce;
 
@@ -130,9 +139,11 @@ class GameListController extends ChangeNotifier {
     UnifiedGameService? unifiedService,
     DatabaseService? databaseService,
     StorageService? storage,
+    String Function(String sourceId)? cacheOwnerOf,
   })  : _unifiedService = unifiedService ?? UnifiedGameService(),
         _databaseService = databaseService ?? DatabaseService(),
-        _storage = storage {
+        _storage = storage,
+        _cacheOwnerOf = cacheOwnerOf {
     _pendingInstalledFilenames = installedFilenames;
     loadGames();
   }
@@ -153,14 +164,23 @@ class GameListController extends ChangeNotifier {
         _groupGames();
         _restoreFilters();
         _resolveInstalledStatus();
-        await _databaseService.saveGames(system.id, _state.allGames, forceDeleteOrphans: true);
+        await _databaseService.saveGamesByRoute(system.id, _state.allGames, forceDeleteOrphans: true, cacheOwnerOf: _cacheOwnerOf);
         onGamesSaved?.call();
         return;
       }
 
       // Cache-first: show cached games immediately if available
       if (!forceRefresh && await _databaseService.hasCache(system.id)) {
-        var cached = await _databaseService.getGames(system.id);
+        // Only this system's *currently live* routes. The other route's rows
+        // stay in the DB untouched, so switching back shows them again
+        // without a re-sync.
+        var cached = await _databaseService.getGamesForRoutes(
+          system.id,
+          systemConfig.providers.map(
+            (p) => (source: p.sourceId ?? '', endpoint: p.endpointId ?? ''),
+          ),
+          cacheOwnerOf: _cacheOwnerOf,
+        );
         if (cached.isNotEmpty) {
           // DB strips auth for security — rehydrate from config
           cached = GameItem.rehydrateAuth(cached, systemConfig.providers);
@@ -190,7 +210,7 @@ class GameListController extends ChangeNotifier {
     _groupGames();
     _restoreFilters();
     _resolveInstalledStatus();
-    _databaseService.saveGames(system.id, _state.allGames, deleteOrphans: true);
+    _databaseService.saveGamesByRoute(system.id, _state.allGames, deleteOrphans: true, cacheOwnerOf: _cacheOwnerOf);
     onGamesSaved?.call();
   }
 
@@ -223,7 +243,7 @@ class GameListController extends ChangeNotifier {
         _restoreFilters();
         _resolveInstalledStatus();
       }
-      _databaseService.saveGames(system.id, games, deleteOrphans: true);
+      _databaseService.saveGamesByRoute(system.id, games, deleteOrphans: true, cacheOwnerOf: _cacheOwnerOf);
       _storage?.setLastSyncTime(system.id, DateTime.now());
       onGamesSaved?.call();
       if (_state.isOffline) {

@@ -28,13 +28,35 @@ class FakeDatabaseService extends DatabaseService {
   Future<bool> hasCache(String systemSlug) async => hasCacheResult;
 
   @override
-  Future<List<GameItem>> getGames(String systemSlug) async => cachedGames;
+  Future<List<GameItem>> getGames(
+    String systemSlug, {
+    String? sourceId,
+    String? endpointId,
+    bool includeLocal = false,
+    String? cacheOwnerId,
+  }) async =>
+      cachedGames;
+
+  /// Records the route scope so tests can assert that a sync writes into the
+  /// route it came from rather than the shared bucket.
+  String? savedSourceId;
+  String? savedEndpointId;
 
   @override
-  Future<void> saveGames(String systemSlug, List<GameItem> games, {bool deleteOrphans = false, bool forceDeleteOrphans = false}) async {
+  Future<void> saveGames(
+    String systemSlug,
+    List<GameItem> games, {
+    bool deleteOrphans = false,
+    bool forceDeleteOrphans = false,
+    String sourceId = '',
+    String endpointId = '',
+    String? cacheOwnerId,
+  }) async {
     savedSystemSlug = systemSlug;
     savedGames = games;
     lastDeleteOrphans = deleteOrphans || forceDeleteOrphans;
+    savedSourceId = sourceId;
+    savedEndpointId = endpointId;
   }
 
   @override

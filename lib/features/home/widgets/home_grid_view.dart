@@ -47,7 +47,11 @@ class HomeGridView extends ConsumerWidget {
           padding: EdgeInsets.only(
             left: horizontalPadding,
             right: horizontalPadding,
-            top: rs.safeAreaTop + 40.0,
+            // No safe-area inset. The app turns immersive in HomeView's
+            // initState, so the first frame still reports a status bar and
+            // every frame after does not — adding it here renders a blank row
+            // above the grid on entry that vanishes as soon as you move.
+            top: 40.0,
             bottom: bottomPadding,
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -198,24 +202,28 @@ class HomeGridView extends ConsumerWidget {
                         if (totalRemote > 0 || totalLocal > 0)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (totalRemote > 0) _GridCountPill(
-                                  icon: Icons.cloud_outlined,
-                                  count: totalRemote,
-                                  color: accentColor,
-                                  isSmall: rs.isSmall,
-                                ),
-                                if (totalRemote > 0 && totalLocal > 0)
-                                  const SizedBox(width: 4),
-                                if (totalLocal > 0) _GridCountPill(
-                                  icon: Icons.folder_outlined,
-                                  count: totalLocal,
-                                  color: accentColor,
-                                  isSmall: rs.isSmall,
-                                ),
-                              ],
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (totalRemote > 0) _GridCountPill(
+                                    icon: Icons.cloud_outlined,
+                                    count: totalRemote,
+                                    color: accentColor,
+                                    isSmall: rs.isSmall,
+                                  ),
+                                  if (totalRemote > 0 && totalLocal > 0)
+                                    const SizedBox(width: 4),
+                                  if (totalLocal > 0) _GridCountPill(
+                                    icon: Icons.folder_outlined,
+                                    count: totalLocal,
+                                    color: accentColor,
+                                    isSmall: rs.isSmall,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         Text(
@@ -374,24 +382,28 @@ class HomeGridView extends ConsumerWidget {
                         if (counts != null && (counts.remote > 0 || counts.local > 0))
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (counts.remote > 0) _GridCountPill(
-                                  icon: Icons.cloud_outlined,
-                                  count: counts.remote,
-                                  color: system.textAccentColor,
-                                  isSmall: rs.isSmall,
-                                ),
-                                if (counts.remote > 0 && counts.local > 0)
-                                  const SizedBox(width: 4),
-                                if (counts.local > 0) _GridCountPill(
-                                  icon: Icons.folder_outlined,
-                                  count: counts.local,
-                                  color: system.textAccentColor,
-                                  isSmall: rs.isSmall,
-                                ),
-                              ],
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (counts.remote > 0) _GridCountPill(
+                                    icon: Icons.cloud_outlined,
+                                    count: counts.remote,
+                                    color: system.textAccentColor,
+                                    isSmall: rs.isSmall,
+                                  ),
+                                  if (counts.remote > 0 && counts.local > 0)
+                                    const SizedBox(width: 4),
+                                  if (counts.local > 0) _GridCountPill(
+                                    icon: Icons.folder_outlined,
+                                    count: counts.local,
+                                    color: system.textAccentColor,
+                                    isSmall: rs.isSmall,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         Text(

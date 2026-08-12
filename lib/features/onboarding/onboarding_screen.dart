@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/console_focusable.dart';
@@ -11,6 +12,7 @@ import '../../providers/app_providers.dart';
 import '../../utils/friendly_error.dart';
 import '../../providers/game_providers.dart';
 import '../../providers/ra_providers.dart';
+import '../../widgets/console_dialog.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../../widgets/download_overlay.dart';
@@ -87,6 +89,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     }
   }
 
+  Future<void> _showExitConfirmation() async {
+    final l = L.of(context);
+    final confirmed = await showConsoleDialog(
+      context,
+      title: l.exit_title,
+      message: l.exit_message,
+      primaryLabel: l.exit_confirmButton,
+      secondaryLabel: l.exit_cancelButton,
+      isDestructive: true,
+    );
+    if (confirmed == true) {
+      SystemNavigator.pop();
+    }
+  }
+
   Future<void> _finishOnboarding() async {
     final controller = ref.read(onboardingControllerProvider.notifier);
     final audioManager = ref.read(audioManagerProvider);
@@ -131,38 +148,66 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final state = ref.watch(onboardingControllerProvider);
     final rs = context.rs;
 
-    return Focus(
-      focusNode: _focusNode,
-      onKeyEvent: _handleKeyEvent,
-      autofocus: true,
-      child: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {},
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
-            children: [
-              const _AnimatedBackground(),
-              const _RadialGlow(),
-              SafeArea(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: rs.isSmall ? rs.spacing.md : rs.spacing.lg,
-                    vertical: rs.isSmall ? rs.spacing.md : rs.spacing.xxl,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: _buildContent(state)),
-                    ],
+    return buildWithActions(
+      Focus(
+        focusNode: _focusNode,
+        onKeyEvent: _handleKeyEvent,
+        autofocus: true,
+        child: PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {},
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: Stack(
+              children: [
+                const _AnimatedBackground(),
+                const _RadialGlow(),
+                SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: rs.isSmall ? rs.spacing.md : rs.spacing.lg,
+                      vertical: rs.isSmall ? rs.spacing.md : rs.spacing.xxl,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _buildContent(state)),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              _buildControls(state),
-            ],
+                _buildControls(state),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget buildWithActions(Widget child) {
+    return Actions(
+      actions: {
+        BackIntent: CallbackAction<BackIntent>(
+          onInvoke: (_) {
+            if (ref.read(onboardingControllerProvider).currentStep ==
+                OnboardingStep.welcome) {
+              _showExitConfirmation();
+            }
+            return null;
+          },
+        ),
+        FavoriteIntent: CallbackAction<FavoriteIntent>(
+          onInvoke: (_) {
+            if (ref.read(onboardingControllerProvider).currentStep ==
+                OnboardingStep.welcome) {
+              _importConfig();
+            }
+            return null;
+          },
+        ),
+      },
+      child: child,
     );
   }
 
@@ -197,7 +242,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // drop in a JSON config without going through any setup wizard.
     if (state.currentStep == OnboardingStep.welcome) {
       return ConsoleHud(
-        select: HudAction(L.of(context).onboarding_importConfig, onTap: _importConfig),
+        b: HudAction(L.of(context).common_exit, onTap: _showExitConfirmation),
+        select: HudAction(L.of(context).onboarding_importConfig,
+            onTap: _importConfig),
       );
     }
 

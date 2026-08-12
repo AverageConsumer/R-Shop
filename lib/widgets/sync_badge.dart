@@ -55,6 +55,8 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(librarySyncServiceProvider);
+    final failoverChoice = ref.watch(activeFailoverChoiceProvider);
+    final isFailoverActive = failoverChoice != null && failoverChoice.isFallback;
 
     ref.listen<LibrarySyncState>(librarySyncServiceProvider, (prev, next) {
       if (next.isSyncing) {
@@ -75,24 +77,41 @@ class _LibrarySyncPillState extends ConsumerState<_LibrarySyncPill> {
     });
 
     final showSyncing = state.isSyncing;
-    if (!showSyncing && _failedSystems.isEmpty) return const SizedBox.shrink();
-
     final rs = context.rs;
     final iconSize = rs.isSmall ? 14.0 : 16.0;
 
     if (showSyncing) {
+      final accent = isFailoverActive ? Colors.amberAccent : Colors.cyanAccent;
+      final labelText = isFailoverActive
+          ? '⚡ 同步中 (代理) ${state.completedSystems}/${state.totalSystems}'
+          : L.of(context).sync_progress(state.completedSystems, state.totalSystems);
+
       return _SyncPillContent(
         key: const ValueKey('library-syncing'),
-        accentColor: Colors.cyanAccent,
+        accentColor: accent,
         leadingIcon: _SpinningIcon(
           size: iconSize,
           icon: Icons.sync,
-          color: Colors.cyanAccent,
+          color: accent,
         ),
-        label: L.of(context).sync_progress(state.completedSystems, state.totalSystems),
+        label: labelText,
         systemName: state.currentSystem,
       );
     }
+
+    if (isFailoverActive && _failedSystems.isEmpty) {
+      return _PulsingPill(
+        key: const ValueKey('library-failover-active'),
+        child: _SyncPillContent(
+          accentColor: Colors.amberAccent,
+          leadingIcon: Icon(Icons.bolt, size: iconSize, color: Colors.amberAccent),
+          label: '⚡ 代理中',
+          systemName: failoverChoice.source?.name,
+        ),
+      );
+    }
+
+    if (_failedSystems.isEmpty) return const SizedBox.shrink();
 
     final l = L.of(context);
     final label = _failedSystems.length == 1
@@ -262,24 +281,27 @@ class _SyncPillContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
-    final fontSize = rs.isSmall ? 10.0 : 12.0;
+    final fontSize = rs.isSmall ? 11.0 : 12.5;
+    final fullText = (systemName != null && systemName!.isNotEmpty)
+        ? '$label · $systemName'
+        : label;
 
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: rs.isSmall ? 10 : 12,
-        vertical: rs.isSmall ? 5 : 6,
+        horizontal: rs.isSmall ? 12 : 14,
+        vertical: rs.isSmall ? 5 : 7,
       ),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.8),
+        color: Colors.black.withValues(alpha: 0.88),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: accentColor.withValues(alpha: 0.3),
-          width: 1,
+          color: accentColor.withValues(alpha: 0.6),
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withValues(alpha: 0.1),
-            blurRadius: 8,
+            color: accentColor.withValues(alpha: 0.2),
+            blurRadius: 10,
           ),
         ],
       ),
@@ -289,35 +311,18 @@ class _SyncPillContent extends StatelessWidget {
           leadingIcon,
           const SizedBox(width: 6),
           ConstrainedBox(
-            constraints:
-                BoxConstraints(maxWidth: rs.isSmall ? 200 : 300),
+            constraints: BoxConstraints(maxWidth: rs.isSmall ? 360 : 480),
             child: Text(
-              label,
+              fullText,
               style: TextStyle(
                 fontSize: fontSize,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
                 color: accentColor.forText,
               ),
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (systemName != null) ...[
-            const SizedBox(width: 4),
-            ConstrainedBox(
-              constraints:
-                  BoxConstraints(maxWidth: rs.isSmall ? 100 : 150),
-              child: Text(
-                systemName!,
-                style: TextStyle(
-                  fontSize: fontSize - 1,
-                  color: Colors.grey[400],
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ),
-          ],
         ],
       ),
     );

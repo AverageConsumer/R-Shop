@@ -11,6 +11,7 @@ import 'app_localizations_es.dart';
 import 'app_localizations_fr.dart';
 import 'app_localizations_ja.dart';
 import 'app_localizations_pt.dart';
+import 'app_localizations_zh.dart';
 
 // ignore_for_file: type=lint
 
@@ -102,7 +103,8 @@ abstract class L {
     Locale('es'),
     Locale('fr'),
     Locale('ja'),
-    Locale('pt')
+    Locale('pt'),
+    Locale('zh')
   ];
 
   /// No description provided for @appTitle.
@@ -2415,6 +2417,24 @@ abstract class L {
   /// **'Server type'**
   String get onboarding_serverType;
 
+  /// No description provided for @onboarding_folderExplanationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup your Library Path'**
+  String get onboarding_folderExplanationTitle;
+
+  /// No description provided for @onboarding_folderExplanationMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'R-Shop needs a base folder to store your downloaded games. This helps organize your files and is required for Android folder permissions.\n\nWe recommend creating a folder named \'ROMs\' and selecting it.'**
+  String get onboarding_folderExplanationMessage;
+
+  /// No description provided for @onboarding_continueToPicker.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Folder'**
+  String get onboarding_continueToPicker;
+
   /// No description provided for @onboarding_hangOn.
   ///
   /// In en, this message translates to:
@@ -3038,6 +3058,438 @@ abstract class L {
   /// In en, this message translates to:
   /// **'{count} queued'**
   String service_queuedCount(int count);
+
+  /// No description provided for @sources_connectionRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection route'**
+  String get sources_connectionRoute;
+
+  /// No description provided for @sources_routeAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get sources_routeAuto;
+
+  /// No description provided for @sources_routeAutoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the fastest route that answers, re-checked as the network changes'**
+  String get sources_routeAutoHint;
+
+  /// No description provided for @sources_routeInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'In use'**
+  String get sources_routeInUse;
+
+  /// No description provided for @sources_routePinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked'**
+  String get sources_routePinned;
+
+  /// No description provided for @sources_routeReachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Reachable'**
+  String get sources_routeReachable;
+
+  /// No description provided for @sources_routeNoAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'No answer'**
+  String get sources_routeNoAnswer;
+
+  /// No description provided for @sources_routeChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get sources_routeChecking;
+
+  /// No description provided for @sources_routeLatencyMs.
+  ///
+  /// In en, this message translates to:
+  /// **'{ms} ms'**
+  String sources_routeLatencyMs(int ms);
+
+  /// No description provided for @sources_routeAutoPicks.
+  ///
+  /// In en, this message translates to:
+  /// **'Would use {route}'**
+  String sources_routeAutoPicks(String route);
+
+  /// No description provided for @sources_routeAutoNoneReachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing answered'**
+  String get sources_routeAutoNoneReachable;
+
+  /// No description provided for @sources_routeFastest.
+  ///
+  /// In en, this message translates to:
+  /// **'Fastest'**
+  String get sources_routeFastest;
+
+  /// No description provided for @sources_routeReleasePin.
+  ///
+  /// In en, this message translates to:
+  /// **'Drops the lock and re-picks the fastest'**
+  String get sources_routeReleasePin;
+
+  /// No description provided for @sources_routeOwnLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Own login'**
+  String get sources_routeOwnLogin;
+
+  /// No description provided for @sources_routeAuthTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Login for this route'**
+  String get sources_routeAuthTitle;
+
+  /// No description provided for @sources_routeAuthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave blank to use the source\'s login. Fill it in only when this address asks for a different one.'**
+  String get sources_routeAuthHint;
+
+  /// No description provided for @sources_routeAuthInherited.
+  ///
+  /// In en, this message translates to:
+  /// **'Using the source\'s login'**
+  String get sources_routeAuthInherited;
+
+  /// No description provided for @sources_routeAuthOwn.
+  ///
+  /// In en, this message translates to:
+  /// **'This route logs in on its own'**
+  String get sources_routeAuthOwn;
+
+  /// No description provided for @sources_routeOnlyOne.
+  ///
+  /// In en, this message translates to:
+  /// **'This source has only one route'**
+  String get sources_routeOnlyOne;
+
+  /// No description provided for @sources_addRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Add route'**
+  String get sources_addRoute;
+
+  /// No description provided for @sources_editRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit route'**
+  String get sources_editRoute;
+
+  /// No description provided for @sources_removeRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove route'**
+  String get sources_removeRoute;
+
+  /// No description provided for @sources_routeDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'This source already has a route to that address'**
+  String get sources_routeDuplicate;
+
+  /// No description provided for @sources_activeSource.
+  ///
+  /// In en, this message translates to:
+  /// **'In use'**
+  String get sources_activeSource;
+
+  /// No description provided for @sources_switchSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch source'**
+  String get sources_switchSource;
+
+  /// No description provided for @sources_prevSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Prev source'**
+  String get sources_prevSource;
+
+  /// No description provided for @sources_nextSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Next source'**
+  String get sources_nextSource;
+
+  /// No description provided for @sources_setFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup source'**
+  String get sources_setFallback;
+
+  /// No description provided for @sources_fallbackNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get sources_fallbackNone;
+
+  /// No description provided for @sources_fallbackShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get sources_fallbackShort;
+
+  /// No description provided for @sources_routeSameServerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'All routes reach the same server. A route can carry its own login when that address asks for a different one.'**
+  String get sources_routeSameServerHint;
+
+  /// No description provided for @sources_routeCannotRemoveLast.
+  ///
+  /// In en, this message translates to:
+  /// **'The last route cannot be removed'**
+  String get sources_routeCannotRemoveLast;
+
+  /// No description provided for @sources_countLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 source} other{{count} sources}}'**
+  String sources_countLabel(num count);
+
+  /// No description provided for @sources_useThisShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this'**
+  String get sources_useThisShort;
+
+  /// No description provided for @sources_stopUsingShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop using'**
+  String get sources_stopUsingShort;
+
+  /// No description provided for @sources_removeConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove source?'**
+  String get sources_removeConfirmTitle;
+
+  /// No description provided for @sources_removeConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove \"{name}\"? Its list disappears from the library, but games already downloaded to this device are kept.'**
+  String sources_removeConfirmMessage(String name);
+
+  /// No description provided for @sources_groupBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get sources_groupBadge;
+
+  /// No description provided for @sources_groupCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Group with another source…'**
+  String get sources_groupCreate;
+
+  /// No description provided for @sources_groupCreateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For two addresses that are really the same server'**
+  String get sources_groupCreateHint;
+
+  /// No description provided for @sources_groupPickMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the source to group with'**
+  String get sources_groupPickMember;
+
+  /// No description provided for @sources_groupSameTypeOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only sources of the same type can be grouped'**
+  String get sources_groupSameTypeOnly;
+
+  /// No description provided for @sources_groupNoCandidates.
+  ///
+  /// In en, this message translates to:
+  /// **'No other source of this type'**
+  String get sources_groupNoCandidates;
+
+  /// No description provided for @sources_groupManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Group settings'**
+  String get sources_groupManage;
+
+  /// No description provided for @sources_groupRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename group'**
+  String get sources_groupRename;
+
+  /// No description provided for @sources_groupNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Group name'**
+  String get sources_groupNameLabel;
+
+  /// No description provided for @sources_groupModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Which member to use'**
+  String get sources_groupModeTitle;
+
+  /// No description provided for @sources_groupModeAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic'**
+  String get sources_groupModeAuto;
+
+  /// No description provided for @sources_groupModeAutoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No order to keep — the address that replies first is the one you can use first'**
+  String get sources_groupModeAutoHint;
+
+  /// No description provided for @sources_groupModeOrdered.
+  ///
+  /// In en, this message translates to:
+  /// **'My order'**
+  String get sources_groupModeOrdered;
+
+  /// No description provided for @sources_groupModeOrderedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Takes the first one in your order that answers'**
+  String get sources_groupModeOrderedHint;
+
+  /// No description provided for @sources_groupPreferred.
+  ///
+  /// In en, this message translates to:
+  /// **'First choice'**
+  String get sources_groupPreferred;
+
+  /// No description provided for @sources_groupAddMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a source'**
+  String get sources_groupAddMember;
+
+  /// No description provided for @sources_groupLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave the group'**
+  String get sources_groupLeave;
+
+  /// No description provided for @sources_groupLeaveConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} keeps no games and has to sync again. The shared list stays with the group.'**
+  String sources_groupLeaveConfirm(String name);
+
+  /// No description provided for @sources_groupLeaveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave the group?'**
+  String get sources_groupLeaveTitle;
+
+  /// No description provided for @sources_groupDissolve.
+  ///
+  /// In en, this message translates to:
+  /// **'Dissolve the group'**
+  String get sources_groupDissolve;
+
+  /// No description provided for @sources_groupDissolveConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} keeps the shared list; the others have to sync again.'**
+  String sources_groupDissolveConfirm(String name);
+
+  /// No description provided for @sources_groupDissolveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dissolve the group?'**
+  String get sources_groupDissolveTitle;
+
+  /// No description provided for @sources_groupMembersCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sources'**
+  String sources_groupMembersCount(int count);
+
+  /// No description provided for @sources_groupUsing.
+  ///
+  /// In en, this message translates to:
+  /// **'Using {name}'**
+  String sources_groupUsing(String name);
+
+  /// No description provided for @sources_moveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get sources_moveUp;
+
+  /// No description provided for @sources_moveDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get sources_moveDown;
+
+  /// No description provided for @sources_routeOrdered.
+  ///
+  /// In en, this message translates to:
+  /// **'My order'**
+  String get sources_routeOrdered;
+
+  /// No description provided for @sources_routeOrderedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the first route in your order that answers'**
+  String get sources_routeOrderedHint;
+
+  /// No description provided for @sources_reorderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Move it with up and down, then press again to finish'**
+  String get sources_reorderHint;
+
+  /// No description provided for @sources_groupMemberHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Press ▶ to send it out of the group; [A] reorders'**
+  String get sources_groupMemberHint;
+
+  /// No description provided for @sources_routeRowHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the row to reorder it; press ▶ for the icons: edit or remove'**
+  String get sources_routeRowHint;
+
+  /// No description provided for @sources_routeUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this route'**
+  String get sources_routeUse;
+
+  /// No description provided for @sources_routeLock.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock to this route'**
+  String get sources_routeLock;
+
+  /// No description provided for @sources_routeUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock'**
+  String get sources_routeUnlock;
+
+  /// No description provided for @sources_removeRouteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove “{name}”? The games cached for this source stay; only the address goes.'**
+  String sources_removeRouteConfirm(String name);
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {
@@ -3055,7 +3507,8 @@ class _LDelegate extends LocalizationsDelegate<L> {
         'es',
         'fr',
         'ja',
-        'pt'
+        'pt',
+        'zh'
       ].contains(locale.languageCode);
 
   @override
@@ -3077,6 +3530,8 @@ L lookupL(Locale locale) {
       return LJa();
     case 'pt':
       return LPt();
+    case 'zh':
+      return LZh();
   }
 
   throw FlutterError(

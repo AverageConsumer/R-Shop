@@ -102,6 +102,11 @@ class ProviderConfig {
   /// back to their owner source for diffing.
   final String? sourceId;
 
+  /// Which [SourceEndpoint] of that source produced this config — the route
+  /// currently live on the source. Games are cached per route, so this is what
+  /// keeps the LAN list and the internet list apart.
+  final String? endpointId;
+
   const ProviderConfig({
     required this.type,
     required this.priority,
@@ -115,6 +120,7 @@ class ProviderConfig {
     this.platformName,
     this.managedBySource = false,
     this.sourceId,
+    this.endpointId,
   });
 
   factory ProviderConfig.fromJson(Map<String, dynamic> json) {
@@ -133,6 +139,7 @@ class ProviderConfig {
       platformName: json['platform_name'] as String?,
       managedBySource: json['managed_by_source'] as bool? ?? false,
       sourceId: json['source_id'] as String?,
+      endpointId: json['endpoint_id'] as String?,
     );
   }
 
@@ -150,6 +157,7 @@ class ProviderConfig {
       if (platformName != null) 'platform_name': platformName,
       if (managedBySource) 'managed_by_source': true,
       if (sourceId != null) 'source_id': sourceId,
+      if (endpointId != null) 'endpoint_id': endpointId,
     };
   }
 
@@ -171,6 +179,7 @@ class ProviderConfig {
       // loaded back from the SQLite cache.
       if (managedBySource) 'managed_by_source': true,
       if (sourceId != null) 'source_id': sourceId,
+      if (endpointId != null) 'endpoint_id': endpointId,
     };
   }
 
@@ -316,6 +325,7 @@ class ProviderConfig {
     String? platformName,
     bool? managedBySource,
     String? sourceId,
+    String? endpointId,
   }) {
     return ProviderConfig(
       type: type ?? this.type,
@@ -330,6 +340,7 @@ class ProviderConfig {
       platformName: platformName ?? this.platformName,
       managedBySource: managedBySource ?? this.managedBySource,
       sourceId: sourceId ?? this.sourceId,
+      endpointId: endpointId ?? this.endpointId,
     );
   }
 }

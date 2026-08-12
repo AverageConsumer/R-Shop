@@ -15,7 +15,7 @@ val keyProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.retro.rshop"
+    namespace = "com.retro.rshop.tw"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -28,8 +28,14 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    buildFeatures {
+        // MainActivity derives the platform-channel prefix from
+        // BuildConfig.APPLICATION_ID; AGP 8 disables BuildConfig by default.
+        buildConfig = true
+    }
+
     defaultConfig {
-        applicationId = "com.retro.rshop"
+        applicationId = "com.retro.rshop.tw"
 
         // Version values are pulled from pubspec.yaml automatically
         minSdk = flutter.minSdkVersion
@@ -63,6 +69,21 @@ android {
             )
         }
     }
+
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            val output = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            val fileName = "R-Shop-v${defaultConfig.versionName}.apk"
+            output.outputFileName = fileName
+        }
+    }
+}
+
+// 引入本地私有任務（若存在），此部分不進入 Git
+val localTasksFile = file("local-tasks.gradle.kts")
+if (localTasksFile.exists()) {
+    apply(from = localTasksFile)
 }
 
 dependencies {

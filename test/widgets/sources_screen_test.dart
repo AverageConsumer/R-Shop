@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:retro_eshop/features/settings/sources_screen.dart';
+import 'package:retro_eshop/features/sources/fallback_picker_overlay.dart';
+import 'package:retro_eshop/widgets/console_hud.dart';
 import 'package:retro_eshop/models/config/source.dart';
 import 'package:retro_eshop/providers/app_providers.dart';
 import 'package:retro_eshop/services/config_storage_service.dart';
@@ -80,7 +82,9 @@ void main() {
       expect(find.text('Mein RomM'), findsOneWidget);
       expect(find.textContaining('192.168.1.50'), findsOneWidget);
       expect(find.text('3 platforms'), findsOneWidget);
-      expect(find.text('1 source · [Y] add new'), findsOneWidget);
+      // The count line is localised now, and the key name lives in the HUD
+      // where it follows the configured controller layout.
+      expect(find.text('1 source'), findsOneWidget);
     });
 
     testWidgets('shows BORROWED badge for borrowed sources', (tester) async {
@@ -106,82 +110,121 @@ void main() {
       expect(find.byIcon(Icons.share), findsOneWidget);
     });
 
-    testWidgets('shows OFF badge for disabled sources', (tester) async {
-      final storage = await _initMockStorage();
-      await tester.pumpWidget(_wrap(
-        storage,
-        const SourcesScreen(),
-        seed: const [
-          Source(
-            id: 'off',
-            name: 'Inactive',
-            type: SourceType.romm,
-            url: 'http://x',
-            autoMap: true,
-            enabled: false,
-            knownPlatforms: {'snes': 4},
-          ),
-        ],
-      ));
-      await tester.pumpAndSettle();
-
-      expect(find.text('OFF'), findsOneWidget);
-    });
-
-    testWidgets('shows expiry warning for tokens expiring within 7 days',
+    testWidgets('the focused card puts its actions in the HUD',
         (tester) async {
       final storage = await _initMockStorage();
-      // Use 5d so the inDays-rounding-down can land on 4 or 5 without
-      // the test going flaky depending on millisecond clock drift.
-      final soon = DateTime.now().add(const Duration(days: 5));
       await tester.pumpWidget(_wrap(
         storage,
-        SourcesScreen(),
-        seed: [
+        const SourcesScreen(),
+        seed: const [
           Source(
-            id: 'soon',
-            name: 'Expiring',
+            id: 'mine',
+            name: 'Mein RomM',
             type: SourceType.romm,
-            url: 'http://x',
+            url: 'http://192.168.1.50:8090',
             autoMap: true,
-            tokenExpiresAt: soon,
-            knownPlatforms: const {'snes': 4},
           ),
         ],
       ));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining(RegExp(r'Expires in [45]d')), findsOneWidget);
+      expect(find.text('Use this'), findsOneWidget);
+      expect(find.text('Remove'), findsOneWidget);
+      expect(find.byIcon(Icons.radio_button_unchecked), findsOneWidget);
     });
 
-    testWidgets('two sources render two cards', (tester) async {
+    testWidgets('the actions menu ends in real buttons, not a typed-out line',
+        (tester) async {
+      // It used to end in a hardcoded Chinese string naming [A]/[X]/[B]:
+      // untranslated in six languages, wrong on two of the three controller
+      // layouts, and doing nothing under a finger.
       final storage = await _initMockStorage();
       await tester.pumpWidget(_wrap(
         storage,
         const SourcesScreen(),
         seed: const [
           Source(
-            id: 'a',
-            name: 'A',
+            id: 'mine',
+            name: 'Mein RomM',
             type: SourceType.romm,
-            url: 'http://a',
+            url: 'http://192.168.1.50:8090',
             autoMap: true,
-            knownPlatforms: {'snes': 4},
-          ),
-          Source(
-            id: 'b',
-            name: 'B',
-            type: SourceType.smb,
-            host: 'nas',
-            share: 'roms',
           ),
         ],
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('A'), findsOneWidget);
-      expect(find.text('B'), findsOneWidget);
-      expect(find.text('2 sources · [Y] add new'), findsOneWidget);
+      // All of it outside the fake async zone: opening the menu plays a
+      // navigation sound, and the audio plugin's timers never complete inside
+      // that zone — the test then fails on teardown rather than on an
+      // expectation.
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Mein RomM'));
+        await tester.pump();
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        await tester.pump();
+
+        expect(find.text('Remove'), findsWidgets);
+        expect(find.textContaining('[A]'), findsNothing);
+        // The screen's own HUD plus the menu's.
+        expect(find.byType(ConsoleHud), findsNWidgets(2));
+        expect(find.text('Select'), findsOneWidget);
+      });
+
+      // Swap the screen out while the scope is still alive: the overlay
+      // releases its dialog-priority claim from a zero-duration timer in
+      // dispose, and a test that ends on top of it fails the teardown rather
+      // than any expectation.
+      await tester.pumpWidget(_wrap(storage, const SizedBox.shrink()));
+      await tester.pump(const Duration(milliseconds: 50));
+    });
+
+    testWidgets('no card focused means no per-source hints', (tester) async {
+      final storage = await _initMockStorage();
+      await tester.pumpWidget(_wrap(storage, const SourcesScreen()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Use this'), findsNothing);
+      expect(find.text('Disable'), findsNothing);
+      expect(find.text('Remove'), findsNothing);
+    });
+  });
+
+  group('SourcesScreen — fresh fallback source addition', () {
+    testWidgets('cancelling fresh fallback creation restores fallback overlay',
+        (tester) async {
+      final storage = await _initMockStorage();
+      await tester.pumpWidget(_wrap(
+        storage,
+        const SourcesScreen(),
+        seed: const [
+          Source(
+            id: 'parent',
+            name: 'Parent RomM',
+            type: SourceType.romm,
+            url: 'http://parent',
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      // Directly pump FallbackPickerOverlay on SourcesScreen state
+      final state = tester.state(find.byType(SourcesScreen)) as dynamic;
+      // Trigger fresh fallback source addition
+      state.addFreshFallbackSourceForTest('parent');
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Windows / NAS network share'), findsOneWidget);
+
+      // Cancel type picker
+      state.closeTypePickerForTest();
+      await tester.pumpAndSettle();
+
+      // Verify FallbackPickerOverlay for parent is restored
+      expect(find.byType(FallbackPickerOverlay), findsOneWidget);
+
+      await tester.pumpWidget(_wrap(storage, const SizedBox.shrink()));
+      await tester.pump(const Duration(milliseconds: 50));
     });
   });
 }

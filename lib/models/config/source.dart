@@ -103,7 +103,10 @@ class Source {
   final int? port; // smb/ftp
   final String? share; // smb
   final String? path; // local
-  final AuthConfig? auth;
+
+  /// Credentials for this source.
+  AuthConfig? get auth => _auth;
+  final AuthConfig? _auth;
 
   // --- Behaviour ---
 
@@ -121,23 +124,29 @@ class Source {
   /// or losing its credentials.
   final bool enabled;
 
+  // --- Multi-entry Fallback Chain ---
+
+  /// Other sources to fall back on when this one does not answer, in order of
+  /// preference.
+  final List<String> fallbackSourceIds;
+
+  /// Optional: whether to automatically probe all fallback sources concurrently
+  /// and pick whichever answers first (`true`), or follow [fallbackSourceIds] list
+  /// order (`false`, default).
+  final bool fallbackAutoSelect;
+
+  /// Backwards compatibility getter returning the first fallback source ID.
+  String? get fallbackSourceId => fallbackSourceIds.isNotEmpty ? fallbackSourceIds.first : null;
+
   // --- Borrow / sharing ---
 
-  /// True when this source was paired from somebody else's RomM (the
-  /// token role/scopes determine that). Surfaced as a "borrowed" badge
-  /// in the Sources screen.
+  /// True when this source was paired from somebody else's RomM.
   final bool borrowed;
 
-  /// RomM Client API Token expiry, mirrored from `auth.clientTokenExpiresAt`
-  /// for convenience so the Sources screen doesn't have to dive into auth.
+  /// RomM Client API Token expiry.
   final DateTime? tokenExpiresAt;
 
   /// Cached map of system slug → RomM numeric platform id (RomM only).
-  ///
-  /// Populated on the first successful sync; used by the resolver to
-  /// answer "does this source even know about NDS, and if so what is its
-  /// numeric id?" without a network round-trip. For non-RomM sources
-  /// this is always empty.
   final Map<String, int> knownPlatforms;
 
   const Source({
@@ -149,14 +158,16 @@ class Source {
     this.port,
     this.share,
     this.path,
-    this.auth,
+    AuthConfig? auth,
     this.autoMap = false,
     this.priority = 100,
     this.enabled = true,
+    this.fallbackSourceIds = const [],
+    this.fallbackAutoSelect = false,
     this.borrowed = false,
     this.tokenExpiresAt,
     this.knownPlatforms = const {},
-  });
+  }) : _auth = auth;
 
   factory Source.fromJson(Map<String, dynamic> json) {
     DateTime? exp;
@@ -164,12 +175,22 @@ class Source {
     if (raw is String && raw.isNotEmpty) {
       exp = DateTime.tryParse(raw);
     }
+    final type = SourceType.values
+            .asNameMap()[json['type'] as String? ?? 'romm'] ??
+        SourceType.romm;
+
+    // Parse fallback source IDs, maintaining backwards compatibility with `fallback_source_id`
+    var fallbacks = <String>[];
+    if (json['fallback_source_ids'] is List) {
+      fallbacks = (json['fallback_source_ids'] as List).cast<String>();
+    } else if (json['fallback_source_id'] is String && (json['fallback_source_id'] as String).isNotEmpty) {
+      fallbacks = [json['fallback_source_id'] as String];
+    }
+
     return Source(
       id: json['id'] as String,
       name: json['name'] as String,
-      type: SourceType.values
-              .asNameMap()[json['type'] as String? ?? 'romm'] ??
-          SourceType.romm,
+      type: type,
       url: json['url'] as String?,
       host: json['host'] as String?,
       port: json['port'] as int?,
@@ -181,6 +202,8 @@ class Source {
       autoMap: json['auto_map'] as bool? ?? false,
       priority: json['priority'] as int? ?? 100,
       enabled: json['enabled'] as bool? ?? true,
+      fallbackSourceIds: fallbacks,
+      fallbackAutoSelect: json['fallback_auto_select'] as bool? ?? false,
       borrowed: json['borrowed'] as bool? ?? false,
       tokenExpiresAt: exp,
       knownPlatforms: (json['known_platforms'] as Map<String, dynamic>?)
@@ -199,10 +222,12 @@ class Source {
       if (port != null) 'port': port,
       if (share != null) 'share': share,
       if (path != null) 'path': path,
-      if (auth != null) 'auth': auth!.toJson(),
+      if (_auth != null) 'auth': _auth!.toJson(),
       'auto_map': autoMap,
       'priority': priority,
       'enabled': enabled,
+      if (fallbackSourceIds.isNotEmpty) 'fallback_source_ids': fallbackSourceIds,
+      if (fallbackAutoSelect) 'fallback_auto_select': fallbackAutoSelect,
       'borrowed': borrowed,
       if (tokenExpiresAt != null)
         'token_expires_at': tokenExpiresAt!.toIso8601String(),
@@ -225,12 +250,6 @@ class Source {
   }
 
   /// Stable identity used for deduplication during legacy migration.
-  ///
-  /// Two providers from the old `SystemConfig.providers` list that share
-  /// the same connection details should collapse into a single [Source]
-  /// even if they were attached to different systems. This identity is
-  /// per-type so that an SMB and a Web source with the same hostname stay
-  /// separate.
   String get connectionKey {
     switch (type) {
       case SourceType.romm:
@@ -257,8 +276,7 @@ class Source {
         '${uri.hasPort ? ':${uri.port}' : ''}$path';
   }
 
-  /// Short label suitable for the Sources screen (e.g. "tim.duckdns.org"
-  /// or "192.168.1.50:8090"). Falls back to [name] if no host is known.
+  /// Short label suitable for the Sources screen.
   String get hostLabel {
     switch (type) {
       case SourceType.romm:
@@ -288,6 +306,9 @@ class Source {
     bool? autoMap,
     int? priority,
     bool? enabled,
+    List<String>? fallbackSourceIds,
+    bool? fallbackAutoSelect,
+    bool clearFallbacks = false,
     bool? borrowed,
     DateTime? tokenExpiresAt,
     Map<String, int>? knownPlatforms,
@@ -301,10 +322,14 @@ class Source {
       port: port ?? this.port,
       share: share ?? this.share,
       path: path ?? this.path,
-      auth: auth ?? this.auth,
+      auth: auth ?? _auth,
       autoMap: autoMap ?? this.autoMap,
       priority: priority ?? this.priority,
       enabled: enabled ?? this.enabled,
+      fallbackSourceIds: clearFallbacks
+          ? const []
+          : (fallbackSourceIds ?? this.fallbackSourceIds),
+      fallbackAutoSelect: fallbackAutoSelect ?? this.fallbackAutoSelect,
       borrowed: borrowed ?? this.borrowed,
       tokenExpiresAt: tokenExpiresAt ?? this.tokenExpiresAt,
       knownPlatforms: knownPlatforms ?? this.knownPlatforms,

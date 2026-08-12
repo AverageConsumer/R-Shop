@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/storage_service.dart';
@@ -13,6 +14,8 @@ import '../services/disk_space_service.dart';
 import '../services/native_smb_service.dart';
 import '../services/romm_pairing_service.dart';
 import '../services/sources_notifier.dart';
+import '../services/source_failover.dart';
+import '../services/endpoint_probe_service.dart';
 import '../models/game_item.dart';
 import '../models/sound_settings.dart';
 
@@ -41,6 +44,10 @@ final rommPairingServiceProvider = Provider<RommPairingService>((ref) {
 final sourcesProvider =
     StateNotifierProvider<SourcesNotifier, SourcesState>((ref) {
   return SourcesNotifier(ref.read(configStorageServiceProvider));
+});
+
+final endpointProbeServiceProvider = Provider<EndpointProbeService>((ref) {
+  return EndpointProbeService();
 });
 
 final configStorageServiceProvider = Provider<ConfigStorageService>((ref) {
@@ -302,16 +309,27 @@ class LocaleNotifier extends StateNotifier<Locale?> {
   LocaleNotifier(this._storage) : super(_initLocale(_storage));
 
   static Locale? _initLocale(StorageService s) {
-    final code = s.getLocaleOverride();
-    return code == null ? null : Locale(code);
+    final tag = s.getLocaleOverride();
+    if (tag == null) return null;
+    final parts = tag.split('-');
+    if (parts.length > 1) {
+      return Locale(parts[0], parts[1]);
+    }
+    return Locale(tag);
   }
 
   Future<void> cycle(List<Locale> supported) async {
-    final codes = [null, ...supported.map((l) => l.languageCode)];
-    final current = state?.languageCode;
-    final idx = codes.indexOf(current);
-    final next = codes[(idx + 1) % codes.length];
-    state = next == null ? null : Locale(next);
+    final tags = [null, ...supported.map((l) => l.toLanguageTag())];
+    final current = state?.toLanguageTag();
+    final idx = tags.indexOf(current);
+    final next = tags[(idx + 1) % tags.length];
+
+    if (next == null) {
+      state = null;
+    } else {
+      final parts = next.split('-');
+      state = parts.length > 1 ? Locale(parts[0], parts[1]) : Locale(next);
+    }
     await _storage.setLocaleOverride(next);
   }
 }
@@ -447,3 +465,52 @@ final storageInfoProvider =
   (ref, path) => DiskSpaceService.getFreeSpace(path),
 );
 
+
+/// Which source the running (or most recent) sync is actually talking to.
+///
+/// Set when a sync resolves its source, so both the home header and the sync
+/// badge can name the server — with two sources configured, "syncing 3/8" on
+/// its own does not say *whose* library is being fetched.
+///
+/// [isFallback] is true when the selected source was unreachable and its
+/// partner stood in. Null means no single answer applies: every source is in
+/// view, or nothing has resolved yet.
+final syncingSourceProvider =
+    StateProvider<({String name, bool isFallback})?>((ref) => null);
+
+class ActiveFailoverChoiceNotifier extends StateNotifier<SourceChoice?> {
+  final Ref _ref;
+
+  ActiveFailoverChoiceNotifier(this._ref) : super(null) {
+    _ref.listen<SourcesState>(sourcesProvider, (previous, next) async {
+      if (previous != null && !next.loading) {
+        await refresh();
+      }
+    });
+  }
+
+  set choice(SourceChoice? value) => state = value;
+
+  Future<void> refresh() async {
+    try {
+      final probe = _ref.read(endpointProbeServiceProvider);
+      probe.invalidate();
+      final configStorage = _ref.read(configStorageServiceProvider);
+      final config = await configStorage.loadConfig();
+      if (config != null) {
+        final resolved = await resolveForSync(config: config, probe: probe);
+        state = resolved.choice;
+      }
+    } catch (e) {
+      debugPrint('Auto failover sync failed: $e');
+    }
+  }
+}
+
+/// Represents current failover choice state across the app.
+/// When non-null and choice.isFallback is true, primary source failed to connect
+/// and a fallback source is in active use.
+final activeFailoverChoiceProvider =
+    StateNotifierProvider<ActiveFailoverChoiceNotifier, SourceChoice?>((ref) {
+  return ActiveFailoverChoiceNotifier(ref);
+});

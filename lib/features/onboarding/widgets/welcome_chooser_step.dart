@@ -13,6 +13,7 @@ import '../../../services/romm_api_service.dart';
 import '../../../services/romm_pairing_service.dart';
 import '../../../services/romm_platform_matcher.dart';
 import '../../../models/system_model.dart';
+import '../../../widgets/console_dialog.dart';
 import '../../pairing/qr_pairing_screen.dart';
 import '../../sources/manual_source_add_screen.dart';
 import '../../sources/source_mappings_screen.dart';
@@ -99,9 +100,20 @@ class _WelcomeChooserStepState extends ConsumerState<WelcomeChooserStep> {
   // ---- path handlers ----
 
   Future<String?> _pickRomBaseFolder() async {
+    final l = L.of(context);
+    final confirmed = await showConsoleDialog(
+      context,
+      title: l.onboarding_folderExplanationTitle,
+      message: l.onboarding_folderExplanationMessage,
+      primaryLabel: l.onboarding_continueToPicker,
+      secondaryLabel: l.common_cancel,
+    );
+
+    if (confirmed != true) return null;
+
     try {
       return await FilePicker.platform.getDirectoryPath(
-        dialogTitle: L.of(context).onboarding_selectFolderPrompt,
+        dialogTitle: l.onboarding_selectFolderPrompt,
       );
     } catch (e) {
       debugPrint('WelcomeChooser: folder picker failed: $e');
@@ -415,58 +427,76 @@ class _ChoiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ConsoleFocusable(
-      focusNode: focusNode,
-      onSelect: onSelect,
-      borderRadius: 12,
-      focusScale: 1.0,
-      focusBorderColor: AppTheme.primaryColor,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1C1C1C),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: AppTheme.primaryColor, size: 22),
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, _) {
+        final isFocused = focusNode.hasFocus;
+        final bgColor = isFocused
+            ? AppTheme.primaryColor.withValues(alpha: 0.35)
+            : const Color(0xFF1C1C1C);
+
+        return ConsoleFocusable(
+          focusNode: focusNode,
+          onSelect: onSelect,
+          borderRadius: 12,
+          focusScale: 1.02,
+          focusBorderColor: Colors.white,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isFocused
+                        ? Colors.white.withValues(alpha: 0.2)
+                        : AppTheme.primaryColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 12,
-                    ),
+                  child: Icon(icon,
+                      color: isFocused ? Colors.white : AppTheme.primaryColor.withValues(alpha: 0.7),
+                      size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: isFocused ? Colors.white : Colors.white,
+                          fontSize: 15,
+                          fontWeight:
+                              isFocused ? FontWeight.w700 : FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: isFocused
+                              ? Colors.white.withValues(alpha: 0.7)
+                              : Colors.grey.shade400,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                Icon(Icons.chevron_right,
+                    color: isFocused ? Colors.white : Colors.white30),
+              ],
             ),
-            const Icon(Icons.chevron_right, color: Colors.white30),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

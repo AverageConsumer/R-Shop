@@ -8,6 +8,7 @@ import '../../core/widgets/console_focusable.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/app_providers.dart';
 import '../../services/romm_pairing_service.dart';
+import '../../widgets/console_hud.dart';
 import 'manual_pairing_screen.dart';
 import 'pairing_result_screen.dart';
 
@@ -39,6 +40,9 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
       detectionSpeed: DetectionSpeed.normal,
       formats: const [BarcodeFormat.qrCode],
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _manualFocus.requestFocus();
+    });
   }
 
   @override
@@ -50,12 +54,8 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
     super.dispose();
   }
 
-  /// Top-level key handler so [B]/Escape always closes the scanner and
-  /// [A]/Enter always opens manual entry, regardless of which inner
-  /// widget happens to have focus. The QR screen has no real "primary
-  /// action" target since the camera does the work, so it makes more
-  /// sense to bind A globally to the only manual-action escape hatch
-  /// than to require the user to tab onto a button first.
+  /// Top-level key handler supporting gamepad joystick navigation between
+  /// top-left back button and bottom manual-entry button, and [B] back.
   KeyEventResult _handleScreenKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
@@ -67,12 +67,21 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
       Navigator.of(context).maybePop();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.gameButtonA ||
-        key == LogicalKeyboardKey.enter ||
-        key == LogicalKeyboardKey.numpadEnter ||
-        key == LogicalKeyboardKey.select) {
-      _openManual();
-      return KeyEventResult.handled;
+    if (key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowLeft) {
+      if (_manualFocus.hasFocus) {
+        _backFocus.requestFocus();
+        ref.read(feedbackServiceProvider).tick();
+        return KeyEventResult.handled;
+      }
+    }
+    if (key == LogicalKeyboardKey.arrowDown ||
+        key == LogicalKeyboardKey.arrowRight) {
+      if (_backFocus.hasFocus) {
+        _manualFocus.requestFocus();
+        ref.read(feedbackServiceProvider).tick();
+        return KeyEventResult.handled;
+      }
     }
     return KeyEventResult.ignored;
   }
@@ -282,6 +291,12 @@ class _QrPairingScreenState extends ConsumerState<QrPairingScreen> {
                                 color: Colors.white, fontSize: 13),
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      ConsoleHud(
+                        embedded: true,
+                        b: const HudAction('返回'),
+                        a: const HudAction('確定 / 選擇'),
                       ),
                       if (_processing)
                         const Padding(

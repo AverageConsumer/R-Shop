@@ -19,10 +19,13 @@ import '../../services/romm_api_service.dart';
 import '../../services/romm_pairing_service.dart';
 import '../../services/romm_platform_matcher.dart';
 import '../../services/sources_notifier.dart';
+import '../../services/source_failover.dart';
+import '../../widgets/console_dialog.dart';
 import '../../widgets/console_hud.dart';
 import '../../widgets/console_notification.dart';
 import '../onboarding/widgets/romm_legacy_login_screen.dart';
 import '../pairing/qr_pairing_screen.dart';
+import '../sources/fallback_picker_overlay.dart';
 import '../sources/manual_source_add_screen.dart';
 import '../sources/source_mappings_screen.dart';
 
@@ -58,11 +61,53 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   Source? _activeActionsSource;
   bool _showTypePicker = false;
 
+
+  /// Which source is designated as in use, read straight from the notifier.
+  ///
+  /// Deliberately not mirrored in a field of this State. It used to be, seeded
+  /// with `_activeSourceId ??= stored` — and `??=` cannot represent
+  /// "deliberately none", so the next build re-seeded it from the stored value
+  /// and the toggle needed a second press to take. One source of truth.
+  String? get _primarySourceId => ref.read(sourcesProvider).primarySourceId;
+
+  /// Set while the fallback picker is open.
+  String? _fallbackPickerSourceId;
+
+  /// Set while creating a new source triggered from inside the fallback picker.
+  /// When source creation finishes or cancels, fallback picker re-opens for this source.
+  String? _addingFallbackForSourceId;
+
+  /// Which card the gamepad is sitting on. The list-level shortcuts act on
+  /// this source, and the HUD reads its state — the disable hint has to say
+  /// which of the two things it is about to do.
+  ///
+  /// Kept rather than recomputed on demand because focus changes do not
+  /// rebuild this widget by themselves, and a stale hint is worse than none.
+  String? _focusedSourceId;
+
   /// True once we've successfully moved focus off of the screen-level
   /// Focus stub created by [ConsoleScreenMixin.buildWithActions]. Until
   /// that happens, the gamepad input bypasses our cards entirely (the
   /// stub eats the key event before it reaches ConsoleFocusable).
   bool _initialFocusClaimed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _probeFailoverState();
+    });
+  }
+
+  Future<void> _probeFailoverState() async {
+    final config = ref.read(bootstrappedConfigProvider).valueOrNull;
+    if (config != null) {
+      final resolved = await resolveForSync(config: config);
+      if (mounted) {
+        ref.read(activeFailoverChoiceProvider.notifier).choice = resolved.choice;
+      }
+    }
+  }
 
   @override
   String get routeId => 'sources_screen';
@@ -76,12 +121,28 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
         // leak focus into the screen-level Focus stub or the HUD when
         // there is nothing to move to.
         NavigateIntent: NavigateAction(ref, onNavigate: _onNavigate),
+        _SourceShortcutIntent: _SourceShortcutAction(ref, _onSourceShortcut),
       };
 
   @override
   Map<ShortcutActivator, Intent>? get additionalShortcuts => {
         const SingleActivator(LogicalKeyboardKey.gameButtonY,
             includeRepeats: false): const SearchIntent(),
+        // The three things done most often here, bound on the list itself so
+        // they no longer cost a menu. The menu keeps them as well: the eye on
+        // the row and the menu rows are the finger half of the same actions.
+        //
+        // L1/R1 are the grid column controls globally; this map is merged
+        // after the defaults, so on this screen they mean these instead.
+        const SingleActivator(LogicalKeyboardKey.gameButtonX,
+                includeRepeats: false):
+            const _SourceShortcutIntent(_SourceShortcut.toggleActive),
+        const SingleActivator(LogicalKeyboardKey.gameButtonLeft1,
+                includeRepeats: false):
+            const _SourceShortcutIntent(_SourceShortcut.toggleEnabled),
+        const SingleActivator(LogicalKeyboardKey.gameButtonRight1,
+                includeRepeats: false):
+            const _SourceShortcutIntent(_SourceShortcut.remove),
       };
 
   @override
@@ -99,7 +160,21 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
   /// once focus has landed on a real interactive widget the flag stays
   /// flipped and subsequent state changes won't yank focus around.
   void _ensureInteractiveFocus(SourcesState state) {
-    if (_initialFocusClaimed || _activeActionsSource != null) return;
+    // Deleting the last source disposes the card that had focus, leaving the
+    // screen with nothing focusable — the gamepad then does nothing at all and
+    // only touch still works. The claim has to be given up whenever the list
+    // the focus was living in disappears, so the empty state can take it.
+    if (_initialFocusClaimed &&
+        !_cardFocusNodes.values.any((n) => n.hasFocus) &&
+        !_addEmptyFocus.hasFocus) {
+      _initialFocusClaimed = false;
+    }
+    // ...and it must not run while an overlay owns the focus. Any overlay,
+    // not just the actions menu: the group editor stays open across a config
+    // write (creating a group rewrites the sources list), and the rebuild that
+    // followed used to yank focus onto the card behind it — the pad stopped
+    // driving the overlay mid-edit while it was still on screen.
+    if (_initialFocusClaimed || _anyOverlayOpen) return;
     if (state.loading) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _initialFocusClaimed) return;
@@ -117,13 +192,31 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     });
   }
 
+  /// True while anything is layered over the list. Each of these has its own
+  /// focus scope, so the list must not compete for focus with it.
+  bool get _anyOverlayOpen =>
+      _activeActionsSource != null ||
+      _fallbackPickerSourceId != null ||
+      _showTypePicker;
+
   /// Returns the focus node for [sourceId], creating it on first access.
   /// Stable across rebuilds so the visible focus indicator doesn't jump
   /// when the list mutates.
   FocusNode _focusFor(String sourceId) {
     return _cardFocusNodes.putIfAbsent(
       sourceId,
-      () => FocusNode(debugLabel: 'source_card_$sourceId'),
+      () {
+        final node = FocusNode(debugLabel: 'source_card_$sourceId');
+        // Only ever set, never cleared on focus loss: moving between cards
+        // passes through a moment where nothing is focused, and clearing
+        // there would blank the HUD hints on every press.
+        node.addListener(() {
+          if (!mounted || !node.hasFocus) return;
+          if (_focusedSourceId == sourceId) return;
+          setState(() => _focusedSourceId = sourceId);
+        });
+        return node;
+      },
     );
   }
 
@@ -138,6 +231,58 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     for (final id in stale) {
       _cardFocusNodes.remove(id)?.dispose();
     }
+    // A removed source must not keep driving the HUD hints.
+    if (_focusedSourceId != null && !liveIds.contains(_focusedSourceId)) {
+      _focusedSourceId = null;
+    }
+  }
+
+  /// The source the shortcuts and the HUD act on. Reads live focus first so a
+  /// press is always applied to what the border is drawn around, and falls
+  /// back to the last remembered card for the gap between two cards.
+  Source? _focusedSource(List<Source> sources) {
+    for (final entry in _cardFocusNodes.entries) {
+      if (entry.value.hasFocus) {
+        return sources.where((s) => s.id == entry.key).firstOrNull;
+      }
+    }
+    final id = _focusedSourceId;
+    if (id == null) return null;
+    return sources.where((s) => s.id == id).firstOrNull;
+  }
+
+  /// Runs one of the three list-level shortcuts against the focused card.
+  void _onSourceShortcut(_SourceShortcut shortcut) {
+    final source = _focusedSource(ref.read(sourcesProvider).sources);
+    if (source == null) return;
+    switch (shortcut) {
+      case _SourceShortcut.toggleActive:
+        ref.read(feedbackServiceProvider).confirm();
+        _toggleActiveSource(source);
+      case _SourceShortcut.toggleEnabled:
+        ref.read(feedbackServiceProvider).confirm();
+        _toggleSourceEnabled(source);
+      case _SourceShortcut.remove:
+        _confirmRemoveSource(source);
+    }
+  }
+
+  /// Removal from the list asks first. In the menu it takes three deliberate
+  /// presses to reach; here it is one, and it drops the source's whole
+  /// library listing — so the one press has to be the one that opens a
+  /// question, not the one that does it.
+  Future<void> _confirmRemoveSource(Source source) async {
+    final l = L.of(context);
+    ref.read(feedbackServiceProvider).tick();
+    final confirmed = await showConsoleDialog(
+      context,
+      title: l.sources_removeConfirmTitle,
+      message: l.sources_removeConfirmMessage(source.name),
+      primaryLabel: l.common_remove,
+      isDestructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+    await _removeSource(source);
   }
 
   void _goBack() {
@@ -198,9 +343,33 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _showTypePicker = true);
   }
 
+  void _addFreshFallbackSource(String parentId) {
+    _addingFallbackForSourceId = parentId;
+    ref.read(feedbackServiceProvider).tick();
+    setState(() {
+      _fallbackPickerSourceId = null;
+      _activeActionsSource = null;
+      _showTypePicker = true;
+    });
+  }
+
+  @visibleForTesting
+  void addFreshFallbackSourceForTest(String parentId) =>
+      _addFreshFallbackSource(parentId);
+
+  @visibleForTesting
+  void closeTypePickerForTest() => _closeTypePicker();
+
   void _closeTypePicker() {
     if (!_showTypePicker) return;
-    setState(() => _showTypePicker = false);
+    setState(() {
+      _showTypePicker = false;
+      if (_addingFallbackForSourceId != null) {
+        _fallbackPickerSourceId = _addingFallbackForSourceId;
+        _addingFallbackForSourceId = null;
+        _activeActionsSource = null;
+      }
+    });
   }
 
   Future<void> _onTypePicked(_TypeOption option) async {
@@ -218,9 +387,31 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final result = await Navigator.of(context).push<Source?>(
       MaterialPageRoute(builder: (_) => ManualSourceAddScreen(type: type)),
     );
-    if (!mounted || result == null) return;
+    if (!mounted) return;
+    if (result == null) {
+      if (_addingFallbackForSourceId != null) {
+        setState(() {
+          _fallbackPickerSourceId = _addingFallbackForSourceId;
+          _addingFallbackForSourceId = null;
+          _activeActionsSource = null;
+        });
+      }
+      return;
+    }
+
+    if (_addingFallbackForSourceId != null) {
+      final parentId = _addingFallbackForSourceId!;
+      _addingFallbackForSourceId = null;
+      await ref.read(sourcesProvider.notifier).addFallbackSource(parentId, result.id);
+      setState(() {
+        _fallbackPickerSourceId = parentId;
+        _activeActionsSource = null;
+      });
+    }
+
     ref.invalidate(bootstrappedConfigProvider);
     ref.invalidate(gamesProvider);
+    if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _focusFor(result.id).requestFocus();
@@ -235,9 +426,19 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
 
   Future<void> _addRommSource() async {
     final result = await Navigator.of(context).push<RommPairResult?>(
-      MaterialPageRoute(builder: (_) => const QrPairingScreen()),
+      MaterialPageRoute(builder: (_) => QrPairingScreen()),
     );
-    if (!mounted || result == null) return;
+    if (!mounted) return;
+    if (result == null) {
+      if (_addingFallbackForSourceId != null) {
+        setState(() {
+          _fallbackPickerSourceId = _addingFallbackForSourceId;
+          _addingFallbackForSourceId = null;
+          _activeActionsSource = null;
+        });
+      }
+      return;
+    }
 
     final source = buildSourceFromPairResult(result);
 
@@ -258,6 +459,16 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final notifier = ref.read(sourcesProvider.notifier);
     final addedSource = source.copyWith(knownPlatforms: knownPlatforms);
     await notifier.addSource(addedSource);
+
+    if (_addingFallbackForSourceId != null) {
+      final parentId = _addingFallbackForSourceId!;
+      _addingFallbackForSourceId = null;
+      await notifier.addFallbackSource(parentId, addedSource.id);
+      setState(() {
+        _fallbackPickerSourceId = parentId;
+        _activeActionsSource = null;
+      });
+    }
 
     // Auto-create SystemConfigs for platforms the user doesn't have yet.
     final basePath = ref.read(storageServiceProvider).getRomPath()
@@ -301,10 +512,30 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     final source = await Navigator.of(context).push<Source?>(
       MaterialPageRoute(builder: (_) => const RommLegacyLoginScreen()),
     );
-    if (!mounted || source == null) return;
+    if (!mounted) return;
+    if (source == null) {
+      if (_addingFallbackForSourceId != null) {
+        setState(() {
+          _fallbackPickerSourceId = _addingFallbackForSourceId;
+          _addingFallbackForSourceId = null;
+          _activeActionsSource = null;
+        });
+      }
+      return;
+    }
 
     final notifier = ref.read(sourcesProvider.notifier);
     await notifier.addSource(source);
+
+    if (_addingFallbackForSourceId != null) {
+      final parentId = _addingFallbackForSourceId!;
+      _addingFallbackForSourceId = null;
+      await notifier.addFallbackSource(parentId, source.id);
+      setState(() {
+        _fallbackPickerSourceId = parentId;
+        _activeActionsSource = null;
+      });
+    }
 
     final basePath = ref.read(storageServiceProvider).getRomPath()
         ?? '/storage/emulated/0/ROMs';
@@ -344,6 +575,47 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _activeActionsSource = source);
   }
 
+  Source? _sourceById(String id) =>
+      ref.read(sourcesProvider).sources.where((s) => s.id == id).firstOrNull;
+
+  void _openFallbackPicker(Source source) {
+    setState(() {
+      _activeActionsSource = null;
+      _fallbackPickerSourceId = source.id;
+    });
+  }
+
+  void _closeFallbackPicker() {
+    if (_fallbackPickerSourceId == null) return;
+    final source = _sourceById(_fallbackPickerSourceId!);
+    setState(() {
+      _fallbackPickerSourceId = null;
+      _activeActionsSource = source;
+    });
+  }
+
+  /// Designates the source in use — what syncs, and what the home screen
+  /// opens on. A plain two-state toggle: this one, or none.
+  ///
+  /// Not the same button as the home screen's triggers. Those change what is
+  /// **shown**, which is a look you can take back; this one changes what the
+  /// app actually works against.
+  ///
+  /// **Never discards cached games** — the other source's library stays in the
+  /// database so coming back is instant. That is what separates this from
+  /// disabling a source.
+  Future<void> _toggleActiveSource(Source source) async {
+    final next = _primarySourceId == source.id ? null : source.id;
+    setState(() => _activeActionsSource = null);
+    try {
+      await ref.read(sourcesProvider.notifier).setPrimarySource(next);
+      ref.invalidate(bootstrappedConfigProvider);
+    } catch (e) {
+      debugPrint('SourcesScreen: setPrimarySource failed: $e');
+    }
+  }
+
+
   void _closeSourceActions() {
     if (_activeActionsSource == null) return;
     final source = _activeActionsSource!;
@@ -374,7 +646,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _activeActionsSource = null);
 
     final result = await Navigator.of(context).push<RommPairResult?>(
-      MaterialPageRoute(builder: (_) => const QrPairingScreen()),
+      MaterialPageRoute(builder: (_) => QrPairingScreen()),
     );
     if (!mounted || result == null) return;
 
@@ -458,12 +730,53 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     }
   }
 
+  /// The per-source hints only appear once a card is focused, because their
+  /// labels depend on that card: "disable" or "enable", "use this" or "stop
+  /// using". With nothing focused they would have to guess.
+  Widget _buildHud(
+    BuildContext context,
+    SourcesState state,
+    String? primary,
+  ) {
+    final l = L.of(context);
+    final source = state.loading ? null : _focusedSource(state.sources);
+    return ConsoleHud(
+      b: HudAction(l.common_back, onTap: _goBack),
+      y: HudAction(l.sources_addSource, onTap: _addSource),
+      x: source == null
+          ? null
+          : HudAction(
+              primary == source.id
+                  ? l.sources_stopUsingShort
+                  : l.sources_useThisShort,
+              onTap: () => _toggleActiveSource(source),
+            ),
+      lb: source == null
+          ? null
+          : HudAction(
+              source.enabled ? l.sources_disable : l.sources_enable,
+              onTap: () => _toggleSourceEnabled(source),
+            ),
+      rb: source == null
+          ? null
+          : HudAction(
+              l.common_remove,
+              onTap: () => _confirmRemoveSource(source),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rs = context.rs;
     final state = ref.watch(sourcesProvider);
+    final primary = state.primarySourceId;
     _gcFocusNodes(state.sources);
     _ensureInteractiveFocus(state);
+
+    ref.listen(sourcesProvider, (prev, next) {
+      _probeFailoverState();
+    });
 
     return buildWithActions(
       ScreenLayout(
@@ -485,16 +798,17 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                               sources: state.sources,
                               focusForId: _focusFor,
                               onTap: _openSourceActions,
+                              onToggleActive: _toggleActiveSource,
+                              onToggleShown: _toggleSourceEnabled,
                               scrollController: _scrollController,
                               rs: rs,
                             ),
                 ),
               ],
             ),
-            ConsoleHud(
-              b: HudAction(L.of(context).common_back, onTap: _goBack),
-              y: HudAction(L.of(context).sources_addSource, onTap: _addSource),
-            ),
+            // Every hint here is also a button: the HUD is the finger half of
+            // the same three shortcuts, so neither input is a dead end.
+            _buildHud(context, state, primary),
             if (_activeActionsSource != null)
               _SourceActionsOverlay(
                 source: _activeActionsSource!,
@@ -505,16 +819,68 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                 onRepair: () => _repairSource(_activeActionsSource!),
                 onEditMappings: () =>
                     _editMappings(_activeActionsSource!),
+                onEditFallback: () =>
+                    _openFallbackPicker(_activeActionsSource!),
+                isActive: primary == _activeActionsSource!.id,
+                onToggleActive: () =>
+                    _toggleActiveSource(_activeActionsSource!),
+                hasOtherSources: state.sources.length > 1,
               ),
             if (_showTypePicker)
               _SourceTypePickerOverlay(
                 onClose: _closeTypePicker,
                 onPick: _onTypePicked,
               ),
+            if (_fallbackPickerSourceId != null)
+              Builder(
+                builder: (context) {
+                  final src = ref
+                      .watch(sourcesProvider)
+                      .sources
+                      .where((s) => s.id == _fallbackPickerSourceId)
+                      .firstOrNull;
+                  if (src == null) return const SizedBox.shrink();
+                  return FallbackPickerOverlay(
+                    sourceId: src.id,
+                    onClose: _closeFallbackPicker,
+                    onAddFreshSource: () => _addFreshFallbackSource(src.id),
+                  );
+                },
+              ),
           ],
         ),
       ),
     );
+  }
+}
+
+/// The list-level shortcuts. One intent with a payload rather than three
+/// intent types, because [ConsoleScreenMixin.screenActions] is keyed by type
+/// and three keys would need three near-identical actions.
+enum _SourceShortcut { toggleActive, toggleEnabled, remove }
+
+class _SourceShortcutIntent extends Intent {
+  const _SourceShortcutIntent(this.shortcut);
+  final _SourceShortcut shortcut;
+}
+
+class _SourceShortcutAction extends Action<_SourceShortcutIntent> {
+  _SourceShortcutAction(this.ref, this.onShortcut);
+
+  final WidgetRef ref;
+  final void Function(_SourceShortcut) onShortcut;
+
+  /// Held off while any overlay is up. The action menu answers X itself, but
+  /// nothing answers L1/R1 — without this they would fire underneath an open
+  /// overlay, acting on a card the user can no longer see.
+  @override
+  bool isEnabled(_SourceShortcutIntent intent) =>
+      ref.read(overlayPriorityProvider) == OverlayPriority.none;
+
+  @override
+  Object? invoke(_SourceShortcutIntent intent) {
+    onShortcut(intent.shortcut);
+    return null;
   }
 }
 
@@ -546,9 +912,12 @@ class _Header extends StatelessWidget {
           ),
           SizedBox(height: rs.spacing.xs),
           Text(
+            // Was an English literal with a hardcoded [Y] in it. The key name
+            // is the HUD's job — it draws from the configured controller
+            // layout, which this line could not.
             count == 0
                 ? L.of(context).sources_noSourcesConfigured
-                : '$count source${count == 1 ? "" : "s"} · [Y] add new',
+                : L.of(context).sources_countLabel(count),
             style: TextStyle(
               fontSize: rs.isSmall ? 10 : 12,
               color: Colors.grey.shade500,
@@ -649,6 +1018,8 @@ class _SourceList extends ConsumerWidget {
     required this.sources,
     required this.focusForId,
     required this.onTap,
+    required this.onToggleActive,
+    required this.onToggleShown,
     required this.scrollController,
     required this.rs,
   });
@@ -656,6 +1027,8 @@ class _SourceList extends ConsumerWidget {
   final List<Source> sources;
   final FocusNode Function(String sourceId) focusForId;
   final void Function(Source source) onTap;
+  final void Function(Source source) onToggleActive;
+  final void Function(Source source) onToggleShown;
   final ScrollController scrollController;
   final Responsive rs;
 
@@ -695,6 +1068,13 @@ class _SourceList extends ConsumerWidget {
                 onTap: () => onTap(source),
                 rs: rs,
                 mappingCount: mappingCounts[source.id] ?? 0,
+                isActive: ref.watch(sourcesProvider).primarySourceId == source.id,
+                onToggleActive: () => onToggleActive(source),
+                // The eye is the on/off switch. It was briefly a second,
+                // separate "show on home" flag — but that is what turning a
+                // source off already did, so there is one switch again.
+                isShown: source.enabled,
+                onToggleShown: () => onToggleShown(source),
               );
             },
           ),
@@ -713,6 +1093,10 @@ class _SourceCard extends ConsumerWidget {
     required this.onTap,
     required this.rs,
     this.mappingCount = 0,
+    this.isActive = false,
+    this.onToggleActive,
+    this.isShown = false,
+    this.onToggleShown,
   });
 
   final Source source;
@@ -721,6 +1105,20 @@ class _SourceCard extends ConsumerWidget {
   final VoidCallback onTap;
   final Responsive rs;
   final int mappingCount;
+
+  /// True when this is the source in use — what syncs, and what the home
+  /// screen opens on. Marked with a tick.
+  final bool isActive;
+
+  /// Designates this source as the one in use, from the tick on the row.
+  final VoidCallback? onToggleActive;
+
+  /// True when this source is switched on: its library is on the home screen
+  /// and it takes part in syncs.
+  final bool isShown;
+
+  /// Switches this source on or off, from the eye on the row.
+  final VoidCallback? onToggleShown;
 
   Color get _accent {
     if (source.borrowed) return Colors.lightBlueAccent;
@@ -782,6 +1180,32 @@ class _SourceCard extends ConsumerWidget {
     final health = healthState.statusFor(source.id);
     final healthError = healthState.errorFor(source.id);
 
+    final failoverChoice = ref.watch(activeFailoverChoiceProvider);
+    final isFailoverActive = source.enabled &&
+        failoverChoice != null &&
+        failoverChoice.isFallback;
+    final allSources = ref.watch(sourcesProvider).sources;
+    final fallbackSources = [
+      for (final fbId in source.fallbackSourceIds)
+        ...allSources.where((s) => s.id == fbId),
+    ];
+    final firstEnabledFallback =
+        fallbackSources.where((s) => s.enabled).firstOrNull;
+    final hasEnabledFallback = firstEnabledFallback != null;
+
+    final isPreferredFailed = source.enabled &&
+        hasEnabledFallback &&
+        ((isFailoverActive && source.id == failoverChoice.preferred?.id) ||
+            (isActive && health == SourceHealth.invalid));
+
+    final fallbackName = failoverChoice?.source?.name ??
+        firstEnabledFallback?.name ??
+        '代理來源';
+
+    final isFallbackInUse = source.enabled &&
+        isFailoverActive &&
+        source.id == failoverChoice.source?.id;
+
     return ConsoleFocusable(
       focusNode: focusNode,
       autofocus: autofocus,
@@ -793,14 +1217,31 @@ class _SourceCard extends ConsumerWidget {
           color: const Color(0xFF1C1C1C),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: source.enabled
-                ? _accent.withValues(alpha: 0.4)
-                : Colors.white12,
-            width: 2,
+            color: Colors.white24,
+            width: 1.5,
           ),
         ),
         child: Row(
           children: [
+            // Two separate decisions, two separate marks. Both are one tap on
+            // the row, with no menu to open first — they are what this screen
+            // The tick is single and names the one the app works against.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onToggleActive,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Icon(
+                  isActive
+                      ? Icons.check_circle
+                      : Icons.radio_button_unchecked,
+                  size: 21,
+                  color: isActive
+                      ? const Color(0xFF7BC67B)
+                      : Colors.white38,
+                ),
+              ),
+            ),
             Container(
               width: 44,
               height: 44,
@@ -831,6 +1272,113 @@ class _SourceCard extends ConsumerWidget {
                           ),
                         ),
                       ),
+                      // Which source the library is actually showing is
+                      // otherwise invisible, and with two sources configured
+                      // that is the first thing you need to know.
+                      if (isActive) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF7BC67B)
+                                .withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: const Color(0xFF7BC67B)
+                                  .withValues(alpha: 0.6),
+                            ),
+                          ),
+                          child: Text(
+                            L.of(context).sources_activeSource,
+                            style: const TextStyle(
+                              color: Color(0xFF7BC67B),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (isPreferredFailed) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD97706).withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: Colors.amber,
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            '⚠️ 斷線 (已切換至: $fallbackName)',
+                            style: const TextStyle(
+                              color: Colors.amberAccent,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (isFallbackInUse) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amberAccent,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.bolt, size: 10, color: Colors.black),
+                              SizedBox(width: 2),
+                              Text(
+                                '代理中',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (source.enabled &&
+                          source.fallbackSourceIds.isNotEmpty &&
+                          !isPreferredFailed) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: hasEnabledFallback
+                                ? Colors.amber.withValues(alpha: 0.18)
+                                : Colors.redAccent.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: hasEnabledFallback
+                                  ? Colors.amber.withValues(alpha: 0.5)
+                                  : Colors.redAccent.withValues(alpha: 0.5),
+                            ),
+                          ),
+                          child: Text(
+                            hasEnabledFallback ? '🛡️ 已設代理' : '🚫 代理已停用',
+                            style: TextStyle(
+                              color: hasEnabledFallback
+                                  ? Colors.amberAccent
+                                  : Colors.redAccent,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                       if (source.borrowed) ...[
                         const SizedBox(width: 6),
                         Container(
@@ -882,8 +1430,8 @@ class _SourceCard extends ConsumerWidget {
                     '${source.type.name.toUpperCase()} · ${source.hostLabel}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.grey.shade500,
+                    style: const TextStyle(
+                      color: Colors.white70,
                       fontSize: 11,
                       fontFamily: 'monospace',
                     ),
@@ -891,8 +1439,8 @@ class _SourceCard extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.games,
-                          size: 11, color: Colors.grey.shade500),
+                      const Icon(Icons.games,
+                          size: 11, color: Colors.white70),
                       const SizedBox(width: 3),
                       Text(
                         entryCount == 0
@@ -901,8 +1449,8 @@ class _SourceCard extends ConsumerWidget {
                                 : 'No mappings — [A] to add')
                             : '$entryCount '
                                 '${entryCount == 1 ? entryNoun : "${entryNoun}s"}',
-                        style: TextStyle(
-                          color: Colors.grey.shade500,
+                        style: const TextStyle(
+                          color: Colors.white70,
                           fontSize: 11,
                         ),
                       ),
@@ -982,6 +1530,10 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
     required this.onRemove,
     required this.onRepair,
     required this.onEditMappings,
+    required this.onEditFallback,
+    required this.onToggleActive,
+    required this.isActive,
+    required this.hasOtherSources,
   });
 
   final Source source;
@@ -990,6 +1542,10 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
   final VoidCallback onRemove;
   final VoidCallback onRepair;
   final VoidCallback onEditMappings;
+  final VoidCallback onEditFallback;
+  final VoidCallback onToggleActive;
+  final bool isActive;
+  final bool hasOtherSources;
 
   @override
   ConsumerState<_SourceActionsOverlay> createState() =>
@@ -1019,6 +1575,11 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
           label: l.sources_editMappings,
           onActivate: widget.onEditMappings,
         ),
+      _OverlayAction(
+        icon: Icons.alt_route,
+        label: '代理設定',
+        onActivate: widget.onEditFallback,
+      ),
       _OverlayAction(
         icon: src.enabled ? Icons.toggle_off : Icons.toggle_on,
         label: src.enabled ? l.sources_disable : l.sources_enable,
@@ -1079,6 +1640,13 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
       widget.onClose();
       return KeyEventResult.handled;
     }
+    // The gamepad half of the eye in the header. Without it that toggle would
+    // be reachable by finger only.
+    if (key == LogicalKeyboardKey.gameButtonX) {
+      ref.read(feedbackServiceProvider).confirm();
+      widget.onToggleActive();
+      return KeyEventResult.handled;
+    }
     return KeyEventResult.ignored;
   }
 
@@ -1095,6 +1663,7 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
   @override
   Widget build(BuildContext context) {
     final src = widget.source;
+    final l = L.of(context);
     final actions = _actions(context);
     return OverlayFocusScope(
       priority: OverlayPriority.dialog,
@@ -1116,9 +1685,14 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF1C1C1C),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
+                    border: Border.all(color: Colors.white, width: 1.5),
                   ),
-                  child: Column(
+                  // Scrollable so the menu can outgrow a 3.92" screen without
+                  // painting Flutter's yellow overflow stripe, which looks
+                  // like a feature nobody can explain. It already overflowed
+                  // by 39px once the routes and backup entries were added.
+                  child: SingleChildScrollView(
+                    child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1131,13 +1705,49 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        src.hostLabel,
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                          fontFamily: 'monospace',
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              src.hostLabel,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ),
+                          // Second entry for "show this source": the row eye
+                          // is touch-only, this one answers [X] as well. A
+                          // corner icon rather than another row — the menu
+                          // already outgrew a 3.92" screen once.
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: widget.onToggleActive,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              // Icon only. A bare "X" beside it read as a
+                              // close button, and spelling out a button name
+                              // here would go stale against the user's
+                              // controller layout anyway — the footer hint
+                              // is where the key belongs.
+                              //
+                              // A tick, not an eye: this marks the source in
+                              // use. The eye means what is on screen, and the
+                              // two must not wear the same icon.
+                              child: Icon(
+                                widget.isActive
+                                    ? Icons.check_circle
+                                    : Icons.radio_button_unchecked,
+                                size: 18,
+                                color: widget.isActive
+                                    ? const Color(0xFF7BC67B)
+                                    : Colors.white38,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 20),
                       for (int i = 0; i < actions.length; i++) ...[
@@ -1148,20 +1758,34 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                           selected: _selectedIndex == i,
                           destructive: actions[i].destructive,
                           subdued: actions[i].cancelStyle,
+                          // Tapping runs the action outright rather than just
+                          // moving the cursor to it — a second tap to confirm
+                          // what you already touched is pure friction.
+                          onTap: () {
+                            setState(() => _selectedIndex = i);
+                            _activate();
+                          },
                         ),
                       ],
                       const SizedBox(height: 12),
-                      const Center(
-                        child: Text(
-                          '↑↓ navigate · [A] select · [B] back',
-                          style: TextStyle(
-                            color: Colors.white30,
-                            fontSize: 10,
-                            letterSpacing: 0.5,
-                          ),
+                      // Real buttons, not a typed-out line. The old one was a
+                      // hardcoded Chinese string that named [A]/[X]/[B] — wrong
+                      // on two of the three controller layouts, untranslated in
+                      // the other six languages, and dead under a finger.
+                      ConsoleHud(
+                        embedded: true,
+                        dpad: (label: '↑↓', action: l.common_navigate),
+                        a: HudAction(l.common_select, onTap: _activate),
+                        b: HudAction(l.common_back, onTap: widget.onClose),
+                        x: HudAction(
+                          widget.isActive
+                              ? l.sources_stopUsingShort
+                              : l.sources_useThisShort,
+                          onTap: widget.onToggleActive,
                         ),
                       ),
                     ],
+                  ),
                   ),
                 ),
               ),
@@ -1196,11 +1820,17 @@ class _OverlayButton extends StatelessWidget {
     required this.selected,
     this.destructive = false,
     this.subdued = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
+
+  /// The overlay is driven by the gamepad, but the device has a touchscreen
+  /// and the cards behind it are tappable — so an overlay that only answers to
+  /// buttons reads as frozen.
+  final VoidCallback? onTap;
   final bool destructive;
   final bool subdued;
 
@@ -1211,39 +1841,43 @@ class _OverlayButton extends StatelessWidget {
         : subdued
             ? Colors.white70
             : AppTheme.primaryColor;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: selected ? 0.25 : 0.10),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: selected ? color : color.withValues(alpha: 0.3),
-          width: selected ? 2 : 1,
-        ),
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.35),
-                  blurRadius: 12,
-                ),
-              ]
-            : null,
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: selected ? 0.25 : 0.10),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? color : color.withValues(alpha: 0.3),
+            width: selected ? 2 : 1,
           ),
-        ],
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.35),
+                    blurRadius: 12,
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1315,6 +1949,13 @@ class _SourceTypePickerOverlayState
     super.dispose();
   }
 
+  /// Single path for choosing an option, so [A] and a tap cannot drift apart
+  /// as one of them later gains a step the other does not.
+  void _pickSelected() {
+    ref.read(feedbackServiceProvider).confirm();
+    widget.onPick(_options[_selectedIndex]);
+  }
+
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
@@ -1335,8 +1976,7 @@ class _SourceTypePickerOverlayState
     if (key == LogicalKeyboardKey.gameButtonA ||
         key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.select) {
-      ref.read(feedbackServiceProvider).confirm();
-      widget.onPick(_options[_selectedIndex]);
+      _pickSelected();
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.gameButtonB ||
@@ -1373,7 +2013,7 @@ class _SourceTypePickerOverlayState
                   decoration: BoxDecoration(
                     color: const Color(0xFF1C1C1C),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white12),
+                    border: Border.all(color: Colors.white, width: 1.5),
                   ),
                   child: SingleChildScrollView(
                     child: Column(
@@ -1402,18 +2042,20 @@ class _SourceTypePickerOverlayState
                         _TypeOptionTile(
                           option: _options[i],
                           selected: _selectedIndex == i,
+                          onTap: () {
+                            setState(() => _selectedIndex = i);
+                            _pickSelected();
+                          },
                         ),
                       ],
                       const SizedBox(height: 14),
-                      const Center(
-                        child: Text(
-                          '↑↓ navigate · [A] select · [B] back',
-                          style: TextStyle(
-                            color: Colors.white30,
-                            fontSize: 10,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                      // Same line was pasted here, and here it also promised
+                      // an [X] this overlay does not answer.
+                      ConsoleHud(
+                        embedded: true,
+                        dpad: (label: '↑↓', action: l.common_navigate),
+                        a: HudAction(l.common_select, onTap: _pickSelected),
+                        b: HudAction(l.common_back, onTap: widget.onClose),
                       ),
                     ],
                   ),
@@ -1444,56 +2086,69 @@ class _TypeOption {
 }
 
 class _TypeOptionTile extends StatelessWidget {
-  const _TypeOptionTile({required this.option, required this.selected});
+  const _TypeOptionTile({
+    required this.option,
+    required this.selected,
+    this.onTap,
+  });
   final _TypeOption option;
   final bool selected;
+
+  /// This overlay is reached with [Y] and driven by the gamepad, but the
+  /// device has a touchscreen and the list behind it answers to taps — a row
+  /// that ignores a finger reads as frozen.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final color = AppTheme.primaryColor;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: selected ? 0.22 : 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: selected ? color : color.withValues(alpha: 0.3),
-          width: selected ? 2 : 1,
-        ),
-        boxShadow: selected
-            ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12)]
-            : null,
-      ),
-      child: Row(
-        children: [
-          Icon(option.icon, color: color, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  option.label,
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  option.hint,
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: selected ? 0.22 : 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? color : color.withValues(alpha: 0.3),
+            width: selected ? 2 : 1,
           ),
-        ],
+          boxShadow: selected
+              ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12)]
+              : null,
+        ),
+        child: Row(
+          children: [
+            Icon(option.icon, color: color, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    option.label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    option.hint,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

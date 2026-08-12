@@ -1254,6 +1254,16 @@ class LJa extends L {
   String get onboarding_serverType => 'サーバータイプ';
 
   @override
+  String get onboarding_folderExplanationTitle => 'ライブラリのパスを設定';
+
+  @override
+  String get onboarding_folderExplanationMessage =>
+      'R-Shop はダウンロードしたゲームを保存するベースフォルダが必要です。ファイルの整理に役立ち、Android のフォルダ権限にも必要です。\n\n「ROMs」という名前のフォルダを作成して選択することをおすすめします。';
+
+  @override
+  String get onboarding_continueToPicker => 'フォルダを選択';
+
+  @override
   String get onboarding_hangOn => 'ちょっと待ってね、接続テスト中...';
 
   @override
@@ -1573,5 +1583,241 @@ class LJa extends L {
   @override
   String service_queuedCount(int count) {
     return '$count件キュー中';
+  }
+
+  @override
+  String get sources_connectionRoute => '接続経路';
+
+  @override
+  String get sources_routeAuto => '自動選択';
+
+  @override
+  String get sources_routeAutoHint => '応答が最も速い経路を使用（ネットワークが変わると選び直します）';
+
+  @override
+  String get sources_routeInUse => '使用中';
+
+  @override
+  String get sources_routePinned => 'ロック中';
+
+  @override
+  String get sources_routeReachable => '接続可能';
+
+  @override
+  String get sources_routeNoAnswer => '応答なし';
+
+  @override
+  String get sources_routeChecking => '確認中…';
+
+  @override
+  String sources_routeLatencyMs(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String sources_routeAutoPicks(String route) {
+    return '「$route」を使用します';
+  }
+
+  @override
+  String get sources_routeAutoNoneReachable => '応答した経路がありません';
+
+  @override
+  String get sources_routeFastest => '最速';
+
+  @override
+  String get sources_routeReleasePin => 'ロックを解除して最速の経路を選び直します';
+
+  @override
+  String get sources_routeOwnLogin => '専用ログイン';
+
+  @override
+  String get sources_routeAuthTitle => 'この経路のログイン情報';
+
+  @override
+  String get sources_routeAuthHint =>
+      '空欄にすると提供元のログイン情報を使います。このアドレスが別のログインを求める場合のみ入力してください。';
+
+  @override
+  String get sources_routeAuthInherited => '提供元のログイン情報を使用中';
+
+  @override
+  String get sources_routeAuthOwn => 'この経路は独自のログイン情報を使用します';
+
+  @override
+  String get sources_routeOnlyOne => 'この提供元の経路は1つだけです';
+
+  @override
+  String get sources_addRoute => '経路を追加';
+
+  @override
+  String get sources_editRoute => '経路を編集';
+
+  @override
+  String get sources_removeRoute => 'この経路を削除';
+
+  @override
+  String get sources_routeDuplicate => 'この提供元には同じアドレスの経路がすでにあります';
+
+  @override
+  String get sources_activeSource => '使用中';
+
+  @override
+  String get sources_switchSource => '提供元切替';
+
+  @override
+  String get sources_prevSource => '前の提供元';
+
+  @override
+  String get sources_nextSource => '次の提供元';
+
+  @override
+  String get sources_setFallback => 'バックアップ提供元';
+
+  @override
+  String get sources_fallbackNone => 'なし';
+
+  @override
+  String get sources_fallbackShort => 'バックアップ';
+
+  @override
+  String get sources_routeSameServerHint =>
+      'すべての経路は同じサーバーにつながります。そのアドレスが別のログインを求める場合、経路ごとに専用のログイン情報を持たせられます。';
+
+  @override
+  String get sources_routeCannotRemoveLast => '最後の経路は削除できません';
+
+  @override
+  String sources_countLabel(num count) {
+    return '$count 件のソース';
+  }
+
+  @override
+  String get sources_useThisShort => 'この提供元を使用';
+
+  @override
+  String get sources_stopUsingShort => '使用をやめる';
+
+  @override
+  String get sources_removeConfirmTitle => 'ソースを削除しますか？';
+
+  @override
+  String sources_removeConfirmMessage(String name) {
+    return '「$name」を削除しますか？このソースの一覧はライブラリから消えますが、すでに端末にダウンロードしたゲームは残ります。';
+  }
+
+  @override
+  String get sources_groupBadge => 'グループ';
+
+  @override
+  String get sources_groupCreate => '他のソースとグループにする…';
+
+  @override
+  String get sources_groupCreateHint => '実際には同じサーバーである 2 つのアドレス向け';
+
+  @override
+  String get sources_groupPickMember => 'グループにするソースを選択';
+
+  @override
+  String get sources_groupSameTypeOnly => '同じ種類のソースだけをグループにできます';
+
+  @override
+  String get sources_groupNoCandidates => '同じ種類のソースが他にありません';
+
+  @override
+  String get sources_groupManage => 'グループ設定';
+
+  @override
+  String get sources_groupRename => 'グループ名を変更';
+
+  @override
+  String get sources_groupNameLabel => 'グループ名';
+
+  @override
+  String get sources_groupModeTitle => 'どれを使うか';
+
+  @override
+  String get sources_groupModeAuto => '自動選択';
+
+  @override
+  String get sources_groupModeAutoHint => '順序を管理する必要はありません。先に応答したアドレスが最も早く使えます';
+
+  @override
+  String get sources_groupModeOrdered => '自分の順序';
+
+  @override
+  String get sources_groupModeOrderedHint => '順序どおりに、最初に応答したものを使用';
+
+  @override
+  String get sources_groupPreferred => '第 1 候補';
+
+  @override
+  String get sources_groupAddMember => 'ソースを追加';
+
+  @override
+  String get sources_groupLeave => 'グループから外す';
+
+  @override
+  String sources_groupLeaveConfirm(String name) {
+    return '「$name」の一覧は残らず、同期し直す必要があります。共有の一覧はグループに残ります。';
+  }
+
+  @override
+  String get sources_groupLeaveTitle => 'グループから外しますか？';
+
+  @override
+  String get sources_groupDissolve => 'グループを解散';
+
+  @override
+  String sources_groupDissolveConfirm(String name) {
+    return '共有の一覧は「$name」に残り、他のソースは同期し直します。';
+  }
+
+  @override
+  String get sources_groupDissolveTitle => 'グループを解散しますか？';
+
+  @override
+  String sources_groupMembersCount(int count) {
+    return '$count 個のソース';
+  }
+
+  @override
+  String sources_groupUsing(String name) {
+    return '「$name」を使用中';
+  }
+
+  @override
+  String get sources_moveUp => '上へ移動';
+
+  @override
+  String get sources_moveDown => '下へ移動';
+
+  @override
+  String get sources_routeOrdered => '自分の順序';
+
+  @override
+  String get sources_routeOrderedHint => '順序どおりに、最初に応答した経路を使用';
+
+  @override
+  String get sources_reorderHint => '上下キーで位置を移動し、もう一度押すと完了';
+
+  @override
+  String get sources_groupMemberHint => '▶ でグループから除外、[A] で並べ替え';
+
+  @override
+  String get sources_routeRowHint => 'この行を選ぶと並べ替え。▶ で右のアイコン：編集・削除';
+
+  @override
+  String get sources_routeUse => 'この経路を使用';
+
+  @override
+  String get sources_routeLock => 'この経路にロック';
+
+  @override
+  String get sources_routeUnlock => 'ロックを解除';
+
+  @override
+  String sources_removeRouteConfirm(String name) {
+    return '「$name」を削除しますか？このソースのゲーム一覧は残り、消えるのはアドレスだけです。';
   }
 }

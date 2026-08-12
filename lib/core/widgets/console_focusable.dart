@@ -104,7 +104,9 @@ class _ConsoleFocusableState extends ConsumerState<ConsoleFocusable>
   void _updateFocusState() {
     final hasFocus = _focusNode.hasFocus;
     if (hasFocus != _isFocused) {
-      _isFocused = hasFocus;
+      setState(() {
+        _isFocused = hasFocus;
+      });
       if (hasFocus) {
         _controller.forward();
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -293,7 +295,9 @@ class _ConsoleFocusableCardState extends ConsumerState<ConsoleFocusableCard>
   void _updateFocusState() {
     final hasFocus = _focusNode.hasFocus;
     if (hasFocus != _isFocused) {
-      _isFocused = hasFocus;
+      setState(() {
+        _isFocused = hasFocus;
+      });
       if (hasFocus) {
         _controller.forward();
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -475,7 +479,9 @@ class _ConsoleFocusableListItemState
   void _updateFocusState() {
     final hasFocus = _focusNode.hasFocus;
     if (hasFocus != _isFocused) {
-      _isFocused = hasFocus;
+      setState(() {
+        _isFocused = hasFocus;
+      });
       if (hasFocus) {
         _controller.forward();
         WidgetsBinding.instance.addPostFrameCallback((_) {

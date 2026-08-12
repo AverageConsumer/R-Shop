@@ -386,42 +386,54 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
             ? AppTheme.primaryColor
             : Colors.white70;
 
-    return ConsoleFocusable(
-      focusNode: focusNode,
-      focusScale: 1.0,
-      focusBorderColor: color,
-      borderRadius: 10,
-      onSelect: onSelect,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: busy
-            ? SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: color),
-              )
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 16, color: color),
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, _) {
+        final isFocused = focusNode.hasFocus;
+        final effectiveColor = isFocused ? Colors.white : color;
+        final bgColor = isFocused
+            ? color.withValues(alpha: 0.3)
+            : color.withValues(alpha: 0.12);
+
+        return ConsoleFocusable(
+          focusNode: focusNode,
+          focusScale: 1.02,
+          focusBorderColor: Colors.white,
+          borderRadius: 10,
+          onSelect: onSelect,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: busy
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child:
+                        CircularProgressIndicator(strokeWidth: 2, color: effectiveColor),
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 16, color: effectiveColor),
+                      const SizedBox(width: 8),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: effectiveColor,
+                          fontSize: 15,
+                          fontWeight: isFocused ? FontWeight.w700 : FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -476,12 +488,19 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
       focusNode: f.consoleFocus,
       focusScale: 1.0,
       onSelect: () => f.textFocus.requestFocus(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _label(f.label),
-          ListenableBuilder(
+      // The white focus frame is drawn tight around the child, so without
+      // room of its own it lands on the label and on the field's own border —
+      // two lines a couple of pixels apart, which reads as a rendering fault
+      // rather than as focus.
+      borderRadius: 12,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _label(f.label),
+            ListenableBuilder(
             listenable: f.textFocus,
             builder: (context, _) {
               final hasFocus = f.textFocus.hasFocus;
@@ -491,7 +510,7 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: hasFocus
-                        ? AppTheme.primaryColor
+                        ? Colors.white
                         : AppTheme.primaryColor.withValues(alpha: 0.4),
                     width: 2,
                   ),
@@ -517,9 +536,10 @@ class _RaOnboardingScreenState extends ConsumerState<RaOnboardingScreen> {
                   ),
                 ),
               );
-            },
-          ),
-        ],
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -12,8 +12,10 @@ import '../../providers/game_providers.dart';
 import '../../widgets/quick_menu.dart';
 import '../../providers/library_providers.dart';
 import '../../providers/ra_providers.dart';
+import '../../models/config/app_config.dart';
 import '../../services/config_bootstrap.dart';
 import '../../services/input_debouncer.dart';
+import '../../services/source_failover.dart';
 import '../../widgets/exit_confirmation_overlay.dart';
 import '../../core/util/color_contrast.dart';
 import '../../widgets/console_hud.dart';
@@ -153,7 +155,12 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   Future<void> _triggerLibrarySync({Set<String> forceSystemIds = const {}}) async {
-    final config = await ref.read(bootstrappedConfigProvider.future);
+    final loaded = await ref.read(bootstrappedConfigProvider.future);
+    if (!mounted) return;
+    // The automatic sync resolves its source the same way the manual one
+    // does. Without this, a background sync would quietly keep hammering an
+    // unreachable source while the badge named the wrong server.
+    final config = await _resolveSyncTarget(loaded);
     if (!mounted) return;
     if (config.systems.isNotEmpty) {
       final timeout = Duration(seconds: ref.read(syncTimeoutProvider));
@@ -486,8 +493,16 @@ class _HomeViewState extends ConsumerState<HomeView>
   }
 
   void _syncAll() async {
-    final config = await ref.read(bootstrappedConfigProvider.future);
-    if (config.systems.isEmpty) return;
+    final loaded = await ref.read(bootstrappedConfigProvider.future);
+    if (loaded.systems.isEmpty) return;
+    // Check the selected source is up before committing to a sync that could
+    // otherwise sit on a dead address for the full RomM timeout, and stand its
+    // partner in when it is not. Only the config passed to the sync changes —
+    // the stored preference is untouched, so the usual source comes back on
+    // its own once it answers.
+    final config = await _resolveSyncTarget(loaded);
+    if (!mounted) return;
+
     final syncService = ref.read(librarySyncServiceProvider.notifier);
     if (ref.read(librarySyncServiceProvider).isSyncing) {
       syncService.cancel();
@@ -522,12 +537,42 @@ class _HomeViewState extends ConsumerState<HomeView>
     SystemNavigator.pop();
   }
 
+  /// Probes the selected source, stands its partner in if it is silent, and
+  /// publishes which one won so the header and the sync badge can name it.
+  ///
+  /// Returns the config to sync with. Only that in-memory copy changes — the
+  /// stored preference is left alone, which is what lets the usual source
+  /// resume on its own once it answers again.
+  Future<AppConfig> _resolveSyncTarget(AppConfig loaded) async {
+    final resolved = await resolveForSync(config: loaded);
+    final chosen = resolved.choice.source;
+    ref.read(syncingSourceProvider.notifier).state = chosen == null
+        ? null
+        : (name: chosen.name, isFallback: resolved.choice.isFallback);
+    ref.read(activeFailoverChoiceProvider.notifier).choice = resolved.choice;
+    return resolved.config;
+  }
+
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is KeyUpEvent) {
       _debouncer.stopHold();
     }
     return KeyEventResult.ignored;
   }
+
+  /// Steps the **shown** source by [delta] over the ring
+  /// `all → first → … → last → all`.
+  ///
+  /// Changes what is on screen and nothing else. The source in use — what
+  /// syncs — is set in the sources list and is not touched here, so browsing
+  /// another library never redirects the next sync at it.
+  ///
+  /// Bound to L2/R2 rather than a face button so the right thumb never has to
+  /// leave A, and made bidirectional so overshooting costs one press instead
+  /// of a full lap.
+  ///
+  /// The ring is the sources and nothing else. It used to carry an extra "all
+
 
   @override
   Widget build(BuildContext context) {
@@ -621,25 +666,30 @@ class _HomeViewState extends ConsumerState<HomeView>
           padding: EdgeInsets.zero,
           body: Stack(
             children: [
-              if (isGrid)
-                HomeGridView(
-                  systems: _configuredSystems,
-                  selectedIndex: _currentIndex,
-                  columns: _columns,
-                  scrollController: _gridScrollController,
-                  itemKeys: _gridItemKeys,
-                  onSelect: (idx) {
-                    setState(() => _currentIndex = idx);
-                    ref.read(feedbackServiceProvider).tick();
-                  },
-                  onConfirm: _navigateToCurrentSystem,
-                  rs: rs,
-                )
-              else if (rs.isPortrait)
-                _buildPortraitLayout(rs, currentSystem, isLibrary)
-              else
-                _buildLandscapeLayout(rs, currentSystem, isLibrary),
-              if (isGrid) _buildControls(rs),
+              Stack(
+                children: [
+                  if (isGrid)
+                    HomeGridView(
+                      systems: _configuredSystems,
+                      selectedIndex: _currentIndex,
+                      columns: _columns,
+                      scrollController: _gridScrollController,
+                      itemKeys: _gridItemKeys,
+                      onSelect: (idx) {
+                        setState(() => _currentIndex = idx);
+                        ref.read(feedbackServiceProvider).tick();
+                      },
+                      onConfirm: _navigateToCurrentSystem,
+                      rs: rs,
+                    )
+                  else if (rs.isPortrait)
+                    _buildPortraitLayout(rs, currentSystem, isLibrary)
+                  else
+                    _buildLandscapeLayout(rs, currentSystem, isLibrary),
+                  if (isGrid) _buildControls(rs),
+                ],
+              ),
+              // Modal overlays stay above everything.
               if (showQuickMenu)
                 QuickMenuOverlay(
                   items: _buildQuickMenuItems(),
@@ -697,6 +747,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        _buildFailoverBadgePill(),
         _buildGameCountBadges(system),
         Text(
           '${system.manufacturer} · ${system.releaseYear}',
@@ -785,6 +836,7 @@ class _HomeViewState extends ConsumerState<HomeView>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        _buildFailoverBadgePill(),
         _buildLibraryCountBadges(),
         Text(
           L.of(context).home_allGames,
@@ -977,6 +1029,48 @@ class _HomeViewState extends ConsumerState<HomeView>
     );
   }
 
+  Widget _buildFailoverBadgePill() {
+    final failoverChoice = ref.watch(activeFailoverChoiceProvider);
+    if (failoverChoice == null || !failoverChoice.isFallback) {
+      return const SizedBox.shrink();
+    }
+    final actName = failoverChoice.source?.name ?? '代理';
+    return _PulsingWidget(
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.amberAccent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white, width: 1),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black54,
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.bolt, size: 12, color: Colors.black),
+            const SizedBox(width: 4),
+            Text(
+              '⚡ 代理使用中: $actName',
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildControls(Responsive rs) {
     // Check full queue (including history) to see if overlay has content
     final hasAnyDownloads = ref.watch(
@@ -1042,6 +1136,46 @@ class _GameCountPill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PulsingWidget extends StatefulWidget {
+  final Widget child;
+  const _PulsingWidget({required this.child});
+
+  @override
+  State<_PulsingWidget> createState() => _PulsingWidgetState();
+}
+
+class _PulsingWidgetState extends State<_PulsingWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _animation,
+      child: widget.child,
     );
   }
 }

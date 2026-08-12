@@ -34,6 +34,7 @@ class SourceMappingsScreen extends ConsumerStatefulWidget {
 class _SourceMappingsScreenState
     extends ConsumerState<SourceMappingsScreen> {
   final _screenFocus = FocusNode(debugLabel: 'mapping_screen');
+  final _backFocus = FocusNode(debugLabel: 'mapping_back');
   final _saveFocus = FocusNode(debugLabel: 'mapping_save');
   final ScrollController _scroll = ScrollController();
 
@@ -85,6 +86,7 @@ class _SourceMappingsScreenState
     for (final r in _rows) {
       r.dispose();
     }
+    _backFocus.dispose();
     _saveFocus.dispose();
     _screenFocus.dispose();
     _scroll.dispose();
@@ -94,7 +96,7 @@ class _SourceMappingsScreenState
   bool get _isEditing => _rows.any((r) => r.textFocus.hasFocus);
 
   List<FocusNode> get _navOrder =>
-      [..._rows.map((r) => r.consoleFocus), _saveFocus];
+      [_backFocus, ..._rows.map((r) => r.consoleFocus), _saveFocus];
 
   KeyEventResult _handleScreenKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
@@ -151,6 +153,10 @@ class _SourceMappingsScreenState
   }
 
   void _activateFocused() {
+    if (_backFocus.hasFocus) {
+      Navigator.of(context).maybePop();
+      return;
+    }
     for (final r in _rows) {
       if (r.consoleFocus.hasFocus) {
         r.textFocus.requestFocus();
@@ -171,7 +177,7 @@ class _SourceMappingsScreenState
     try {
       await ref
           .read(sourcesProvider.notifier)
-          .setMappingsForSource(widget.source.id, mappings);
+          .setManualMappings(widget.source.id, mappings);
       ref.invalidate(bootstrappedConfigProvider);
       ref.invalidate(gamesProvider);
       if (!mounted) return;
@@ -194,14 +200,23 @@ class _SourceMappingsScreenState
           focusNode: _screenFocus,
           autofocus: true,
           onKeyEvent: _handleScreenKey,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            children: [
+              // Fixed Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+                child: Row(
                   children: [
+                    ConsoleFocusable(
+                      focusNode: _backFocus,
+                      onSelect: () => Navigator.of(context).maybePop(),
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(Icons.arrow_back,
+                            color: Colors.white, size: 26),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
                     Text(
                       L.of(context).sourceMappings_title,
                       style: const TextStyle(
@@ -210,87 +225,105 @@ class _SourceMappingsScreenState
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${widget.source.name} · ${widget.source.hostLabel}',
-                      style: TextStyle(
-                        color: Colors.grey.shade500,
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      L.of(context).sourceMappings_instruction,
-                      style: TextStyle(
-                          color: Colors.grey.shade500, fontSize: 12),
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: _rows.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No systems configured yet — add one '
-                                'from the home screen first.',
-                                style: TextStyle(
-                                    color: Colors.white54, fontSize: 13),
-                                textAlign: TextAlign.center,
-                              ),
-                            )
-                          : ListView.separated(
-                              controller: _scroll,
-                              itemCount: _rows.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 10),
-                              itemBuilder: (_, i) => _MappingRowWidget(
-                                row: _rows[i],
-                              ),
-                            ),
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 8),
-                      Text(_error!,
-                          style: const TextStyle(
-                              color: Colors.redAccent, fontSize: 13)),
-                    ],
-                    const SizedBox(height: 14),
-                    ConsoleFocusable(
-                      focusNode: _saveFocus,
-                      onSelect: _busy ? null : _save,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: AppTheme.primaryColor, width: 2),
-                        ),
-                        child: _busy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppTheme.primaryColor,
-                                ),
-                              )
-                            : Text(
-                                L.of(context).sourceMappings_save,
-                                style: const TextStyle(
-                                  color: AppTheme.primaryColor,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                      ),
-                    ),
                   ],
                 ),
               ),
-            ),
+              // Scrollable Content
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 640),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          Text(
+                            '${widget.source.name} · ${widget.source.hostLabel}',
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            L.of(context).sourceMappings_instruction,
+                            style: TextStyle(
+                                color: Colors.grey.shade500, fontSize: 12),
+                          ),
+                          const SizedBox(height: 16),
+                          Expanded(
+                            child: _rows.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'No systems configured yet — add one '
+                                      'from the home screen first.',
+                                      style: TextStyle(
+                                          color: Colors.white54, fontSize: 13),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  )
+                                : ListView.separated(
+                                    controller: _scroll,
+                                    itemCount: _rows.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: 10),
+                                    itemBuilder: (_, i) => _MappingRowWidget(
+                                      row: _rows[i],
+                                    ),
+                                  ),
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 8),
+                            Text(_error!,
+                                style: const TextStyle(
+                                    color: Colors.redAccent, fontSize: 13)),
+                          ],
+                          const SizedBox(height: 14),
+                          ConsoleFocusable(
+                            focusNode: _saveFocus,
+                            onSelect: _busy ? null : _save,
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: AppTheme.primaryColor
+                                    .withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: AppTheme.primaryColor, width: 2),
+                              ),
+                              child: _busy
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    )
+                                  : Text(
+                                      L.of(context).sourceMappings_save,
+                                      style: const TextStyle(
+                                        color: AppTheme.primaryColor,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 40),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
