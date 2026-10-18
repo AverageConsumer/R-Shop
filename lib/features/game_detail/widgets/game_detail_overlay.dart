@@ -416,7 +416,6 @@ class _GenreChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: accentColor.withValues(alpha: 0.35),
-          width: 1,
         ),
       ),
       child: Text(
@@ -445,7 +444,7 @@ class _TagChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
       child: Text(
         tag.raw,

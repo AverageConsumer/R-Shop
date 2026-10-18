@@ -36,14 +36,13 @@ class ConsoleGrid extends ConsumerWidget {
           final systemConfig = state.configuredSystems[system.id];
           final isConfigured = systemConfig != null;
           final isLocalOnly = systemConfig != null && systemConfig.providers.isEmpty;
-          final hasRommMatch = false;
           final hasLocalMatch = isLocalOnly;
 
           return _ConsoleTile(
             system: system,
             isConfigured: isConfigured,
             isLocalOnly: isLocalOnly,
-            hasRommMatch: hasRommMatch,
+            hasRommMatch: false,
             hasLocalMatch: hasLocalMatch,
             onTap: () => controller.selectConsole(system.id),
             autofocus: index == 0,
@@ -67,7 +66,7 @@ class _ConsoleTile extends StatefulWidget {
     required this.system,
     required this.isConfigured,
     this.isLocalOnly = false,
-    this.hasRommMatch = false,
+    required this.hasRommMatch,
     this.hasLocalMatch = false,
     required this.onTap,
     this.autofocus = false,

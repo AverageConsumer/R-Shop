@@ -423,7 +423,7 @@ class _ShelfEditScreenState extends ConsumerState<ShelfEditScreen>
                       } else {
                         // Remove only truly-manual IDs from manualGameIds
                         final toRemove = _trulyManualGameIds.toSet();
-                        _manualGameIds.removeWhere((id) => toRemove.contains(id));
+                        _manualGameIds.removeWhere(toRemove.contains);
                       }
                       _showGameListOverlay = false;
                     });

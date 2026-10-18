@@ -270,18 +270,15 @@ void main() {
           RaAchievement(
               id: 1,
               title: 'A',
-              points: 5,
-              dateEarned: null),
+              points: 5),
           RaAchievement(
               id: 2,
               title: 'B',
-              points: 10,
-              dateEarned: null),
+              points: 10),
           RaAchievement(
               id: 3,
               title: 'C',
-              points: 15,
-              dateEarned: null),
+              points: 15),
         ],
       );
       expect(progress.earnedCount, 0);
@@ -301,7 +298,7 @@ void main() {
             id: 1,
             title: 'A',
             points: 10,
-            dateEarned: DateTime(2024, 1, 1),
+            dateEarned: DateTime(2024),
           ),
           const RaAchievement(id: 2, title: 'B', points: 20),
         ],
@@ -322,7 +319,7 @@ void main() {
             id: 1,
             title: 'A',
             points: 5,
-            dateEarned: DateTime(2024, 1, 1),
+            dateEarned: DateTime(2024),
           ),
         ],
       );
@@ -334,7 +331,6 @@ void main() {
       const progress = RaGameProgress(
         raGameId: 1,
         title: 'Test',
-        numAchievements: 0,
       );
       expect(progress.completionPercent, 0.0);
       expect(progress.isCompleted, false);

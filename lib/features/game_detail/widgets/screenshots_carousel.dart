@@ -28,7 +28,7 @@ class _ScreenshotsCarouselState extends State<ScreenshotsCarousel> {
   final Map<int, GlobalKey> _itemKeys = {};
 
   GlobalKey _keyFor(int index) =>
-      _itemKeys.putIfAbsent(index, () => GlobalKey());
+      _itemKeys.putIfAbsent(index, GlobalKey.new);
 
   @override
   void didUpdateWidget(ScreenshotsCarousel oldWidget) {

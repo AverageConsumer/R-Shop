@@ -11,6 +11,9 @@ import 'package:path/path.dart' as p;
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
 import '../../core/util/source_color.dart';
+import '../../core/widgets/screen_layout.dart';
+import '../../core/widgets/skeleton.dart';
+import '../../widgets/state_views.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/config/app_config.dart';
 import '../../models/config/provider_config.dart';
@@ -351,7 +354,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
       switch (_selectedTab) {
         case 1: // Installed
           games = _deduplicateInstalled(
-            games.where((g) => _isGameInstalled(g)).toList(),
+            games.where(_isGameInstalled).toList(),
           );
         case 2: // Favorites
           games =
@@ -1043,7 +1046,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   int get _installedCount =>
       _deduplicateInstalled(
-        _allGames.where((g) => _isGameInstalled(g)).toList(),
+        _allGames.where(_isGameInstalled).toList(),
       ).length;
 
   int get _favoritesCount =>
@@ -1064,8 +1067,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) _handleBack();
         },
-        child: Scaffold(
+        child: ScreenLayout(
           backgroundColor: Colors.black,
+          accentColor: Colors.cyanAccent,
+          useSafeArea: false,
+          padding: EdgeInsets.zero,
           body: Stack(
             children: [
               // Grid content (behind header)
@@ -1184,7 +1190,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 LibraryTabs(
                   selectedTab: _selectedTab,
                   tabs: tabs,
-                  accentColor: Colors.cyanAccent,
                   onTap: _selectTab,
                 ),
               ],
@@ -1212,8 +1217,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   Widget _buildContent(Responsive rs) {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.cyanAccent),
+      final spacing = rs.isSmall ? 10.0 : 16.0;
+      return SkeletonGrid(
+        columns: _columns,
+        spacing: spacing,
+        padding: EdgeInsets.only(
+          left: rs.spacing.lg,
+          right: rs.spacing.lg,
+          top: rs.spacing.md,
+          bottom: rs.isPortrait ? 80 : 100,
+        ),
       );
     }
 
@@ -1237,26 +1250,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
         title = l.library_noGamesInLibrary;
         subtitle = _allGames.isEmpty ? l.library_gamesAfterSync : null;
       }
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.library_books_outlined,
-                size: 64, color: Colors.grey[700]),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: TextStyle(color: Colors.grey[500], fontSize: 16),
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
-              ),
-            ],
-          ],
-        ),
+      return EmptyStateView(
+        icon: Icons.library_books_outlined,
+        title: title,
+        subtitle: subtitle,
       );
     }
 
@@ -1285,7 +1282,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
           crossAxisCount: _columns,
           mainAxisSpacing: rs.isSmall ? 10 : 16,
           crossAxisSpacing: rs.isSmall ? 10 : 16,
-          childAspectRatio: 1.0,
         ),
         itemCount: _filteredGames.length,
         itemBuilder: (context, index) {

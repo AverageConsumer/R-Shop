@@ -56,6 +56,14 @@ class _GlobalInputWrapperState extends ConsumerState<GlobalInputWrapper> {
       NavigateIntent: NavigateAction(ref),
       AdjustColumnsIntent: AdjustColumnsAction(ref),
       MenuIntent: MenuAction(ref),
+      // The three below have no globally-meaningful behavior — they fire
+      // only when a screen wraps itself in ScreenActionsWrapper with a
+      // concrete onTabLeft / onTabRight / onFavorite callback. Without
+      // these registrations the matching shortcuts would bubble up
+      // unhandled and trigger nothing at all.
+      TabLeftIntent: TabLeftAction(ref),
+      TabRightIntent: TabRightAction(ref),
+      FavoriteIntent: FavoriteAction(ref),
     };
   }
 }

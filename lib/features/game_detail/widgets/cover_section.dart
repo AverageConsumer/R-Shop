@@ -58,14 +58,12 @@ class CoverSection extends StatelessWidget {
                         decoration: BoxDecoration(
                           border: Border.all(
                             color: Colors.white.withValues(alpha: 0.1),
-                            width: 1,
                           ),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: SmartCoverImage(
                           urls: coverUrls,
                           cachedUrl: cachedUrl,
-                          fit: BoxFit.contain,
                           hasThumbnail: hasThumbnail,
                         ),
                       ),

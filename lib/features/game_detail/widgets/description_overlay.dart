@@ -100,7 +100,6 @@ class DescriptionOverlay extends StatelessWidget {
                                         border: Border.all(
                                           color: accentColor
                                               .withValues(alpha: 0.35),
-                                          width: 1,
                                         ),
                                       ),
                                       child: Text(

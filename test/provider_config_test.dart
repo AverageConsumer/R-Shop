@@ -145,13 +145,13 @@ void main() {
   // ─── toJsonWithoutAuth ────────────────────────────────────────────
 
   group('ProviderConfig toJsonWithoutAuth', () {
-    final config = ProviderConfig(
+    const config = ProviderConfig(
       type: ProviderType.smb,
       priority: 1,
       host: '10.0.0.1',
       port: 445,
       share: 'games',
-      auth: const AuthConfig(user: 'me', pass: 'secret'),
+      auth: AuthConfig(user: 'me', pass: 'secret'),
     );
 
     test('strips auth from config with credentials', () {

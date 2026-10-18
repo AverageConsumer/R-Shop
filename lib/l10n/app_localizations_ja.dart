@@ -69,6 +69,9 @@ class LJa extends L {
   String get common_favorite => 'お気に入り';
 
   @override
+  String get common_share => '共有';
+
+  @override
   String get common_unfavorite => 'お気に入り解除';
 
   @override
@@ -249,6 +252,13 @@ class LJa extends L {
 
   @override
   String get gameDetail_noAchievementsFound => '実績が見つかりません';
+
+  @override
+  String get gameDetail_noMetadata => '追加情報なし';
+
+  @override
+  String get gameDetail_noMetadataHint =>
+      '説明とスクリーンショットは、RomMから自動的に読み込まれます（利用可能な場合）。';
 
   @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';
@@ -1087,7 +1097,7 @@ class LJa extends L {
   String get gameList_syncingLibrary => 'ライブラリを同期中…';
 
   @override
-  String get gameList_localFilesOnly => 'ローカルファイルのみ · プロバイダーを追加してダウンロード';
+  String get gameList_localFilesOnly => 'ローカル';
 
   @override
   String get gameList_pressMenuHint => ' + でメニュー';
@@ -1574,4 +1584,24 @@ class LJa extends L {
   String service_queuedCount(int count) {
     return '$count件キュー中';
   }
+
+  @override
+  String get sources_endpoints => '接続先アドレス';
+
+  @override
+  String get sources_primaryAddress => '優先アドレス';
+
+  @override
+  String get sources_alternativeAddresses => '代替アドレス';
+
+  @override
+  String get sources_endpointHint =>
+      '優先順に代替ベースURLを1行ずつ入力してください。同じサーバーとライブラリのアドレスを指定します。認証情報は共通です。同期時は優先アドレスから接続します。空欄で自動切り替えを無効にします。';
+
+  @override
+  String get sources_endpointInvalid =>
+      '認証情報、クエリ、フラグメントを含まない有効なHTTP(S)ベースURLを入力してください。';
+
+  @override
+  String get sources_endpointSaveFailed => '接続先を保存できませんでした。もう一度お試しください。';
 }

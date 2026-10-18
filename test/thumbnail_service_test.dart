@@ -243,10 +243,7 @@ void main() {
   // ─── Dispose safety ────────────────────────────────────
 
   group('Dispose safety', () {
-    test('dispose is safe to call when not initialized', () {
-      // Should not throw
-      ThumbnailService.dispose();
-    });
+    test('dispose is safe to call when not initialized', ThumbnailService.dispose);
 
     test('dispose completes pending with failed', () async {
       // Simulate: pending completers should resolve after dispose

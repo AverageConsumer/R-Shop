@@ -229,7 +229,7 @@ void main() {
       await insertGame('a.gba', 'gba', coverUrl: 'http://a');
       await insertGame('b.gba', 'gba', coverUrl: 'http://b');
 
-      await svc.preloadAll(dbService, phase1Pool: 6, phase2Pool: 4);
+      await svc.preloadAll(dbService);
 
       expect(svc.phase1Calls.length, 2);
     });
@@ -407,7 +407,7 @@ void main() {
 
       await insertGame('only.gba', 'gba', coverUrl: 'http://only');
 
-      await svc.preloadAll(dbService, phase1Pool: 6, phase2Pool: 4);
+      await svc.preloadAll(dbService);
 
       expect(svc.phase1Calls.length, 1);
       expect(svc.state.completed, 1);

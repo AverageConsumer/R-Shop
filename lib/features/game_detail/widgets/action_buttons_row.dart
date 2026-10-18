@@ -84,7 +84,7 @@ class ActionButtonsRow extends StatelessWidget {
 
     return switch (_mode) {
       _Mode.primary => _buildPrimary(rs),
-      _Mode.icons => _buildIcons(rs),
+      _Mode.icons => _buildIcons(context, rs),
     };
   }
 
@@ -115,9 +115,10 @@ class ActionButtonsRow extends StatelessWidget {
     );
   }
 
-  Widget _buildIcons(Responsive rs) {
+  Widget _buildIcons(BuildContext context, Responsive rs) {
     final shareEnabled = isShareEnabled ?? true;
     final collectionEnabled = isCollectionEnabled ?? true;
+    final l = L.of(context);
 
     return Row(
       children: [
@@ -127,6 +128,7 @@ class ActionButtonsRow extends StatelessWidget {
             icon: isFavorite!
                 ? Icons.favorite_rounded
                 : Icons.favorite_border_rounded,
+            label: isFavorite! ? l.common_unfavorite : l.common_favorite,
             color: isFavorite! ? Colors.redAccent : Colors.white54,
             isFocused: isSectionFocused && focusedButtonIndex == 0,
             accentColor: accentColor,
@@ -138,6 +140,7 @@ class ActionButtonsRow extends StatelessWidget {
         Expanded(
           child: _IconActionButton(
             icon: Icons.share_rounded,
+            label: l.common_share,
             color: shareEnabled ? Colors.white54 : Colors.white12,
             isFocused: shareEnabled && isSectionFocused && focusedButtonIndex == 1,
             accentColor: accentColor,
@@ -150,6 +153,7 @@ class ActionButtonsRow extends StatelessWidget {
         Expanded(
           child: _IconActionButton(
             icon: Icons.shelves,
+            label: l.gameDetail_addToShelf,
             color: collectionEnabled ? Colors.white54 : Colors.white12,
             isFocused: collectionEnabled && isSectionFocused && focusedButtonIndex == 2,
             accentColor: accentColor,
@@ -384,6 +388,7 @@ class _PrimaryActionButton extends StatelessWidget {
 
 class _IconActionButton extends StatelessWidget {
   final IconData icon;
+  final String label;
   final Color color;
   final bool isFocused;
   final Color accentColor;
@@ -392,6 +397,7 @@ class _IconActionButton extends StatelessWidget {
 
   const _IconActionButton({
     required this.icon,
+    required this.label,
     required this.color,
     required this.isFocused,
     required this.accentColor,
@@ -413,30 +419,48 @@ class _IconActionButton extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: EdgeInsets.symmetric(
-            horizontal: rs.isSmall ? 10 : 14,
+            horizontal: rs.isSmall ? 8 : 12,
             vertical: rs.isSmall ? 8 : 10,
           ),
           decoration: BoxDecoration(
             color: effectiveFocused
-                ? accentColor.withValues(alpha: 0.15)
+                ? accentColor.withValues(alpha: 0.18)
                 : Colors.white.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(rs.radius.md),
             border: Border.all(
               color: effectiveFocused
-                  ? Colors.white.withValues(alpha: 0.7)
+                  ? accentColor.withValues(alpha: 0.85)
                   : Colors.white.withValues(alpha: 0.1),
-              width: 1,
+              width: effectiveFocused ? 2 : 1,
             ),
             boxShadow: effectiveFocused
                 ? [
                     BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      blurRadius: 8,
+                      color: accentColor.withValues(alpha: 0.35),
+                      blurRadius: 12,
+                      spreadRadius: 1,
                     ),
                   ]
                 : null,
           ),
-          child: Icon(icon, color: color, size: rs.isSmall ? 18 : 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: rs.isSmall ? 22 : 26),
+              SizedBox(height: rs.isSmall ? 4 : 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: rs.isSmall ? 9 : 11,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.4,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ],
+          ),
         ),
       ),
     );

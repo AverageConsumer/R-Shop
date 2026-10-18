@@ -3,6 +3,8 @@ import 'dart:io';
 
 import '../models/config/app_config.dart';
 import '../models/config/provider_config.dart';
+import '../models/config/source.dart';
+import 'http_endpoint_failover.dart';
 
 class ConfigParseException implements Exception {
   final String message;
@@ -45,6 +47,13 @@ class ConfigParser {
 
   static void _validate(AppConfig config) {
     final seenIds = <String>{};
+    for (final source in config.sources) {
+      if (source.fallbackUrls.isEmpty) continue;
+      if (source.type != SourceType.romm && source.type != SourceType.web) {
+        throw const ConfigParseException('Alternative URLs require RomM or Web');
+      }
+      _validateRoutes(source.url, source.fallbackUrls);
+    }
 
     for (final system in config.systems) {
       if (system.id.isEmpty) {
@@ -72,6 +81,12 @@ class ConfigParser {
   }
 
   static void _validateProvider(ProviderConfig provider, String systemId) {
+    if (provider.fallbackUrls.isNotEmpty) {
+      if (provider.type != ProviderType.romm && provider.type != ProviderType.web) {
+        throw const ConfigParseException('Alternative URLs require RomM or Web');
+      }
+      _validateRoutes(provider.url, provider.fallbackUrls);
+    }
     switch (provider.type) {
       case ProviderType.web:
         if (provider.url == null || provider.url!.isEmpty) {
@@ -101,6 +116,14 @@ class ConfigParser {
           throw ConfigParseException(
               'ROMM provider for "$systemId" requires a platformId');
         }
+    }
+  }
+
+  static void _validateRoutes(String? primary, List<String> urls) {
+    try {
+      HttpEndpointRoutes(primary ?? '', urls);
+    } on FormatException catch (e) {
+      throw ConfigParseException(e.message);
     }
   }
 }

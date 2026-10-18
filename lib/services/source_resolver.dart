@@ -126,6 +126,7 @@ class SourceResolver {
           type: ProviderType.romm,
           priority: entry.effectivePriority,
           url: source.url,
+          fallbackUrls: source.fallbackUrls,
           auth: source.auth,
           platformId: source.rommPlatformIdFor(system.id),
           platformName: system.id,
@@ -163,6 +164,8 @@ class SourceResolver {
           type: ProviderType.web,
           priority: entry.effectivePriority,
           url: joined,
+          fallbackUrls: source.fallbackUrls
+              .map((base) => _joinUrl(base, segment)).toList(),
           auth: source.auth,
           managedBySource: true,
           sourceId: source.id,

@@ -69,6 +69,9 @@ class LDe extends L {
   String get common_favorite => 'Favorit';
 
   @override
+  String get common_share => 'Teilen';
+
+  @override
   String get common_unfavorite => 'Entfernen';
 
   @override
@@ -251,6 +254,13 @@ class LDe extends L {
 
   @override
   String get gameDetail_noAchievementsFound => 'Keine Achievements gefunden';
+
+  @override
+  String get gameDetail_noMetadata => 'Keine zusätzlichen Infos';
+
+  @override
+  String get gameDetail_noMetadataHint =>
+      'Beschreibungen und Screenshots werden automatisch aus RomM geladen, wenn verfügbar.';
 
   @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';
@@ -1110,8 +1120,7 @@ class LDe extends L {
   String get gameList_syncingLibrary => 'Bibliothek wird synchronisiert…';
 
   @override
-  String get gameList_localFilesOnly =>
-      'Nur lokale Dateien · Füge eine Quelle hinzu für Downloads';
+  String get gameList_localFilesOnly => 'Lokal';
 
   @override
   String get gameList_pressMenuHint => 'Drücke  +  für Menü';
@@ -1622,4 +1631,25 @@ class LDe extends L {
   String service_queuedCount(int count) {
     return '$count in Warteschlange';
   }
+
+  @override
+  String get sources_endpoints => 'Verbindungsadressen';
+
+  @override
+  String get sources_primaryAddress => 'Primäre Adresse';
+
+  @override
+  String get sources_alternativeAddresses => 'Alternative Adressen';
+
+  @override
+  String get sources_endpointHint =>
+      'Eine alternative Basis-URL pro Zeile, nach Priorität. Verwende Adressen desselben Servers und derselben Bibliothek; die Anmeldung bleibt gleich. Bei jedem Sync wird zuerst die primäre Adresse versucht. Leer lassen, um Failover auszuschalten.';
+
+  @override
+  String get sources_endpointInvalid =>
+      'Gültige HTTP(S)-Basis-URLs ohne eingebettete Zugangsdaten, Abfrageparameter oder Fragmente eingeben.';
+
+  @override
+  String get sources_endpointSaveFailed =>
+      'Verbindungsadressen konnten nicht gespeichert werden. Bitte erneut versuchen.';
 }

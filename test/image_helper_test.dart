@@ -46,7 +46,7 @@ void main() {
 
     test('filename with region does not add fallbacks', () {
       final urls = ImageHelper.getCoverUrls(_nes, ['Mario (USA).zip']);
-      final naiveName = 'Mario';
+      const naiveName = 'Mario';
       expect(
           urls.any(
               (u) => u.contains(Uri.encodeComponent('$naiveName (Europe)'))),

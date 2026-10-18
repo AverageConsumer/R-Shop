@@ -23,6 +23,7 @@
   "common_retry": "Tentar de novo",
   "common_remove": "Remover",
   "common_favorite": "Favoritar",
+  "common_share": "Compartilhar",
   "common_unfavorite": "Desfavoritar",
   "common_downloads": "Downloads",
   "common_installed": "INSTALADO",
@@ -84,6 +85,8 @@
   "gameDetail_achievements": "Conquistas",
   "gameDetail_mastered": "DOMINADO",
   "gameDetail_noAchievementsFound": "Nenhuma conquista encontrada",
+  "gameDetail_noMetadata": "Sem informações adicionais",
+  "gameDetail_noMetadataHint": "Descrições e capturas são carregadas automaticamente do RomM quando disponíveis.",
   "gameDetail_retroachievements": "RETROACHIEVEMENTS",
   "gameDetail_romVerified": "ROM Verificada",
   "gameDetail_incompatibleRom": "ROM Incompat\u00edvel",
@@ -365,7 +368,7 @@
   "gameList_errorLoadingGames": "Erro ao carregar jogos",
   "gameList_gamesAppearShortly": "Os jogos v\u00e3o aparecer em breve",
   "gameList_syncingLibrary": "Sincronizando biblioteca\u2026",
-  "gameList_localFilesOnly": "S\u00f3 arquivos locais \u00B7 Adicione um provedor pra baixar mais",
+  "gameList_localFilesOnly": "Local",
   "gameList_pressMenuHint": "Aperte  +  pro menu",
 
   "filter_activeCount": "{count} ativos",
@@ -526,5 +529,11 @@
   "service_downloadComplete": "Downloads conclu\u00eddos",
   "service_downloading": "Baixando: {details}",
   "service_activeCount": "{count} ativos",
-  "service_queuedCount": "{count} na fila"
+  "service_queuedCount": "{count} na fila",
+  "sources_endpoints": "Endereços de conexão",
+  "sources_primaryAddress": "Endereço principal",
+  "sources_alternativeAddresses": "Endereços alternativos",
+  "sources_endpointHint": "Insira uma URL base alternativa por linha, em ordem de prioridade. Use endereços do mesmo servidor e biblioteca, com as mesmas credenciais. Cada sincronização tenta primeiro o endereço principal. Deixe vazio para desativar a alternância.",
+  "sources_endpointInvalid": "Insira URLs base HTTP(S) válidas sem credenciais, parâmetros ou fragmentos.",
+  "sources_endpointSaveFailed": "Não foi possível salvar os endereços. Tente novamente."
 }

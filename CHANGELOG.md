@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.8.0] — 2026-10-18
+
+### Added
+- Per-source LAN/WAN failover for RomM and Web: configure alternative addresses under My Sources → Connection addresses. Independent sources continue to merge with their existing priorities.
+- Xbox and Xbox 360 support with platform icons, RomM matching, and folder aliases (adapted from PR #16).
+- Neo Geo MVS as a separate system from generic Arcade, as requested in issue #10.
+- Traditional Chinese (Taiwan) localization, adapted from PR #15 to the current UI.
+
+### Improved
+- Refreshed console accents, loading and empty states, game details, and controller focus behavior.
+- Settings remember the active tab when reopened.
+
+### Fixed
+- Console settings now commit changes on Back and preserve source mappings and enabled-source selections (#14). Android system Back follows the same save flow and a failed save keeps the editor open.
+- Newly added consoles leave ZIP auto-extraction off; existing user settings are preserved (#10).
+- Configuration export uses the system file-save dialog instead of the share sheet (#14); exported credentials remain stripped.
+
+---
+
 ## [1.6.0] — 2026-04-12
 
 ### Added

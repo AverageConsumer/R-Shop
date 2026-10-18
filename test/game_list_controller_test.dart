@@ -189,7 +189,7 @@ void main() {
     test('copyWith error: null clears error', () {
       const state = GameListState(error: 'something broke');
       // copyWith uses `error: error` (no ??), so passing null explicitly clears
-      final cleared = state.copyWith(error: null);
+      final cleared = state.copyWith();
       expect(cleared.error, isNull);
     });
   });
@@ -678,7 +678,6 @@ void main() {
         systemConfig: _config(),
         unifiedService: service,
         databaseService: db,
-        storage: null,
       );
       await Future.delayed(Duration.zero);
       await Future.delayed(Duration.zero);

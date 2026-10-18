@@ -22,7 +22,6 @@ class RegionBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.15),
-          width: 1,
         ),
       ),
       child: Row(
@@ -169,7 +168,6 @@ class _TagBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(compact ? 4 : 6),
         border: Border.all(
           color: color.withValues(alpha: 0.4),
-          width: 1,
         ),
       ),
       child: Text(
@@ -201,7 +199,6 @@ class FileTypeBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.12),
-          width: 1,
         ),
       ),
       child: Text(
@@ -238,7 +235,6 @@ class InstalledBadge extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(
           color: Colors.greenAccent.withValues(alpha: 0.5),
-          width: 1,
         ),
       ),
       child: Icon(

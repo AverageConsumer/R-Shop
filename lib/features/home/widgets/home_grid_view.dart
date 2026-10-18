@@ -52,7 +52,6 @@ class HomeGridView extends ConsumerWidget {
           ),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
-            childAspectRatio: 1.0,
             crossAxisSpacing: spacing,
             mainAxisSpacing: spacing,
           ),
@@ -117,20 +116,20 @@ class HomeGridView extends ConsumerWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(borderRadius),
             border: isSelected
-                ? Border.all(color: Colors.white, width: borderSelected)
+                ? Border.all(color: accentColor, width: borderSelected)
                 : Border.all(
-                    color: Colors.white.withValues(alpha: 0.08), width: 1),
+                    color: Colors.white.withValues(alpha: 0.08)),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      spreadRadius: 2,
+                      color: accentColor.withValues(alpha: 0.55),
+                      blurRadius: 24,
+                      spreadRadius: 1,
                     ),
                     BoxShadow(
-                      color: accentColor.withValues(alpha: 0.3),
-                      blurRadius: 30,
-                      spreadRadius: 5,
+                      color: accentColor.withValues(alpha: 0.25),
+                      blurRadius: 40,
+                      spreadRadius: 4,
                     ),
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.7),
@@ -298,20 +297,20 @@ class HomeGridView extends ConsumerWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(borderRadius),
             border: isSelected
-                ? Border.all(color: Colors.white, width: borderSelected)
+                ? Border.all(color: accentColor, width: borderSelected)
                 : Border.all(
-                    color: Colors.white.withValues(alpha: 0.08), width: 1),
+                    color: Colors.white.withValues(alpha: 0.08)),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      spreadRadius: 2,
+                      color: accentColor.withValues(alpha: 0.55),
+                      blurRadius: 24,
+                      spreadRadius: 1,
                     ),
                     BoxShadow(
-                      color: accentColor.withValues(alpha: 0.3),
-                      blurRadius: 30,
-                      spreadRadius: 5,
+                      color: accentColor.withValues(alpha: 0.25),
+                      blurRadius: 40,
+                      spreadRadius: 4,
                     ),
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.7),
@@ -333,11 +332,10 @@ class HomeGridView extends ConsumerWidget {
               fit: StackFit.expand,
               children: [
                 Container(
-                  color: const Color(0xFF151515),
+                  color: const Color(0xFF151515).withValues(alpha: 0.62),
                   padding: EdgeInsets.all(rs.isSmall ? 20.0 : 28.0),
                   child: SvgPicture.asset(
                     system.iconAssetPath,
-                    fit: BoxFit.contain,
                     colorFilter: ColorFilter.mode(system.iconColor, BlendMode.srcIn),
                     placeholderBuilder: (_) => Icon(
                       Icons.gamepad,
@@ -397,8 +395,10 @@ class HomeGridView extends ConsumerWidget {
                         Text(
                           '${system.manufacturer} \u00B7 ${system.releaseYear}',
                           style: TextStyle(
-                            fontSize: rs.isSmall ? 8.0 : 10.0,
-                            color: Colors.grey[400],
+                            fontSize: rs.isSmall ? 9.0 : 11.0,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.55),
+                            letterSpacing: 0.4,
                           ),
                         ),
                       ],

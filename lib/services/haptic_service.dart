@@ -27,9 +27,7 @@ class HapticService {
   void success() {
     if (!_enabled) return;
     HapticFeedback.mediumImpact();
-    Future.delayed(const Duration(milliseconds: 80), () {
-      HapticFeedback.lightImpact();
-    });
+    Future.delayed(const Duration(milliseconds: 80), HapticFeedback.lightImpact);
   }
 
   void warning() {

@@ -116,7 +116,6 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     state = LibrarySyncState(
       isSyncing: true,
       totalSystems: config.systems.length,
-      completedSystems: 0,
       isUserTriggered: true,
     );
 
@@ -199,7 +198,6 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
 
     state = state.copyWith(
       isSyncing: false,
-      currentSystem: null,
       failedSystems: failures,
       gamesPerSystem: Map.of(perSystem),
       totalGamesFound: totalGames,
@@ -247,7 +245,6 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     state = LibrarySyncState(
       isSyncing: true,
       totalSystems: systemsToSync.length,
-      completedSystems: 0,
     );
 
     final db = DatabaseService();
@@ -325,7 +322,6 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
 
     state = state.copyWith(
       isSyncing: false,
-      currentSystem: null,
       failedSystems: failures,
       gamesPerSystem: Map.of(perSystem),
       totalGamesFound: totalGames,
@@ -348,7 +344,6 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     state = LibrarySyncState(
       isSyncing: true,
       totalSystems: config.systems.length,
-      completedSystems: 0,
       isUserTriggered: true,
     );
 
@@ -433,7 +428,6 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     // Keep final summary visible (don't reset like syncAll does)
     state = state.copyWith(
       isSyncing: false,
-      currentSystem: null,
       failedSystems: failures,
     );
 
@@ -478,7 +472,6 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     state = LibrarySyncState(
       isSyncing: true,
       totalSystems: 1,
-      completedSystems: 0,
       currentSystem: _displayName(systemId, systemConfig),
       isUserTriggered: true,
     );
@@ -495,7 +488,6 @@ class LibrarySyncService extends StateNotifier<LibrarySyncState> {
     _isQueueActive = false;
     state = state.copyWith(
       isSyncing: false,
-      currentSystem: null,
     );
     _syncCompleter?.complete();
     _syncCompleter = null;

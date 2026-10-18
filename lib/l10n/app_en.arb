@@ -23,6 +23,7 @@
   "common_retry": "Retry",
   "common_remove": "Remove",
   "common_favorite": "Favorite",
+  "common_share": "Share",
   "common_unfavorite": "Unfavorite",
   "common_downloads": "Downloads",
   "common_installed": "INSTALLED",
@@ -94,6 +95,8 @@
   "gameDetail_achievements": "Achievements",
   "gameDetail_mastered": "MASTERED",
   "gameDetail_noAchievementsFound": "No achievements found",
+  "gameDetail_noMetadata": "No additional info yet",
+  "gameDetail_noMetadataHint": "Descriptions and screenshots load automatically from RomM when available.",
   "gameDetail_retroachievements": "RETROACHIEVEMENTS",
   "gameDetail_romVerified": "ROM Verified",
   "gameDetail_incompatibleRom": "Incompatible ROM",
@@ -390,7 +393,7 @@
   "gameList_errorLoadingGames": "Error loading games",
   "gameList_gamesAppearShortly": "Games will appear shortly",
   "gameList_syncingLibrary": "Syncing library\u2026",
-  "gameList_localFilesOnly": "Local files only \u00B7 Add a provider to download more",
+  "gameList_localFilesOnly": "Local",
   "gameList_pressMenuHint": "Press  +  for menu",
 
   "filter_activeCount": "{count} active",
@@ -564,5 +567,11 @@
   "service_activeCount": "{count} active",
   "@service_activeCount": { "placeholders": { "count": { "type": "int" } } },
   "service_queuedCount": "{count} queued",
-  "@service_queuedCount": { "placeholders": { "count": { "type": "int" } } }
+  "@service_queuedCount": { "placeholders": { "count": { "type": "int" } } },
+  "sources_endpoints": "Connection addresses",
+  "sources_primaryAddress": "Primary address",
+  "sources_alternativeAddresses": "Alternative addresses",
+  "sources_endpointHint": "Enter one alternative base URL per line, in priority order. Use addresses of the same server and library; the same login is used. The primary address is tried first on each sync. Leave empty to disable failover.",
+  "sources_endpointInvalid": "Enter valid HTTP(S) base URLs without embedded login details, query parameters or fragments.",
+  "sources_endpointSaveFailed": "Could not save connection addresses. Please try again."
 }

@@ -183,7 +183,7 @@ class ImageHelper {
   /// "(USA)" → "(USA, Europe)", "(Europe)" → "(USA, Europe)".
   /// Returns null if not applicable.
   static String? _getExtendedRegionName(String filename) {
-    var name = _removeExtension(filename);
+    final name = _removeExtension(filename);
     final match = RegExp(r'\(([^)]*)\)').firstMatch(name);
     if (match == null) return null;
     final content = match.group(1)!;
@@ -206,7 +206,7 @@ class ImageHelper {
   /// strips all other parens and brackets.
   /// Normalizes comma spacing: "(USA,Europe)" → "(USA, Europe)".
   static String _getRegionCleanName(String filename) {
-    var name = _removeExtension(filename);
+    final name = _removeExtension(filename);
     final match = RegExp(r'\(([^)]*)\)').firstMatch(name);
     if (match == null) return '';
     final baseName = name.substring(0, match.start).trim();
@@ -218,7 +218,7 @@ class ImageHelper {
 
   /// For multi-region tags like "(USA,Europe)", extracts just the first region "(USA)".
   static String _getPrimaryRegionName(String filename) {
-    var name = _removeExtension(filename);
+    final name = _removeExtension(filename);
     final match = RegExp(r'\(([^)]*)\)').firstMatch(name);
     if (match == null) return '';
     final content = match.group(1)!;

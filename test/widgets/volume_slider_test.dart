@@ -64,7 +64,7 @@ void main() {
 
     testWidgets('isSelected=false has no bars with boxShadow', (tester) async {
       await tester.pumpWidget(createTestApp(
-        const VolumeSlider(volume: 1.0, isSelected: false),
+        const VolumeSlider(volume: 1.0),
       ));
 
       final containers = tester.widgetList<AnimatedContainer>(
@@ -126,7 +126,7 @@ void main() {
       await tester.pumpWidget(createTestApp(
         VolumeSlider(
           volume: 0.5,
-          onChanged: (v) => receivedVolumes.add(v),
+          onChanged: receivedVolumes.add,
         ),
       ));
 

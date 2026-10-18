@@ -89,7 +89,7 @@ On success, R-Shop will sync achievement data for supported systems in the backg
 
 A summary of your configured consoles. Press Select to export your configuration as a JSON backup file, then press A to enter the app.
 
-**You can always reconfigure consoles and providers later from Settings.**
+**You can always reconfigure consoles and providers later from Settings.** Changes to a console are saved when you go back, including with the Android Back button. Config export opens a file-save dialog.
 
 ---
 
@@ -374,6 +374,16 @@ Each console can have multiple providers with a priority order (lower number = t
 
 ---
 
+### LAN/WAN failover for RomM and Web
+
+Open **Settings → My Sources**, select a RomM or Web source, then choose **Connection addresses**. Keep the primary address as your preferred LAN URL and enter one alternative base URL per line, in priority order. Include any reverse-proxy base path (for example, `https://games.example.com/romm`). Clear the alternatives to disable failover.
+
+All addresses must reach the **same server and library**, using the source's existing login. For RomM, this also means identical platform and ROM IDs. Alternative addresses are connection routes within a source; other enabled sources keep contributing games and duplicate download alternatives with their existing priorities, mappings, and allow-lists. SMB, FTP, and local sources are unchanged.
+
+Each sync and startup health check starts with the primary address. Network failures and HTTP 5xx responses try the alternatives in order. A working address is reused for later pages in that sync. Authentication failures (401/403), missing resources (404), rate limits (429), cancellation, and certificate errors do not trigger an address switch. RomM login HTML returned instead of API JSON is rejected. Freshly fetched RomM cover and screenshot URLs follow the working address; existing cached image URLs refresh on the next sync.
+
+Downloads also try the primary address first, followed by the alternatives. When a transfer changes address, it restarts from zero to avoid combining unverified partial files. Source identity, Android app ID, and the database schema stay unchanged. Existing configurations have no alternatives and retain their previous behavior.
+
 ## Downloads
 
 R-Shop uses a queue system for managing file downloads.
@@ -398,7 +408,7 @@ The download queue survives app restarts. Active downloads resume from the queue
 
 ### Archive Extraction
 
-ZIP files are extracted automatically when the system has auto-extract enabled. Multi-file games (e.g. PlayStation .bin/.cue pairs) are extracted into subfolders, preserving the file structure.
+Auto-extract is off by default for newly added systems. Existing settings are preserved. Enable it per system in Console Settings when you want ZIP files extracted after download. Multi-file games (e.g. PlayStation .bin/.cue pairs) are extracted into subfolders, preserving the file structure.
 
 Multi-file games (bin/cue pairs) can also be downloaded as complete folders directly via SMB and FTP providers, without needing archives.
 

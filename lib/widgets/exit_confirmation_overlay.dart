@@ -150,7 +150,6 @@ class _ExitConfirmationOverlayState
         child: GlassOverlay(
           blur: 15,
           opacity: 0.7,
-          tint: Colors.black,
           child: Stack(
             children: [
               Center(

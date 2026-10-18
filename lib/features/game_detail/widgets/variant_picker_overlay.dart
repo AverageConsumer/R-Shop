@@ -79,7 +79,7 @@ class _VariantPickerOverlayState extends ConsumerState<VariantPickerOverlay>
 
   void _ensureKeys() {
     for (int i = 0; i < widget.variants.length; i++) {
-      _cardKeys.putIfAbsent(i, () => GlobalKey());
+      _cardKeys.putIfAbsent(i, GlobalKey.new);
     }
   }
 

@@ -34,7 +34,6 @@ class DetailsSection extends StatelessWidget {
             borderRadius: BorderRadius.circular(rs.radius.md),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.1),
-              width: 1,
             ),
           ),
           child: TagBadges(

@@ -10,6 +10,8 @@ class ScreenLayout extends StatelessWidget {
   final bool useSafeArea;
   final EdgeInsetsGeometry? padding;
   final Widget? floatingActionButton;
+  final double glowIntensity;
+  final bool secondaryGlow;
 
   const ScreenLayout({
     super.key,
@@ -19,6 +21,8 @@ class ScreenLayout extends StatelessWidget {
     this.useSafeArea = true,
     this.padding,
     this.floatingActionButton,
+    this.glowIntensity = 1.0,
+    this.secondaryGlow = false,
   });
 
   @override
@@ -28,7 +32,14 @@ class ScreenLayout extends StatelessWidget {
       body: Stack(
         children: [
           AnimatedBackground(accentColor: accentColor),
-          RadialGlow(color: accentColor),
+          RadialGlow(color: accentColor, intensity: glowIntensity),
+          if (secondaryGlow)
+            RadialGlow(
+              color: accentColor,
+              intensity: glowIntensity * 0.7,
+              center: const Alignment(0.0, 0.6),
+              radius: 0.9,
+            ),
           if (useSafeArea)
             SafeArea(
               child: Padding(

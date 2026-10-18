@@ -20,7 +20,6 @@ class _StubSourcesNotifier extends SourcesNotifier {
         )) {
     state = SourcesState(
       sources: List<Source>.unmodifiable(seed),
-      loading: false,
     );
   }
 }
@@ -136,7 +135,7 @@ void main() {
       final soon = DateTime.now().add(const Duration(days: 5));
       await tester.pumpWidget(_wrap(
         storage,
-        SourcesScreen(),
+        const SourcesScreen(),
         seed: [
           Source(
             id: 'soon',

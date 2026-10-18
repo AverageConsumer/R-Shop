@@ -118,7 +118,7 @@ class RomFolderService {
       await for (final entity in dir.list()) {
         if (entity is File) {
           final lower = entity.path.toLowerCase();
-          if (_allRomExtensions.any((ext) => lower.endsWith(ext))) {
+          if (_allRomExtensions.any(lower.endsWith)) {
             count++;
           }
         } else if (entity is Directory && depth < _maxScanDepth) {

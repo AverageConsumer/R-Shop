@@ -40,7 +40,6 @@ class RaInfoSection extends ConsumerWidget {
         borderRadius: BorderRadius.circular(rs.radius.md),
         border: Border.all(
           color: _borderColor.withValues(alpha: 0.3),
-          width: 1,
         ),
       ),
       child: Column(

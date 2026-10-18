@@ -41,10 +41,8 @@ Source buildSourceFromPairResult(
     ),
     autoMap: true,
     priority: priority,
-    enabled: true,
     borrowed: guessedBorrowed,
     tokenExpiresAt: result.expiresAt,
-    knownPlatforms: const {},
   );
 }
 
@@ -88,8 +86,6 @@ Source buildLegacyRommSource({
     ),
     autoMap: true,
     priority: priority,
-    enabled: true,
-    borrowed: false,
     knownPlatforms: knownPlatforms,
   );
 }

@@ -437,13 +437,13 @@ void main() {
 
     test('does not mark read+write tokens as borrowed', () {
       final src = buildSourceFromPairResult(
-          result(scopes: const ['roms.read', 'roms.write']));
+          result());
       expect(src.borrowed, isFalse);
     });
 
     test('explicit borrowed flag overrides the heuristic', () {
       final src = buildSourceFromPairResult(
-        result(scopes: const ['roms.read', 'roms.write']),
+        result(),
         borrowed: true,
       );
       expect(src.borrowed, isTrue);

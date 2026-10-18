@@ -48,7 +48,6 @@ class FtpProvider implements SourceProvider {
       port: config.port ?? 21,
       user: config.auth?.user ?? 'anonymous',
       pass: config.auth?.pass ?? '',
-      timeout: 30,
     );
   }
 

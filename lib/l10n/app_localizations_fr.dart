@@ -69,6 +69,9 @@ class LFr extends L {
   String get common_favorite => 'Favori';
 
   @override
+  String get common_share => 'Partager';
+
+  @override
   String get common_unfavorite => 'Retirer favori';
 
   @override
@@ -250,6 +253,13 @@ class LFr extends L {
 
   @override
   String get gameDetail_noAchievementsFound => 'Aucun succès trouvé';
+
+  @override
+  String get gameDetail_noMetadata => 'Aucune info supplémentaire';
+
+  @override
+  String get gameDetail_noMetadataHint =>
+      'Les descriptions et captures sont chargées automatiquement depuis RomM lorsqu\'elles sont disponibles.';
 
   @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';
@@ -1110,8 +1120,7 @@ class LFr extends L {
   String get gameList_syncingLibrary => 'Synchronisation en cours…';
 
   @override
-  String get gameList_localFilesOnly =>
-      'Fichiers locaux uniquement · Ajoute une source pour plus';
+  String get gameList_localFilesOnly => 'Local';
 
   @override
   String get gameList_pressMenuHint => 'Appuie sur  +  pour le menu';
@@ -1623,4 +1632,25 @@ class LFr extends L {
   String service_queuedCount(int count) {
     return '$count en attente';
   }
+
+  @override
+  String get sources_endpoints => 'Adresses de connexion';
+
+  @override
+  String get sources_primaryAddress => 'Adresse principale';
+
+  @override
+  String get sources_alternativeAddresses => 'Adresses alternatives';
+
+  @override
+  String get sources_endpointHint =>
+      'Saisissez une URL de base alternative par ligne, par priorité. Utilisez le même serveur et la même bibliothèque avec les mêmes identifiants. Chaque synchronisation essaie d’abord l’adresse principale. Laissez vide pour désactiver le basculement.';
+
+  @override
+  String get sources_endpointInvalid =>
+      'Saisissez des URL HTTP(S) valides sans identifiants, paramètres ni fragments.';
+
+  @override
+  String get sources_endpointSaveFailed =>
+      'Impossible d’enregistrer les adresses. Réessayez.';
 }

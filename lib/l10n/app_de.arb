@@ -23,6 +23,7 @@
   "common_retry": "Erneut",
   "common_remove": "Entfernen",
   "common_favorite": "Favorit",
+  "common_share": "Teilen",
   "common_unfavorite": "Entfernen",
   "common_downloads": "Downloads",
   "common_installed": "INSTALLIERT",
@@ -84,6 +85,8 @@
   "gameDetail_achievements": "Achievements",
   "gameDetail_mastered": "GEMEISTERT",
   "gameDetail_noAchievementsFound": "Keine Achievements gefunden",
+  "gameDetail_noMetadata": "Keine zusätzlichen Infos",
+  "gameDetail_noMetadataHint": "Beschreibungen und Screenshots werden automatisch aus RomM geladen, wenn verfügbar.",
   "gameDetail_retroachievements": "RETROACHIEVEMENTS",
   "gameDetail_romVerified": "ROM verifiziert",
   "gameDetail_incompatibleRom": "Inkompatibles ROM",
@@ -365,7 +368,7 @@
   "gameList_errorLoadingGames": "Fehler beim Laden",
   "gameList_gamesAppearShortly": "Spiele erscheinen in Kürze",
   "gameList_syncingLibrary": "Bibliothek wird synchronisiert\u2026",
-  "gameList_localFilesOnly": "Nur lokale Dateien \u00B7 Füge eine Quelle hinzu für Downloads",
+  "gameList_localFilesOnly": "Lokal",
   "gameList_pressMenuHint": "Drücke  +  für Menü",
 
   "filter_activeCount": "{count} aktiv",
@@ -526,5 +529,11 @@
   "service_downloadComplete": "Downloads abgeschlossen",
   "service_downloading": "Laden: {details}",
   "service_activeCount": "{count} aktiv",
-  "service_queuedCount": "{count} in Warteschlange"
+  "service_queuedCount": "{count} in Warteschlange",
+  "sources_endpoints": "Verbindungsadressen",
+  "sources_primaryAddress": "Primäre Adresse",
+  "sources_alternativeAddresses": "Alternative Adressen",
+  "sources_endpointHint": "Eine alternative Basis-URL pro Zeile, nach Priorität. Verwende Adressen desselben Servers und derselben Bibliothek; die Anmeldung bleibt gleich. Bei jedem Sync wird zuerst die primäre Adresse versucht. Leer lassen, um Failover auszuschalten.",
+  "sources_endpointInvalid": "Gültige HTTP(S)-Basis-URLs ohne eingebettete Zugangsdaten, Abfrageparameter oder Fragmente eingeben.",
+  "sources_endpointSaveFailed": "Verbindungsadressen konnten nicht gespeichert werden. Bitte erneut versuchen."
 }

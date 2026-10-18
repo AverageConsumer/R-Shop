@@ -106,7 +106,7 @@ class GameMetadataInfo {
       final list = jsonDecode(siblings!) as List<dynamic>;
       return list
           .whereType<Map<String, dynamic>>()
-          .map((e) => SiblingInfo.fromJson(e))
+          .map(SiblingInfo.fromJson)
           .toList();
     } catch (e) {
       return const [];

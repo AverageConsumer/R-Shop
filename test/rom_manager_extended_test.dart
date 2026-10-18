@@ -247,7 +247,6 @@ void main() {
         name: 'Custom',
         manufacturer: 'Test',
         releaseYear: 2000,
-        romExtensions: [],
         accentColor: Color(0xFF000000),
       );
       const game = GameItem(
@@ -265,7 +264,6 @@ void main() {
         name: 'Custom',
         manufacturer: 'Test',
         releaseYear: 2000,
-        romExtensions: [],
         accentColor: Color(0xFF000000),
       );
       const game = GameItem(

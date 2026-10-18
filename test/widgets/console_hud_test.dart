@@ -41,7 +41,7 @@ void main() {
     });
 
     testWidgets('Nintendo layout renders SVG buttons for A/B', (tester) async {
-      final storage = await _createMockStorage(layout: ControllerLayout.nintendo);
+      final storage = await _createMockStorage();
       await tester.pumpWidget(createTestAppWithProviders(
         Stack(children: [
           ConsoleHud(
@@ -111,7 +111,7 @@ void main() {
     });
 
     testWidgets('Nintendo Start renders SVG (plus button)', (tester) async {
-      final storage = await _createMockStorage(layout: ControllerLayout.nintendo);
+      final storage = await _createMockStorage();
       await tester.pumpWidget(createTestAppWithProviders(
         Stack(children: [
           ConsoleHud(start: HudAction('Menu', onTap: () {})),
@@ -150,7 +150,7 @@ void main() {
     });
 
     testWidgets('Nintendo LB/RB render SVGs', (tester) async {
-      final storage = await _createMockStorage(layout: ControllerLayout.nintendo);
+      final storage = await _createMockStorage();
       await tester.pumpWidget(createTestAppWithProviders(
         Stack(children: [
           ConsoleHud(
@@ -214,7 +214,6 @@ void main() {
         Stack(children: [
           ConsoleHud(
             a: HudAction('Confirm', onTap: () {}),
-            embedded: false,
           ),
         ]),
         overrides: _overrides(storage),

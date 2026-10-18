@@ -443,7 +443,7 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.only(left: 12, bottom: 0),
+      padding: const EdgeInsets.only(left: 12),
       decoration: const BoxDecoration(
         border: Border(
           left: BorderSide(color: AppTheme.primaryColor, width: 3),

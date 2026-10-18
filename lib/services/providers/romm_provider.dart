@@ -8,6 +8,7 @@ import '../../models/game_item.dart';
 import '../../models/game_metadata_info.dart';
 import '../database_service.dart';
 import '../download_handle.dart';
+import '../http_endpoint_failover.dart';
 import '../romm_api_service.dart';
 import '../source_provider.dart';
 
@@ -20,7 +21,7 @@ class RommProvider implements SourceProvider {
   final RommApiService _api;
 
   RommProvider(this.config, {RommApiService? api})
-      : _api = api ?? RommApiService();
+      : _api = api ?? RommApiService(primaryUrl: config.url, fallbackUrls: config.fallbackUrls);
 
   String get _baseUrl {
     final url = config.url;
@@ -93,8 +94,8 @@ class RommProvider implements SourceProvider {
       String? screenshotsCsv;
       if (rom.mergedScreenshots.isNotEmpty) {
         final fullUrls = rom.mergedScreenshots.map((s) {
-          if (s.toLowerCase().startsWith('http')) return s;
-          return '$_baseUrl$s';
+          if (s.toLowerCase().startsWith('http')) return _api.effectiveUrl(s);
+          return _api.effectiveUrl('$_baseUrl$s');
         }).toList();
         screenshotsCsv = fullUrls.join(',');
       }
@@ -147,8 +148,11 @@ class RommProvider implements SourceProvider {
 
   @override
   Future<DownloadHandle> resolveDownload(GameItem game) async {
+    final routes = config.fallbackUrls.isEmpty ? <String>[]
+        : HttpEndpointRoutes(_baseUrl, config.fallbackUrls).urlsFor(game.url);
     return HttpDownloadHandle(
-      url: game.url,
+      url: routes.isEmpty ? game.url : routes.first,
+      fallbackUrls: routes.skip(1).toList(),
       headers: _authHeaders.isNotEmpty ? _authHeaders : null,
     );
   }

@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../models/config/app_config.dart';
 import 'config_parser.dart';
@@ -180,17 +180,22 @@ class ConfigStorageService {
     return file.exists();
   }
 
-  /// Exports the config as a formatted JSON file via the system share sheet.
+  /// Exports the config using the system's file-save dialog.
   /// Auth credentials are stripped to prevent accidental sharing.
   Future<void> exportConfig(AppConfig config) async {
     final jsonString =
         const JsonEncoder.withIndent('  ').convert(config.toJsonWithoutAuth());
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/r_shop_config.json');
-    await file.writeAsString(jsonString);
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/json')],
-      subject: 'R-Shop Config',
+    final bytes = Uint8List.fromList(utf8.encode(jsonString));
+    final path = await FilePicker.platform.saveFile(
+      fileName: 'r_shop_config.json',
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      bytes: bytes,
     );
+    // Mobile pickers write the bytes through the document provider themselves.
+    // Desktop pickers only return the selected path.
+    if (path != null && !Platform.isAndroid && !Platform.isIOS) {
+      await File(path).writeAsBytes(bytes);
+    }
   }
 }

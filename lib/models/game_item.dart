@@ -99,8 +99,9 @@ class GameItem {
       final pc = game.providerConfig;
       if (pc == null || pc.auth != null) return game;
       final match = pc.findMatchIn(providers);
-      if (match?.auth == null) return game;
-      return game.copyWith(providerConfig: pc.copyWith(auth: match!.auth));
+      if (match == null) return game;
+      return game.copyWith(providerConfig: pc.copyWith(
+        auth: match.auth, fallbackUrls: match.fallbackUrls));
     }).toList();
   }
 

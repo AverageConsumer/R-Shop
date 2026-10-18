@@ -44,7 +44,6 @@ class VolumeSlider extends StatelessWidget {
                     BoxShadow(
                       color: AppTheme.primaryColor.withValues(alpha: 0.5),
                       blurRadius: 4,
-                      spreadRadius: 0,
                     )
                   ]
                 : [],

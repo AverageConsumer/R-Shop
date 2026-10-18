@@ -216,7 +216,7 @@ void main() {
   group('playNavigation', () {
     test('plays when enabled + initialized', () async {
       await manager.init();
-      manager.updateSettings(const SoundSettings(enabled: true));
+      manager.updateSettings(const SoundSettings());
 
       manager.playNavigation();
       // play is async (fire-and-forget), but the engine.play() is called
@@ -235,7 +235,7 @@ void main() {
     });
 
     test('no-op when not initialized', () {
-      manager.updateSettings(const SoundSettings(enabled: true));
+      manager.updateSettings(const SoundSettings());
       manager.playNavigation();
       expect(engine.playCalls, isEmpty);
     });
@@ -266,7 +266,7 @@ void main() {
   group('playConfirm / playCancel', () {
     test('plays correct sound types', () async {
       await manager.init();
-      manager.updateSettings(const SoundSettings(enabled: true));
+      manager.updateSettings(const SoundSettings());
 
       manager.playConfirm();
       await Future.delayed(Duration.zero);
@@ -315,7 +315,7 @@ void main() {
 
     test('startBgm fades in when enabled', () async {
       await manager.init();
-      manager.updateSettings(const SoundSettings(enabled: true, bgmVolume: 0.4));
+      manager.updateSettings(const SoundSettings(bgmVolume: 0.4));
 
       await manager.startBgm();
 
@@ -431,7 +431,7 @@ void main() {
   group('typing', () {
     test('startTyping plays looping sound', () async {
       await manager.init();
-      manager.updateSettings(const SoundSettings(enabled: true, sfxVolume: 0.5));
+      manager.updateSettings(const SoundSettings(sfxVolume: 0.5));
 
       await manager.startTyping();
 

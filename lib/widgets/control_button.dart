@@ -131,14 +131,12 @@ class ControlButton extends StatelessWidget {
               color: effectiveColor != null
                   ? effectiveColor.withValues(alpha: 0.6)
                   : Colors.white.withValues(alpha: 0.3),
-              width: 1,
             ),
             boxShadow: effectiveColor != null && !highlight
                 ? [
                     BoxShadow(
                       color: effectiveColor.withValues(alpha: 0.2),
                       blurRadius: 6,
-                      spreadRadius: 0,
                     ),
                   ]
                 : null,

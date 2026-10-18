@@ -177,7 +177,7 @@ void main() {
     });
 
     test('returns early when no API key', () async {
-      storage = await createStorage(apiKey: null);
+      storage = await createStorage();
       final db = DatabaseService();
       final service =
           RaSyncService(raService, db, storage, configStorage);

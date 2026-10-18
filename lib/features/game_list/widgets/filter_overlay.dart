@@ -330,7 +330,6 @@ class _FilterOverlayState extends State<FilterOverlay>
         border: Border(
           right: BorderSide(
             color: widget.accentColor.withValues(alpha: 0.3),
-            width: 1,
           ),
         ),
         boxShadow: [

@@ -324,10 +324,7 @@ class _ManualSourceAddScreenState
           : null,
       share: widget.type == SourceType.smb ? _shareCtl.text.trim() : null,
       auth: auth,
-      autoMap: false,
       priority: 5,
-      enabled: true,
-      knownPlatforms: const {},
     );
 
     try {

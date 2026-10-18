@@ -14,6 +14,7 @@ import '../../models/system_model.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/game_providers.dart';
 import '../../providers/library_providers.dart';
+import '../../widgets/state_views.dart';
 import '../../providers/source_health_providers.dart';
 import '../../services/romm_api_service.dart';
 import '../../services/romm_pairing_service.dart';
@@ -25,6 +26,7 @@ import '../onboarding/widgets/romm_legacy_login_screen.dart';
 import '../pairing/qr_pairing_screen.dart';
 import '../sources/manual_source_add_screen.dart';
 import '../sources/source_mappings_screen.dart';
+import '../sources/source_endpoints_screen.dart';
 
 /// Verwaltungs-Screen für alle gepairten / konfigurierten [Source]s.
 ///
@@ -344,6 +346,16 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
     setState(() => _activeActionsSource = source);
   }
 
+  Future<void> _editEndpoints(Source source) async {
+    setState(() => _activeActionsSource = null);
+    await Navigator.of(context).push<bool>(MaterialPageRoute(
+        builder: (_) => SourceEndpointsScreen(source: source)));
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _cardFocusNodes[source.id]?.requestFocus();
+    });
+  }
+
   void _closeSourceActions() {
     if (_activeActionsSource == null) return;
     final source = _activeActionsSource!;
@@ -476,10 +488,47 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                   child: state.loading
                       ? const Center(child: CircularProgressIndicator())
                       : state.sources.isEmpty
-                          ? _EmptyState(
-                              rs: rs,
-                              focusNode: _addEmptyFocus,
-                              onAdd: _addSource,
+                          ? EmptyStateView(
+                              icon: Icons.cloud_off_outlined,
+                              title: L.of(context).sources_noSourcesYet,
+                              subtitle:
+                                  L.of(context).sources_noSourcesDescription,
+                              action: ConsoleFocusable(
+                                focusNode: _addEmptyFocus,
+                                autofocus: true,
+                                onSelect: _addSource,
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: rs.spacing.lg,
+                                    vertical: rs.spacing.md,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryColor
+                                        .withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: AppTheme.primaryColor,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.add,
+                                          color: AppTheme.primaryColor),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        L.of(context).sources_addSource,
+                                        style: const TextStyle(
+                                          color: AppTheme.primaryColor,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             )
                           : _SourceList(
                               sources: state.sources,
@@ -505,6 +554,7 @@ class _SourcesScreenState extends ConsumerState<SourcesScreen>
                 onRepair: () => _repairSource(_activeActionsSource!),
                 onEditMappings: () =>
                     _editMappings(_activeActionsSource!),
+                onEditEndpoints: () => _editEndpoints(_activeActionsSource!),
               ),
             if (_showTypePicker)
               _SourceTypePickerOverlay(
@@ -556,89 +606,6 @@ class _Header extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.rs,
-    required this.focusNode,
-    required this.onAdd,
-  });
-  final Responsive rs;
-  final FocusNode focusNode;
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.cloud_off_outlined,
-              size: rs.isSmall ? 56 : 72,
-              color: Colors.white24,
-            ),
-            SizedBox(height: rs.spacing.lg),
-            Text(
-              L.of(context).sources_noSourcesYet,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: rs.isSmall ? 16 : 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            SizedBox(height: rs.spacing.sm),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: rs.spacing.lg),
-              child: Text(
-                L.of(context).sources_noSourcesDescription,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey.shade500,
-                  fontSize: rs.isSmall ? 11 : 13,
-                ),
-              ),
-            ),
-            SizedBox(height: rs.spacing.lg),
-            ConsoleFocusable(
-              focusNode: focusNode,
-              autofocus: true,
-              onSelect: onAdd,
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: rs.spacing.lg,
-                  vertical: rs.spacing.md,
-                ),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.primaryColor, width: 2),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.add, color: AppTheme.primaryColor),
-                    const SizedBox(width: 8),
-                    Text(
-                      L.of(context).sources_addSource,
-                      style: const TextStyle(
-                        color: AppTheme.primaryColor,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -847,7 +814,7 @@ class _SourceCard extends ConsumerWidget {
                           ),
                           child: Text(
                             L.of(context).sources_borrowed,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: Colors.lightBlueAccent,
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
@@ -867,7 +834,7 @@ class _SourceCard extends ConsumerWidget {
                           ),
                           child: Text(
                             L.of(context).sources_off,
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: Colors.white54,
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
@@ -982,6 +949,7 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
     required this.onRemove,
     required this.onRepair,
     required this.onEditMappings,
+    required this.onEditEndpoints,
   });
 
   final Source source;
@@ -990,6 +958,7 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
   final VoidCallback onRemove;
   final VoidCallback onRepair;
   final VoidCallback onEditMappings;
+  final VoidCallback onEditEndpoints;
 
   @override
   ConsumerState<_SourceActionsOverlay> createState() =>
@@ -997,9 +966,23 @@ class _SourceActionsOverlay extends ConsumerStatefulWidget {
 }
 
 class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
-  final FocusNode _scopeFocus =
-      FocusNode(debugLabel: 'source_actions_overlay');
+  final FocusNode _scopeFocus = FocusNode(debugLabel: 'source_actions_overlay');
   int _selectedIndex = 0;
+  final _actionKeys = <int, GlobalKey>{};
+
+  void _scrollSelectedIntoView() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final selected = _actionKeys[_selectedIndex]?.currentContext;
+      if (selected != null) {
+        Scrollable.ensureVisible(
+          selected,
+          alignment: 0.5,
+          duration: const Duration(milliseconds: 100),
+        );
+      }
+    });
+  }
 
   /// Build the ordered list of actions for the current source. Re-pair is
   /// only offered for RomM sources because the QR/code flow is RomM-only.
@@ -1007,6 +990,12 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
     final src = widget.source;
     final l = L.of(context);
     return [
+      if (src.type == SourceType.romm || src.type == SourceType.web)
+        _OverlayAction(
+          icon: Icons.alt_route,
+          label: l.sources_endpoints,
+          onActivate: widget.onEditEndpoints,
+        ),
       if (src.type == SourceType.romm)
         _OverlayAction(
           icon: Icons.qr_code_2,
@@ -1056,6 +1045,7 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
       setState(() {
         _selectedIndex = (_selectedIndex - 1 + count) % count;
       });
+      _scrollSelectedIntoView();
       ref.read(feedbackServiceProvider).tick();
       return KeyEventResult.handled;
     }
@@ -1063,6 +1053,7 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
       setState(() {
         _selectedIndex = (_selectedIndex + 1) % count;
       });
+      _scrollSelectedIntoView();
       ref.read(feedbackServiceProvider).tick();
       return KeyEventResult.handled;
     }
@@ -1118,50 +1109,53 @@ class _SourceActionsOverlayState extends ConsumerState<_SourceActionsOverlay> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: Colors.white12),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        src.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        src.hostLabel,
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      for (int i = 0; i < actions.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 8),
-                        _OverlayButton(
-                          icon: actions[i].icon,
-                          label: actions[i].label,
-                          selected: _selectedIndex == i,
-                          destructive: actions[i].destructive,
-                          subdued: actions[i].cancelStyle,
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      const Center(
-                        child: Text(
-                          '↑↓ navigate · [A] select · [B] back',
-                          style: TextStyle(
-                            color: Colors.white30,
-                            fontSize: 10,
-                            letterSpacing: 0.5,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          src.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          src.hostLabel,
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        for (int i = 0; i < actions.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 8),
+                          _OverlayButton(
+                          key: _actionKeys.putIfAbsent(i, GlobalKey.new),
+                            icon: actions[i].icon,
+                            label: actions[i].label,
+                            selected: _selectedIndex == i,
+                            destructive: actions[i].destructive,
+                            subdued: actions[i].cancelStyle,
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        const Center(
+                          child: Text(
+                            '↑↓ navigate · [A] select · [B] back',
+                            style: TextStyle(
+                              color: Colors.white30,
+                              fontSize: 10,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1191,6 +1185,7 @@ class _OverlayAction {
 
 class _OverlayButton extends StatelessWidget {
   const _OverlayButton({
+    super.key,
     required this.icon,
     required this.label,
     required this.selected,
@@ -1382,7 +1377,7 @@ class _SourceTypePickerOverlayState
                     children: [
                       Text(
                         l.sources_addSource,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
@@ -1450,7 +1445,7 @@ class _TypeOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = AppTheme.primaryColor;
+    const color = AppTheme.primaryColor;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 120),
       width: double.infinity,
@@ -1476,7 +1471,7 @@ class _TypeOptionTile extends StatelessWidget {
               children: [
                 Text(
                   option.label,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: color,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,

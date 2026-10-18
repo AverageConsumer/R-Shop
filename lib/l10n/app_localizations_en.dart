@@ -69,6 +69,9 @@ class LEn extends L {
   String get common_favorite => 'Favorite';
 
   @override
+  String get common_share => 'Share';
+
+  @override
   String get common_unfavorite => 'Unfavorite';
 
   @override
@@ -250,6 +253,13 @@ class LEn extends L {
 
   @override
   String get gameDetail_noAchievementsFound => 'No achievements found';
+
+  @override
+  String get gameDetail_noMetadata => 'No additional info yet';
+
+  @override
+  String get gameDetail_noMetadataHint =>
+      'Descriptions and screenshots load automatically from RomM when available.';
 
   @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';
@@ -1102,8 +1112,7 @@ class LEn extends L {
   String get gameList_syncingLibrary => 'Syncing library…';
 
   @override
-  String get gameList_localFilesOnly =>
-      'Local files only · Add a provider to download more';
+  String get gameList_localFilesOnly => 'Local';
 
   @override
   String get gameList_pressMenuHint => 'Press  +  for menu';
@@ -1611,4 +1620,25 @@ class LEn extends L {
   String service_queuedCount(int count) {
     return '$count queued';
   }
+
+  @override
+  String get sources_endpoints => 'Connection addresses';
+
+  @override
+  String get sources_primaryAddress => 'Primary address';
+
+  @override
+  String get sources_alternativeAddresses => 'Alternative addresses';
+
+  @override
+  String get sources_endpointHint =>
+      'Enter one alternative base URL per line, in priority order. Use addresses of the same server and library; the same login is used. The primary address is tried first on each sync. Leave empty to disable failover.';
+
+  @override
+  String get sources_endpointInvalid =>
+      'Enter valid HTTP(S) base URLs without embedded login details, query parameters or fragments.';
+
+  @override
+  String get sources_endpointSaveFailed =>
+      'Could not save connection addresses. Please try again.';
 }

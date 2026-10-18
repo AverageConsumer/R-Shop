@@ -47,7 +47,6 @@ class SettingsTabs extends StatelessWidget {
                   color: isActive
                       ? accentColor.withValues(alpha: 0.5)
                       : Colors.white.withValues(alpha: 0.08),
-                  width: 1,
                 ),
               ),
               child: Text(

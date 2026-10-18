@@ -114,7 +114,7 @@ void main() {
     });
 
     test('remote game without URL: local enrichment kept', () {
-      final remote = [_game('Game.zip', url: '')];
+      final remote = [_game('Game.zip')];
       final local = [_game('Other.nes')];
       final result = GameMergeHelper.merge(remote, local, _nes);
       expect(result.length, 2);

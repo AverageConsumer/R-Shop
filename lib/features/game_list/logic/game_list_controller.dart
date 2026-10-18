@@ -139,9 +139,9 @@ class GameListController extends ChangeNotifier {
 
   Future<void> loadGames({bool forceRefresh = false, bool silent = false}) async {
     if (silent) {
-      _state = _state.copyWith(error: null);
+      _state = _state.copyWith();
     } else {
-      _state = _state.copyWith(isLoading: true, error: null);
+      _state = _state.copyWith(isLoading: true);
       notifyListeners();
     }
 
@@ -385,7 +385,7 @@ class GameListController extends ChangeNotifier {
       groups = groups.where((groupName) {
         final variants = _state.groupedGames[groupName];
         if (variants == null) return false;
-        final matching = variants.where((game) => _matchesFilters(game)).toList();
+        final matching = variants.where(_matchesFilters).toList();
         if (matching.isEmpty) return false;
         filteredMap[groupName] = matching;
         return true;
@@ -501,9 +501,7 @@ class GameListController extends ChangeNotifier {
 
   void _scheduleThumbnailNotify() {
     _thumbnailDebounce?.cancel();
-    _thumbnailDebounce = Timer(const Duration(milliseconds: 100), () {
-      notifyListeners();
-    });
+    _thumbnailDebounce = Timer(const Duration(milliseconds: 100), notifyListeners);
   }
 
   void _updateInMemorySilent(

@@ -26,7 +26,7 @@ void main() {
     });
 
     testWidgets('compact=false has normal font (10.0)', (tester) async {
-      await tester.pumpWidget(createTestApp(const InstalledBadge(compact: false)));
+      await tester.pumpWidget(createTestApp(const InstalledBadge()));
 
       final text = tester.widget<Text>(find.text('INSTALLED'));
       expect(text.style!.fontSize, 10.0);
@@ -40,7 +40,7 @@ void main() {
     });
 
     testWidgets('compact=false has normal icon (14.0)', (tester) async {
-      await tester.pumpWidget(createTestApp(const InstalledBadge(compact: false)));
+      await tester.pumpWidget(createTestApp(const InstalledBadge()));
 
       final icon = tester.widget<Icon>(find.byIcon(Icons.check_circle));
       expect(icon.size, 14.0);

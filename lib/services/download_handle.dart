@@ -9,8 +9,9 @@ sealed class DownloadHandle {
 final class HttpDownloadHandle extends DownloadHandle {
   final String url;
   final Map<String, String>? headers;
+  final List<String> fallbackUrls;
 
-  const HttpDownloadHandle({required this.url, this.headers});
+  const HttpDownloadHandle({required this.url, this.headers, this.fallbackUrls = const []});
 }
 
 final class NativeSmbDownloadHandle extends DownloadHandle {

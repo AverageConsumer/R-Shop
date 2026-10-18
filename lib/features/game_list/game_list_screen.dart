@@ -8,6 +8,7 @@ import '../../models/config/system_config.dart';
 
 import '../../core/input/input.dart';
 import '../../core/responsive/responsive.dart';
+import '../../core/widgets/screen_layout.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
@@ -31,6 +32,7 @@ import '../library/widgets/shelf_picker_dialog.dart';
 import 'widgets/game_grid.dart';
 import 'widgets/game_list_header.dart';
 import 'widgets/filter_overlay.dart';
+import 'widgets/filter_pill_bar.dart';
 
 class GameListScreen extends ConsumerStatefulWidget {
   final SystemModel system;
@@ -550,10 +552,9 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
     final state = _controller.state;
     final baseTopPadding = rs.safeAreaTop + (rs.isSmall ? 60 : 80);
     final folderExtraPadding = widget.targetFolder.isNotEmpty ? (rs.isSmall ? 14.0 : 16.0) : 0.0;
-    final localOnlyExtraPadding = state.isLocalOnly ? (rs.isSmall ? 24.0 : 28.0) : 0.0;
     final searchExtraPadding = rs.isSmall ? 16.0 : 20.0;
     final topPadding =
-        baseTopPadding + folderExtraPadding + localOnlyExtraPadding + (isSearchActive ? searchExtraPadding : 0.0);
+        baseTopPadding + folderExtraPadding + (isSearchActive ? searchExtraPadding : 0.0);
 
     return buildWithActions(
       PopScope(
@@ -563,8 +564,11 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
             _handleBack();
           }
         },
-        child: Scaffold(
+        child: ScreenLayout(
         backgroundColor: Colors.black,
+        accentColor: widget.system.accentColor,
+        useSafeArea: false,
+        padding: EdgeInsets.zero,
         body: GestureDetector(
           onScaleStart: (details) {
             _lastPinchScale = 1.0;
@@ -595,7 +599,6 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
               if (_isFiltering) _buildFilterContent(state),
               if (_isFiltering)
                 ConsoleHud(
-                  a: null,
                   b: HudAction(L.of(context).common_close, onTap: _closeFilter),
                   x: HudAction(L.of(context).common_clear, onTap: () {
                     _controller.clearFilters();
@@ -640,9 +643,20 @@ class _GameListScreenState extends ConsumerState<GameListScreen>
 
     return Stack(
       children: [
-        Padding(
-          padding: EdgeInsets.only(top: topPadding),
-          child: _buildGridOrStatus(state, syncActive),
+        Positioned.fill(
+          top: topPadding,
+          child: Column(
+            children: [
+              if (state.activeFilters.isNotEmpty)
+                FilterPillBar(
+                  filters: state.activeFilters,
+                  availableRegions: state.availableRegions,
+                  availableLanguages: state.availableLanguages,
+                  accentColor: widget.system.accentColor,
+                ),
+              Expanded(child: _buildGridOrStatus(state, syncActive)),
+            ],
+          ),
         ),
         GameListHeader(
           system: widget.system,

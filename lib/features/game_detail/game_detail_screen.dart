@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/input/input.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/responsive/responsive.dart';
+import '../../widgets/state_views.dart';
 import '../../models/download_item.dart';
 import '../../models/game_item.dart';
 import '../../models/game_metadata_info.dart';
@@ -164,7 +165,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
   }
 
   GlobalKey _keyForSection(DetailSection section) {
-    return _sectionKeys.putIfAbsent(section, () => GlobalKey());
+    return _sectionKeys.putIfAbsent(section, GlobalKey.new);
   }
 
   void _scrollToFocusedSection({bool scrollingUp = false}) {
@@ -511,7 +512,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         QuickMenuItem(
           label: L.of(context).gameDetail_gameInfo,
           icon: Icons.info_outline_rounded,
-          onSelect: () => controller.openGameInfo(),
+          onSelect: controller.openGameInfo,
         ),
       if (raMatch != null && raMatch.hasMatch && raMatch.raGameId != null)
         QuickMenuItem(
@@ -529,7 +530,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
         QuickMenuItem(
           label: L.of(context).gameDetail_fromProvider(variant.providerConfig?.detailLabel ?? 'Primary'),
           icon: Icons.cloud_download_outlined,
-          onSelect: () => controller.performAction(),
+          onSelect: controller.performAction,
         ),
         for (final alt in variant.alternativeSources)
           QuickMenuItem(
@@ -863,26 +864,19 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
                 : (rs.screenWidth * (rs.isSmall ? 0.35 : 0.30)).clamp(180, 340),
             child: Column(
               children: [
-                // Cover takes available space, buttons anchor to bottom
+                // Cover fills remaining vertical space, BoxFit.contain inside
+                // CoverSection scales it without cropping. Action buttons
+                // anchor below.
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        AspectRatio(
-                          aspectRatio: 0.75,
-                          child: CoverSection(
-                            game: widget.game,
-                            system: widget.system,
-                            coverUrls: coverUrls,
-                            cachedUrl: selectedVariant.cachedCoverUrl,
-                            metadata: fileMetadata,
-                            isFavorite: isFavorite,
-                            isInstalled: state.isVariantInstalled,
-                            hasThumbnail: selectedVariant.hasThumbnail,
-                          ),
-                        ),
-                      ],
-                    ),
+                  child: CoverSection(
+                    game: widget.game,
+                    system: widget.system,
+                    coverUrls: coverUrls,
+                    cachedUrl: selectedVariant.cachedCoverUrl,
+                    metadata: fileMetadata,
+                    isFavorite: isFavorite,
+                    isInstalled: state.isVariantInstalled,
+                    hasThumbnail: selectedVariant.hasThumbnail,
                   ),
                 ),
                 SizedBox(height: rs.spacing.sm),
@@ -986,19 +980,40 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     final sections = controller.availableSections;
     final focused = controller.focusedSection;
 
+    // In landscape, the right column ends up empty when no rich metadata
+    // has loaded — only title/badges/fileDetails render and the bottom 60%
+    // is dead space. Fill with an EmptyStateView so the screen reads as
+    // intentional, not broken.
+    final rightColumnSections = sections
+        .where((s) => !(excludeActions && leftColumnSections.contains(s)))
+        .toList();
+    final hasRichSections = rightColumnSections.any((s) =>
+        s == DetailSection.summary ||
+        s == DetailSection.screenshots ||
+        s == DetailSection.otherVersions ||
+        s == DetailSection.achievements);
+    final showEmptyState = excludeActions && !hasRichSections;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final section in sections)
-          if (!(excludeActions && leftColumnSections.contains(section)))
-            _buildSection(
-              rs, state, controller, section,
-              fileMetadata: fileMetadata,
-              richMetadata: richMetadata,
-              isMultiRom: isMultiRom,
-              raMatch: raMatch,
-              isFocused: section == focused,
-            ),
+        for (final section in rightColumnSections)
+          _buildSection(
+            rs, state, controller, section,
+            fileMetadata: fileMetadata,
+            richMetadata: richMetadata,
+            isMultiRom: isMultiRom,
+            raMatch: raMatch,
+            isFocused: section == focused,
+          ),
+        if (showEmptyState) ...[
+          SizedBox(height: rs.spacing.xl),
+          EmptyStateView(
+            icon: Icons.info_outline_rounded,
+            title: L.of(context).gameDetail_noMetadata,
+            subtitle: L.of(context).gameDetail_noMetadataHint,
+          ),
+        ],
       ],
     );
   }
@@ -1200,7 +1215,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
               ),
             ],
           ),
-          maxLines: controller.state.showFullFilename ? 3 : 2,
+          maxLines: controller.state.showFullFilename ? 4 : 3,
           overflow: TextOverflow.ellipsis,
         ),
         SizedBox(height: rs.spacing.sm),
@@ -1214,7 +1229,6 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
             borderRadius: BorderRadius.circular(rs.radius.sm),
             border: Border.all(
               color: widget.system.accentColor.withValues(alpha: 0.5),
-              width: 1,
             ),
           ),
           child: Row(
@@ -1271,7 +1285,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
     // For single-ROM: check the selected variant.
     // For multi-ROM: check all variants, pick the most "active" one.
     if (baseState == DownloadButtonState.download ||
-        baseState == DownloadButtonState.delete) {
+        baseState == DownloadButtonState.installed) {
       final variantsToCheck = isMultiRom
           ? widget.variants
           : [controller.selectedVariant];
@@ -1360,7 +1374,7 @@ class _GameDetailScreenState extends ConsumerState<GameDetailScreen>
           ? DownloadButtonState.installed
           : DownloadButtonState.download;
     }
-    if (state.isVariantInstalled) return DownloadButtonState.delete;
+    if (state.isVariantInstalled) return DownloadButtonState.installed;
     return DownloadButtonState.download;
   }
 

@@ -50,7 +50,6 @@ class RemoteFolderScanner {
       user: config.auth?.user ?? 'guest',
       pass: config.auth?.pass ?? '',
       domain: config.auth?.domain ?? '',
-      maxDepth: 0,
     ).timeout(NetworkTimeouts.smbConnect);
 
     return entries
@@ -70,7 +69,6 @@ class RemoteFolderScanner {
       port: config.port ?? 21,
       user: config.auth?.user ?? 'anonymous',
       pass: config.auth?.pass ?? '',
-      timeout: 30,
     );
 
     await ftp.connect().timeout(NetworkTimeouts.ftpConnect);

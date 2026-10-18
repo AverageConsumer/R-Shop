@@ -13,6 +13,7 @@ import 'config_storage_service.dart';
 import 'database_service.dart';
 import 'romm_pairing_service.dart';
 import 'source_resolver.dart';
+import 'http_endpoint_failover.dart';
 
 /// Snapshot exposed by [SourcesNotifier]. Loading and error states are
 /// modelled explicitly so the UI can show a spinner / retry without
@@ -111,7 +112,6 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
 
       state = SourcesState(
         sources: List<Source>.unmodifiable(_cachedConfig.sources),
-        loading: false,
       );
     } catch (e) {
       debugPrint('SourcesNotifier: bootstrap failed: $e');
@@ -167,7 +167,6 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
         name: model.name,
         targetFolder: '$basePath/$systemId',
         providers: const [],
-        autoExtract: model.isZipped,
       ));
       newIds.add(systemId);
       newNames.add(model.name);
@@ -236,6 +235,16 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
     final next = [...state.sources];
     next[idx] = source;
     await _writeAndPublish(next);
+  }
+
+  Future<void> setFallbackUrls(String id, List<String> urls) async {
+    await ready;
+    final source = state.sources.firstWhere((s) => s.id == id);
+    if (source.type != SourceType.romm && source.type != SourceType.web) {
+      throw ArgumentError('Alternative URLs require a RomM or Web source');
+    }
+    final routes = HttpEndpointRoutes(source.url ?? '', urls);
+    await updateSource(source.copyWith(fallbackUrls: routes.bases.skip(1).toList()));
   }
 
   /// Removes the source with [id]. No-op if it doesn't exist. Also drops
@@ -435,7 +444,6 @@ class SourcesNotifier extends StateNotifier<SourcesState> {
       _cachedConfig = updated;
       state = SourcesState(
         sources: List<Source>.unmodifiable(next),
-        loading: false,
       );
     } catch (e) {
       debugPrint('SourcesNotifier: persist failed: $e');

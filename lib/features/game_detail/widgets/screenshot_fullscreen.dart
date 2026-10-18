@@ -62,16 +62,16 @@ class _ScreenshotFullscreenState extends ConsumerState<ScreenshotFullscreen> {
       isVisible: true,
       onClose: widget.onClose,
       child: Shortcuts(
-        shortcuts: <ShortcutActivator, Intent>{
-          const SingleActivator(LogicalKeyboardKey.arrowLeft): const NavigateIntent(GridDirection.left),
-          const SingleActivator(LogicalKeyboardKey.arrowRight): const NavigateIntent(GridDirection.right),
+        shortcuts: const <ShortcutActivator, Intent>{
+          SingleActivator(LogicalKeyboardKey.arrowLeft): NavigateIntent(GridDirection.left),
+          SingleActivator(LogicalKeyboardKey.arrowRight): NavigateIntent(GridDirection.right),
           // L1/R1 shoulder buttons
-          const SingleActivator(LogicalKeyboardKey.gameButtonLeft1): const NavigateIntent(GridDirection.left),
-          const SingleActivator(LogicalKeyboardKey.gameButtonRight1): const NavigateIntent(GridDirection.right),
-          const SingleActivator(LogicalKeyboardKey.pageUp): const NavigateIntent(GridDirection.left),
-          const SingleActivator(LogicalKeyboardKey.pageDown): const NavigateIntent(GridDirection.right),
-          const SingleActivator(LogicalKeyboardKey.escape): const BackIntent(),
-          const SingleActivator(LogicalKeyboardKey.gameButtonB): const BackIntent(),
+          SingleActivator(LogicalKeyboardKey.gameButtonLeft1): NavigateIntent(GridDirection.left),
+          SingleActivator(LogicalKeyboardKey.gameButtonRight1): NavigateIntent(GridDirection.right),
+          SingleActivator(LogicalKeyboardKey.pageUp): NavigateIntent(GridDirection.left),
+          SingleActivator(LogicalKeyboardKey.pageDown): NavigateIntent(GridDirection.right),
+          SingleActivator(LogicalKeyboardKey.escape): BackIntent(),
+          SingleActivator(LogicalKeyboardKey.gameButtonB): BackIntent(),
         },
         child: Actions(
           actions: {
@@ -143,7 +143,6 @@ class _ScreenshotFullscreenState extends ConsumerState<ScreenshotFullscreen> {
                             borderRadius: BorderRadius.circular(rs.radius.md),
                             border: Border.all(
                               color: widget.accentColor.withValues(alpha: 0.3),
-                              width: 1,
                             ),
                           ),
                           child: Text(

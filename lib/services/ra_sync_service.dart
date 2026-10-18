@@ -147,7 +147,6 @@ class RaSyncService extends StateNotifier<RaSyncState> {
         state = state.copyWith(
           isSyncing: false,
           completedSystems: state.totalSystems,
-          currentSystem: null,
         );
       }
     }

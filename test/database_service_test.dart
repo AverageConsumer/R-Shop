@@ -601,7 +601,7 @@ void main() {
       await service.saveGames('snes', [
         const GameItem(filename: 'A.zip', displayName: 'A', url: 'http://a'),
       ]);
-      await service.batchUpdateThumbnailData(['A.zip'], hasThumbnail: null);
+      await service.batchUpdateThumbnailData(['A.zip']);
       final loaded = await service.getGames('snes');
       expect(loaded.first.hasThumbnail, isFalse);
     });

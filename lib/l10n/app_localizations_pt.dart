@@ -69,6 +69,9 @@ class LPt extends L {
   String get common_favorite => 'Favoritar';
 
   @override
+  String get common_share => 'Compartilhar';
+
+  @override
   String get common_unfavorite => 'Desfavoritar';
 
   @override
@@ -250,6 +253,13 @@ class LPt extends L {
 
   @override
   String get gameDetail_noAchievementsFound => 'Nenhuma conquista encontrada';
+
+  @override
+  String get gameDetail_noMetadata => 'Sem informações adicionais';
+
+  @override
+  String get gameDetail_noMetadataHint =>
+      'Descrições e capturas são carregadas automaticamente do RomM quando disponíveis.';
 
   @override
   String get gameDetail_retroachievements => 'RETROACHIEVEMENTS';
@@ -1111,8 +1121,7 @@ class LPt extends L {
   String get gameList_syncingLibrary => 'Sincronizando biblioteca…';
 
   @override
-  String get gameList_localFilesOnly =>
-      'Só arquivos locais · Adicione um provedor pra baixar mais';
+  String get gameList_localFilesOnly => 'Local';
 
   @override
   String get gameList_pressMenuHint => 'Aperte  +  pro menu';
@@ -1621,4 +1630,25 @@ class LPt extends L {
   String service_queuedCount(int count) {
     return '$count na fila';
   }
+
+  @override
+  String get sources_endpoints => 'Endereços de conexão';
+
+  @override
+  String get sources_primaryAddress => 'Endereço principal';
+
+  @override
+  String get sources_alternativeAddresses => 'Endereços alternativos';
+
+  @override
+  String get sources_endpointHint =>
+      'Insira uma URL base alternativa por linha, em ordem de prioridade. Use endereços do mesmo servidor e biblioteca, com as mesmas credenciais. Cada sincronização tenta primeiro o endereço principal. Deixe vazio para desativar a alternância.';
+
+  @override
+  String get sources_endpointInvalid =>
+      'Insira URLs base HTTP(S) válidas sem credenciais, parâmetros ou fragmentos.';
+
+  @override
+  String get sources_endpointSaveFailed =>
+      'Não foi possível salvar os endereços. Tente novamente.';
 }

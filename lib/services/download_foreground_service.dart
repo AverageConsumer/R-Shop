@@ -41,12 +41,6 @@ class DownloadForegroundService {
         channelId: 'r_shop_download',
         channelName: 'Downloads',
         channelDescription: 'Shows progress while downloading games',
-        channelImportance: NotificationChannelImportance.LOW,
-        priority: NotificationPriority.LOW,
-        enableVibration: false,
-        playSound: false,
-        showWhen: false,
-        showBadge: false,
         onlyAlertOnce: true,
       ),
       iosNotificationOptions: const IOSNotificationOptions(
@@ -54,7 +48,6 @@ class DownloadForegroundService {
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
         eventAction: ForegroundTaskEventAction.nothing(),
-        allowWakeLock: true,
         allowWifiLock: true,
       ),
     );

@@ -75,7 +75,7 @@ void main() {
 
     testWidgets('shows "Waiting..." for queued status', (tester) async {
       await tester.pumpWidget(createTestApp(
-        StatusLabel(item: _makeItem(status: DownloadStatus.queued)),
+        StatusLabel(item: _makeItem()),
       ));
 
       expect(find.text('Waiting...'), findsOneWidget);
@@ -121,7 +121,7 @@ void main() {
 
     testWidgets('no speed text for queued items', (tester) async {
       await tester.pumpWidget(createTestApp(
-        StatusLabel(item: _makeItem(status: DownloadStatus.queued)),
+        StatusLabel(item: _makeItem()),
       ));
 
       // Speed divider should not appear
@@ -135,7 +135,7 @@ void main() {
   group('DownloadProgressBar', () {
     testWidgets('renders LinearProgressIndicator for queued', (tester) async {
       await tester.pumpWidget(createTestApp(
-        DownloadProgressBar(item: _makeItem(status: DownloadStatus.queued)),
+        DownloadProgressBar(item: _makeItem()),
       ));
 
       expect(find.byType(LinearProgressIndicator), findsOneWidget);
@@ -317,7 +317,7 @@ void main() {
     testWidgets('queued shows white close icon', (tester) async {
       await tester.pumpWidget(createTestApp(
         DownloadActionButton(
-          item: _makeItem(status: DownloadStatus.queued),
+          item: _makeItem(),
           isHighlighted: false,
           onTap: () {},
         ),
@@ -330,7 +330,7 @@ void main() {
       bool tapped = false;
       await tester.pumpWidget(createTestApp(
         DownloadActionButton(
-          item: _makeItem(status: DownloadStatus.queued),
+          item: _makeItem(),
           isHighlighted: false,
           onTap: () => tapped = true,
         ),
@@ -375,7 +375,7 @@ void main() {
     testWidgets('button has circular shape', (tester) async {
       await tester.pumpWidget(createTestApp(
         DownloadActionButton(
-          item: _makeItem(status: DownloadStatus.queued),
+          item: _makeItem(),
           isHighlighted: false,
           onTap: () {},
         ),

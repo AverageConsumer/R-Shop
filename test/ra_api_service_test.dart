@@ -208,7 +208,7 @@ void main() {
     test('caps results at pagination limit', () async {
       final bigList = List.generate(
         25000,
-        (i) => _gameJson(id: i, consoleId: 1),
+        (i) => _gameJson(id: i),
       );
       fakeDio.enqueue(bigList);
 
@@ -359,7 +359,7 @@ void main() {
       fakeDio.enqueue({
         'Title': 'Zelda',
         'Achievements': [
-          _achievementJson(id: 1, points: 5),
+          _achievementJson(id: 1),
           _achievementJson(id: 2, points: 10),
         ],
       });
@@ -604,8 +604,8 @@ void main() {
 
   group('rate limiter', () {
     test('serializes requests (second call waits for first)', () async {
-      fakeDio.enqueue([_gameJson(id: 1, consoleId: 1)]);
-      fakeDio.enqueue([_gameJson(id: 2, consoleId: 1)]);
+      fakeDio.enqueue([_gameJson(id: 1)]);
+      fakeDio.enqueue([_gameJson(id: 2)]);
 
       final results = await Future.wait([
         service.fetchGameList(1, apiKey: 'k'),

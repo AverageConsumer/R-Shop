@@ -82,6 +82,10 @@ class ProviderConfig {
   final ProviderType type;
   final int priority;
   final String? url;
+
+  /// Ordered alternative base URLs for the same HTTP server/library. These are
+  /// connection routes, never additional content sources. Credentials are shared.
+  final List<String> fallbackUrls;
   final String? host;
   final int? port;
   final String? share;
@@ -106,6 +110,7 @@ class ProviderConfig {
     required this.type,
     required this.priority,
     this.url,
+    this.fallbackUrls = const [],
     this.host,
     this.port,
     this.share,
@@ -122,6 +127,8 @@ class ProviderConfig {
       type: ProviderType.values.asNameMap()[json['type'] as String] ?? ProviderType.web,
       priority: json['priority'] as int,
       url: json['url'] as String?,
+      fallbackUrls: (json['fallback_urls'] as List<dynamic>?)
+          ?.cast<String>().toList() ?? const [],
       host: json['host'] as String?,
       port: json['port'] as int?,
       share: json['share'] as String?,
@@ -141,6 +148,7 @@ class ProviderConfig {
       'type': type.name,
       'priority': priority,
       if (url != null) 'url': url,
+      if (fallbackUrls.isNotEmpty) 'fallback_urls': fallbackUrls,
       if (host != null) 'host': host,
       if (port != null) 'port': port,
       if (share != null) 'share': share,
@@ -160,6 +168,7 @@ class ProviderConfig {
       'type': type.name,
       'priority': priority,
       if (url != null) 'url': url,
+      if (fallbackUrls.isNotEmpty) 'fallback_urls': fallbackUrls,
       if (host != null) 'host': host,
       if (port != null) 'port': port,
       if (share != null) 'share': share,
@@ -307,6 +316,7 @@ class ProviderConfig {
     ProviderType? type,
     int? priority,
     String? url,
+    List<String>? fallbackUrls,
     String? host,
     int? port,
     String? share,
@@ -321,6 +331,7 @@ class ProviderConfig {
       type: type ?? this.type,
       priority: priority ?? this.priority,
       url: url ?? this.url,
+      fallbackUrls: fallbackUrls ?? this.fallbackUrls,
       host: host ?? this.host,
       port: port ?? this.port,
       share: share ?? this.share,

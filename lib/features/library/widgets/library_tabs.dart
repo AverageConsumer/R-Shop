@@ -119,7 +119,6 @@ class _LibraryTabsState extends State<LibraryTabs> {
                     color: isActive
                         ? widget.accentColor.withValues(alpha: 0.5)
                         : Colors.white.withValues(alpha: 0.08),
-                    width: 1,
                   ),
                 ),
                 child: Row(

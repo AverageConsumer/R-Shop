@@ -20,6 +20,7 @@
   "common_retry": "Réessayer",
   "common_remove": "Retirer",
   "common_favorite": "Favori",
+  "common_share": "Partager",
   "common_unfavorite": "Retirer favori",
   "common_downloads": "Téléchargements",
   "common_installed": "INSTALLÉ",
@@ -72,6 +73,8 @@
   "gameDetail_achievements": "Succès",
   "gameDetail_mastered": "MAÎTRISÉ",
   "gameDetail_noAchievementsFound": "Aucun succès trouvé",
+  "gameDetail_noMetadata": "Aucune info supplémentaire",
+  "gameDetail_noMetadataHint": "Les descriptions et captures sont chargées automatiquement depuis RomM lorsqu'elles sont disponibles.",
   "gameDetail_retroachievements": "RETROACHIEVEMENTS",
   "gameDetail_romVerified": "ROM vérifiée",
   "gameDetail_incompatibleRom": "ROM incompatible",
@@ -340,7 +343,7 @@
   "gameList_errorLoadingGames": "Erreur de chargement",
   "gameList_gamesAppearShortly": "Les jeux vont apparaître bientôt",
   "gameList_syncingLibrary": "Synchronisation en cours\u2026",
-  "gameList_localFilesOnly": "Fichiers locaux uniquement \u00B7 Ajoute une source pour plus",
+  "gameList_localFilesOnly": "Local",
   "gameList_pressMenuHint": "Appuie sur  +  pour le menu",
   "filter_activeCount": "{count} actifs",
   "shelfEdit_addFilter": "+ AJOUTER FILTRE",
@@ -488,5 +491,11 @@
   "service_downloadComplete": "Téléchargements terminés",
   "service_downloading": "Téléchargement : {details}",
   "service_activeCount": "{count} actifs",
-  "service_queuedCount": "{count} en attente"
+  "service_queuedCount": "{count} en attente",
+  "sources_endpoints": "Adresses de connexion",
+  "sources_primaryAddress": "Adresse principale",
+  "sources_alternativeAddresses": "Adresses alternatives",
+  "sources_endpointHint": "Saisissez une URL de base alternative par ligne, par priorité. Utilisez le même serveur et la même bibliothèque avec les mêmes identifiants. Chaque synchronisation essaie d’abord l’adresse principale. Laissez vide pour désactiver le basculement.",
+  "sources_endpointInvalid": "Saisissez des URL HTTP(S) valides sans identifiants, paramètres ni fragments.",
+  "sources_endpointSaveFailed": "Impossible d’enregistrer les adresses. Réessayez."
 }

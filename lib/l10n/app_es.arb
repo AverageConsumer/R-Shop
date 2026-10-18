@@ -20,6 +20,7 @@
   "common_retry": "Reintentar",
   "common_remove": "Quitar",
   "common_favorite": "Favorito",
+  "common_share": "Compartir",
   "common_unfavorite": "Quitar favorito",
   "common_downloads": "Descargas",
   "common_installed": "INSTALADO",
@@ -72,6 +73,8 @@
   "gameDetail_achievements": "Logros",
   "gameDetail_mastered": "DOMINADO",
   "gameDetail_noAchievementsFound": "No se encontraron logros",
+  "gameDetail_noMetadata": "Sin información adicional",
+  "gameDetail_noMetadataHint": "Las descripciones y capturas se cargan automáticamente desde RomM cuando están disponibles.",
   "gameDetail_retroachievements": "RETROACHIEVEMENTS",
   "gameDetail_romVerified": "ROM verificada",
   "gameDetail_incompatibleRom": "ROM incompatible",
@@ -340,7 +343,7 @@
   "gameList_errorLoadingGames": "Error al cargar juegos",
   "gameList_gamesAppearShortly": "Los juegos aparecerán pronto",
   "gameList_syncingLibrary": "Sincronizando biblioteca\u2026",
-  "gameList_localFilesOnly": "Solo archivos locales \u00B7 Añade un proveedor para más",
+  "gameList_localFilesOnly": "Local",
   "gameList_pressMenuHint": "Pulsa  +  para el menú",
   "filter_activeCount": "{count} activos",
   "shelfEdit_addFilter": "+ AÑADIR FILTRO",
@@ -488,5 +491,11 @@
   "service_downloadComplete": "Descargas completas",
   "service_downloading": "Descargando: {details}",
   "service_activeCount": "{count} activas",
-  "service_queuedCount": "{count} en cola"
+  "service_queuedCount": "{count} en cola",
+  "sources_endpoints": "Direcciones de conexión",
+  "sources_primaryAddress": "Dirección principal",
+  "sources_alternativeAddresses": "Direcciones alternativas",
+  "sources_endpointHint": "Introduce una URL base alternativa por línea, por orden de prioridad. Usa direcciones del mismo servidor y biblioteca, con las mismas credenciales. Cada sincronización intenta primero la dirección principal. Déjalo vacío para desactivar el cambio automático.",
+  "sources_endpointInvalid": "Introduce URL base HTTP(S) válidas sin credenciales, parámetros ni fragmentos.",
+  "sources_endpointSaveFailed": "No se pudieron guardar las direcciones. Inténtalo de nuevo."
 }

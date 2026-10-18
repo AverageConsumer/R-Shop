@@ -46,6 +46,8 @@ class RommPlatformMatcher {
     'intellivision': 67,
     'vectrex': 70,
     'msx': 27,
+    'xbox': 11,
+    'xbox360': 12,
     'amstradcpc': 25,
     'channelf': 127,
     'odyssey2': 133,

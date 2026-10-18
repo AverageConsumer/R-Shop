@@ -30,7 +30,7 @@ void main() {
 
   group('ScanConsoleTile', () {
     testWidgets('pending state shows low opacity and no indicators', (tester) async {
-      await tester.pumpWidget(buildTile(scanState: ScanTileState.pending));
+      await tester.pumpWidget(buildTile());
 
       // System name is rendered
       expect(find.text(testSystem.name), findsOneWidget);
@@ -67,7 +67,6 @@ void main() {
     testWidgets('complete state with 0 games hides badge', (tester) async {
       await tester.pumpWidget(buildTile(
         scanState: ScanTileState.complete,
-        gameCount: 0,
       ));
 
       // Badge only shown when gameCount > 0

@@ -29,6 +29,8 @@ class ConfigModeScreen extends ConsumerStatefulWidget {
 class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen>
     with ConsoleScreenMixin {
   bool _initialized = false;
+  bool _saving = false;
+  bool _allowPop = false;
   final FocusNode _firstListNode = FocusNode();
   final FocusNode _firstDetailNode = FocusNode();
 
@@ -57,7 +59,8 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen>
     if (configAsync case AsyncData(value: final config)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          ref.read(onboardingControllerProvider.notifier)
+          ref
+              .read(onboardingControllerProvider.notifier)
               .loadFromConfig(config);
           // Focus the first system card after config is loaded and the
           // list has been built.
@@ -72,9 +75,10 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen>
   }
 
   void _handleBack() {
+    if (_saving) return;
     final state = ref.read(onboardingControllerProvider);
     if (state.hasConsoleSelected) {
-      ref.read(onboardingControllerProvider.notifier).deselectConsole();
+      ref.read(onboardingControllerProvider.notifier).commitSelectedConsole();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _firstListNode.requestFocus();
       });
@@ -84,14 +88,26 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen>
   }
 
   Future<void> _saveAndGoBack() async {
-    final controller = ref.read(onboardingControllerProvider.notifier);
-    final config = await controller.buildFinalConfig();
-    final jsonString =
-        const JsonEncoder.withIndent('  ').convert(config.toJson());
-    await ref.read(configStorageServiceProvider).saveConfig(jsonString);
-    ref.invalidate(bootstrappedConfigProvider);
-    if (!mounted) return;
-    Navigator.pop(context);
+    _saving = true;
+    try {
+      final controller = ref.read(onboardingControllerProvider.notifier);
+      final config = await controller.buildFinalConfig();
+      final jsonString =
+          const JsonEncoder.withIndent('  ').convert(config.toJson());
+      await ref.read(configStorageServiceProvider).saveConfig(jsonString);
+      ref.invalidate(bootstrappedConfigProvider);
+      if (!mounted) return;
+      setState(() => _allowPop = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.pop(context);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _saving = false;
+      showErrorNotification(context, ref,
+          message:
+              L.of(context).onboarding_failedToSave(getUserFriendlyError(e)));
+    }
   }
 
   Future<void> _exportConfig() async {
@@ -154,55 +170,61 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen>
     final topPadding = rs.safeAreaTop + (rs.isSmall ? 56 : 72);
 
     return buildWithActions(
-      ScreenLayout(
-        backgroundColor: Colors.black,
-        accentColor: AppTheme.primaryColor,
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1A1A1A), Colors.black],
+      PopScope(
+        canPop: _allowPop,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) _handleBack();
+        },
+        child: ScreenLayout(
+          backgroundColor: Colors.black,
+          accentColor: AppTheme.primaryColor,
+          body: Stack(
+            children: [
+              Positioned.fill(
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF1A1A1A), Colors.black],
+                    ),
                   ),
                 ),
               ),
-            ),
-            Column(
-              children: [
-                SizedBox(height: topPadding),
-                Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: state.hasConsoleSelected
-                        ? SystemDetailView(
-                            key: ValueKey(
-                                'detail_${state.selectedConsoleId}'),
-                            firstFocusNode: _firstDetailNode,
-                          )
-                        : _SystemList(
-                            key: const ValueKey('system_list'),
-                            systems: state.configuredSystems,
-                            firstFocusNode: _firstListNode,
-                            onSelect: _selectSystem,
-                          ),
+              Column(
+                children: [
+                  SizedBox(height: topPadding),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: state.hasConsoleSelected
+                          ? SystemDetailView(
+                              key:
+                                  ValueKey('detail_${state.selectedConsoleId}'),
+                              firstFocusNode: _firstDetailNode,
+                            )
+                          : _SystemList(
+                              key: const ValueKey('system_list'),
+                              systems: state.configuredSystems,
+                              firstFocusNode: _firstListNode,
+                              onSelect: _selectSystem,
+                            ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            _buildHeader(rs, state, l),
-            ConsoleHud(
-              b: HudAction(l.common_back, onTap: _handleBack),
-              start: state.hasConsoleSelected
-                  ? null
-                  : HudAction(l.configMode_export, onTap: _exportConfig),
-              select: state.hasConsoleSelected
-                  ? null
-                  : HudAction(l.configMode_import, onTap: _importConfig),
-            ),
-          ],
+                ],
+              ),
+              _buildHeader(rs, state, l),
+              ConsoleHud(
+                b: HudAction(l.common_back, onTap: _handleBack),
+                start: state.hasConsoleSelected
+                    ? null
+                    : HudAction(l.configMode_export, onTap: _exportConfig),
+                select: state.hasConsoleSelected
+                    ? null
+                    : HudAction(l.configMode_import, onTap: _importConfig),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -210,9 +232,8 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen>
 
   Widget _buildHeader(Responsive rs, OnboardingState state, L l) {
     final system = state.selectedSystem;
-    final title = system != null
-        ? system.name.toUpperCase()
-        : l.configMode_title;
+    final title =
+        system != null ? system.name.toUpperCase() : l.configMode_title;
 
     return Positioned(
       top: 0,
@@ -244,9 +265,8 @@ class _ConfigModeScreenState extends ConsumerState<ConfigModeScreen>
               style: TextStyle(
                 fontSize: rs.isSmall ? 18 : 22,
                 fontWeight: FontWeight.w900,
-                color: system != null
-                    ? system.accentColor.forText
-                    : Colors.white,
+                color:
+                    system != null ? system.accentColor.forText : Colors.white,
                 letterSpacing: 4,
               ),
             ),
@@ -273,14 +293,12 @@ class _SystemList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l = L.of(context);
     final rs = context.rs;
-    final allSystems = SystemModel.supportedSystems;
+    const allSystems = SystemModel.supportedSystems;
     // Show configured systems first, then unconfigured ones.
-    final configured = allSystems
-        .where((s) => systems.containsKey(s.id))
-        .toList();
-    final unconfigured = allSystems
-        .where((s) => !systems.containsKey(s.id))
-        .toList();
+    final configured =
+        allSystems.where((s) => systems.containsKey(s.id)).toList();
+    final unconfigured =
+        allSystems.where((s) => !systems.containsKey(s.id)).toList();
     final sorted = [...configured, ...unconfigured];
 
     return Center(
@@ -307,8 +325,8 @@ class _SystemList extends ConsumerWidget {
                 focusScale: 1.0,
                 focusBorderColor: accent,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1C1C1C),
                     borderRadius: BorderRadius.circular(12),
@@ -354,7 +372,9 @@ class _SystemList extends ConsumerWidget {
                             const SizedBox(height: 2),
                             Text(
                               isConfigured
-                                  ? config.targetFolder.isEmpty ? l.configMode_noFolderSet : config.targetFolder
+                                  ? config.targetFolder.isEmpty
+                                      ? l.configMode_noFolderSet
+                                      : config.targetFolder
                                   : l.configMode_notConfigured,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -368,11 +388,9 @@ class _SystemList extends ConsumerWidget {
                       ),
                       if (isConfigured)
                         Icon(Icons.check_circle,
-                            color: accent.forIcon,
-                            size: 18),
+                            color: accent.forIcon, size: 18),
                       const SizedBox(width: 8),
-                      const Icon(Icons.chevron_right,
-                          color: Colors.white30),
+                      const Icon(Icons.chevron_right, color: Colors.white30),
                     ],
                   ),
                 ),
