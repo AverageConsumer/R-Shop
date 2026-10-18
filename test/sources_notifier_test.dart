@@ -557,4 +557,27 @@ void main() {
       expect(reloaded.state.sources.map((s) => s.id), ['b', 'c']);
     });
   });
+
+  group('SourcesNotifier — ensureSystemsForSource', () {
+    test('creates missing systems with autoExtract off', () async {
+      final storage = _storageInTempDir();
+      final notifier = SourcesNotifier(storage);
+      await notifier.ready;
+      final source = _romm(platforms: const {'snes': 4, 'xbox': 11});
+      await notifier.addSource(source);
+
+      final created = await notifier.ensureSystemsForSource(
+        source,
+        basePath: '/roms',
+      );
+      expect(created.ids, containsAll(['snes', 'xbox']));
+
+      final systems = {
+        for (final s in notifier.debugCachedConfig.systems) s.id: s,
+      };
+      expect(systems['snes']!.autoExtract, isFalse);
+      expect(systems['xbox']!.autoExtract, isFalse);
+      expect(systems['xbox']!.targetFolder, '/roms/xbox');
+    });
+  });
 }

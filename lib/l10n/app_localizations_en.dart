@@ -1620,4 +1620,25 @@ class LEn extends L {
   String service_queuedCount(int count) {
     return '$count queued';
   }
+
+  @override
+  String get sources_endpoints => 'Connection addresses';
+
+  @override
+  String get sources_primaryAddress => 'Primary address';
+
+  @override
+  String get sources_alternativeAddresses => 'Alternative addresses';
+
+  @override
+  String get sources_endpointHint =>
+      'Enter one alternative base URL per line, in priority order. Use addresses of the same server and library; the same login is used. The primary address is tried first on each sync. Leave empty to disable failover.';
+
+  @override
+  String get sources_endpointInvalid =>
+      'Enter valid HTTP(S) base URLs without embedded login details, query parameters or fragments.';
+
+  @override
+  String get sources_endpointSaveFailed =>
+      'Could not save connection addresses. Please try again.';
 }

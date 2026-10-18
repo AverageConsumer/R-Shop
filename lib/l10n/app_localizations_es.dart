@@ -1630,4 +1630,25 @@ class LEs extends L {
   String service_queuedCount(int count) {
     return '$count en cola';
   }
+
+  @override
+  String get sources_endpoints => 'Direcciones de conexión';
+
+  @override
+  String get sources_primaryAddress => 'Dirección principal';
+
+  @override
+  String get sources_alternativeAddresses => 'Direcciones alternativas';
+
+  @override
+  String get sources_endpointHint =>
+      'Introduce una URL base alternativa por línea, por orden de prioridad. Usa direcciones del mismo servidor y biblioteca, con las mismas credenciales. Cada sincronización intenta primero la dirección principal. Déjalo vacío para desactivar el cambio automático.';
+
+  @override
+  String get sources_endpointInvalid =>
+      'Introduce URL base HTTP(S) válidas sin credenciales, parámetros ni fragmentos.';
+
+  @override
+  String get sources_endpointSaveFailed =>
+      'No se pudieron guardar las direcciones. Inténtalo de nuevo.';
 }

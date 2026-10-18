@@ -11,6 +11,7 @@ import 'app_localizations_es.dart';
 import 'app_localizations_fr.dart';
 import 'app_localizations_ja.dart';
 import 'app_localizations_pt.dart';
+import 'app_localizations_zh.dart';
 
 // ignore_for_file: type=lint
 
@@ -102,7 +103,8 @@ abstract class L {
     Locale('es'),
     Locale('fr'),
     Locale('ja'),
-    Locale('pt')
+    Locale('pt'),
+    Locale('zh')
   ];
 
   /// No description provided for @appTitle.
@@ -3056,6 +3058,42 @@ abstract class L {
   /// In en, this message translates to:
   /// **'{count} queued'**
   String service_queuedCount(int count);
+
+  /// No description provided for @sources_endpoints.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection addresses'**
+  String get sources_endpoints;
+
+  /// No description provided for @sources_primaryAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Primary address'**
+  String get sources_primaryAddress;
+
+  /// No description provided for @sources_alternativeAddresses.
+  ///
+  /// In en, this message translates to:
+  /// **'Alternative addresses'**
+  String get sources_alternativeAddresses;
+
+  /// No description provided for @sources_endpointHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter one alternative base URL per line, in priority order. Use addresses of the same server and library; the same login is used. The primary address is tried first on each sync. Leave empty to disable failover.'**
+  String get sources_endpointHint;
+
+  /// No description provided for @sources_endpointInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter valid HTTP(S) base URLs without embedded login details, query parameters or fragments.'**
+  String get sources_endpointInvalid;
+
+  /// No description provided for @sources_endpointSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save connection addresses. Please try again.'**
+  String get sources_endpointSaveFailed;
 }
 
 class _LDelegate extends LocalizationsDelegate<L> {
@@ -3073,7 +3111,8 @@ class _LDelegate extends LocalizationsDelegate<L> {
         'es',
         'fr',
         'ja',
-        'pt'
+        'pt',
+        'zh'
       ].contains(locale.languageCode);
 
   @override
@@ -3095,6 +3134,8 @@ L lookupL(Locale locale) {
       return LJa();
     case 'pt':
       return LPt();
+    case 'zh':
+      return LZh();
   }
 
   throw FlutterError(

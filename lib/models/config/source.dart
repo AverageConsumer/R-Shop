@@ -99,6 +99,10 @@ class Source {
 
   // --- Connection ---
   final String? url; // romm/web
+
+  /// Ordered alternative base URLs for the same HTTP server/library. These are
+  /// connection routes, never additional content sources. Credentials are shared.
+  final List<String> fallbackUrls;
   final String? host; // smb/ftp
   final int? port; // smb/ftp
   final String? share; // smb
@@ -145,6 +149,7 @@ class Source {
     required this.name,
     required this.type,
     this.url,
+    this.fallbackUrls = const [],
     this.host,
     this.port,
     this.share,
@@ -171,6 +176,8 @@ class Source {
               .asNameMap()[json['type'] as String? ?? 'romm'] ??
           SourceType.romm,
       url: json['url'] as String?,
+      fallbackUrls: (json['fallback_urls'] as List<dynamic>?)
+          ?.cast<String>().toList() ?? const [],
       host: json['host'] as String?,
       port: json['port'] as int?,
       share: json['share'] as String?,
@@ -195,6 +202,7 @@ class Source {
       'name': name,
       'type': type.name,
       if (url != null) 'url': url,
+      if (fallbackUrls.isNotEmpty) 'fallback_urls': fallbackUrls,
       if (host != null) 'host': host,
       if (port != null) 'port': port,
       if (share != null) 'share': share,
@@ -280,6 +288,7 @@ class Source {
     String? name,
     SourceType? type,
     String? url,
+    List<String>? fallbackUrls,
     String? host,
     int? port,
     String? share,
@@ -297,6 +306,7 @@ class Source {
       name: name ?? this.name,
       type: type ?? this.type,
       url: url ?? this.url,
+      fallbackUrls: fallbackUrls ?? this.fallbackUrls,
       host: host ?? this.host,
       port: port ?? this.port,
       share: share ?? this.share,

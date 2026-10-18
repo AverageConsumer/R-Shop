@@ -1,8 +1,35 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:retro_eshop/models/config/app_config.dart';
+import 'package:retro_eshop/models/config/provider_config.dart';
+import 'package:retro_eshop/models/config/source.dart';
+import 'package:retro_eshop/models/config/system_config.dart';
 import 'package:retro_eshop/services/config_storage_service.dart';
+
+class _SaveFilePicker extends FilePicker {
+  String? destination;
+  String? suggestedName;
+  Uint8List? contents;
+
+  @override
+  Future<String?> saveFile({
+    String? dialogTitle,
+    String? fileName,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Uint8List? bytes,
+    bool lockParentWindow = false,
+  }) async {
+    suggestedName = fileName;
+    contents = bytes;
+    return destination;
+  }
+}
 
 /// Minimal valid JSON that ConfigParser.parse() accepts.
 String _validConfigJson({String systemId = 'snes', String name = 'SNES'}) {
@@ -14,7 +41,11 @@ String _validConfigJson({String systemId = 'snes', String name = 'SNES'}) {
         'name': name,
         'target_folder': '/roms/$systemId',
         'providers': [
-          {'type': 'web', 'priority': 1, 'url': 'http://example.com/$systemId/'},
+          {
+            'type': 'web',
+            'priority': 1,
+            'url': 'http://example.com/$systemId/'
+          },
         ],
       },
     ],
@@ -35,6 +66,63 @@ void main() {
   });
 
   // ─── saveConfig ────────────────────────────────────────
+
+  group('exportConfig', () {
+    late _SaveFilePicker picker;
+
+    setUp(() {
+      picker = _SaveFilePicker();
+      FilePicker.platform = picker;
+    });
+
+    test('save dialog receives JSON with provider and source auth removed',
+        () async {
+      const auth = AuthConfig(user: 'test-user', pass: 'secret');
+      const config = AppConfig(
+        systems: [
+          SystemConfig(
+            id: 'snes',
+            name: 'SNES',
+            targetFolder: '/roms/snes',
+            autoExtract: true,
+            autoSync: false,
+            providers: [
+              ProviderConfig(
+                  type: ProviderType.web,
+                  priority: 1,
+                  url: 'https://example.com',
+                  auth: auth)
+            ],
+          ),
+        ],
+        sources: [
+          Source(
+              id: 'server',
+              name: 'Server',
+              type: SourceType.web,
+              url: 'https://example.com',
+              auth: auth)
+        ],
+      );
+      picker.destination = '${tempDir.path}/export.json';
+      await service.exportConfig(config);
+      final json = utf8.decode(picker.contents!);
+      expect(picker.suggestedName, 'r_shop_config.json');
+      expect(json, isNot(contains('secret')));
+      expect(json, isNot(contains('test-user')));
+      final restored =
+          AppConfig.fromJson(jsonDecode(json) as Map<String, dynamic>);
+      expect(restored.systems.single.autoExtract, isTrue);
+      expect(restored.systems.single.autoSync, isFalse);
+      expect(restored.sources.single.auth, isNull);
+      expect(File(picker.destination!).readAsStringSync(), json);
+    });
+
+    test('cancelling the save dialog writes no file', () async {
+      await service.exportConfig(AppConfig.empty);
+      expect(tempDir.listSync(), isEmpty);
+    });
+  });
 
   group('saveConfig', () {
     test('creates config.json on disk', () async {

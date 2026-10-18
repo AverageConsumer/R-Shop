@@ -658,9 +658,9 @@ class DownloadQueueManager extends ChangeNotifier {
     if (systemConfig == null) return item;
 
     final match = pc.findMatchIn(systemConfig.providers);
-    if (match?.auth == null) return item;
+    if (match == null) return item;
 
-    final rehydrated = pc.copyWith(auth: match!.auth);
+    final rehydrated = pc.copyWith(auth: match.auth, fallbackUrls: match.fallbackUrls);
     final updatedGame = item.game.copyWith(providerConfig: rehydrated);
     return item.copyWith(game: updatedGame);
   }

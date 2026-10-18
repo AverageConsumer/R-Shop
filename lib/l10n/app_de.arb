@@ -529,5 +529,11 @@
   "service_downloadComplete": "Downloads abgeschlossen",
   "service_downloading": "Laden: {details}",
   "service_activeCount": "{count} aktiv",
-  "service_queuedCount": "{count} in Warteschlange"
+  "service_queuedCount": "{count} in Warteschlange",
+  "sources_endpoints": "Verbindungsadressen",
+  "sources_primaryAddress": "Primäre Adresse",
+  "sources_alternativeAddresses": "Alternative Adressen",
+  "sources_endpointHint": "Eine alternative Basis-URL pro Zeile, nach Priorität. Verwende Adressen desselben Servers und derselben Bibliothek; die Anmeldung bleibt gleich. Bei jedem Sync wird zuerst die primäre Adresse versucht. Leer lassen, um Failover auszuschalten.",
+  "sources_endpointInvalid": "Gültige HTTP(S)-Basis-URLs ohne eingebettete Zugangsdaten, Abfrageparameter oder Fragmente eingeben.",
+  "sources_endpointSaveFailed": "Verbindungsadressen konnten nicht gespeichert werden. Bitte erneut versuchen."
 }

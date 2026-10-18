@@ -529,5 +529,11 @@
   "service_downloadComplete": "\u30c0\u30a6\u30f3\u30ed\u30fc\u30c9\u5b8c\u4e86",
   "service_downloading": "\u30c0\u30a6\u30f3\u30ed\u30fc\u30c9\u4e2d: {details}",
   "service_activeCount": "{count}\u4ef6\u30a2\u30af\u30c6\u30a3\u30d6",
-  "service_queuedCount": "{count}\u4ef6\u30ad\u30e5\u30fc\u4e2d"
+  "service_queuedCount": "{count}\u4ef6\u30ad\u30e5\u30fc\u4e2d",
+  "sources_endpoints": "接続先アドレス",
+  "sources_primaryAddress": "優先アドレス",
+  "sources_alternativeAddresses": "代替アドレス",
+  "sources_endpointHint": "優先順に代替ベースURLを1行ずつ入力してください。同じサーバーとライブラリのアドレスを指定します。認証情報は共通です。同期時は優先アドレスから接続します。空欄で自動切り替えを無効にします。",
+  "sources_endpointInvalid": "認証情報、クエリ、フラグメントを含まない有効なHTTP(S)ベースURLを入力してください。",
+  "sources_endpointSaveFailed": "接続先を保存できませんでした。もう一度お試しください。"
 }

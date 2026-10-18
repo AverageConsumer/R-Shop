@@ -73,6 +73,20 @@ void main() {
       expect(result, isNotNull);
     });
 
+    test('IGDB ID fallback for xbox', () {
+      final platforms = [_platform(slug: 'microsoft-xbox', igdbId: 11)];
+      final result = RommPlatformMatcher.findMatch('xbox', platforms);
+      expect(result, isNotNull);
+      expect(result!.igdbId, 11);
+    });
+
+    test('IGDB ID fallback for xbox360', () {
+      final platforms = [_platform(slug: 'xbox-360', igdbId: 12)];
+      final result = RommPlatformMatcher.findMatch('xbox360', platforms);
+      expect(result, isNotNull);
+      expect(result!.igdbId, 12);
+    });
+
     test('no match returns null', () {
       final platforms = [_platform(slug: 'snes', igdbId: 19)];
       final result = RommPlatformMatcher.findMatch('atari2600', platforms);
@@ -86,6 +100,16 @@ void main() {
   });
 
   group('buildKnownPlatforms', () {
+    test('maps Neo Geo MVS independently of generic Arcade', () {
+      final platforms = [
+        _platform(slug: 'arcade', igdbId: 52),
+        _platform(slug: 'neogeomvs'),
+      ];
+      expect(RommPlatformMatcher.findMatch('neogeomvs', platforms)!.slug,
+          'neogeomvs');
+      expect(
+          RommPlatformMatcher.findMatch('arcade', platforms)!.slug, 'arcade');
+    });
     RommPlatform p({
       required int id,
       required String slug,

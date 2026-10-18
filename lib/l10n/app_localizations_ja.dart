@@ -1584,4 +1584,24 @@ class LJa extends L {
   String service_queuedCount(int count) {
     return '$count件キュー中';
   }
+
+  @override
+  String get sources_endpoints => '接続先アドレス';
+
+  @override
+  String get sources_primaryAddress => '優先アドレス';
+
+  @override
+  String get sources_alternativeAddresses => '代替アドレス';
+
+  @override
+  String get sources_endpointHint =>
+      '優先順に代替ベースURLを1行ずつ入力してください。同じサーバーとライブラリのアドレスを指定します。認証情報は共通です。同期時は優先アドレスから接続します。空欄で自動切り替えを無効にします。';
+
+  @override
+  String get sources_endpointInvalid =>
+      '認証情報、クエリ、フラグメントを含まない有効なHTTP(S)ベースURLを入力してください。';
+
+  @override
+  String get sources_endpointSaveFailed => '接続先を保存できませんでした。もう一度お試しください。';
 }

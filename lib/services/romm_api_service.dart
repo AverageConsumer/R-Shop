@@ -7,6 +7,7 @@ import '../models/config/provider_config.dart';
 import '../utils/friendly_error.dart';
 import '../utils/network_constants.dart';
 import 'source_provider.dart';
+import 'http_endpoint_failover.dart';
 
 class RommPlatform {
   final int id;
@@ -276,13 +277,17 @@ class RommRom {
 class RommApiService {
   static const _maxPaginationItems = 20000;
   final Dio _dio;
+  final bool _fallbackEnabled;
 
-  RommApiService({Dio? dio})
-      : _dio = dio ??
+  RommApiService({Dio? dio, String? primaryUrl, List<String> fallbackUrls = const []})
+      : _fallbackEnabled = primaryUrl != null && fallbackUrls.isNotEmpty,
+        _dio = dio ??
             Dio(BaseOptions(
               connectTimeout: NetworkTimeouts.apiConnect,
               receiveTimeout: NetworkTimeouts.apiReceive,
-            ));
+            )) {
+    installEndpointFailover(_dio, primaryUrl, fallbackUrls, rejectHtml: true);
+  }
 
   Options? _buildAuthOptions(AuthConfig? auth) {
     if (auth == null) return null;
@@ -407,19 +412,26 @@ class RommApiService {
     }
   }
 
+  String effectiveUrl(String url) {
+    if (!_fallbackEnabled) return url;
+    final adapter = _dio.httpClientAdapter;
+    return adapter is HttpEndpointFailover
+        ? adapter.routes.rebase(url, adapter.preferredBase) ?? url : url;
+  }
+
   String buildRomDownloadUrl(String baseUrl, RommRom rom) {
-    final base = _normalizeBaseUrl(baseUrl);
+    final base = effectiveUrl(_normalizeBaseUrl(baseUrl));
     final encodedFileName = Uri.encodeComponent(rom.fileName);
     return '$base/api/roms/${rom.id}/content/$encodedFileName';
   }
 
   String? buildCoverUrl(String baseUrl, RommRom rom) {
-    final base = _normalizeBaseUrl(baseUrl);
+    final base = effectiveUrl(_normalizeBaseUrl(baseUrl));
 
     // 1. External CDN URL (fastest)
     final cover = rom.urlCover;
     if (cover != null && cover.isNotEmpty) {
-      if (cover.toLowerCase().startsWith('http')) return cover;
+      if (cover.toLowerCase().startsWith('http')) return effectiveUrl(cover);
       return '$base$cover';
     }
 
@@ -433,7 +445,7 @@ class RommApiService {
     // 3. First screenshot as fallback cover
     if (rom.mergedScreenshots.isNotEmpty) {
       final screenshot = rom.mergedScreenshots.first;
-      if (screenshot.toLowerCase().startsWith('http')) return screenshot;
+      if (screenshot.toLowerCase().startsWith('http')) return effectiveUrl(screenshot);
       return '$base$screenshot';
     }
 

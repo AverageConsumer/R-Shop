@@ -1631,4 +1631,25 @@ class LDe extends L {
   String service_queuedCount(int count) {
     return '$count in Warteschlange';
   }
+
+  @override
+  String get sources_endpoints => 'Verbindungsadressen';
+
+  @override
+  String get sources_primaryAddress => 'Primäre Adresse';
+
+  @override
+  String get sources_alternativeAddresses => 'Alternative Adressen';
+
+  @override
+  String get sources_endpointHint =>
+      'Eine alternative Basis-URL pro Zeile, nach Priorität. Verwende Adressen desselben Servers und derselben Bibliothek; die Anmeldung bleibt gleich. Bei jedem Sync wird zuerst die primäre Adresse versucht. Leer lassen, um Failover auszuschalten.';
+
+  @override
+  String get sources_endpointInvalid =>
+      'Gültige HTTP(S)-Basis-URLs ohne eingebettete Zugangsdaten, Abfrageparameter oder Fragmente eingeben.';
+
+  @override
+  String get sources_endpointSaveFailed =>
+      'Verbindungsadressen konnten nicht gespeichert werden. Bitte erneut versuchen.';
 }

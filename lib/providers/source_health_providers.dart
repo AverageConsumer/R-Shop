@@ -81,12 +81,12 @@ class SourceHealthNotifier extends StateNotifier<SourceHealthState> {
     }
     state = state.copyWith(statuses: checking);
 
-    final api = RommApiService();
     final allSystemIds = SystemModel.supportedSystems.map((s) => s.id);
 
     final results = await Future.wait(
       rommSources.map((s) async {
         try {
+          final api = RommApiService(primaryUrl: s.url, fallbackUrls: s.fallbackUrls);
           final platforms =
               await api.fetchPlatforms(s.url!, auth: s.auth);
           final known = RommPlatformMatcher.buildKnownPlatforms(

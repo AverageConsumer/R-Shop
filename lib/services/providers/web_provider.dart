@@ -10,6 +10,7 @@ import '../../models/config/system_config.dart';
 import '../../models/game_item.dart';
 import '../../models/system_model.dart';
 import '../download_handle.dart';
+import '../http_endpoint_failover.dart';
 import '../source_provider.dart';
 
 class WebProvider implements SourceProvider {
@@ -26,7 +27,9 @@ class WebProvider implements SourceProvider {
             Dio(BaseOptions(
               connectTimeout: NetworkTimeouts.apiConnect,
               receiveTimeout: NetworkTimeouts.apiReceive,
-            ));
+            )) {
+    installEndpointFailover(_dio, config.url, config.fallbackUrls);
+  }
 
   String get _baseUrl {
     final url = config.url;
@@ -94,6 +97,7 @@ class WebProvider implements SourceProvider {
       response = await _dio.get<String>(normalizedUrl, options: _authOptions);
     } catch (e) {
       debugPrint('WebProvider: failed to fetch $normalizedUrl: $e');
+      if (depth == 0 && config.fallbackUrls.isNotEmpty) rethrow;
       return;
     }
 
@@ -185,8 +189,11 @@ class WebProvider implements SourceProvider {
 
   @override
   Future<DownloadHandle> resolveDownload(GameItem game) async {
+    final routes = config.fallbackUrls.isEmpty ? <String>[]
+        : HttpEndpointRoutes(_baseUrl, config.fallbackUrls).urlsFor(game.url);
     return HttpDownloadHandle(
-      url: game.url,
+      url: routes.isEmpty ? game.url : routes.first,
+      fallbackUrls: routes.skip(1).toList(),
       headers: _authHeaders.isNotEmpty ? _authHeaders : null,
     );
   }

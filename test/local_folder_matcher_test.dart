@@ -71,9 +71,38 @@ void main() {
     });
 
     test('alias: SuperFamicom → snes', () {
-      final result = LocalFolderMatcher.matchFolder(
-          'SuperFamicom', _allSystems, const []);
+      final result =
+          LocalFolderMatcher.matchFolder('SuperFamicom', _allSystems, const []);
       expect(result, 'snes');
+    });
+
+    test('alias: originalxbox → xbox', () {
+      final result =
+          LocalFolderMatcher.matchFolder('OriginalXbox', _allSystems, const []);
+      expect(result, 'xbox');
+    });
+
+    test('alias: x360 → xbox360', () {
+      final result =
+          LocalFolderMatcher.matchFolder('x360', _allSystems, const []);
+      expect(result, 'xbox360');
+    });
+
+    test('Neo Geo MVS folders stay separate from generic Arcade', () {
+      for (final name in ['neogeomvs', 'Neo Geo MVS', 'mvs']) {
+        expect(LocalFolderMatcher.matchFolder(name, _allSystems, const []),
+            'neogeomvs');
+      }
+      expect(LocalFolderMatcher.matchFolder('mame', _allSystems, const []),
+          'arcade');
+      expect(LocalFolderMatcher.matchFolder('fbneo', _allSystems, const []),
+          'arcade');
+    });
+
+    test('exact match on xbox360 system.id', () {
+      final result =
+          LocalFolderMatcher.matchFolder('xbox360', _allSystems, const []);
+      expect(result, 'xbox360');
     });
 
     test('alias: sfc → snes', () {
@@ -180,16 +209,14 @@ void main() {
     });
 
     test('empty folder name returns null', () {
-      final result =
-          LocalFolderMatcher.matchFolder('', _allSystems, const []);
+      final result = LocalFolderMatcher.matchFolder('', _allSystems, const []);
       expect(result, isNull);
     });
 
     test('works with subset of systems', () {
       final subset = _allSystems.where((s) => s.id == 'nes').toList();
       // 'snes' shouldn't match if only nes is in the list
-      final result =
-          LocalFolderMatcher.matchFolder('snes', subset, const []);
+      final result = LocalFolderMatcher.matchFolder('snes', subset, const []);
       expect(result, isNull);
     });
 

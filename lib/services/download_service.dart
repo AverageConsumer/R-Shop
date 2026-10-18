@@ -12,9 +12,15 @@ import '../utils/file_utils.dart';
 import '../utils/friendly_error.dart';
 import '../utils/network_constants.dart';
 import 'download_handle.dart';
+import 'http_endpoint_failover.dart';
 import 'native_smb_service.dart';
 import 'provider_factory.dart';
 import 'rom_manager.dart';
+
+class _HttpDownloadStatusException extends HttpException {
+  _HttpDownloadStatusException(this.statusCode) : super('Server returned status $statusCode');
+  final int statusCode;
+}
 
 class DownloadProgress {
   final DownloadStatus status;
@@ -298,7 +304,7 @@ class DownloadService {
 
       switch (handle) {
         case HttpDownloadHandle():
-          await _downloadHttp(handle, tempFile);
+          await _downloadHttpWithFailover(handle, tempFile);
         case NativeSmbDownloadHandle():
           await _downloadNativeSmb(handle, tempFile);
         case FtpDownloadHandle():
@@ -331,14 +337,37 @@ class DownloadService {
     }
   }
 
+  Future<void> _downloadHttpWithFailover(HttpDownloadHandle handle, File tempFile) async {
+    final urls = {handle.url, ...handle.fallbackUrls}.toList();
+    for (var i = 0; i < urls.length; i++) {
+      if (_isCancelled) return;
+      try {
+        await _downloadHttp(HttpDownloadHandle(url: urls[i], headers: handle.headers),
+            tempFile, quickConnect: urls.length > 1);
+        return;
+      } catch (e) {
+        final retry = e is _HttpDownloadStatusException
+            ? e.statusCode >= 500 && e.statusCode <= 599
+            : e is SocketException || e is HttpException || e is TimeoutException;
+        if (_isCancelled || !retry || i == urls.length - 1) rethrow;
+        _httpClient?.close(force: true);
+        await _downloadSubscription?.cancel();
+        // A different endpoint must never append to an unverified partial file.
+        await tempFile.writeAsBytes(const []);
+        _resolvedFilename = null;
+      }
+    }
+  }
+
   Future<void> _downloadHttp(
     HttpDownloadHandle handle,
     File tempFile, {
     int depth = 0,
+    bool quickConnect = false,
   }) async {
     _httpClient?.close(force: true);
     _httpClient = HttpClient()
-      ..connectionTimeout = NetworkTimeouts.httpConnect
+      ..connectionTimeout = quickConnect ? HttpEndpointFailover.connectTimeout : NetworkTimeouts.httpConnect
       ..idleTimeout = NetworkTimeouts.httpIdle;
 
     final client = _httpClient;
@@ -371,7 +400,9 @@ class DownloadService {
       }
     }
 
-    final response = await request.close();
+    final response = quickConnect
+        ? await request.close().timeout(const Duration(seconds: 15))
+        : await request.close();
 
     // Parse Content-Disposition header for actual filename (e.g. RomM zips Switch games)
     final disposition = response.headers.value('content-disposition');
@@ -404,8 +435,12 @@ class DownloadService {
         debugPrint('DownloadService: server returned 200, restarting download');
       }
     } else {
-      await response.drain<void>();
-      throw Exception('Server returned status ${response.statusCode}');
+      if (quickConnect) {
+        await response.listen(null).cancel();
+      } else {
+        await response.drain<void>();
+      }
+      throw _HttpDownloadStatusException(response.statusCode);
     }
 
     // Safety check: existing bytes exceed expected total
@@ -417,7 +452,7 @@ class DownloadService {
       debugPrint('DownloadService: temp file already complete or oversized, restarting');
       await tempFile.delete();
       // Recurse once with fresh state
-      return _downloadHttp(handle, tempFile, depth: depth + 1);
+      return _downloadHttp(handle, tempFile, depth: depth + 1, quickConnect: quickConnect);
     }
 
     final effectiveTotalBytes = totalBytes > 0 ? totalBytes : null;
@@ -431,13 +466,16 @@ class DownloadService {
 
     // Inactivity detection: timestamp + periodic check (avoids Timer churn per chunk)
     int lastDataTick = 0;
-    final inactivityCheck = Timer.periodic(const Duration(seconds: 10), (_) {
+    final inactivityCheck = Timer.periodic(const Duration(seconds: 10), (timer) async {
       if (stopwatch.elapsedMilliseconds - lastDataTick > 60000) {
         if (!completer.isCompleted) {
-          _downloadSubscription?.cancel();
-          sink.close().catchError((e) { debugPrint('DownloadService: sink close on stall: $e'); });
-          completer.completeError(
-              Exception('Download stalled — no data received for 60 seconds'));
+          timer.cancel();
+          await _downloadSubscription?.cancel();
+          try { await sink.close(); } catch (e) { debugPrint('DownloadService: sink close on stall: $e'); }
+          if (!completer.isCompleted) {
+            completer.completeError(
+                TimeoutException('Download stalled — no data received for 60 seconds'));
+          }
         }
       }
     });

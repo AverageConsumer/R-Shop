@@ -1632,4 +1632,25 @@ class LFr extends L {
   String service_queuedCount(int count) {
     return '$count en attente';
   }
+
+  @override
+  String get sources_endpoints => 'Adresses de connexion';
+
+  @override
+  String get sources_primaryAddress => 'Adresse principale';
+
+  @override
+  String get sources_alternativeAddresses => 'Adresses alternatives';
+
+  @override
+  String get sources_endpointHint =>
+      'Saisissez une URL de base alternative par ligne, par priorité. Utilisez le même serveur et la même bibliothèque avec les mêmes identifiants. Chaque synchronisation essaie d’abord l’adresse principale. Laissez vide pour désactiver le basculement.';
+
+  @override
+  String get sources_endpointInvalid =>
+      'Saisissez des URL HTTP(S) valides sans identifiants, paramètres ni fragments.';
+
+  @override
+  String get sources_endpointSaveFailed =>
+      'Impossible d’enregistrer les adresses. Réessayez.';
 }

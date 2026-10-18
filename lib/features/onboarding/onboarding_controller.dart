@@ -61,7 +61,6 @@ class OnboardingController extends StateNotifier<OnboardingState> {
           name: model.name,
           targetFolder: '$basePath/${folder.name}',
           providers: const [],
-          autoExtract: model.isZipped,
         );
       }
       state = state.copyWith(configuredSystems: updated);
@@ -93,7 +92,6 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         name: model.name,
         targetFolder: '$base/$systemId',
         providers: const [],
-        autoExtract: model.isZipped,
       );
     }
     state = state.copyWith(
@@ -127,7 +125,6 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         name: model.name,
         targetFolder: '$base/$systemId',
         providers: const [],
-        autoExtract: model.isZipped,
       );
     }
     state = state.copyWith(
@@ -188,13 +185,11 @@ class OnboardingController extends StateNotifier<OnboardingState> {
         providers: List.of(existing.providers),
       );
     } else {
-      subState = ConsoleSetupState(
-        autoExtract: system.isZipped,
-      );
+      subState = const ConsoleSetupState();
     }
 
     state = state.copyWith(
-      selectedConsoleId: id,
+      selectedConsoleId: system.id,
       consoleSubState: subState,
     );
   }
@@ -205,6 +200,18 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       clearConsoleSubState: true,
       clearProviderForm: true,
     );
+  }
+
+  /// Persists the in-progress console editor into [configuredSystems]
+  /// (when a target folder is set) and always leaves the editor.
+  ///
+  /// Settings → Edit Systems uses this on Back so auto-extract / auto-sync
+  /// / folder changes survive leaving a console tile.
+  void commitSelectedConsole() {
+    saveConsoleConfig();
+    if (state.selectedConsoleId != null) {
+      deselectConsole();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -626,6 +633,7 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       (s) => s.id == id,
     );
 
+    final existing = state.configuredSystems[id];
     final config = SystemConfig(
       id: id,
       name: system.name,
@@ -633,6 +641,8 @@ class OnboardingController extends StateNotifier<OnboardingState> {
       providers: sub.providers,
       autoExtract: sub.autoExtract,
       autoSync: sub.autoSync,
+      enabledSourceIds: existing?.enabledSourceIds,
+      manualMappings: existing?.manualMappings ?? const [],
     );
 
     final updated = Map<String, SystemConfig>.from(state.configuredSystems);

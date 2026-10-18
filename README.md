@@ -26,7 +26,7 @@ R-Shop is a controller-first game manager for Android handhelds and TVs. Connect
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.7.0-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.8.0-blue?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/platform-Android-brightgreen?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
   <img src="https://img.shields.io/github/stars/averageconsumer/R-Shop?style=flat-square&color=yellow" alt="GitHub stars" />
@@ -101,7 +101,7 @@ Merge games from multiple providers into a single clean library instead of juggl
 
 ## Supported systems
 
-R-Shop supports **66 systems** with icons, RetroAchievements integration, and automatic folder mapping.
+R-Shop supports **69 systems** with icons, RetroAchievements integration, and automatic folder mapping.
 
 Highlights include:
 - **Nintendo:** NES, SNES, N64, GameCube, Wii, Wii U, Switch, GB, GBC, GBA, NDS, 3DS, DSi, Virtual Boy, FDS, Game & Watch
@@ -109,7 +109,8 @@ Highlights include:
 - **Sega:** Master System, Mega Drive, Game Gear, Sega CD, 32X, Saturn, Dreamcast, SG-1000
 - **Atari:** 2600, 5200, 7800, Lynx, Jaguar, Jaguar CD, ST
 - **NEC:** TurboGrafx-16, TurboGrafx-CD, PC-FX
-- **SNK:** Neo Geo Pocket, Neo Geo CD
+- **Microsoft:** Xbox, Xbox 360
+- **SNK:** Neo Geo MVS, Neo Geo Pocket, Neo Geo CD
 - **Others:** WonderSwan, ColecoVision, Intellivision, Vectrex, MSX, Amstrad CPC, Commodore 64, Amiga, ZX Spectrum, Arcade, DOS, and more
 
 ---

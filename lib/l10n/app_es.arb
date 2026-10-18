@@ -491,5 +491,11 @@
   "service_downloadComplete": "Descargas completas",
   "service_downloading": "Descargando: {details}",
   "service_activeCount": "{count} activas",
-  "service_queuedCount": "{count} en cola"
+  "service_queuedCount": "{count} en cola",
+  "sources_endpoints": "Direcciones de conexión",
+  "sources_primaryAddress": "Dirección principal",
+  "sources_alternativeAddresses": "Direcciones alternativas",
+  "sources_endpointHint": "Introduce una URL base alternativa por línea, por orden de prioridad. Usa direcciones del mismo servidor y biblioteca, con las mismas credenciales. Cada sincronización intenta primero la dirección principal. Déjalo vacío para desactivar el cambio automático.",
+  "sources_endpointInvalid": "Introduce URL base HTTP(S) válidas sin credenciales, parámetros ni fragmentos.",
+  "sources_endpointSaveFailed": "No se pudieron guardar las direcciones. Inténtalo de nuevo."
 }

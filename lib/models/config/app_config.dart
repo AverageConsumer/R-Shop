@@ -147,6 +147,7 @@ AppConfig _migrateLegacyToV3(List<SystemConfig> legacySystems) {
           name: _deriveName(provider),
           type: probe.type,
           url: provider.url,
+          fallbackUrls: provider.fallbackUrls,
           host: provider.host,
           port: provider.port,
           share: provider.share,

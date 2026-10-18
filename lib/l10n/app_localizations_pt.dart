@@ -1630,4 +1630,25 @@ class LPt extends L {
   String service_queuedCount(int count) {
     return '$count na fila';
   }
+
+  @override
+  String get sources_endpoints => 'Endereços de conexão';
+
+  @override
+  String get sources_primaryAddress => 'Endereço principal';
+
+  @override
+  String get sources_alternativeAddresses => 'Endereços alternativos';
+
+  @override
+  String get sources_endpointHint =>
+      'Insira uma URL base alternativa por linha, em ordem de prioridade. Use endereços do mesmo servidor e biblioteca, com as mesmas credenciais. Cada sincronização tenta primeiro o endereço principal. Deixe vazio para desativar a alternância.';
+
+  @override
+  String get sources_endpointInvalid =>
+      'Insira URLs base HTTP(S) válidas sem credenciais, parâmetros ou fragmentos.';
+
+  @override
+  String get sources_endpointSaveFailed =>
+      'Não foi possível salvar os endereços. Tente novamente.';
 }

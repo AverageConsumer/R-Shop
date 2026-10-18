@@ -3,6 +3,7 @@ import 'package:retro_eshop/features/onboarding/onboarding_controller.dart';
 import 'package:retro_eshop/models/config/app_config.dart';
 import 'package:retro_eshop/models/config/provider_config.dart';
 import 'package:retro_eshop/models/config/system_config.dart';
+import 'package:retro_eshop/models/config/source.dart';
 import 'package:retro_eshop/models/system_model.dart';
 import 'package:retro_eshop/services/config_storage_service.dart';
 import 'package:retro_eshop/services/romm_api_service.dart';
@@ -109,8 +110,9 @@ void main() {
       c.selectConsole('snes');
       expect(c.state.selectedConsoleId, 'snes');
       expect(c.state.consoleSubState, isNotNull);
-      // SNES is zipped, so autoExtract should be true
-      expect(c.state.consoleSubState!.autoExtract, true);
+      // Auto-extract stays off unless the user opts in — zipped libraries
+      // should not be unpacked by default.
+      expect(c.state.consoleSubState!.autoExtract, false);
       expect(c.state.consoleSubState!.providers, isEmpty);
     });
 
@@ -686,6 +688,60 @@ void main() {
       );
       c.saveConsoleConfig();
       expect(c.state.configuredSystems['nes']!.targetFolder, '/new/path');
+    });
+
+    test('commitSelectedConsole persists autoExtract then leaves the editor', () {
+      final c = _createController();
+      c
+        ..state = c.state.copyWith(
+          configuredSystems: {
+            'nes': _systemConfig('nes', autoExtract: true),
+          },
+        )
+        ..selectConsole('nes')
+        ..setAutoExtract(false)
+        ..commitSelectedConsole();
+      expect(c.state.configuredSystems['nes']!.autoExtract, false);
+      expect(c.state.selectedConsoleId, isNull);
+      expect(c.state.consoleSubState, isNull);
+    });
+
+    test('commitSelectedConsole deselects incomplete editor without saving', () {
+      final c = _createController()
+        ..selectConsole('xbox')
+        ..setAutoExtract(true)
+        ..commitSelectedConsole();
+      expect(c.state.configuredSystems.containsKey('xbox'), false);
+      expect(c.state.selectedConsoleId, isNull);
+    });
+
+    test('saveConsoleConfig keeps source mappings and allow-list', () {
+      final c = _createController();
+      const mapping = SystemSourceMapping(
+        sourceId: 'src-smb',
+        remotePath: '/games/nes',
+      );
+      const existing = SystemConfig(
+        id: 'nes',
+        name: 'Nintendo Entertainment System',
+        targetFolder: '/roms/nes',
+        providers: [],
+        autoExtract: true,
+        enabledSourceIds: ['src-smb'],
+        manualMappings: [mapping],
+      );
+      c
+        ..state = c.state.copyWith(
+          configuredSystems: {'nes': existing},
+        )
+        ..selectConsole('nes')
+        ..setAutoExtract(false)
+        ..saveConsoleConfig();
+      final saved = c.state.configuredSystems['nes']!;
+      expect(saved.autoExtract, false);
+      expect(saved.enabledSourceIds, ['src-smb']);
+      expect(saved.manualMappings.single.sourceId, 'src-smb');
+      expect(saved.manualMappings.single.remotePath, '/games/nes');
     });
 
     test('saveConsoleConfig without selectedConsoleId is no-op', () {
